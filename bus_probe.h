@@ -4,7 +4,11 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
-#define SAMPLE_BUFFER_SIZE 512
+
+#define SAMPLE_BUFFER_SIZE 2048
+
+// Burst-Ende nach 5ms ohne Flanke
+#define IDLE_TIMEOUT_US 5000
 
 
 struct Sample {
@@ -19,7 +23,8 @@ static volatile uint16_t sample_count = 0;
 static volatile bool capturing = false;
 static volatile bool capture_ready = false;
 
-static uint32_t capture_start_time = 0;
+static volatile uint32_t last_edge_time = 0;
+static volatile uint32_t start_time = 0;
 
 
 static uint8_t read_bus()
@@ -41,23 +46,29 @@ static uint8_t read_bus()
 
 static void IRAM_ATTR bus_isr(void *arg)
 {
+  uint32_t now = esp_timer_get_time();
+
+
   if (capture_ready)
     return;
 
-  uint32_t now = esp_timer_get_time();
 
   if (!capturing)
   {
     capturing = true;
     sample_count = 0;
-    capture_start_time = now;
+    start_time = now;
   }
+
+
+  last_edge_time = now;
 
 
   if (sample_count < SAMPLE_BUFFER_SIZE)
   {
-    samples[sample_count].dt = now - capture_start_time;
+    samples[sample_count].dt = now - start_time;
     samples[sample_count].value = read_bus();
+
     sample_count++;
   }
   else
@@ -71,6 +82,7 @@ static void IRAM_ATTR bus_isr(void *arg)
 
 void bus_probe_init()
 {
+
   gpio_install_isr_service(0);
 
 
@@ -83,6 +95,7 @@ void bus_probe_init()
 
   for (auto pin : pins)
   {
+
     gpio_config_t io = {};
 
     io.pin_bit_mask = (1ULL << pin);
@@ -95,46 +108,149 @@ void bus_probe_init()
 
     gpio_config(&io);
 
+
     gpio_isr_handler_add(
       pin,
       bus_isr,
-      nullptr);
+      nullptr
+    );
   }
 
 
-  ESP_LOGI("BUS", "edge triggered capture active");
+  ESP_LOGI("BUS", "edge capture enabled");
 }
+
 
 
 
 void bus_probe_report()
 {
+
+  uint32_t now = esp_timer_get_time();
+
+
+  // Aufnahme läuft noch
+  if (capturing)
+  {
+    if ((now - last_edge_time) > IDLE_TIMEOUT_US)
+    {
+      capturing = false;
+      capture_ready = true;
+    }
+  }
+
+
+
   if (!capture_ready)
     return;
 
 
+
   ESP_LOGI(
     "BUS",
-    "Captured %d samples",
+    "=============================="
+  );
+
+
+  ESP_LOGI(
+    "BUS",
+    "Captured %u samples",
     sample_count
   );
 
 
-  for (int i = 0; i < sample_count; i++)
+  if (sample_count > 1)
   {
-    uint8_t v = samples[i].value;
+
+    uint32_t min_dt = 0xffffffff;
+    uint32_t max_dt = 0;
+
+    uint32_t changes[3] = {0,0,0};
+
+
+    for (int i=1;i<sample_count;i++)
+    {
+
+      uint32_t d =
+        samples[i].dt -
+        samples[i-1].dt;
+
+
+      if (d < min_dt)
+        min_dt=d;
+
+      if (d > max_dt)
+        max_dt=d;
+
+
+
+      uint8_t diff =
+        samples[i].value ^
+        samples[i-1].value;
+
+
+      if (diff & 1)
+        changes[0]++;
+
+      if (diff & 2)
+        changes[1]++;
+
+      if (diff & 4)
+        changes[2]++;
+    }
+
 
     ESP_LOGI(
       "BUS",
-      "%6lu us  GPIO38=%d GPIO39=%d GPIO40=%d",
-      samples[i].dt,
-      !!(v & 1),
-      !!(v & 2),
-      !!(v & 4)
+      "min edge spacing: %lu us",
+      min_dt
+    );
+
+
+    if (min_dt)
+    {
+      ESP_LOGI(
+        "BUS",
+        "max edge rate: %.1f kHz",
+        1000.0f / min_dt
+      );
+    }
+
+
+    ESP_LOGI(
+      "BUS",
+      "changes GPIO38=%lu GPIO39=%lu GPIO40=%lu",
+      changes[0],
+      changes[1],
+      changes[2]
     );
   }
 
 
-  sample_count = 0;
-  capture_ready = false;
+
+  ESP_LOGI("BUS","DATA:");
+
+  for (int i=0;i<sample_count;i++)
+  {
+
+    ESP_LOGI(
+      "BUS",
+      "%8lu us  %d%d%d",
+      samples[i].dt,
+      !!(samples[i].value & 4),
+      !!(samples[i].value & 2),
+      !!(samples[i].value & 1)
+    );
+
+  }
+
+
+  ESP_LOGI(
+    "BUS",
+    "=============================="
+  );
+
+
+  sample_count=0;
+  capture_ready=false;
 }
