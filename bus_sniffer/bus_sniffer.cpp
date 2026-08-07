@@ -1,310 +1,225 @@
-#include "esphome/core/component.h"
+#include "bus_sniffer.h"
+
 #include "esphome/core/log.h"
-#include "esphome.h"
+
+#include "driver/gpio.h"
+#include "esp_timer.h"
 
 namespace esphome {
 namespace bus_sniffer {
 
+static const char *TAG = "BUS";
 
+// deine Pins
+static constexpr gpio_num_t PIN_A = GPIO_NUM_38;
+static constexpr gpio_num_t PIN_B = GPIO_NUM_39;
+static constexpr gpio_num_t PIN_C = GPIO_NUM_40;
 
-#define BUS_TAG "BUS"
+static constexpr int MAX_SAMPLES = 2048;
+static constexpr uint32_t FRAME_TIMEOUT_US = 50000; // 50 ms
 
-#define PIN_A 38
-#define PIN_B 39
-#define PIN_C 40
+struct Sample {
+  uint32_t t;
+  uint8_t value;
+};
 
-#define BUFFER_SIZE 4096
+volatile Sample samples[MAX_SAMPLES];
+volatile uint16_t sample_count = 0;
 
-// Zeit ohne Flanke -> Frame beendet
-#define FRAME_TIMEOUT_US 20000
+volatile uint64_t last_edge = 0;
 
-// maximale Ausgabe pro Frame
-#define MAX_PRINT 300
-
-
-volatile uint32_t edge_time[BUFFER_SIZE];
-volatile uint8_t edge_state[BUFFER_SIZE];
-
-volatile uint16_t write_pos = 0;
-volatile bool overflow = false;
-
-volatile uint32_t last_edge_time = 0;
+BusSniffer *instance = nullptr;
 
 
 // ISR
-void IRAM_ATTR bus_edge_isr()
-{
-  uint16_t pos = write_pos;
+static void IRAM_ATTR gpio_isr(void *arg) {
 
-  if (pos >= BUFFER_SIZE) {
-    overflow = true;
-    return;
+  uint64_t now = esp_timer_get_time();
+
+  uint8_t v = 0;
+
+  if (gpio_get_level(PIN_A))
+    v |= 1;
+
+  if (gpio_get_level(PIN_B))
+    v |= 2;
+
+  if (gpio_get_level(PIN_C))
+    v |= 4;
+
+
+  if (sample_count < MAX_SAMPLES) {
+    samples[sample_count].t = now;
+    samples[sample_count].value = v;
+    sample_count++;
   }
 
-
-  uint8_t state = 0;
-
-  if (digitalRead(PIN_A))
-    state |= 0x01;
-
-  if (digitalRead(PIN_B))
-    state |= 0x02;
-
-  if (digitalRead(PIN_C))
-    state |= 0x04;
-
-
-  edge_time[pos] = micros();
-  edge_state[pos] = state;
-
-  write_pos = pos + 1;
-
-  last_edge_time = edge_time[pos];
+  last_edge = now;
 }
 
 
+void BusSniffer::setup() {
 
-class BusSniffer : public Component {
+  instance = this;
 
- public:
+  gpio_config_t io = {};
+
+  io.mode = GPIO_MODE_INPUT;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io.intr_type = GPIO_INTR_ANYEDGE;
+
+  io.pin_bit_mask =
+      (1ULL << PIN_A) |
+      (1ULL << PIN_B) |
+      (1ULL << PIN_C);
+
+  gpio_config(&io);
 
 
-  void setup() override
-  {
-    ESP_LOGI(BUS_TAG, "Starting bus sniffer");
+  gpio_install_isr_service(0);
 
-
-    pinMode(PIN_A, INPUT);
-    pinMode(PIN_B, INPUT);
-    pinMode(PIN_C, INPUT);
-
-
-    attachInterrupt(
+  gpio_isr_handler_add(
       PIN_A,
-      bus_edge_isr,
-      CHANGE
-    );
+      gpio_isr,
+      nullptr);
 
-    attachInterrupt(
+  gpio_isr_handler_add(
       PIN_B,
-      bus_edge_isr,
-      CHANGE
-    );
+      gpio_isr,
+      nullptr);
 
-    attachInterrupt(
+  gpio_isr_handler_add(
       PIN_C,
-      bus_edge_isr,
-      CHANGE
-    );
+      gpio_isr,
+      nullptr);
 
 
-    ESP_LOGI(
-      BUS_TAG,
-      "Watching GPIO %d %d %d",
-      PIN_A,
-      PIN_B,
-      PIN_C
-    );
+  ESP_LOGI(TAG, "Bus sniffer started");
+}
+
+
+void BusSniffer::loop() {
+
+  static uint64_t frame_start = 0;
+
+  if (sample_count == 0)
+    return;
+
+
+  uint64_t now = esp_timer_get_time();
+
+
+  // noch Datenverkehr?
+  if (now - last_edge < FRAME_TIMEOUT_US)
+    return;
+
+
+  // Interrupt kurz sperren
+  portDISABLE_INTERRUPTS();
+
+  uint16_t count = sample_count;
+
+  Sample local[MAX_SAMPLES];
+
+  if (count > MAX_SAMPLES)
+    count = MAX_SAMPLES;
+
+  for (uint16_t i = 0; i < count; i++) {
+    local[i].t = samples[i].t;
+    local[i].value = samples[i].value;
+  }
+
+  sample_count = 0;
+
+  portENABLE_INTERRUPTS();
+
+
+  ESP_LOGI(TAG, "==============================");
+  ESP_LOGI(TAG, "Captured %u samples", count);
+
+
+  if (count == 0)
+    return;
+
+
+  uint32_t min_delta = UINT32_MAX;
+  uint32_t max_delta = 0;
+
+  uint32_t changes[3] = {0,0,0};
+
+
+  for (uint16_t i=1;i<count;i++) {
+
+    uint32_t dt =
+        local[i].t -
+        local[i-1].t;
+
+
+    if (dt < min_delta)
+      min_delta = dt;
+
+    if (dt > max_delta)
+      max_delta = dt;
+
+
+    uint8_t diff =
+        local[i].value ^
+        local[i-1].value;
+
+
+    if (diff & 1)
+      changes[0]++;
+
+    if (diff & 2)
+      changes[1]++;
+
+    if (diff & 4)
+      changes[2]++;
   }
 
 
-
-  void loop() override
-  {
-
-    uint16_t count;
-    uint32_t idle;
-
-
-    noInterrupts();
-
-    count = write_pos;
-
-    idle = micros() - last_edge_time;
-
-    interrupts();
-
-
-
-    if (count < 5)
-      return;
-
-
-
-    if (idle < FRAME_TIMEOUT_US)
-      return;
-
-
-
-    //
-    // Capture übernehmen
-    //
-
-    uint32_t times[BUFFER_SIZE];
-    uint8_t states[BUFFER_SIZE];
-
-    noInterrupts();
-
-    uint16_t n = write_pos;
-
-    if (n > BUFFER_SIZE)
-      n = BUFFER_SIZE;
-
-
-    memcpy(
-      times,
-      (const void*)edge_time,
-      n * sizeof(uint32_t)
-    );
-
-
-    memcpy(
-      states,
-      (const void*)edge_state,
-      n * sizeof(uint8_t)
-    );
-
-
-    write_pos = 0;
-    overflow = false;
-
-    interrupts();
-
-
-
-    ESP_LOGI(BUS_TAG, "==============================");
-
-    ESP_LOGI(
-      BUS_TAG,
-      "Captured %u samples",
-      n
-    );
-
-
-    if (overflow)
-    {
-      ESP_LOGW(
-        BUS_TAG,
-        "BUFFER OVERFLOW"
-      );
-    }
-
-
-
-    //
-    // Statistik
-    //
-
-    uint32_t min_delta = UINT32_MAX;
-    uint32_t max_delta = 0;
-
-
-    uint8_t changes[3] = {0,0,0};
-
-
-    for(uint16_t i=1;i<n;i++)
-    {
-      uint32_t delta =
-        times[i]-times[i-1];
-
-
-      if(delta < min_delta)
-        min_delta = delta;
-
-
-      if(delta > max_delta)
-        max_delta = delta;
-
-
-      uint8_t diff =
-        states[i-1] ^ states[i];
-
-
-      if(diff & 1)
-        changes[0]++;
-
-      if(diff & 2)
-        changes[1]++;
-
-      if(diff & 4)
-        changes[2]++;
-    }
-
-
-    ESP_LOGI(
-      BUS_TAG,
+  ESP_LOGI(TAG,
       "min edge spacing: %lu us",
-      min_delta
-    );
+      min_delta);
 
 
-    if(min_delta)
-    {
-      ESP_LOGI(
-        BUS_TAG,
-        "max edge rate: %.1f kHz",
-        1000.0f / min_delta
-      );
-    }
+  if (min_delta > 0)
+    ESP_LOGI(TAG,
+      "max edge rate: %.1f kHz",
+      1000.0f / min_delta);
 
 
-    ESP_LOGI(
-      BUS_TAG,
-      "changes GPIO%d=%d GPIO%d=%d GPIO%d=%d",
-      PIN_A, changes[0],
-      PIN_B, changes[1],
-      PIN_C, changes[2]
-    );
+  ESP_LOGI(TAG,
+      "changes GPIO38=%lu GPIO39=%lu GPIO40=%lu",
+      changes[0],
+      changes[1],
+      changes[2]);
 
 
+  ESP_LOGI(TAG,"DATA:");
 
-    //
-    // Daten ausgeben
-    //
-
-    ESP_LOGI(BUS_TAG,"DATA:");
-
-    uint32_t start = times[0];
+  uint32_t base =
+      local[0].t;
 
 
-    uint16_t print_count = n;
+  for(uint16_t i=0;i<count;i++) {
 
-    if(print_count > MAX_PRINT)
-      print_count = MAX_PRINT;
+    ESP_LOGI(TAG,
+      "%8lu us  %c%c%c",
+      local[i].t - base,
 
-
-
-    for(uint16_t i=0;i<print_count;i++)
-    {
-
-      ESP_LOGI(
-        BUS_TAG,
-        "%8lu us  %03d",
-        times[i]-start,
-        states[i]
-      );
-
-    }
-
-
-    if(n > MAX_PRINT)
-    {
-      ESP_LOGI(
-        BUS_TAG,
-        "... %u samples omitted",
-        n-MAX_PRINT
-      );
-    }
-
-
-    ESP_LOGI(
-      BUS_TAG,
-      "=============================="
+      (local[i].value & 1) ? '1':'0',
+      (local[i].value & 2) ? '1':'0',
+      (local[i].value & 4) ? '1':'0'
     );
 
   }
 
-};
+
+  ESP_LOGI(TAG,"==============================");
+}
+
 
 } // namespace bus_sniffer
 } // namespace esphome

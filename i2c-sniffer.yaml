@@ -2,14 +2,6 @@ esphome:
   name: i2csniffer
   friendly_name: I2C-Sniffer
 
-#  includes:
-#    - bus_sniffer.h
-
-  on_boot:
-    priority: 800
-    then:
-      - lambda: |-
-          bus_probe_init();
 
 external_components:
   - source:
@@ -51,8 +43,3 @@ esp32:
     type: esp-idf
 
 
-interval:
-  - interval: 1s
-    then:
-      - lambda: |-
-          bus_probe_report();
