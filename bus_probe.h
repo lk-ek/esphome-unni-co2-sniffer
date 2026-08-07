@@ -8,52 +8,63 @@
 
 
 struct Sample {
-  uint32_t time;
+  uint32_t dt;
   uint8_t value;
 };
 
 
-volatile Sample sample_buffer[SAMPLE_BUFFER_SIZE];
-volatile uint16_t sample_index = 0;
-volatile bool capture_active = false;
+static volatile Sample samples[SAMPLE_BUFFER_SIZE];
+
+static volatile uint16_t sample_count = 0;
+static volatile bool capturing = false;
+static volatile bool capture_ready = false;
+
+static uint32_t capture_start_time = 0;
 
 
-static const gpio_num_t monitored_pins[] = {
-  GPIO_NUM_38,
-  GPIO_NUM_39,
-  GPIO_NUM_40
-};
-
-
-static void IRAM_ATTR gpio_capture_isr(void *arg)
+static uint8_t read_bus()
 {
-  uint32_t now = esp_timer_get_time();
-
-  if (!capture_active)
-    return;
-
-  if (sample_index >= SAMPLE_BUFFER_SIZE)
-  {
-    capture_active = false;
-    return;
-  }
-
-  uint8_t value = 0;
+  uint8_t v = 0;
 
   if (gpio_get_level(GPIO_NUM_38))
-    value |= 1;
+    v |= 1;
 
   if (gpio_get_level(GPIO_NUM_39))
-    value |= 2;
+    v |= 2;
 
   if (gpio_get_level(GPIO_NUM_40))
-    value |= 4;
+    v |= 4;
+
+  return v;
+}
 
 
-  sample_buffer[sample_index].time = now;
-  sample_buffer[sample_index].value = value;
+static void IRAM_ATTR bus_isr(void *arg)
+{
+  if (capture_ready)
+    return;
 
-  sample_index++;
+  uint32_t now = esp_timer_get_time();
+
+  if (!capturing)
+  {
+    capturing = true;
+    sample_count = 0;
+    capture_start_time = now;
+  }
+
+
+  if (sample_count < SAMPLE_BUFFER_SIZE)
+  {
+    samples[sample_count].dt = now - capture_start_time;
+    samples[sample_count].value = read_bus();
+    sample_count++;
+  }
+  else
+  {
+    capturing = false;
+    capture_ready = true;
+  }
 }
 
 
@@ -63,14 +74,20 @@ void bus_probe_init()
   gpio_install_isr_service(0);
 
 
-  for (auto pin : monitored_pins)
+  gpio_num_t pins[] = {
+    GPIO_NUM_38,
+    GPIO_NUM_39,
+    GPIO_NUM_40
+  };
+
+
+  for (auto pin : pins)
   {
     gpio_config_t io = {};
 
     io.pin_bit_mask = (1ULL << pin);
     io.mode = GPIO_MODE_INPUT;
 
-    // keine Pullups!
     io.pull_up_en = GPIO_PULLUP_DISABLE;
     io.pull_down_en = GPIO_PULLDOWN_DISABLE;
 
@@ -80,53 +97,44 @@ void bus_probe_init()
 
     gpio_isr_handler_add(
       pin,
-      gpio_capture_isr,
+      bus_isr,
       nullptr);
   }
 
 
-  ESP_LOGI("BUS", "capture ready");
+  ESP_LOGI("BUS", "edge triggered capture active");
 }
 
 
 
 void bus_probe_report()
 {
+  if (!capture_ready)
+    return;
+
+
   ESP_LOGI(
     "BUS",
-    "GPIO levels: %d %d %d",
-    gpio_get_level(GPIO_NUM_38),
-    gpio_get_level(GPIO_NUM_39),
-    gpio_get_level(GPIO_NUM_40)
+    "Captured %d samples",
+    sample_count
   );
 
 
-  // wenn gerade nichts aufgenommen wird:
-  if (!capture_active)
+  for (int i = 0; i < sample_count; i++)
   {
-    sample_index = 0;
-    capture_active = true;
-    ESP_LOGI("BUS", "capture started");
-    return;
-  }
+    uint8_t v = samples[i].value;
 
-
-  // Ausgabe, wenn Buffer voll:
-  ESP_LOGI("BUS", "capture dump %d samples", sample_index);
-
-
-  for (int i = 0; i < sample_index; i++)
-  {
     ESP_LOGI(
       "BUS",
-      "%lu us  %c%c%c",
-      sample_buffer[i].time,
-      (sample_buffer[i].value & 1) ? '1':'0',
-      (sample_buffer[i].value & 2) ? '1':'0',
-      (sample_buffer[i].value & 4) ? '1':'0'
+      "%6lu us  GPIO38=%d GPIO39=%d GPIO40=%d",
+      samples[i].dt,
+      !!(v & 1),
+      !!(v & 2),
+      !!(v & 4)
     );
   }
 
 
-  capture_active = false;
+  sample_count = 0;
+  capture_ready = false;
 }
