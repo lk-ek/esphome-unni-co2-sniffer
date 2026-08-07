@@ -1,0 +1,50 @@
+esphome:
+  name: i2csniffer
+  friendly_name: I2C-Sniffer
+
+  includes:
+    - bus_probe.h
+
+  on_boot:
+    priority: 800
+    then:
+      - lambda: |-
+          bus_probe_init();
+
+# Enable logging
+logger:
+  level: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret i2csniffer__encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret i2csniffer__ota
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "I2CSniffer Fallback Hotspot"
+    password: "1TtKb0m072q3"
+
+captive_portal:
+
+
+
+esp32:
+  board: esp32-s2-saola-1
+  framework:
+    type: esp-idf
+
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          bus_probe_report();
