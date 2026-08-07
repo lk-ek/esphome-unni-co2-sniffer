@@ -15,7 +15,7 @@ static constexpr gpio_num_t PIN_A = GPIO_NUM_38;
 static constexpr gpio_num_t PIN_B = GPIO_NUM_39;
 static constexpr gpio_num_t PIN_C = GPIO_NUM_40;
 
-static constexpr int MAX_SAMPLES = 2048;
+static constexpr int MAX_SAMPLES = 512;
 static constexpr uint32_t FRAME_TIMEOUT_US = 50000; // 50 ms
 
 struct Sample {
@@ -137,6 +137,9 @@ void BusSniffer::loop() {
 
   ESP_LOGI(TAG, "==============================");
   ESP_LOGI(TAG, "Captured %u samples", count);
+  if (count >= MAX_SAMPLES) {
+    ESP_LOGW(TAG, "Buffer overflow, frame truncated");
+  }
 
 
   if (count == 0)
@@ -202,17 +205,20 @@ void BusSniffer::loop() {
   uint32_t base =
       local[0].t;
 
+  uint32_t rel;
 
-  for(uint16_t i=0;i<count;i++) {
+  for(uint16_t i = 0; i < count; i++) {
 
+    rel = (uint32_t)(local[i].t - base);
+ 
     ESP_LOGI(TAG,
-      "%8lu us  %c%c%c",
-      local[i].t - base,
-
-      (local[i].value & 1) ? '1':'0',
-      (local[i].value & 2) ? '1':'0',
-      (local[i].value & 4) ? '1':'0'
+        "%lu us %u%u%u",
+        (unsigned long)rel,
+        (local[i].value >> 0) & 1,
+        (local[i].value >> 1) & 1,
+        (local[i].value >> 2) & 1
     );
+
 
   }
 
