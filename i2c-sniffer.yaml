@@ -10,7 +10,7 @@ external_components:
 
 # Enable logging
 logger:
-  level: DEBUG
+  level: INFO
 
 # Enable Home Assistant API
 api:
@@ -49,3 +49,9 @@ bus_sniffer:
     name: "CO2"
     id: cd40_co2
     icon: mdi:molecule-co2
+
+  crc_errors:
+    name: "CO2 Sniffer CRC Errors"
+
+  frame_errors:
+    name: "CO2 Sniffer Frame Errors"

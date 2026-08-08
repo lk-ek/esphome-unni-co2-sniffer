@@ -15,8 +15,24 @@ class BusSniffer : public Component {
     this->co2_sensor_ = sensor;
   }
 
+  void set_crc_errors_sensor(sensor::Sensor *sensor) {
+    this->crc_errors_sensor_ = sensor;
+  }
+
+  void set_frame_errors_sensor(sensor::Sensor *sensor) {
+    this->frame_errors_sensor_ = sensor;
+  }
+
  protected:
   sensor::Sensor *co2_sensor_{nullptr};
+  sensor::Sensor *crc_errors_sensor_{nullptr};
+  sensor::Sensor *frame_errors_sensor_{nullptr};
+
+  bool have_last_ppm_{false};
+  uint16_t last_ppm_{0};
+
+  uint32_t crc_errors_{0};
+  uint32_t frame_errors_{0};
 };
 
 }  // namespace bus_sniffer

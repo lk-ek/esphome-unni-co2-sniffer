@@ -11,6 +11,8 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
+
 
 namespace esphome {
 namespace bus_sniffer {
@@ -20,21 +22,24 @@ static const char *TAG = "bus_sniffer";
 
 /*
  * ============================================================================
- * Pins
+ * Hardware
  * ============================================================================
- *
- * Aus den Captures eindeutig:
  *
  * GPIO40 = SCL
  * GPIO39 = SDA
+ * GPIO38 = zusätzlicher Logic-Analyzer-Kanal
  *
- * GPIO38 bleibt als dritter Logic-Analyzer-Kanal erhalten,
- * erzeugt aber KEINE Interrupts mehr.
+ * GPIO38 wird nur mitgesampelt und erzeugt selbst keine Interrupts.
  */
 
-static constexpr gpio_num_t PIN_SCL   = GPIO_NUM_40;
-static constexpr gpio_num_t PIN_SDA   = GPIO_NUM_39;
-static constexpr gpio_num_t PIN_OTHER = GPIO_NUM_38;
+static constexpr gpio_num_t PIN_SCL =
+    GPIO_NUM_40;
+
+static constexpr gpio_num_t PIN_SDA =
+    GPIO_NUM_39;
+
+static constexpr gpio_num_t PIN_OTHER =
+    GPIO_NUM_38;
 
 
 /*
@@ -43,12 +48,17 @@ static constexpr gpio_num_t PIN_OTHER = GPIO_NUM_38;
  * ============================================================================
  */
 
-static constexpr uint16_t MAX_SAMPLES = 4096;
+static constexpr uint16_t MAX_SAMPLES =
+    4096;
 
-// EC05 write -> Antwortpause ~2.13 ms.
-// 5 ms reicht also bequem, um beide I2C-Transaktionen in
-// einem Capture zu halten.
-static constexpr uint32_t CAPTURE_TIMEOUT_US = 5000;
+
+/*
+ * Zwischen EC05 und der Antwort sehen wir etwa 2.13 ms.
+ *
+ * Mit 5 ms Timeout landen Request und Response im selben Capture.
+ */
+static constexpr uint32_t CAPTURE_TIMEOUT_US =
+    5000;
 
 
 struct Sample {
@@ -65,12 +75,13 @@ static volatile uint32_t last_edge = 0;
 
 static volatile uint8_t last_value = 0xff;
 
-// Zustand unmittelbar VOR dem ersten Event.
-// Wichtig für START-Erkennung.
-static volatile uint8_t capture_initial_value = 0xff;
+static volatile uint8_t capture_initial_value =
+    0xff;
 
 static volatile bool capturing = true;
+
 static volatile bool capture_finished = false;
+
 static volatile bool capture_overflow = false;
 
 
@@ -78,25 +89,17 @@ static volatile bool capture_overflow = false;
  * ============================================================================
  * Letzter Raw-Capture für HTTP
  * ============================================================================
- *
- * Anders als vorher wird die Aufnahme NICHT angehalten, bis jemand
- * /capture herunterlädt.
- *
- * Nach jedem Frame:
- *
- *   1. dekodieren
- *   2. letzten Capture hier speichern
- *   3. sofort neuen Capture starten
  */
 
 static std::string last_capture_data;
 
-static SemaphoreHandle_t last_capture_mutex = nullptr;
+static SemaphoreHandle_t last_capture_mutex =
+    nullptr;
 
 
 /*
  * ============================================================================
- * GPIO helpers
+ * GPIO
  * ============================================================================
  */
 
@@ -134,10 +137,7 @@ static inline bool sda_level(uint8_t value)
  * ISR
  * ============================================================================
  *
- * Nur SCL und SDA erzeugen Interrupts.
- *
- * GPIO38 wird jeweils mitgesampelt, kann den ESP32 aber nicht mehr
- * mit Interrupts bombardieren.
+ * Nur SCL und SDA lösen Interrupts aus.
  */
 
 static void IRAM_ATTR gpio_isr(void *arg)
@@ -146,44 +146,51 @@ static void IRAM_ATTR gpio_isr(void *arg)
     return;
 
 
-  uint32_t now =
-      (uint32_t) esp_timer_get_time();
+  const uint32_t now =
+      static_cast<uint32_t>(
+          esp_timer_get_time()
+      );
 
 
-  uint8_t value =
+  const uint8_t value =
       read_gpio_state();
 
 
+  /*
+   * Mehrere praktisch gleichzeitige GPIO-Interrupts können
+   * denselben Gesamtzustand sehen.
+   */
   if (value == last_value)
     return;
 
 
   /*
-   * Beim ersten Event den Zustand VOR der Flanke merken.
-   *
-   * Damit können wir später z.B.
-   *
-   *     SDA 1 -> 0 bei SCL=1
-   *
-   * zuverlässig als I2C START erkennen.
+   * Zustand unmittelbar vor der ersten Flanke erhalten.
+   * Wird für START/STOP-Erkennung benötigt.
    */
   if (sample_count == 0)
-    capture_initial_value = last_value;
+    capture_initial_value =
+        last_value;
 
 
   last_value = value;
   last_edge = now;
 
 
-  uint16_t index = sample_count;
+  const uint16_t index =
+      sample_count;
 
 
   if (index < MAX_SAMPLES) {
 
-    samples[index].t = now;
-    samples[index].value = value;
+    samples[index].t =
+        now;
 
-    sample_count = index + 1;
+    samples[index].value =
+        value;
+
+    sample_count =
+        index + 1;
 
   } else {
 
@@ -196,39 +203,58 @@ static void IRAM_ATTR gpio_isr(void *arg)
 
 /*
  * ============================================================================
- * Sensirion CRC-8
+ * CRC-8
  * ============================================================================
  *
- * Polynomial: 0x31
- * Init:       0xFF
+ * Sensirion/SCD4x:
  *
- * Kein final XOR.
+ * Polynomial 0x31
+ * Init       0xFF
  */
 
 static uint8_t sensirion_crc(
     uint8_t byte0,
     uint8_t byte1)
 {
-  uint8_t crc = 0xff;
+  uint8_t crc =
+      0xff;
 
-  uint8_t data[2] = {
+
+  const uint8_t data[2] = {
       byte0,
       byte1
   };
 
 
-  for (uint8_t n = 0; n < 2; n++) {
+  for (uint8_t n = 0;
+       n < 2;
+       n++) {
 
-    crc ^= data[n];
+    crc ^=
+        data[n];
 
-    for (uint8_t bit = 0; bit < 8; bit++) {
 
-      if (crc & 0x80)
-        crc = (crc << 1) ^ 0x31;
-      else
-        crc <<= 1;
+    for (uint8_t bit = 0;
+         bit < 8;
+         bit++) {
+
+      if (crc & 0x80) {
+
+        crc =
+            static_cast<uint8_t>(
+                (crc << 1) ^ 0x31
+            );
+
+      } else {
+
+        crc =
+            static_cast<uint8_t>(
+                crc << 1
+            );
+      }
     }
   }
+
 
   return crc;
 }
@@ -236,7 +262,7 @@ static uint8_t sensirion_crc(
 
 /*
  * ============================================================================
- * I2C decoder
+ * I2C Decoder
  * ============================================================================
  */
 
@@ -248,6 +274,17 @@ struct I2CTransaction {
 };
 
 
+struct DecodeResult {
+  bool have_co2{false};
+
+  uint16_t co2_ppm{0};
+
+  uint32_t crc_errors{0};
+
+  uint32_t frame_errors{0};
+};
+
+
 static void clear_transaction(
     I2CTransaction &txn)
 {
@@ -256,24 +293,26 @@ static void clear_transaction(
   memset(
       txn.bytes,
       0,
-      sizeof(txn.bytes));
+      sizeof(txn.bytes)
+  );
 
   memset(
       txn.ack,
       0,
-      sizeof(txn.ack));
+      sizeof(txn.ack)
+  );
 }
 
 
 /*
  * ============================================================================
- * Einzelne I2C-Transaktion auswerten
+ * Einzelne I2C-Transaktion
  * ============================================================================
  */
 
-void process_i2c_transaction(
+static void process_i2c_transaction(
     const I2CTransaction &txn,
-    sensor::Sensor *co2_sensor)
+    DecodeResult &result)
 {
   if (txn.count == 0)
     return;
@@ -281,25 +320,25 @@ void process_i2c_transaction(
 
   /*
    * --------------------------------------------------------------------------
-   * WRITE an 0x62
+   * SCD4x-kompatibles read_measurement
    *
-   * Capture zeigt:
+   * Adresse 0x62 WRITE:
    *
-   *   C4 EC 05
-   *
-   * C4:
-   *
-   *   0x62 << 1 | WRITE
+   * C4 EC 05
+   * --------------------------------------------------------------------------
    */
+
   if (
       txn.count >= 3 &&
       txn.bytes[0] == 0xC4 &&
       txn.bytes[1] == 0xEC &&
-      txn.bytes[2] == 0x05) {
+      txn.bytes[2] == 0x05
+  ) {
 
     ESP_LOGV(
         TAG,
-        "I2C: SCD4x read_measurement command");
+        "read_measurement command"
+    );
 
     return;
   }
@@ -307,113 +346,145 @@ void process_i2c_transaction(
 
   /*
    * --------------------------------------------------------------------------
-   * READ von 0x62
+   * Antwort:
    *
-   * Capture zeigt:
+   * C5 CO2_MSB CO2_LSB CRC
    *
-   *   C5 CO2_MSB CO2_LSB CRC
-   *
-   * Danach beendet der originale Controller den Read.
+   * Danach beendet der originale Controller die Übertragung.
+   * --------------------------------------------------------------------------
    */
-  if (
-      txn.count >= 4 &&
-      txn.bytes[0] == 0xC5) {
 
-    uint8_t msb =
-        txn.bytes[1];
-
-    uint8_t lsb =
-        txn.bytes[2];
-
-    uint8_t received_crc =
-        txn.bytes[3];
+  if (txn.bytes[0] != 0xC5)
+    return;
 
 
-    uint8_t calculated_crc =
-        sensirion_crc(
-            msb,
-            lsb);
+  /*
+   * Adresse + zwei Datenbytes + CRC erforderlich.
+   */
+  if (txn.count < 4) {
 
+    result.frame_errors++;
 
-    /*
-     * CRC muss stimmen.
-     *
-     * Damit publizieren wir niemals einen durch verlorene
-     * Flanken beschädigten ppm-Wert.
-     */
-    if (received_crc != calculated_crc) {
-
-      ESP_LOGW(
-          TAG,
-          "CO2 CRC mismatch: "
-          "data=%02X %02X "
-          "received=%02X expected=%02X",
-          msb,
-          lsb,
-          received_crc,
-          calculated_crc);
-
-      return;
-    }
-
-
-    uint16_t ppm =
-        (static_cast<uint16_t>(msb) << 8) |
-        lsb;
-
-
-    ESP_LOGI(
+    ESP_LOGV(
         TAG,
-        "CO2: %u ppm",
-        ppm);
-
-
-    if (co2_sensor != nullptr) {
-
-      co2_sensor->publish_state(
-          static_cast<float>(ppm));
-    }
+        "Incomplete CO2 transaction: %u bytes",
+        txn.count
+    );
 
     return;
   }
 
 
   /*
-   * Andere I2C-Transaktionen ignorieren.
+   * Erwartetes ACK-Muster:
    *
-   * Bei VERBOSE kann man sie trotzdem sehen.
+   * C5        ACK
+   * CO2 MSB   ACK
+   * CO2 LSB   ACK
+   * CRC       NACK
    */
-  ESP_LOGV(
-      TAG,
-      "I2C transaction: %u bytes, first=0x%02X",
-      txn.count,
-      txn.bytes[0]);
+
+  if (
+      !txn.ack[0] ||
+      !txn.ack[1] ||
+      !txn.ack[2] ||
+      txn.ack[3]
+  ) {
+
+    result.frame_errors++;
+
+    ESP_LOGV(
+        TAG,
+        "Invalid ACK sequence"
+    );
+
+    return;
+  }
+
+
+  const uint8_t msb =
+      txn.bytes[1];
+
+  const uint8_t lsb =
+      txn.bytes[2];
+
+  const uint8_t received_crc =
+      txn.bytes[3];
+
+
+  const uint8_t calculated_crc =
+      sensirion_crc(
+          msb,
+          lsb
+      );
+
+
+  if (received_crc != calculated_crc) {
+
+    result.crc_errors++;
+
+    ESP_LOGV(
+        TAG,
+        "CRC mismatch: %02X %02X, "
+        "received=%02X expected=%02X",
+        msb,
+        lsb,
+        received_crc,
+        calculated_crc
+    );
+
+    return;
+  }
+
+
+  result.co2_ppm =
+      (
+          static_cast<uint16_t>(msb)
+          << 8
+      ) |
+      lsb;
+
+
+  result.have_co2 =
+      true;
 }
 
 
 /*
  * ============================================================================
- * Gesamten Capture als I2C dekodieren
+ * Capture als I2C dekodieren
  * ============================================================================
  */
 
-static void decode_i2c_capture(
+static DecodeResult decode_i2c_capture(
     const volatile Sample *data,
     uint16_t count,
-    uint8_t initial_value,
-    sensor::Sensor *co2_sensor)
+    uint8_t initial_value)
 {
+  DecodeResult result;
+
+
   if (count == 0)
-    return;
+    return result;
 
 
-  bool active = false;
+  bool active =
+      false;
 
-  uint8_t current_byte = 0;
-  uint8_t bit_count = 0;
+
+  uint8_t current_byte =
+      0;
+
+
+  uint8_t bit_count =
+      0;
+
 
   I2CTransaction txn;
-  clear_transaction(txn);
+
+  clear_transaction(
+      txn
+  );
 
 
   uint8_t previous =
@@ -424,58 +495,60 @@ static void decode_i2c_capture(
        i < count;
        i++) {
 
-    uint8_t current =
+    const uint8_t current =
         data[i].value;
 
 
-    bool prev_scl =
+    const bool prev_scl =
         scl_level(previous);
 
-    bool cur_scl =
+    const bool cur_scl =
         scl_level(current);
 
-
-    bool prev_sda =
+    const bool prev_sda =
         sda_level(previous);
 
-    bool cur_sda =
+    const bool cur_sda =
         sda_level(current);
 
 
     /*
      * ------------------------------------------------------------------------
-     * START
+     * START / repeated START
      *
-     * SDA HIGH -> LOW während SCL HIGH
+     * SDA fällt bei SCL HIGH.
      * ------------------------------------------------------------------------
      */
+
     if (
         prev_sda &&
         !cur_sda &&
-        cur_scl) {
+        cur_scl
+    ) {
 
-      /*
-       * Repeated START:
-       *
-       * Falls bereits eine Transaktion lief, deren vorhandene Bytes
-       * zuerst abschließen.
-       */
-      if (active && txn.count != 0) {
+      if (
+          active &&
+          txn.count != 0
+      ) {
 
         process_i2c_transaction(
             txn,
-            co2_sensor);
+            result
+        );
       }
 
 
-      clear_transaction(txn);
+      clear_transaction(
+          txn
+      );
+
 
       current_byte = 0;
       bit_count = 0;
-
       active = true;
 
-      previous = current;
+      previous =
+          current;
 
       continue;
     }
@@ -485,30 +558,37 @@ static void decode_i2c_capture(
      * ------------------------------------------------------------------------
      * STOP
      *
-     * SDA LOW -> HIGH während SCL HIGH
+     * SDA steigt bei SCL HIGH.
      * ------------------------------------------------------------------------
      */
+
     if (
         active &&
         !prev_sda &&
         cur_sda &&
-        cur_scl) {
+        cur_scl
+    ) {
 
       if (txn.count != 0) {
 
         process_i2c_transaction(
             txn,
-            co2_sensor);
+            result
+        );
       }
 
 
-      clear_transaction(txn);
+      clear_transaction(
+          txn
+      );
 
-      active = false;
+
       current_byte = 0;
       bit_count = 0;
+      active = false;
 
-      previous = current;
+      previous =
+          current;
 
       continue;
     }
@@ -516,48 +596,58 @@ static void decode_i2c_capture(
 
     /*
      * ------------------------------------------------------------------------
-     * Daten werden auf steigender SCL-Flanke gesampelt.
+     * Daten auf steigender SCL-Flanke.
      * ------------------------------------------------------------------------
      */
+
     if (
         active &&
         !prev_scl &&
-        cur_scl) {
+        cur_scl
+    ) {
 
-      bool bit =
+      const bool bit =
           cur_sda;
 
 
       /*
-       * 8 Datenbits
+       * 8 Datenbits.
        */
       if (bit_count < 8) {
 
-        current_byte <<= 1;
+        current_byte =
+            static_cast<uint8_t>(
+                current_byte << 1
+            );
+
 
         if (bit)
           current_byte |= 1;
+
 
         bit_count++;
 
       } else {
 
         /*
-         * 9. Clock = ACK/NACK.
+         * 9. Clock:
          *
-         * SDA LOW  = ACK
-         * SDA HIGH = NACK
+         * LOW  = ACK
+         * HIGH = NACK
          */
 
         if (
             txn.count <
-            sizeof(txn.bytes)) {
+            sizeof(txn.bytes)
+        ) {
 
           txn.bytes[txn.count] =
               current_byte;
 
+
           txn.ack[txn.count] =
               !bit;
+
 
           txn.count++;
         }
@@ -569,41 +659,49 @@ static void decode_i2c_capture(
     }
 
 
-    previous = current;
+    previous =
+        current;
   }
 
 
   /*
-   * Falls Capture ohne sichtbaren STOP endet.
+   * Falls STOP selbst nicht mehr im Capture gelandet ist.
    */
   if (
       active &&
-      txn.count != 0) {
+      txn.count != 0
+  ) {
 
     process_i2c_transaction(
         txn,
-        co2_sensor);
+        result
+    );
   }
+
+
+  return result;
 }
 
 
 /*
  * ============================================================================
- * Raw Capture speichern
+ * Raw-Capture archivieren
  * ============================================================================
  *
- * LA01:
+ * Format LA01:
  *
- *   4 Byte  "LA01"
- *   4 Byte  sample count
- *   1 Byte  flags
+ * 4 Byte  "LA01"
+ * 4 Byte  sample count
+ * 1 Byte  flags
  *
- * pro Event:
+ * danach pro Event:
  *
- *   4 Byte timestamp relativ zum ersten Event
- *   1 Byte GPIO state
+ * 4 Byte  timestamp_us
+ * 1 Byte  GPIO state
  *
- * flags bit0 = overflow
+ * flags:
+ *
+ * bit 0 = capture overflow
  */
 
 static void store_raw_capture(
@@ -617,9 +715,11 @@ static void store_raw_capture(
 
   std::string output;
 
+
   output.resize(
       9 +
-      static_cast<size_t>(count) * 5);
+      static_cast<size_t>(count) * 5
+  );
 
 
   char *p =
@@ -629,32 +729,40 @@ static void store_raw_capture(
   memcpy(
       p,
       "LA01",
-      4);
+      4
+  );
 
   p += 4;
 
 
-  uint32_t count32 =
+  const uint32_t count32 =
       count;
+
 
   memcpy(
       p,
       &count32,
-      sizeof(count32));
+      sizeof(count32)
+  );
 
   p += 4;
 
 
-  uint8_t flags = 0;
+  uint8_t flags =
+      0;
+
 
   if (overflow)
     flags |= 0x01;
 
+
   *p++ =
-      static_cast<char>(flags);
+      static_cast<char>(
+          flags
+      );
 
 
-  uint32_t base =
+  const uint32_t base =
       data[0].t;
 
 
@@ -662,50 +770,50 @@ static void store_raw_capture(
        i < count;
        i++) {
 
-    uint32_t timestamp =
-        (uint32_t)
-        (data[i].t - base);
+    const uint32_t timestamp =
+        static_cast<uint32_t>(
+            data[i].t - base
+        );
 
 
     memcpy(
         p,
         &timestamp,
-        sizeof(timestamp));
+        sizeof(timestamp)
+    );
 
     p += 4;
 
 
     *p++ =
         static_cast<char>(
-            data[i].value);
+            data[i].value
+        );
   }
 
 
-  /*
-   * HTTP-Task und ESPHome-loop können auf unterschiedlichen
-   * FreeRTOS-Tasks laufen.
-   */
-  if (last_capture_mutex != nullptr) {
+  if (
+      last_capture_mutex != nullptr &&
+      xSemaphoreTake(
+          last_capture_mutex,
+          pdMS_TO_TICKS(100)
+      ) == pdTRUE
+  ) {
 
-    if (
-        xSemaphoreTake(
-            last_capture_mutex,
-            pdMS_TO_TICKS(100))
-        == pdTRUE) {
+    last_capture_data =
+        std::move(output);
 
-      last_capture_data =
-          std::move(output);
 
-      xSemaphoreGive(
-          last_capture_mutex);
-    }
+    xSemaphoreGive(
+        last_capture_mutex
+    );
   }
 }
 
 
 /*
  * ============================================================================
- * HTTP Handler
+ * HTTP /capture
  * ============================================================================
  */
 
@@ -726,7 +834,8 @@ class CaptureHandler
     ];
 
 
-    return request->url_to(url) == "/capture";
+    return request->url_to(url) ==
+        "/capture";
   }
 
 
@@ -737,20 +846,21 @@ class CaptureHandler
     std::string output;
 
 
-    if (last_capture_mutex != nullptr) {
+    if (
+        last_capture_mutex != nullptr &&
+        xSemaphoreTake(
+            last_capture_mutex,
+            pdMS_TO_TICKS(100)
+        ) == pdTRUE
+    ) {
 
-      if (
-          xSemaphoreTake(
-              last_capture_mutex,
-              pdMS_TO_TICKS(100))
-          == pdTRUE) {
+      output =
+          last_capture_data;
 
-        output =
-            last_capture_data;
 
-        xSemaphoreGive(
-            last_capture_mutex);
-      }
+      xSemaphoreGive(
+          last_capture_mutex
+      );
     }
 
 
@@ -759,7 +869,8 @@ class CaptureHandler
       request->send(
           204,
           "text/plain",
-          nullptr);
+          nullptr
+      );
 
       return;
     }
@@ -769,16 +880,19 @@ class CaptureHandler
         request->beginResponse(
             200,
             "application/octet-stream",
-            output);
+            output
+        );
 
 
     response->addHeader(
         "Content-Disposition",
-        "attachment; filename=\"capture.la\"");
+        "attachment; filename=\"capture.la\""
+    );
 
 
     request->send(
-        response);
+        response
+    );
   }
 };
 
@@ -794,19 +908,12 @@ static CaptureHandler capture_handler;
 
 void BusSniffer::setup()
 {
-  /*
-   * Mutex für letzten HTTP-Capture.
-   */
   last_capture_mutex =
       xSemaphoreCreateMutex();
 
 
-  /*
-   * Alle drei Pins Eingänge.
-   *
-   * Nur SCL/SDA bekommen anschließend ISR-Handler.
-   */
   gpio_config_t io = {};
+
 
   io.mode =
       GPIO_MODE_INPUT;
@@ -828,7 +935,9 @@ void BusSniffer::setup()
 
 
   esp_err_t err =
-      gpio_config(&io);
+      gpio_config(
+          &io
+      );
 
 
   if (err != ESP_OK) {
@@ -836,53 +945,57 @@ void BusSniffer::setup()
     ESP_LOGE(
         TAG,
         "gpio_config failed: %d",
-        err);
+        err
+    );
 
     return;
   }
 
 
   /*
-   * Interrupts nur für SCL + SDA.
+   * Nur SCL und SDA erzeugen Interrupts.
    */
+
   gpio_set_intr_type(
       PIN_SCL,
-      GPIO_INTR_ANYEDGE);
+      GPIO_INTR_ANYEDGE
+  );
+
 
   gpio_set_intr_type(
       PIN_SDA,
-      GPIO_INTR_ANYEDGE);
+      GPIO_INTR_ANYEDGE
+  );
 
 
-  /*
-   * Anfangszustand.
-   */
   last_value =
       read_gpio_state();
+
 
   capture_initial_value =
       last_value;
 
+
   last_edge =
-      (uint32_t)
-      esp_timer_get_time();
+      static_cast<uint32_t>(
+          esp_timer_get_time()
+      );
 
 
-  /*
-   * ISR Service.
-   */
   err =
       gpio_install_isr_service(0);
 
 
   if (
       err != ESP_OK &&
-      err != ESP_ERR_INVALID_STATE) {
+      err != ESP_ERR_INVALID_STATE
+  ) {
 
     ESP_LOGE(
         TAG,
         "gpio_install_isr_service failed: %d",
-        err);
+        err
+    );
 
     return;
   }
@@ -892,7 +1005,8 @@ void BusSniffer::setup()
       gpio_isr_handler_add(
           PIN_SCL,
           gpio_isr,
-          nullptr);
+          nullptr
+      );
 
 
   if (err != ESP_OK) {
@@ -900,7 +1014,8 @@ void BusSniffer::setup()
     ESP_LOGE(
         TAG,
         "SCL ISR failed: %d",
-        err);
+        err
+    );
 
     return;
   }
@@ -910,7 +1025,8 @@ void BusSniffer::setup()
       gpio_isr_handler_add(
           PIN_SDA,
           gpio_isr,
-          nullptr);
+          nullptr
+      );
 
 
   if (err != ESP_OK) {
@@ -918,75 +1034,56 @@ void BusSniffer::setup()
     ESP_LOGE(
         TAG,
         "SDA ISR failed: %d",
-        err);
+        err
+    );
 
     return;
   }
 
 
-  /*
-   * HTTP.
-   */
   if (
-      web_server_base::global_web_server_base
-      != nullptr) {
+      web_server_base::global_web_server_base !=
+      nullptr
+  ) {
 
     web_server_base::
         global_web_server_base->
         add_handler(
-            &capture_handler);
-
-
-    ESP_LOGI(
-        TAG,
-        "Raw capture: GET /capture");
+            &capture_handler
+        );
 
   } else {
 
     ESP_LOGW(
         TAG,
-        "web_server_base unavailable");
+        "web_server_base unavailable"
+    );
   }
 
 
-  ESP_LOGI(
-      TAG,
-      "================================");
+  /*
+   * Diagnosezähler mit 0 initialisieren.
+   */
+
+  if (this->crc_errors_sensor_ != nullptr)
+    this->crc_errors_sensor_->publish_state(0);
+
+
+  if (this->frame_errors_sensor_ != nullptr)
+    this->frame_errors_sensor_->publish_state(0);
 
 
   ESP_LOGI(
       TAG,
-      "Passive CD40/SCD4x CO2 sniffer");
+      "Passive CO2 sniffer ready "
+      "(I2C 0x62, SCL GPIO40, SDA GPIO39)"
+  );
 
 
-  ESP_LOGI(
+  ESP_LOGD(
       TAG,
-      "SCL = GPIO40");
-
-
-  ESP_LOGI(
-      TAG,
-      "SDA = GPIO39");
-
-
-  ESP_LOGI(
-      TAG,
-      "CH2 = GPIO38 (sample only)");
-
-
-  ESP_LOGI(
-      TAG,
-      "I2C target = 0x62");
-
-
-  ESP_LOGI(
-      TAG,
-      "command = 0xEC05");
-
-
-  ESP_LOGI(
-      TAG,
-      "================================");
+      "Raw captures available at /capture"
+  );
 }
 
 
@@ -999,9 +1096,7 @@ void BusSniffer::setup()
 void BusSniffer::loop()
 {
   /*
-   * ------------------------------------------------------------
-   * Capture durch Buffer-Overflow abgeschlossen?
-   * ------------------------------------------------------------
+   * Capture noch aktiv?
    */
 
   if (!capture_finished) {
@@ -1010,34 +1105,34 @@ void BusSniffer::loop()
       return;
 
 
-    uint32_t now =
-        (uint32_t)
-        esp_timer_get_time();
+    const uint32_t now =
+        static_cast<uint32_t>(
+            esp_timer_get_time()
+        );
 
 
-    /*
-     * Bus noch aktiv.
-     */
     if (
-        (uint32_t)
-        (now - last_edge)
-        <
-        CAPTURE_TIMEOUT_US) {
+        static_cast<uint32_t>(
+            now - last_edge
+        ) <
+        CAPTURE_TIMEOUT_US
+    ) {
 
       return;
     }
 
 
     /*
-     * Capture einfrieren.
+     * Bus war 5 ms ruhig.
      */
+
     capturing = false;
     capture_finished = true;
   }
 
 
   /*
-   * ISR verändert samples[] jetzt nicht mehr.
+   * ISR schreibt jetzt nicht mehr.
    */
 
   uint16_t count =
@@ -1048,72 +1143,211 @@ void BusSniffer::loop()
     count = MAX_SAMPLES;
 
 
-  bool overflow =
+  const bool overflow =
       capture_overflow;
 
 
-  uint8_t initial_value =
+  const uint8_t initial_value =
       capture_initial_value;
 
 
   if (count != 0) {
 
-    uint32_t duration =
-        (uint32_t)
-        (samples[count - 1].t -
-         samples[0].t);
+    const uint32_t duration =
+        static_cast<uint32_t>(
+            samples[count - 1].t -
+            samples[0].t
+        );
 
 
-    ESP_LOGD(
+    /*
+     * Nur noch VERBOSE:
+     *
+     * Bei normalem DEBUG-Logging erscheint damit nicht
+     * mehr alle ~6 Sekunden eine Capture-Zeile.
+     */
+
+    ESP_LOGV(
         TAG,
         "Capture: %u events, %lu us%s",
         count,
-        (unsigned long) duration,
-        overflow ? " OVERFLOW" : "");
+        static_cast<unsigned long>(
+            duration
+        ),
+        overflow ? " OVERFLOW" : ""
+    );
 
 
     /*
-     * I2C auswerten.
+     * Overflow = garantiert unvollständiger Capture.
      */
-    decode_i2c_capture(
-        samples,
-        count,
-        initial_value,
-        this->co2_sensor_);
+
+    if (overflow) {
+
+      this->frame_errors_++;
+
+
+      if (
+          this->frame_errors_sensor_ !=
+          nullptr
+      ) {
+
+        this->frame_errors_sensor_->
+            publish_state(
+                this->frame_errors_
+            );
+      }
+
+    } else {
+
+      const DecodeResult result =
+          decode_i2c_capture(
+              samples,
+              count,
+              initial_value
+          );
+
+
+      /*
+       * CRC-Fehler übernehmen.
+       */
+
+      if (result.crc_errors != 0) {
+
+        this->crc_errors_ +=
+            result.crc_errors;
+
+
+        if (
+            this->crc_errors_sensor_ !=
+            nullptr
+        ) {
+
+          this->crc_errors_sensor_->
+              publish_state(
+                  this->crc_errors_
+              );
+        }
+      }
+
+
+      /*
+       * Framefehler übernehmen.
+       */
+
+      if (result.frame_errors != 0) {
+
+        this->frame_errors_ +=
+            result.frame_errors;
+
+
+        if (
+            this->frame_errors_sensor_ !=
+            nullptr
+        ) {
+
+          this->frame_errors_sensor_->
+              publish_state(
+                  this->frame_errors_
+              );
+        }
+      }
+
+
+      /*
+       * CO2 nur publizieren, wenn sich der Wert
+       * tatsächlich geändert hat.
+       */
+
+      if (result.have_co2) {
+
+        const uint16_t ppm =
+            result.co2_ppm;
+
+
+        if (
+            !this->have_last_ppm_ ||
+            ppm != this->last_ppm_
+        ) {
+
+          this->have_last_ppm_ =
+              true;
+
+
+          this->last_ppm_ =
+              ppm;
+
+
+          ESP_LOGI(
+              TAG,
+              "CO2: %u ppm",
+              ppm
+          );
+
+
+          if (
+              this->co2_sensor_ !=
+              nullptr
+          ) {
+
+            this->co2_sensor_->
+                publish_state(
+                    static_cast<float>(
+                        ppm
+                    )
+                );
+          }
+
+        } else {
+
+          ESP_LOGV(
+              TAG,
+              "CO2 unchanged: %u ppm",
+              ppm
+          );
+        }
+      }
+    }
 
 
     /*
-     * Rohdaten für /capture archivieren.
+     * Den letzten Capture unabhängig vom Decoderergebnis
+     * weiterhin für /capture aufbewahren.
      */
+
     store_raw_capture(
         samples,
         count,
-        overflow);
+        overflow
+    );
   }
 
 
   /*
-   * ------------------------------------------------------------
-   * Sofort nächsten Capture starten.
-   * ------------------------------------------------------------
+   * ==========================================================================
+   * Nächsten Capture sofort starten
+   * ==========================================================================
    */
 
   sample_count = 0;
 
   capture_overflow = false;
+
   capture_finished = false;
 
 
   last_value =
       read_gpio_state();
 
+
   capture_initial_value =
       last_value;
 
 
   last_edge =
-      (uint32_t)
-      esp_timer_get_time();
+      static_cast<uint32_t>(
+          esp_timer_get_time()
+      );
 
 
   capturing = true;
