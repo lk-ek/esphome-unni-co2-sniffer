@@ -7,601 +7,596 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 
-#include <stdint.h>
-
 namespace esphome {
 namespace bus_sniffer {
 
 static const char *TAG = "BUS";
 
 /*
- * Vermutete Belegung:
+ * I2C:
  *
- * GPIO38 = SCL
+ * GPIO39 = SCL
  * GPIO40 = SDA
- * GPIO39 = unbekanntes drittes Signal
+ *
+ * GPIO38 = zusätzliches Signal, wird nur mitgesampelt.
  */
-static constexpr gpio_num_t PIN_SCL = GPIO_NUM_38;
-static constexpr gpio_num_t PIN_AUX = GPIO_NUM_39;
+static constexpr gpio_num_t PIN_SCL = GPIO_NUM_39;
 static constexpr gpio_num_t PIN_SDA = GPIO_NUM_40;
+static constexpr gpio_num_t PIN_OTHER = GPIO_NUM_38;
 
-
-/*
- * GPIO39 erzeugt offenbar sehr viele Flanken.
- *
- * 2048 Samples reichen für die bisher beobachteten Transaktionen
- * normalerweise aus. Der Speicherbedarf beträgt nur ca. 8 kB.
- */
-static constexpr uint16_t MAX_SAMPLES = 2048;
-
+static constexpr int MAX_SAMPLES = 4096;
 
 /*
- * Eine Transaktion gilt als beendet, wenn 20 ms lang keine
- * Flanke mehr aufgetreten ist.
- *
- * Das ist absichtlich deutlich kürzer als vorher 50 ms, damit
- * kontinuierliche Signale nicht alles zu einem riesigen Frame
- * zusammenfassen.
+ * Ein Capture wird beendet, wenn für diese Zeit keine
+ * SCL/SDA-Flanke mehr gekommen ist.
  */
-static constexpr uint32_t FRAME_TIMEOUT_US = 20000;
-
+static constexpr uint32_t FRAME_TIMEOUT_US = 5000;
 
 /*
  * Sehr kurze Glitches ignorieren.
- *
- * 2-3 us wurden bereits beobachtet. Deshalb zunächst nur
- * 2 us als Grenze verwenden.
+ * 1 us ist hier absichtlich relativ konservativ.
  */
-static constexpr uint32_t GLITCH_FILTER_US = 2;
+static constexpr uint32_t GLITCH_FILTER_US = 1;
 
-
-/*
- * Sample:
- *
- * bit 0 = GPIO38 / SCL
- * bit 1 = GPIO39 / AUX
- * bit 2 = GPIO40 / SDA
- */
 struct Sample {
   uint32_t t;
   uint8_t value;
 };
 
+/*
+ * Bits:
+ *
+ * bit 0 = SCL
+ * bit 1 = SDA
+ * bit 2 = GPIO38
+ */
+volatile Sample samples[MAX_SAMPLES];
+volatile uint16_t sample_count = 0;
+
+volatile uint32_t last_edge = 0;
+volatile uint8_t last_value = 0xff;
+
+static uint8_t read_bus()
+{
+  uint8_t v = 0;
+
+  if (gpio_get_level(PIN_SCL))
+    v |= 1;
+
+  if (gpio_get_level(PIN_SDA))
+    v |= 2;
+
+  if (gpio_get_level(PIN_OTHER))
+    v |= 4;
+
+  return v;
+}
+
 
 /*
- * ISR-Ring/Buffer.
+ * ISR
  *
- * Die ISR schreibt ausschließlich hier hinein.
+ * Nur SCL und SDA lösen Interrupts aus.
+ * GPIO38 wird lediglich zusammen mit den beiden Busleitungen
+ * abgetastet.
  */
-static volatile Sample samples[MAX_SAMPLES];
-static volatile uint16_t sample_count = 0;
+static void IRAM_ATTR gpio_isr(void *arg)
+{
+  uint32_t now = (uint32_t) esp_timer_get_time();
 
-static volatile uint32_t last_edge = 0;
-static volatile uint8_t last_value = 0xff;
+  uint8_t v = read_bus();
 
-static portMUX_TYPE sample_mux = portMUX_INITIALIZER_UNLOCKED;
+  /*
+   * Gleichen Zustand nicht zweimal speichern.
+   */
+  if (v == last_value)
+    return;
+
+  /*
+   * Sehr kurze Glitches ignorieren.
+   */
+  if ((uint32_t)(now - last_edge) < GLITCH_FILTER_US)
+    return;
+
+  last_edge = now;
+  last_value = v;
+
+  if (sample_count < MAX_SAMPLES) {
+    samples[sample_count].t = now;
+    samples[sample_count].value = v;
+    sample_count++;
+  }
+}
 
 
 /*
  * Hilfsfunktionen
  */
 
-static inline uint8_t get_scl(uint8_t v) {
-  return (v & 0x01) ? 1 : 0;
+static bool scl(const Sample &s)
+{
+  return (s.value & 1) != 0;
 }
 
-static inline uint8_t get_aux(uint8_t v) {
-  return (v & 0x02) ? 1 : 0;
+static bool sda(const Sample &s)
+{
+  return (s.value & 2) != 0;
 }
 
-static inline uint8_t get_sda(uint8_t v) {
-  return (v & 0x04) ? 1 : 0;
+static bool other(const Sample &s)
+{
+  return (s.value & 4) != 0;
 }
 
 
 /*
- * I2C-Dekoder
- *
- * Wir analysieren ausschließlich:
- *
- *   GPIO38 = SCL
- *   GPIO40 = SDA
- *
- * GPIO39 wird separat ausgewertet.
+ * I2C Decoder
  */
-struct I2CDecoder {
-  bool active = false;
-
-  uint8_t byte_value = 0;
-  uint8_t bit_count = 0;
-
-  uint32_t start_time = 0;
-
-  uint32_t bytes = 0;
+struct I2CStats {
   uint32_t starts = 0;
   uint32_t stops = 0;
-  uint32_t acks = 0;
-  uint32_t nacks = 0;
 
-  bool have_last = false;
-  uint8_t last_scl = 1;
-  uint8_t last_sda = 1;
+  uint32_t bytes = 0;
+  uint32_t ack = 0;
+  uint32_t nack = 0;
+
+  uint32_t address_count = 0;
+
+  uint8_t current_byte = 0;
+  int bit_count = 0;
+
+  bool active = false;
+  bool have_previous = false;
+
+  uint8_t previous_value = 0;
 };
 
 
-/*
- * Ausgabe eines fertig dekodierten Bytes.
- */
-static void log_i2c_byte(uint8_t value, bool ack, uint32_t t) {
+static void log_byte(uint8_t byte, bool address, bool read)
+{
+  if (address) {
+    uint8_t addr = byte >> 1;
 
-  uint8_t address = value >> 1;
-  bool read = value & 1;
-
-  /*
-   * Das erste Byte nach START ist normalerweise die Adresse.
-   */
-  ESP_LOGI(
-      TAG,
-      "I2C %lu us: BYTE 0x%02X%s",
-      (unsigned long)t,
-      value,
-      ack ? " ACK" : " NACK"
-  );
-
-  /*
-   * 0x62 ist die erwartete Adresse der SCD4x-Familie.
-   */
-  if (address == 0x62) {
     ESP_LOGI(
         TAG,
-        "       -> SCD4x address 0x62, %s",
-        read ? "READ" : "WRITE"
-    );
+        "  ADDRESS: 0x%02X (%u) %s",
+        addr,
+        addr,
+        read ? "READ" : "WRITE");
+
+  } else {
+
+    char ascii = '.';
+
+    if (byte >= 32 && byte <= 126)
+      ascii = (char) byte;
+
+    ESP_LOGI(
+        TAG,
+        "  DATA:    0x%02X (%3u) '%c'",
+        byte,
+        byte,
+        ascii);
   }
 }
 
 
 /*
- * I2C-Decoder über die aufgezeichneten Samples laufen lassen.
+ * Decodiert einen einzelnen Capture.
  */
 static void decode_i2c(
     const Sample *data,
-    uint16_t count
-) {
-
-  I2CDecoder d;
-
-  if (count < 2) {
+    uint16_t count)
+{
+  if (count < 2)
     return;
-  }
 
-  d.last_scl = get_scl(data[0].value);
-  d.last_sda = get_sda(data[0].value);
-  d.have_last = true;
+  ESP_LOGI(TAG, "I2C DECODE");
+  ESP_LOGI(TAG, "------------------------------");
+
+  I2CStats st;
+
+  uint32_t base = data[0].t;
+
+  bool in_transaction = false;
+
+  /*
+   * Nach START ist das nächste Byte immer die Adresse.
+   */
+  bool first_byte = true;
+
+  /*
+   * Datenbitzähler:
+   *
+   * 0..7 = Datenbits
+   * 8    = ACK/NACK
+   */
+  int bit_count = 0;
+  uint8_t current_byte = 0;
+
+  uint32_t last_scl_rise = 0;
 
   for (uint16_t i = 1; i < count; i++) {
 
-    const uint8_t prev = data[i - 1].value;
-    const uint8_t cur = data[i].value;
+    const Sample &prev = data[i - 1];
+    const Sample &cur = data[i];
 
-    const uint8_t prev_scl = get_scl(prev);
-    const uint8_t prev_sda = get_sda(prev);
+    bool prev_scl = scl(prev);
+    bool prev_sda = sda(prev);
 
-    const uint8_t scl = get_scl(cur);
-    const uint8_t sda = get_sda(cur);
+    bool cur_scl = scl(cur);
+    bool cur_sda = sda(cur);
 
-    const uint32_t t = data[i].t;
-
+    uint32_t rel =
+        (uint32_t)(cur.t - base);
 
     /*
-     * START:
-     *
+     * ----------------------------------------
+     * START
      * SDA: HIGH -> LOW
-     * SCL: HIGH
+     * SCL bleibt HIGH
+     * ----------------------------------------
      */
-    if (prev_sda == 1 && sda == 0 && scl == 1) {
+    if (prev_sda && !cur_sda &&
+        prev_scl && cur_scl) {
 
-      d.active = true;
-      d.byte_value = 0;
-      d.bit_count = 0;
-      d.start_time = t;
-      d.starts++;
+      st.starts++;
 
       ESP_LOGI(
           TAG,
-          "I2C %lu us: START",
-          (unsigned long)t
-      );
+          "%lu us: START",
+          (unsigned long) rel);
+
+      in_transaction = true;
+      first_byte = true;
+
+      bit_count = 0;
+      current_byte = 0;
 
       continue;
     }
 
-
     /*
-     * STOP:
-     *
+     * ----------------------------------------
+     * STOP
      * SDA: LOW -> HIGH
-     * SCL: HIGH
+     * SCL bleibt HIGH
+     * ----------------------------------------
      */
-    if (prev_sda == 0 && sda == 1 && scl == 1) {
+    if (!prev_sda && cur_sda &&
+        prev_scl && cur_scl) {
 
-      if (d.active) {
+      st.stops++;
 
-        ESP_LOGI(
-            TAG,
-            "I2C %lu us: STOP",
-            (unsigned long)t
-        );
-      }
+      ESP_LOGI(
+          TAG,
+          "%lu us: STOP",
+          (unsigned long) rel);
 
-      d.active = false;
-      d.byte_value = 0;
-      d.bit_count = 0;
-      d.stops++;
+      in_transaction = false;
+
+      bit_count = 0;
+      current_byte = 0;
 
       continue;
     }
-
-
-    if (!d.active) {
-      continue;
-    }
-
 
     /*
-     * Daten werden auf der steigenden SCL-Flanke
-     * übernommen.
+     * Nur innerhalb einer Transaktion Bytes dekodieren.
      */
-    if (prev_scl == 0 && scl == 1) {
+    if (!in_transaction)
+      continue;
+
+    /*
+     * ----------------------------------------
+     * SCL rising edge
+     *
+     * SDA wird bei HIGH von SCL ausgewertet.
+     * ----------------------------------------
+     */
+    if (!prev_scl && cur_scl) {
 
       /*
-       * Die ersten 8 Clock-Flanken enthalten das Byte.
+       * Erste steigende Flanke nach START:
+       * Datenbit.
        */
-      if (d.bit_count < 8) {
 
-        d.byte_value <<= 1;
+      if (bit_count < 8) {
 
-        if (sda) {
-          d.byte_value |= 1;
-        }
+        current_byte <<= 1;
 
-        d.bit_count++;
+        if (cur_sda)
+          current_byte |= 1;
+
+        bit_count++;
+
+        last_scl_rise = cur.t;
 
       } else {
 
         /*
-         * 9. Clock = ACK/NACK
-         *
-         * SDA LOW  = ACK
-         * SDA HIGH = NACK
+         * 9. Clock:
+         * ACK = SDA LOW
+         * NACK = SDA HIGH
          */
-        const bool ack = (sda == 0);
 
-        if (ack) {
-          d.acks++;
+        if (cur_sda) {
+          st.nack++;
+
+          ESP_LOGI(
+              TAG,
+              "  NACK");
         } else {
-          d.nacks++;
+          st.ack++;
+
+          ESP_LOGI(
+              TAG,
+              "  ACK");
         }
 
-        d.bytes++;
+        st.bytes++;
 
-        log_i2c_byte(
-            d.byte_value,
-            ack,
-            t
-        );
+        log_byte(
+            current_byte,
+            first_byte,
+            first_byte ? ((current_byte & 1) != 0) : false);
 
-        d.byte_value = 0;
-        d.bit_count = 0;
+        first_byte = false;
+
+        bit_count = 0;
+        current_byte = 0;
       }
     }
   }
-
-
-  ESP_LOGI(TAG, "I2C summary:");
-  ESP_LOGI(
-      TAG,
-      "  START=%lu STOP=%lu BYTES=%lu ACK=%lu NACK=%lu",
-      (unsigned long)d.starts,
-      (unsigned long)d.stops,
-      (unsigned long)d.bytes,
-      (unsigned long)d.acks,
-      (unsigned long)d.nacks
-  );
-}
-
-
-/*
- * Analyse des dritten Pins GPIO39.
- */
-static void analyze_aux(
-    const Sample *data,
-    uint16_t count
-) {
-
-  uint32_t rising = 0;
-  uint32_t falling = 0;
-
-  uint32_t min_delta = UINT32_MAX;
-  uint32_t max_delta = 0;
-
-  uint32_t last_change = 0;
-
-  uint8_t previous = get_aux(data[0].value);
 
   /*
-   * Wir zählen nur tatsächliche GPIO39-Änderungen.
+   * Zusammenfassung
    */
-  for (uint16_t i = 1; i < count; i++) {
-
-    const uint8_t current = get_aux(data[i].value);
-
-    if (current == previous) {
-      continue;
-    }
-
-    const uint32_t dt = data[i].t - last_change;
-
-    /*
-     * last_change ist zunächst 0.
-     * Deshalb erst ab dem zweiten echten Wechsel
-     * die Differenz auswerten.
-     */
-    if (last_change != 0) {
-
-      if (dt < min_delta) {
-        min_delta = dt;
-      }
-
-      if (dt > max_delta) {
-        max_delta = dt;
-      }
-    }
-
-    last_change = data[i].t;
-
-    if (current) {
-      rising++;
-    } else {
-      falling++;
-    }
-
-    previous = current;
-  }
-
-
-  ESP_LOGI(TAG, "GPIO39 analysis:");
-  ESP_LOGI(
-      TAG,
-      "  rising=%lu falling=%lu total=%lu",
-      (unsigned long)rising,
-      (unsigned long)falling,
-      (unsigned long)(rising + falling)
-  );
-
-  if (min_delta != UINT32_MAX) {
-
-    ESP_LOGI(
-        TAG,
-        "  min GPIO39 interval=%lu us",
-        (unsigned long)min_delta
-    );
-
-    ESP_LOGI(
-        TAG,
-        "  max GPIO39 rate=%.1f kHz",
-        1000.0f / (float)min_delta
-    );
-  }
-
-  if (max_delta != 0) {
-
-    ESP_LOGI(
-        TAG,
-        "  max GPIO39 interval=%lu us",
-        (unsigned long)max_delta
-    );
-  }
-}
-
-
-/*
- * Allgemeine Statistik.
- */
-static void analyze_statistics(
-    const Sample *data,
-    uint16_t count
-) {
-
-  uint32_t changes[3] = {0, 0, 0};
-
-  uint32_t rising[3] = {0, 0, 0};
-  uint32_t falling[3] = {0, 0, 0};
-
-  uint32_t min_delta = UINT32_MAX;
-  uint32_t max_delta = 0;
-
-  for (uint16_t i = 1; i < count; i++) {
-
-    const uint32_t dt =
-        data[i].t - data[i - 1].t;
-
-    if (dt < min_delta) {
-      min_delta = dt;
-    }
-
-    if (dt > max_delta) {
-      max_delta = dt;
-    }
-
-    const uint8_t old_value =
-        data[i - 1].value;
-
-    const uint8_t new_value =
-        data[i].value;
-
-    const uint8_t diff =
-        old_value ^ new_value;
-
-
-    for (int bit = 0; bit < 3; bit++) {
-
-      const uint8_t mask =
-          1 << bit;
-
-      if (!(diff & mask)) {
-        continue;
-      }
-
-      changes[bit]++;
-
-      if (new_value & mask) {
-        rising[bit]++;
-      } else {
-        falling[bit]++;
-      }
-    }
-  }
-
-
   ESP_LOGI(TAG, "------------------------------");
 
   ESP_LOGI(
       TAG,
-      "changes: GPIO38=%lu GPIO39=%lu GPIO40=%lu",
-      (unsigned long)changes[0],
-      (unsigned long)changes[1],
-      (unsigned long)changes[2]
-  );
+      "START=%lu STOP=%lu",
+      (unsigned long) st.starts,
+      (unsigned long) st.stops);
 
   ESP_LOGI(
       TAG,
-      "rising : GPIO38=%lu GPIO39=%lu GPIO40=%lu",
-      (unsigned long)rising[0],
-      (unsigned long)rising[1],
-      (unsigned long)rising[2]
-  );
+      "BYTES=%lu ACK=%lu NACK=%lu",
+      (unsigned long) st.bytes,
+      (unsigned long) st.ack,
+      (unsigned long) st.nack);
+
+  ESP_LOGI(TAG, "------------------------------");
+}
+
+
+/*
+ * Statistik über GPIO39/40
+ */
+static void analyze_bus(
+    const Sample *data,
+    uint16_t count)
+{
+  if (count < 2)
+    return;
+
+  uint32_t scl_rising = 0;
+  uint32_t scl_falling = 0;
+
+  uint32_t sda_rising = 0;
+  uint32_t sda_falling = 0;
+
+  uint32_t min_delta = UINT32_MAX;
+  uint32_t max_delta = 0;
+
+  uint32_t scl_min_delta = UINT32_MAX;
+  uint32_t scl_max_delta = 0;
+
+  uint32_t sda_min_delta = UINT32_MAX;
+  uint32_t sda_max_delta = 0;
+
+  uint32_t last_scl_edge = data[0].t;
+  uint32_t last_sda_edge = data[0].t;
+
+  uint32_t other_changes = 0;
+
+  for (uint16_t i = 1; i < count; i++) {
+
+    uint32_t dt =
+        (uint32_t)(data[i].t - data[i - 1].t);
+
+    if (dt < min_delta)
+      min_delta = dt;
+
+    if (dt > max_delta)
+      max_delta = dt;
+
+    bool pscl = scl(data[i - 1]);
+    bool cscl = scl(data[i]);
+
+    bool psda = sda(data[i - 1]);
+    bool csda = sda(data[i]);
+
+    bool pother = other(data[i - 1]);
+    bool cother = other(data[i]);
+
+    /*
+     * SCL
+     */
+    if (!pscl && cscl) {
+
+      scl_rising++;
+
+      uint32_t d =
+          (uint32_t)(data[i].t - last_scl_edge);
+
+      if (d < scl_min_delta)
+        scl_min_delta = d;
+
+      if (d > scl_max_delta)
+        scl_max_delta = d;
+
+      last_scl_edge = data[i].t;
+    }
+
+    if (pscl && !cscl) {
+
+      scl_falling++;
+
+      uint32_t d =
+          (uint32_t)(data[i].t - last_scl_edge);
+
+      if (d < scl_min_delta)
+        scl_min_delta = d;
+
+      if (d > scl_max_delta)
+        scl_max_delta = d;
+
+      last_scl_edge = data[i].t;
+    }
+
+    /*
+     * SDA
+     */
+    if (!psda && csda) {
+
+      sda_rising++;
+
+      uint32_t d =
+          (uint32_t)(data[i].t - last_sda_edge);
+
+      if (d < sda_min_delta)
+        sda_min_delta = d;
+
+      if (d > sda_max_delta)
+        sda_max_delta = d;
+
+      last_sda_edge = data[i].t;
+    }
+
+    if (psda && !csda) {
+
+      sda_falling++;
+
+      uint32_t d =
+          (uint32_t)(data[i].t - last_sda_edge);
+
+      if (d < sda_min_delta)
+        sda_min_delta = d;
+
+      if (d > sda_max_delta)
+        sda_max_delta = d;
+
+      last_sda_edge = data[i].t;
+    }
+
+    /*
+     * GPIO38 separat zählen.
+     */
+    if (pother != cother)
+      other_changes++;
+  }
+
+  ESP_LOGI(TAG, "BUS STATISTICS");
+  ESP_LOGI(TAG, "------------------------------");
 
   ESP_LOGI(
       TAG,
-      "falling: GPIO38=%lu GPIO39=%lu GPIO40=%lu",
-      (unsigned long)falling[0],
-      (unsigned long)falling[1],
-      (unsigned long)falling[2]
-  );
+      "SCL GPIO39: rising=%lu falling=%lu",
+      (unsigned long) scl_rising,
+      (unsigned long) scl_falling);
 
-  if (min_delta != UINT32_MAX) {
+  ESP_LOGI(
+      TAG,
+      "SDA GPIO40: rising=%lu falling=%lu",
+      (unsigned long) sda_rising,
+      (unsigned long) sda_falling);
 
-    ESP_LOGI(
-        TAG,
-        "min edge spacing: %lu us",
-        (unsigned long)min_delta
-    );
+  if (scl_min_delta != UINT32_MAX) {
 
     ESP_LOGI(
         TAG,
-        "max edge rate: %.1f kHz",
-        1000.0f / (float)min_delta
-    );
+        "SCL min interval: %lu us",
+        (unsigned long) scl_min_delta);
+
+    ESP_LOGI(
+        TAG,
+        "SCL max interval: %lu us",
+        (unsigned long) scl_max_delta);
+
+    if (scl_min_delta > 0) {
+
+      ESP_LOGI(
+          TAG,
+          "SCL max edge rate: %.1f kHz",
+          1000.0f / scl_min_delta);
+    }
+  }
+
+  if (sda_min_delta != UINT32_MAX) {
+
+    ESP_LOGI(
+        TAG,
+        "SDA min interval: %lu us",
+        (unsigned long) sda_min_delta);
+
+    ESP_LOGI(
+        TAG,
+        "SDA max interval: %lu us",
+        (unsigned long) sda_max_delta);
   }
 
   ESP_LOGI(
       TAG,
-      "longest interval: %lu us",
-      (unsigned long)max_delta
-  );
+      "GPIO38 changes: %lu",
+      (unsigned long) other_changes);
+
+  ESP_LOGI(TAG, "------------------------------");
 }
 
 
 /*
  * Rohdaten ausgeben.
  *
- * Maximal 300 Samples, damit der ESPHome-Logger nicht
- * mit tausenden Zeilen geflutet wird.
+ * Bei großen Captures nur die ersten 200 Samples.
  */
-static void dump_samples(
+static void dump_data(
     const Sample *data,
-    uint16_t count
-) {
+    uint16_t count)
+{
+  uint16_t limit = count;
 
-  ESP_LOGI(TAG, "DATA:");
+  if (limit > 200)
+    limit = 200;
 
-  const uint16_t limit =
-      (count < 300) ? count : 300;
+  if (count > limit) {
+    ESP_LOGI(
+        TAG,
+        "RAW DATA: first %u of %u samples",
+        limit,
+        count);
+  } else {
+    ESP_LOGI(
+        TAG,
+        "RAW DATA: %u samples",
+        count);
+  }
 
-  const uint32_t base =
-      data[0].t;
+  uint32_t base = data[0].t;
 
   for (uint16_t i = 0; i < limit; i++) {
 
-    const uint32_t rel =
-        data[i].t - base;
+    uint32_t rel =
+        (uint32_t)(data[i].t - base);
 
     ESP_LOGI(
         TAG,
-        "%lu us %u%u%u",
-        (unsigned long)rel,
-        get_scl(data[i].value),
-        get_aux(data[i].value),
-        get_sda(data[i].value)
-    );
-  }
-
-  if (count > limit) {
-
-    ESP_LOGI(
-        TAG,
-        "... %u more samples omitted",
-        count - limit
-    );
-  }
-}
-
-
-/*
- * GPIO ISR
- */
-static void IRAM_ATTR gpio_isr(void *arg) {
-
-  const uint32_t now =
-      (uint32_t)esp_timer_get_time();
-
-
-  const uint8_t value =
-      (gpio_get_level(PIN_SCL) ? 0x01 : 0) |
-      (gpio_get_level(PIN_AUX) ? 0x02 : 0) |
-      (gpio_get_level(PIN_SDA) ? 0x04 : 0);
-
-
-  /*
-   * Identische Zustände nicht erneut speichern.
-   */
-  if (value == last_value) {
-    return;
-  }
-
-
-  /*
-   * Sehr kurze Glitches unterdrücken.
-   */
-  if ((uint32_t)(now - last_edge) < GLITCH_FILTER_US) {
-    return;
-  }
-
-
-  last_edge = now;
-  last_value = value;
-
-
-  /*
-   * Sample speichern.
-   */
-  if (sample_count < MAX_SAMPLES) {
-
-    samples[sample_count].t = now;
-    samples[sample_count].value = value;
-
-    sample_count++;
+        "%lu us SCL=%u SDA=%u GPIO38=%u",
+        (unsigned long) rel,
+        scl(data[i]) ? 1 : 0,
+        sda(data[i]) ? 1 : 0,
+        other(data[i]) ? 1 : 0);
   }
 }
 
@@ -609,279 +604,214 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 /*
  * Setup
  */
-void BusSniffer::setup() {
-
+void BusSniffer::setup()
+{
   /*
-   * Alle drei Pins als reine Eingänge.
+   * GPIOs als reine Eingänge.
    *
-   * WICHTIG:
-   * Keine internen Pull-Ups.
-   *
-   * Die beiden 10-kOhm-Pullups auf der Sensorplatine
-   * sind für I2C genau das, was wir erwarten.
+   * Keine internen Pullups aktivieren!
+   * Die Platine hat bereits externe 10k Pullups.
    */
   gpio_config_t io = {};
 
   io.mode = GPIO_MODE_INPUT;
 
-  io.pull_up_en =
-      GPIO_PULLUP_DISABLE;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
 
-  io.pull_down_en =
-      GPIO_PULLDOWN_DISABLE;
-
-  io.intr_type =
-      GPIO_INTR_ANYEDGE;
+  /*
+   * Wichtig:
+   * Nur GPIO39 und GPIO40 lösen Interrupts aus.
+   *
+   * GPIO38 ist NICHT Bestandteil der Interrupt-Maske.
+   */
+  io.intr_type = GPIO_INTR_ANYEDGE;
 
   io.pin_bit_mask =
       (1ULL << PIN_SCL) |
-      (1ULL << PIN_AUX) |
       (1ULL << PIN_SDA);
 
-
-  ESP_ERROR_CHECK(
-      gpio_config(&io)
-  );
-
+  gpio_config(&io);
 
   /*
-   * GPIO-ISR-Service.
+   * GPIO38 separat als Eingang konfigurieren.
+   */
+  gpio_config_t other_io = {};
+
+  other_io.mode = GPIO_MODE_INPUT;
+  other_io.pull_up_en = GPIO_PULLUP_DISABLE;
+  other_io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  other_io.intr_type = GPIO_INTR_DISABLE;
+  other_io.pin_bit_mask = (1ULL << PIN_OTHER);
+
+  gpio_config(&other_io);
+
+  /*
+   * ISR-Service.
    */
   esp_err_t err =
       gpio_install_isr_service(0);
 
-  if (err != ESP_OK &&
-      err != ESP_ERR_INVALID_STATE) {
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
 
     ESP_LOGE(
         TAG,
-        "gpio_install_isr_service failed: %s",
-        esp_err_to_name(err)
-    );
+        "gpio_install_isr_service failed: %d",
+        err);
 
     return;
   }
 
+  err = gpio_isr_handler_add(
+      PIN_SCL,
+      gpio_isr,
+      nullptr);
 
-  ESP_ERROR_CHECK(
-      gpio_isr_handler_add(
-          PIN_SCL,
-          gpio_isr,
-          nullptr
-      )
-  );
+  if (err != ESP_OK) {
 
-  ESP_ERROR_CHECK(
-      gpio_isr_handler_add(
-          PIN_AUX,
-          gpio_isr,
-          nullptr
-      )
-  );
+    ESP_LOGE(
+        TAG,
+        "ISR GPIO39 failed: %d",
+        err);
 
-  ESP_ERROR_CHECK(
-      gpio_isr_handler_add(
-          PIN_SDA,
-          gpio_isr,
-          nullptr
-      )
-  );
+    return;
+  }
 
+  err = gpio_isr_handler_add(
+      PIN_SDA,
+      gpio_isr,
+      nullptr);
+
+  if (err != ESP_OK) {
+
+    ESP_LOGE(
+        TAG,
+        "ISR GPIO40 failed: %d",
+        err);
+
+    return;
+  }
 
   /*
-   * Anfangszustand aufnehmen.
+   * Anfangszustand synchronisieren.
    */
-  last_value =
-      (gpio_get_level(PIN_SCL) ? 0x01 : 0) |
-      (gpio_get_level(PIN_AUX) ? 0x02 : 0) |
-      (gpio_get_level(PIN_SDA) ? 0x04 : 0);
+  last_value = read_bus();
+  last_edge = (uint32_t) esp_timer_get_time();
 
-  last_edge =
-      (uint32_t)esp_timer_get_time();
-
-
-  ESP_LOGI(
-      TAG,
-      "Bus sniffer started"
-  );
-
-  ESP_LOGI(
-      TAG,
-      "I2C candidate: SCL=GPIO38 SDA=GPIO40"
-  );
-
-  ESP_LOGI(
-      TAG,
-      "Auxiliary signal: GPIO39"
-  );
+  ESP_LOGI(TAG, "==============================");
+  ESP_LOGI(TAG, "I2C sniffer started");
+  ESP_LOGI(TAG, "SCL = GPIO39");
+  ESP_LOGI(TAG, "SDA = GPIO40");
+  ESP_LOGI(TAG, "OTHER = GPIO38");
+  ESP_LOGI(TAG, "==============================");
 }
 
 
 /*
  * Loop
  */
-void BusSniffer::loop() {
-
-  if (sample_count == 0) {
+void BusSniffer::loop()
+{
+  if (sample_count == 0)
     return;
-  }
 
-
-  const uint32_t now =
-      (uint32_t)esp_timer_get_time();
-
+  uint32_t now =
+      (uint32_t) esp_timer_get_time();
 
   /*
    * Noch Aktivität?
    */
-  const uint32_t last =
-      last_edge;
-
-  if ((uint32_t)(now - last) <
-      FRAME_TIMEOUT_US) {
-
+  if ((uint32_t)(now - last_edge) <
+      FRAME_TIMEOUT_US)
     return;
-  }
-
 
   /*
-   * Wir übernehmen die Samples atomar.
-   *
-   * Die lokale Kopie ist static, damit sie NICHT
-   * auf dem FreeRTOS-Stack liegt.
+   * Interrupts kurz sperren.
    */
-  static Sample local[MAX_SAMPLES];
+  portDISABLE_INTERRUPTS();
 
+  uint16_t count = sample_count;
 
-  uint16_t count;
-
-
-  portENTER_CRITICAL(&sample_mux);
-
-  count = sample_count;
-
-  if (count > MAX_SAMPLES) {
+  if (count > MAX_SAMPLES)
     count = MAX_SAMPLES;
-  }
-
 
   /*
-   * Explizit kopieren.
+   * Wichtig:
    *
-   * Kein:
+   * volatile -> normal
+   * deshalb NICHT:
    *
-   *   local[i] = samples[i];
+   * local[i] = samples[i];
    *
-   * weil samples[] volatile ist.
+   * sondern jedes Feld einzeln kopieren.
    */
+  Sample local[MAX_SAMPLES];
+
   for (uint16_t i = 0; i < count; i++) {
 
-    local[i].t =
-        samples[i].t;
-
-    local[i].value =
-        samples[i].value;
+    local[i].t = samples[i].t;
+    local[i].value = samples[i].value;
   }
 
+  bool overflow =
+      (sample_count >= MAX_SAMPLES);
 
   sample_count = 0;
 
-  portEXIT_CRITICAL(&sample_mux);
+  portENABLE_INTERRUPTS();
 
-
-  if (count == 0) {
+  if (count == 0)
     return;
-  }
 
-
-  ESP_LOGI(
-      TAG,
-      "=============================="
-  );
+  ESP_LOGI(TAG, "==============================");
 
   ESP_LOGI(
       TAG,
       "Captured %u samples",
-      count
-  );
+      count);
 
-
-  if (count >= MAX_SAMPLES) {
+  if (overflow) {
 
     ESP_LOGW(
         TAG,
-        "Buffer overflow - frame truncated"
-    );
+        "Buffer overflow - frame truncated");
   }
 
-
   /*
-   * Allgemeine Statistik.
+   * Busstatistik
    */
-  analyze_statistics(
+  analyze_bus(
       local,
-      count
-  );
-
+      count);
 
   /*
-   * GPIO39 unabhängig untersuchen.
+   * I2C dekodieren
    */
-  analyze_aux(
-      local,
-      count
-  );
-
-
-  /*
-   * I2C aus GPIO38/40 dekodieren.
-   */
-  ESP_LOGI(
-      TAG,
-      "I2C decode:"
-  );
-
   decode_i2c(
       local,
-      count
-  );
-
+      count);
 
   /*
-   * Rohdaten nur bei kleinen Frames vollständig
-   * ausgeben.
+   * Rohdaten nur bei überschaubaren Captures.
    *
-   * Bei den großen 1024-Sample-Frames würden wir
-   * sonst den ESPHome-Logger massiv belasten.
+   * Große Captures können den ESP-Logger massiv belasten.
    */
   if (count <= 300) {
 
-    dump_samples(
+    dump_data(
         local,
-        count
-    );
+        count);
 
   } else {
 
     ESP_LOGI(
         TAG,
         "Raw data omitted (%u samples)",
-        count
-    );
-
-    ESP_LOGI(
-        TAG,
-        "Use I2C decoder + GPIO39 statistics above."
-    );
+        count);
   }
 
-
-  ESP_LOGI(
-      TAG,
-      "=============================="
-  );
+  ESP_LOGI(TAG, "==============================");
 }
 
 }  // namespace bus_sniffer
 }  // namespace esphome
-
