@@ -8,8 +8,6 @@ external_components:
       type: local
       path: .
 
-bus_sniffer:
-
 # Enable logging
 logger:
   level: DEBUG
@@ -46,3 +44,8 @@ esp32:
 web_server:
   port: 80
 
+bus_sniffer:
+  co2:
+    name: "CO2"
+    id: cd40_co2
+    icon: mdi:molecule-co2
