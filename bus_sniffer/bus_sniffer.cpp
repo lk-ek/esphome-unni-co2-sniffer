@@ -10,53 +10,65 @@ namespace bus_sniffer {
 
 static const char *TAG = "BUS";
 
-// deine Pins
 static constexpr gpio_num_t PIN_A = GPIO_NUM_38;
 static constexpr gpio_num_t PIN_B = GPIO_NUM_39;
 static constexpr gpio_num_t PIN_C = GPIO_NUM_40;
 
-static constexpr int MAX_SAMPLES = 512;
-static constexpr uint32_t FRAME_TIMEOUT_US = 50000; // 50 ms
+static constexpr int MAX_SAMPLES = 1024;
+
+static constexpr uint32_t FRAME_TIMEOUT_US = 50000;
+static constexpr uint32_t GLITCH_FILTER_US = 5;
+
 
 struct Sample {
   uint32_t t;
   uint8_t value;
 };
 
+
 volatile Sample samples[MAX_SAMPLES];
 volatile uint16_t sample_count = 0;
 
 volatile uint64_t last_edge = 0;
+volatile uint8_t last_value = 0xff;
 
 BusSniffer *instance = nullptr;
 
 
-// ISR
+
 static void IRAM_ATTR gpio_isr(void *arg) {
 
-  uint64_t now = esp_timer_get_time();
+  uint32_t now = (uint32_t) esp_timer_get_time();
 
-  uint8_t v = 0;
+  uint8_t v =
+      (gpio_get_level(PIN_A) ? 1 : 0) |
+      (gpio_get_level(PIN_B) ? 2 : 0) |
+      (gpio_get_level(PIN_C) ? 4 : 0);
 
-  if (gpio_get_level(PIN_A))
-    v |= 1;
 
-  if (gpio_get_level(PIN_B))
-    v |= 2;
+  // gleiche Zustände nicht speichern
+  if (v == last_value)
+    return;
 
-  if (gpio_get_level(PIN_C))
-    v |= 4;
+
+  // Glitches unter 5us ignorieren
+  if ((now - last_edge) < GLITCH_FILTER_US)
+    return;
+
+
+  last_edge = now;
 
 
   if (sample_count < MAX_SAMPLES) {
+
     samples[sample_count].t = now;
     samples[sample_count].value = v;
+
     sample_count++;
+
+    last_value = v;
   }
-
-  last_edge = now;
 }
-
 
 void BusSniffer::setup() {
 
@@ -100,8 +112,6 @@ void BusSniffer::setup() {
 
 
 void BusSniffer::loop() {
-
-  static uint64_t frame_start = 0;
 
   if (sample_count == 0)
     return;
@@ -211,6 +221,7 @@ void BusSniffer::loop() {
 
     rel = (uint32_t)(local[i].t - base);
  
+    if (i < 200 || count < 250) {
     ESP_LOGI(TAG,
         "%lu us %u%u%u",
         (unsigned long)rel,
@@ -218,7 +229,7 @@ void BusSniffer::loop() {
         (local[i].value >> 1) & 1,
         (local[i].value >> 2) & 1
     );
-
+  }
 
   }
 
