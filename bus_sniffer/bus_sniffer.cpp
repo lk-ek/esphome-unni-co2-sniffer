@@ -473,10 +473,15 @@ void BusSniffer::setup()
       GPIO_INTR_ANYEDGE;
 
 
-  io.pin_bit_mask =
+/*  io.pin_bit_mask =
       (1ULL << PIN_CH0) |
       (1ULL << PIN_CH1) |
       (1ULL << PIN_CH2);
+*/
+
+  io.pin_bit_mask =
+      (1ULL << PIN_CH0) |
+      (1ULL << PIN_CH1);
 
 
   esp_err_t err =
@@ -569,12 +574,12 @@ void BusSniffer::setup()
 
   /*
    * CH2 / GPIO38
-   */
   err =
       gpio_isr_handler_add(
           PIN_CH2,
           gpio_isr,
           nullptr);
+   */
 
 
   if (err != ESP_OK) {
