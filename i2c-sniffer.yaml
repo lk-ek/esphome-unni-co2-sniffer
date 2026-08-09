@@ -56,22 +56,7 @@ bus_sniffer:
   frame_errors:
     name: "CO2 Sniffer Frame Errors"
 
-  # RT/RH test points on GPIO10..13.
-  # Values are raw ADC counts; min/max are additionally logged every 2 s.
-  # A ~1 kHz four-channel triggered waveform is available at:
-  #   http://<device>/analog_capture.csv
-  # Trigger: any channel raw > 100, ~0.5 s pre-trigger + ~3 s post-trigger.
-  probe_gpio10:
-    name: "Probe GPIO10 ADC"
-
-  probe_gpio11:
-    name: "Probe GPIO11 ADC"
-
-  probe_gpio12:
-    name: "Probe GPIO12 ADC"
-
-  probe_gpio13:
-    name: "Probe GPIO13 ADC"
-
-  adc_read_errors:
-    name: "Probe ADC Read Errors"
+  # RT/RH test points on GPIO10..13 are captured passively as digital edges.
+  # The first edge starts a 500 ms capture. Download the frozen capture at:
+  #   http://<device>/rt_rh_capture.csv
+  # Downloading rearms the RT/RH capture for the next measurement cycle.

@@ -4,7 +4,6 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 
 #include "driver/gpio.h"
-#include "esp_adc/adc_oneshot.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
 
@@ -907,543 +906,150 @@ static CaptureHandler capture_handler;
 
 /*
  * ============================================================================
- * RT/RH ADC probe diagnostics
+ * RT/RH digital edge capture
  * ============================================================================
  *
- * GPIO10 = ADC1
- * GPIO11..13 = ADC2 on ESP32-S2.
- *
- * We deliberately use the ESP-IDF oneshot driver directly here instead of the
- * ESPHome ADC component so that ADC2 can at least be attempted while Wi-Fi is
- * active. Failed/contended reads are counted and exposed as a diagnostic.
- *
- * This is discovery instrumentation, not the final temperature/RH conversion.
+ * GPIO10..13 are connected to the four RT/RH test points.  They are treated
+ * strictly as passive digital inputs.  The first edge starts a 500 ms capture;
+ * every subsequent state change stores a microsecond timestamp plus the state
+ * of all four lines.  When complete, the frozen capture is available as CSV at
+ * /rt_rh_capture.csv.  Downloading it rearms the capture for the next cycle.
  */
 
-static constexpr uint8_t PROBE_COUNT = 4;
-static constexpr int PROBE_GPIOS[PROBE_COUNT] = {10, 11, 12, 13};
+static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_10;
+static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_11;
+static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
+static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
-// Target: about 2 kSamples/s per channel. Loop jitter is intentional/useful
-// while we are trying to discover AC excitation on the RH network.
-static constexpr uint32_t PROBE_SAMPLE_INTERVAL_US = 500;
-static constexpr uint32_t PROBE_PUBLISH_INTERVAL_US = 2000000;
+static constexpr uint32_t RTRH_CAPTURE_US = 500000;
+static constexpr uint16_t RTRH_MAX_SAMPLES = 4096;
 
-struct ProbeState {
-  adc_unit_t unit{ADC_UNIT_1};
-  adc_channel_t channel{ADC_CHANNEL_0};
-  bool configured{false};
-
-  uint32_t samples{0};
-  uint64_t sum{0};
-  int min_raw{INT_MAX};
-  int max_raw{INT_MIN};
+struct __attribute__((packed)) RtRhSample {
+  uint32_t t_us;
+  uint8_t value;
 };
 
-static ProbeState probe_states[PROBE_COUNT];
-static adc_oneshot_unit_handle_t adc1_handle = nullptr;
-static adc_oneshot_unit_handle_t adc2_handle = nullptr;
-static uint32_t next_probe_sample_us = 0;
-static uint32_t next_probe_publish_us = 0;
+static volatile RtRhSample rtrh_samples[RTRH_MAX_SAMPLES];
+static volatile uint16_t rtrh_sample_count = 0;
+static volatile uint8_t rtrh_last_value = 0xff;
+static volatile uint32_t rtrh_start_us = 0;
+static volatile bool rtrh_capturing = false;
+static volatile bool rtrh_capture_ready = false;
+static volatile bool rtrh_overflow = false;
+static volatile uint32_t rtrh_sequence = 0;
 
-
-/*
- * ============================================================================
- * High-speed analog trigger capture
- * ============================================================================
- *
- * A dedicated FreeRTOS task samples GPIO10..13 at roughly 1 kHz per channel.
- * When any valid ADC reading rises above ANALOG_TRIGGER_RAW, the ring buffer is
- * frozen after a post-trigger interval.  The finished waveform remains
- * available as CSV at /analog_capture.csv while acquisition immediately
- * rearms for the next measurement burst.
- */
-
-static constexpr uint32_t ANALOG_SAMPLE_PERIOD_US = 1000;
-static constexpr uint16_t ANALOG_PRETRIGGER_SAMPLES = 250;
-static constexpr uint16_t ANALOG_POSTTRIGGER_SAMPLES = 1250;
-static constexpr uint16_t ANALOG_CAPTURE_SAMPLES =
-    ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES;
-static constexpr int ANALOG_TRIGGER_RAW = 100;
-static constexpr uint16_t ANALOG_REARM_QUIET_SAMPLES = 250;
-
-// Fixed sample period means a timestamp per sample is unnecessary.
-// This keeps each entry compact: 4 x uint16 raw + validity mask.
-struct AnalogSample {
-  uint16_t raw[PROBE_COUNT];
-  uint8_t valid_mask;
-};
-
-// Only the pre-trigger history needs a ring buffer. Once triggered we write
-// directly into the final capture buffer. This avoids duplicating several
-// seconds of samples in DRAM.
-static AnalogSample analog_pretrigger[ANALOG_PRETRIGGER_SAMPLES];
-static AnalogSample analog_capture[ANALOG_CAPTURE_SAMPLES];
-
-static volatile uint16_t analog_pretrigger_write = 0;
-static volatile uint16_t analog_pretrigger_count = 0;
-static volatile bool analog_triggered = false;
-static volatile uint16_t analog_post_remaining = 0;
-static volatile bool analog_armed = true;
-static volatile uint16_t analog_quiet_samples = 0;
-
-static uint16_t analog_capture_count = 0;
-static uint16_t analog_capture_trigger_pos = 0;
-static uint32_t analog_capture_sequence = 0;
-static SemaphoreHandle_t analog_capture_mutex = nullptr;
-static TaskHandle_t analog_capture_task_handle = nullptr;
-static esp_timer_handle_t analog_sample_timer = nullptr;
-
-
-static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit);
-
-
-static void analog_begin_capture(const AnalogSample &trigger_sample)
+static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
-  if (analog_capture_mutex == nullptr ||
-      xSemaphoreTake(analog_capture_mutex, 0) != pdTRUE) {
+  uint8_t value = 0;
+  if (gpio_get_level(PIN_RTRH0)) value |= 0x01;
+  if (gpio_get_level(PIN_RTRH1)) value |= 0x02;
+  if (gpio_get_level(PIN_RTRH2)) value |= 0x04;
+  if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
+  return value;
+}
+
+static void IRAM_ATTR rtrh_gpio_isr(void *arg)
+{
+  if (rtrh_capture_ready)
+    return;
+
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  const uint8_t value = read_rtrh_state();
+
+  if (value == rtrh_last_value)
+    return;
+
+  rtrh_last_value = value;
+
+  if (!rtrh_capturing) {
+    rtrh_capturing = true;
+    rtrh_start_us = now;
+    rtrh_sample_count = 0;
+    rtrh_overflow = false;
+  }
+
+  const uint16_t index = rtrh_sample_count;
+  if (index >= RTRH_MAX_SAMPLES) {
+    rtrh_overflow = true;
+    rtrh_capturing = false;
+    rtrh_capture_ready = true;
+    rtrh_sequence++;
     return;
   }
 
-  // Copy the available pre-trigger history in chronological order.
-  const uint16_t pre_count = analog_pretrigger_count;
-  const uint16_t oldest = static_cast<uint16_t>(
-      (analog_pretrigger_write + ANALOG_PRETRIGGER_SAMPLES - pre_count) %
-      ANALOG_PRETRIGGER_SAMPLES);
-
-  for (uint16_t i = 0; i < pre_count; i++) {
-    analog_capture[i] =
-        analog_pretrigger[(oldest + i) % ANALOG_PRETRIGGER_SAMPLES];
-  }
-
-  analog_capture_trigger_pos = pre_count;
-  analog_capture[pre_count] = trigger_sample;
-  analog_capture_count = pre_count + 1;
-  analog_post_remaining = ANALOG_POSTTRIGGER_SAMPLES;
-  analog_triggered = true;
-  analog_armed = false;
-  analog_quiet_samples = 0;
-
-  ESP_LOGI(
-      TAG,
-      "Analog trigger detected (pre=%u samples)",
-      pre_count);
+  rtrh_samples[index].t_us = static_cast<uint32_t>(now - rtrh_start_us);
+  rtrh_samples[index].value = value;
+  rtrh_sample_count = index + 1;
 }
 
-
-static void analog_finish_capture()
-{
-  analog_triggered = false;
-  analog_capture_sequence++;
-
-  ESP_LOGI(
-      TAG,
-      "Analog capture ready: %u samples, sequence %lu",
-      analog_capture_count,
-      static_cast<unsigned long>(analog_capture_sequence));
-
-  // analog_begin_capture() acquired this mutex. Keep it for the complete
-  // acquisition so /analog_capture.csv can never read a half-written frame.
-  if (analog_capture_mutex != nullptr)
-    xSemaphoreGive(analog_capture_mutex);
-}
-
-
-static void analog_capture_task(void *arg)
-{
-  while (true) {
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    AnalogSample sample{};
-    bool above_trigger = false;
-
-    for (uint8_t i = 0; i < PROBE_COUNT; i++) {
-      ProbeState &state = probe_states[i];
-      if (!state.configured)
-        continue;
-
-      adc_oneshot_unit_handle_t handle = probe_handle_for_unit(state.unit);
-      if (handle == nullptr)
-        continue;
-
-      int raw = 0;
-      if (adc_oneshot_read(handle, state.channel, &raw) != ESP_OK)
-        continue;
-
-      if (raw < 0)
-        raw = 0;
-      if (raw > 65535)
-        raw = 65535;
-
-      sample.raw[i] = static_cast<uint16_t>(raw);
-      sample.valid_mask |= static_cast<uint8_t>(1U << i);
-
-      if (raw > ANALOG_TRIGGER_RAW)
-        above_trigger = true;
-    }
-
-    if (analog_triggered) {
-      if (analog_capture_count < ANALOG_CAPTURE_SAMPLES) {
-        analog_capture[analog_capture_count++] = sample;
-      }
-
-      if (analog_post_remaining > 0)
-        analog_post_remaining--;
-
-      if (analog_post_remaining == 0 ||
-          analog_capture_count >= ANALOG_CAPTURE_SAMPLES) {
-        analog_finish_capture();
-      }
-
-      continue;
-    }
-
-    if (!analog_armed) {
-      if (above_trigger) {
-        analog_quiet_samples = 0;
-      } else if (++analog_quiet_samples >= ANALOG_REARM_QUIET_SAMPLES) {
-        analog_armed = true;
-        analog_quiet_samples = 0;
-        ESP_LOGD(TAG, "Analog trigger rearmed");
-      }
-
-      // Keep refreshing pre-trigger history while waiting for rearm.
-      analog_pretrigger[analog_pretrigger_write] = sample;
-      analog_pretrigger_write = static_cast<uint16_t>(
-          (analog_pretrigger_write + 1) % ANALOG_PRETRIGGER_SAMPLES);
-      if (analog_pretrigger_count < ANALOG_PRETRIGGER_SAMPLES)
-        analog_pretrigger_count++;
-      continue;
-    }
-
-    if (above_trigger) {
-      analog_begin_capture(sample);
-      continue;
-    }
-
-    analog_pretrigger[analog_pretrigger_write] = sample;
-    analog_pretrigger_write = static_cast<uint16_t>(
-        (analog_pretrigger_write + 1) % ANALOG_PRETRIGGER_SAMPLES);
-    if (analog_pretrigger_count < ANALOG_PRETRIGGER_SAMPLES)
-      analog_pretrigger_count++;
-  }
-}
-
-
-static void analog_sample_timer_callback(void *arg)
-{
-  if (analog_capture_task_handle != nullptr)
-    xTaskNotifyGive(analog_capture_task_handle);
-}
-
-
-static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit)
-{
-  return unit == ADC_UNIT_1 ? adc1_handle : adc2_handle;
-}
-
-
-static void reset_probe_window(ProbeState &state)
-{
-  state.samples = 0;
-  state.sum = 0;
-  state.min_raw = INT_MAX;
-  state.max_raw = INT_MIN;
-}
-
-
-static void setup_adc_probes()
-{
-  adc_oneshot_unit_init_cfg_t unit1_cfg = {};
-  unit1_cfg.unit_id = ADC_UNIT_1;
-
-  esp_err_t err = adc_oneshot_new_unit(&unit1_cfg, &adc1_handle);
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "ADC1 init failed: %s", esp_err_to_name(err));
-    adc1_handle = nullptr;
-  }
-
-  adc_oneshot_unit_init_cfg_t unit2_cfg = {};
-  unit2_cfg.unit_id = ADC_UNIT_2;
-
-  err = adc_oneshot_new_unit(&unit2_cfg, &adc2_handle);
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "ADC2 init failed: %s", esp_err_to_name(err));
-    adc2_handle = nullptr;
-  }
-
-  adc_oneshot_chan_cfg_t chan_cfg = {};
-  chan_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
-  chan_cfg.atten = ADC_ATTEN_DB_12;
-
-  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
-    ProbeState &state = probe_states[i];
-    reset_probe_window(state);
-
-    err = adc_oneshot_io_to_channel(
-        PROBE_GPIOS[i],
-        &state.unit,
-        &state.channel);
-
-    if (err != ESP_OK) {
-      ESP_LOGW(
-          TAG,
-          "GPIO%d is not a usable ADC input: %s",
-          PROBE_GPIOS[i],
-          esp_err_to_name(err));
-      continue;
-    }
-
-    adc_oneshot_unit_handle_t handle =
-        probe_handle_for_unit(state.unit);
-
-    if (handle == nullptr) {
-      ESP_LOGW(
-          TAG,
-          "GPIO%d ADC unit unavailable",
-          PROBE_GPIOS[i]);
-      continue;
-    }
-
-    err = adc_oneshot_config_channel(
-        handle,
-        state.channel,
-        &chan_cfg);
-
-    if (err != ESP_OK) {
-      ESP_LOGW(
-          TAG,
-          "GPIO%d ADC channel config failed: %s",
-          PROBE_GPIOS[i],
-          esp_err_to_name(err));
-      continue;
-    }
-
-    state.configured = true;
-
-    ESP_LOGI(
-        TAG,
-        "Probe GPIO%d -> ADC%d channel %d",
-        PROBE_GPIOS[i],
-        static_cast<int>(state.unit) + 1,
-        static_cast<int>(state.channel));
-  }
-
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-  next_probe_sample_us = now;
-  next_probe_publish_us = now + PROBE_PUBLISH_INTERVAL_US;
-}
-
-
-void BusSniffer::sample_adc_probes_()
-{
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-
-  if (static_cast<int32_t>(now - next_probe_sample_us) < 0)
-    return;
-
-  next_probe_sample_us = now + PROBE_SAMPLE_INTERVAL_US;
-
-  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
-    ProbeState &state = probe_states[i];
-
-    if (!state.configured)
-      continue;
-
-    adc_oneshot_unit_handle_t handle =
-        probe_handle_for_unit(state.unit);
-
-    if (handle == nullptr)
-      continue;
-
-    int raw = 0;
-    const esp_err_t err = adc_oneshot_read(
-        handle,
-        state.channel,
-        &raw);
-
-    if (err != ESP_OK) {
-      this->adc_read_errors_++;
-      continue;
-    }
-
-    state.samples++;
-    state.sum += static_cast<uint32_t>(raw);
-
-    if (raw < state.min_raw)
-      state.min_raw = raw;
-
-    if (raw > state.max_raw)
-      state.max_raw = raw;
-  }
-}
-
-
-void BusSniffer::publish_adc_probes_()
-{
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-
-  if (static_cast<int32_t>(now - next_probe_publish_us) < 0)
-    return;
-
-  next_probe_publish_us = now + PROBE_PUBLISH_INTERVAL_US;
-
-  char line[512];
-  int pos = snprintf(line, sizeof(line), "ADC probes raw:");
-
-  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
-    ProbeState &state = probe_states[i];
-
-    if (!state.configured) {
-      pos += snprintf(
-          line + pos,
-          sizeof(line) - pos,
-          " G%d=unavailable",
-          PROBE_GPIOS[i]);
-      continue;
-    }
-
-    if (state.samples == 0) {
-      pos += snprintf(
-          line + pos,
-          sizeof(line) - pos,
-          " G%d=no-data",
-          PROBE_GPIOS[i]);
-      continue;
-    }
-
-    const float avg =
-        static_cast<float>(state.sum) /
-        static_cast<float>(state.samples);
-
-    pos += snprintf(
-        line + pos,
-        sizeof(line) - pos,
-        " G%d avg=%.0f min=%d max=%d n=%lu",
-        PROBE_GPIOS[i],
-        avg,
-        state.min_raw,
-        state.max_raw,
-        static_cast<unsigned long>(state.samples));
-
-    if (this->probe_sensors_[i] != nullptr)
-      this->probe_sensors_[i]->publish_state(avg);
-  }
-
-  ESP_LOGI(TAG, "%s", line);
-
-  if (this->adc_read_errors_sensor_ != nullptr)
-    this->adc_read_errors_sensor_->publish_state(this->adc_read_errors_);
-
-  if (this->adc_read_errors_ != 0) {
-    ESP_LOGD(
-        TAG,
-        "ADC read errors/timeouts so far: %lu",
-        static_cast<unsigned long>(this->adc_read_errors_));
-  }
-
-  for (uint8_t i = 0; i < PROBE_COUNT; i++)
-    reset_probe_window(probe_states[i]);
-}
-
-
-
-/*
- * ============================================================================
- * HTTP /analog_capture.csv
- * ============================================================================
- */
-
-class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
+class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
   {
     if (request->method() != HTTP_GET)
       return false;
-
     char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
-    return request->url_to(url) == "/analog_capture.csv";
+    return request->url_to(url) == "/rt_rh_capture.csv";
   }
 
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
   {
-    if (analog_capture_mutex == nullptr ||
-        xSemaphoreTake(analog_capture_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
-      request->send(503, "text/plain", "capture busy");
-      return;
-    }
-
-    const uint16_t count = analog_capture_count;
-    const uint32_t sequence = analog_capture_sequence;
-    const uint16_t trigger_pos = analog_capture_trigger_pos;
-
-    if (count == 0) {
-      xSemaphoreGive(analog_capture_mutex);
+    if (!rtrh_capture_ready || rtrh_sample_count == 0) {
       request->send(204, "text/plain", nullptr);
       return;
     }
 
-    // Do not build the complete CSV in a std::string. On the ESP32-S2 that
-    // would require tens of kilobytes of contiguous heap and beginResponse()
-    // would make another copy. Stream the file directly through ESP-IDF's
-    // chunked HTTP API instead.
     httpd_req_t *req = *request;
-
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(
         req,
         "Content-Disposition",
-        "attachment; filename=\"analog_capture.csv\"");
+        "attachment; filename=\"rt_rh_capture.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask,trigger\n";
-
-    esp_err_t err = httpd_resp_send_chunk(
-        req, HEADER, sizeof(HEADER) - 1);
+        "sequence,t_us,gpio10,gpio11,gpio12,gpio13,state,overflow\n";
+    esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
     char line[128];
+    const uint16_t count = rtrh_sample_count;
+    const uint32_t sequence = rtrh_sequence;
+    const bool overflow = rtrh_overflow;
 
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
-      const AnalogSample &sample = analog_capture[i];
-      const uint32_t rel =
-          static_cast<uint32_t>(i) * ANALOG_SAMPLE_PERIOD_US;
-
+      const uint32_t t = rtrh_samples[i].t_us;
+      const uint8_t v = rtrh_samples[i].value;
       const int n = snprintf(
-          line,
-          sizeof(line),
+          line, sizeof(line),
           "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence),
-          static_cast<unsigned long>(rel),
-          sample.raw[0],
-          sample.raw[1],
-          sample.raw[2],
-          sample.raw[3],
-          sample.valid_mask,
-          i == trigger_pos ? 1U : 0U);
-
-      if (n > 0) {
-        const size_t len =
-            static_cast<size_t>(n) < sizeof(line)
-                ? static_cast<size_t>(n)
-                : sizeof(line) - 1;
-        err = httpd_resp_send_chunk(req, line, len);
-      }
+          static_cast<unsigned long>(t),
+          (v & 0x01) ? 1U : 0U,
+          (v & 0x02) ? 1U : 0U,
+          (v & 0x04) ? 1U : 0U,
+          (v & 0x08) ? 1U : 0U,
+          v,
+          overflow ? 1U : 0U);
+      if (n > 0)
+        err = httpd_resp_send_chunk(req, line, static_cast<size_t>(n));
     }
 
-    // A zero-length chunk terminates the HTTP response.
     if (err == ESP_OK)
       httpd_resp_send_chunk(req, nullptr, 0);
 
-    xSemaphoreGive(analog_capture_mutex);
+    // Rearm only after the frozen capture has been downloaded.
+    rtrh_sample_count = 0;
+    rtrh_overflow = false;
+    rtrh_capture_ready = false;
+    rtrh_capturing = false;
+    rtrh_last_value = read_rtrh_state();
 
-    if (err != ESP_OK) {
-      ESP_LOGW(TAG, "analog_capture.csv client disconnected (%d)", err);
-    }
+    if (err != ESP_OK)
+      ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
   }
 };
 
-static AnalogCaptureHandler analog_capture_handler;
-
+static RtRhCaptureHandler rtrh_capture_handler;
 
 /*
  * ============================================================================
@@ -1455,51 +1061,6 @@ void BusSniffer::setup()
 {
   last_capture_mutex =
       xSemaphoreCreateMutex();
-
-
-  setup_adc_probes();
-
-  analog_capture_mutex = xSemaphoreCreateMutex();
-
-  if (analog_capture_mutex == nullptr) {
-    ESP_LOGE(TAG, "Failed to create analog capture mutex");
-  } else {
-    const BaseType_t task_result = xTaskCreate(
-        analog_capture_task,
-        "analog_capture",
-        4096,
-        nullptr,
-        1,
-        &analog_capture_task_handle);
-
-    if (task_result != pdPASS) {
-      analog_capture_task_handle = nullptr;
-      ESP_LOGE(TAG, "Failed to start analog capture task");
-    } else {
-      esp_timer_create_args_t timer_args = {};
-      timer_args.callback = &analog_sample_timer_callback;
-      timer_args.arg = nullptr;
-      timer_args.dispatch_method = ESP_TIMER_TASK;
-      timer_args.name = "analog_sample";
-
-      esp_err_t timer_err = esp_timer_create(&timer_args, &analog_sample_timer);
-      if (timer_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create analog sample timer: %s", esp_err_to_name(timer_err));
-      } else {
-        timer_err = esp_timer_start_periodic(analog_sample_timer, ANALOG_SAMPLE_PERIOD_US);
-        if (timer_err != ESP_OK) {
-          ESP_LOGE(TAG, "Failed to start analog sample timer: %s", esp_err_to_name(timer_err));
-        } else {
-          ESP_LOGI(
-              TAG,
-              "Analog trigger capture: GPIO10..13 @ 1 kHz, %u ms pre + %u ms post, trigger raw>%d",
-              ANALOG_PRETRIGGER_SAMPLES,
-              ANALOG_POSTTRIGGER_SAMPLES,
-              ANALOG_TRIGGER_RAW);
-        }
-      }
-    }
-  }
 
 
   gpio_config_t io = {};
@@ -1521,7 +1082,11 @@ void BusSniffer::setup()
   io.pin_bit_mask =
       (1ULL << PIN_SCL) |
       (1ULL << PIN_SDA) |
-      (1ULL << PIN_OTHER);
+      (1ULL << PIN_OTHER) |
+      (1ULL << PIN_RTRH0) |
+      (1ULL << PIN_RTRH1) |
+      (1ULL << PIN_RTRH2) |
+      (1ULL << PIN_RTRH3);
 
 
   esp_err_t err =
@@ -1558,12 +1123,20 @@ void BusSniffer::setup()
   );
 
 
+  gpio_set_intr_type(PIN_RTRH0, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(PIN_RTRH1, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(PIN_RTRH2, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(PIN_RTRH3, GPIO_INTR_ANYEDGE);
+
+
   last_value =
       read_gpio_state();
 
 
   capture_initial_value =
       last_value;
+
+  rtrh_last_value = read_rtrh_state();
 
 
   last_edge =
@@ -1631,6 +1204,18 @@ void BusSniffer::setup()
   }
 
 
+  static constexpr gpio_num_t RTRH_PINS[] = {
+      PIN_RTRH0, PIN_RTRH1, PIN_RTRH2, PIN_RTRH3};
+
+  for (gpio_num_t pin : RTRH_PINS) {
+    err = gpio_isr_handler_add(pin, rtrh_gpio_isr, nullptr);
+    if (err != ESP_OK) {
+      ESP_LOGE(TAG, "RT/RH ISR GPIO%d failed: %d", static_cast<int>(pin), err);
+      return;
+    }
+  }
+
+
   if (
       web_server_base::global_web_server_base !=
       nullptr
@@ -1643,7 +1228,7 @@ void BusSniffer::setup()
         );
 
     web_server_base::global_web_server_base->add_handler(
-        &analog_capture_handler);
+        &rtrh_capture_handler);
 
   } else {
 
@@ -1666,10 +1251,6 @@ void BusSniffer::setup()
     this->frame_errors_sensor_->publish_state(0);
 
 
-  if (this->adc_read_errors_sensor_ != nullptr)
-    this->adc_read_errors_sensor_->publish_state(0);
-
-
   ESP_LOGI(
       TAG,
       "Passive CO2 sniffer ready "
@@ -1679,7 +1260,7 @@ void BusSniffer::setup()
 
   ESP_LOGD(
       TAG,
-      "Raw captures available at /capture; analog at /analog_capture.csv"
+      "Raw captures at /capture; RT/RH edges at /rt_rh_capture.csv"
   );
 }
 
@@ -1692,10 +1273,20 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
-  // Independent RT/RH discovery sampling must keep running even while there
-  // is no CO2 bus activity.
-  this->sample_adc_probes_();
-  this->publish_adc_probes_();
+  if (rtrh_capturing && !rtrh_capture_ready) {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+    if (static_cast<uint32_t>(now - rtrh_start_us) >= RTRH_CAPTURE_US) {
+      rtrh_capturing = false;
+      rtrh_capture_ready = true;
+      rtrh_sequence++;
+      ESP_LOGI(
+          TAG,
+          "RT/RH edge capture ready: %u events, sequence %lu%s",
+          rtrh_sample_count,
+          static_cast<unsigned long>(rtrh_sequence),
+          rtrh_overflow ? " OVERFLOW" : "");
+    }
+  }
 
   /*
    * Capture noch aktiv?
