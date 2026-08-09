@@ -27,14 +27,8 @@ class BusSniffer : public Component {
     this->rt_temperature_sensor_ = sensor;
   }
 
-  // GPIO10..13: temporary raw ADC diagnostics for RT/RH reverse engineering.
-  void set_probe_sensor(uint8_t index, sensor::Sensor *sensor) {
-    if (index < 4)
-      this->probe_sensors_[index] = sensor;
-  }
-
-  void set_adc_read_errors_sensor(sensor::Sensor *sensor) {
-    this->adc_read_errors_sensor_ = sensor;
+  void set_rh_humidity_sensor(sensor::Sensor *sensor) {
+    this->rh_humidity_sensor_ = sensor;
   }
 
  protected:
@@ -42,19 +36,13 @@ class BusSniffer : public Component {
   sensor::Sensor *crc_errors_sensor_{nullptr};
   sensor::Sensor *frame_errors_sensor_{nullptr};
   sensor::Sensor *rt_temperature_sensor_{nullptr};
-
-  sensor::Sensor *probe_sensors_[4]{nullptr, nullptr, nullptr, nullptr};
-  sensor::Sensor *adc_read_errors_sensor_{nullptr};
+  sensor::Sensor *rh_humidity_sensor_{nullptr};
 
   bool have_last_ppm_{false};
   uint16_t last_ppm_{0};
 
   uint32_t crc_errors_{0};
   uint32_t frame_errors_{0};
-  uint32_t adc_read_errors_{0};
-
-  void sample_adc_probes_();
-  void publish_adc_probes_();
 };
 
 }  // namespace bus_sniffer

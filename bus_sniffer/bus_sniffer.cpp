@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 
 #include <climits>
+#include <cmath>
 #include <cstdio>
 #include <climits>
 #include <cstring>
@@ -965,6 +966,14 @@ static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 // T[°C] = M * RT_period_us + C
 static constexpr float RTRH_TEMP_M = -0.4163213f;
 static constexpr float RTRH_TEMP_C = 84.38101f;
+
+// Preliminary RH calibration from the passive RH oscillator.
+// x = ln(period_us)
+// RH[%] = A*x^2 + B*x + C
+// Based on the best usable points from the dynamic sweep; provisional.
+static constexpr float RTRH_RH_A = 5.5477837f;
+static constexpr float RTRH_RH_B = -73.210527f;
+static constexpr float RTRH_RH_C = 276.45988f;
 
 // Phase-based passive RT/RH decoder.
 // Sequence: REF (~76.7 us) -> RT (~138 us) -> RH (variable).
@@ -2058,6 +2067,30 @@ void BusSniffer::loop()
             static_cast<unsigned>(t.count),
             rh_duration_ms,
             rh_frequency_hz);
+
+        if (period_mean > 0.0f) {
+          const float x = logf(period_mean);
+
+          float rh_percent =
+              RTRH_RH_A * x * x +
+              RTRH_RH_B * x +
+              RTRH_RH_C;
+
+          if (rh_percent < 0.0f)
+            rh_percent = 0.0f;
+          else if (rh_percent > 100.0f)
+            rh_percent = 100.0f;
+
+          ESP_LOGI(
+              TAG,
+              "RH humidity PASSIVE: %.1f %% from RH period %.3f us",
+              rh_percent,
+              period_mean);
+
+          if (this->rh_humidity_sensor_ != nullptr)
+            this->rh_humidity_sensor_->
+                publish_state(rh_percent);
+        }
       }
     }
 
