@@ -55,3 +55,20 @@ bus_sniffer:
 
   frame_errors:
     name: "CO2 Sniffer Frame Errors"
+
+  # Temporary ADC diagnostics for the four RT/RH test points.
+  # Values are raw ADC counts; min/max are additionally logged every 2 s.
+  probe_gpio10:
+    name: "Probe GPIO10 ADC"
+
+  probe_gpio11:
+    name: "Probe GPIO11 ADC"
+
+  probe_gpio12:
+    name: "Probe GPIO12 ADC"
+
+  probe_gpio13:
+    name: "Probe GPIO13 ADC"
+
+  adc_read_errors:
+    name: "Probe ADC Read Errors"

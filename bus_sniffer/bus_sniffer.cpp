@@ -4,11 +4,14 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 
 #include "driver/gpio.h"
+#include "esp_adc/adc_oneshot.h"
 #include "esp_timer.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include <climits>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -902,6 +905,257 @@ static CaptureHandler capture_handler;
 
 /*
  * ============================================================================
+ * RT/RH ADC probe diagnostics
+ * ============================================================================
+ *
+ * GPIO10 = ADC1
+ * GPIO11..13 = ADC2 on ESP32-S2.
+ *
+ * We deliberately use the ESP-IDF oneshot driver directly here instead of the
+ * ESPHome ADC component so that ADC2 can at least be attempted while Wi-Fi is
+ * active. Failed/contended reads are counted and exposed as a diagnostic.
+ *
+ * This is discovery instrumentation, not the final temperature/RH conversion.
+ */
+
+static constexpr uint8_t PROBE_COUNT = 4;
+static constexpr int PROBE_GPIOS[PROBE_COUNT] = {10, 11, 12, 13};
+
+// Target: about 2 kSamples/s per channel. Loop jitter is intentional/useful
+// while we are trying to discover AC excitation on the RH network.
+static constexpr uint32_t PROBE_SAMPLE_INTERVAL_US = 500;
+static constexpr uint32_t PROBE_PUBLISH_INTERVAL_US = 2000000;
+
+struct ProbeState {
+  adc_unit_t unit{ADC_UNIT_1};
+  adc_channel_t channel{ADC_CHANNEL_0};
+  bool configured{false};
+
+  uint32_t samples{0};
+  uint64_t sum{0};
+  int min_raw{INT_MAX};
+  int max_raw{INT_MIN};
+};
+
+static ProbeState probe_states[PROBE_COUNT];
+static adc_oneshot_unit_handle_t adc1_handle = nullptr;
+static adc_oneshot_unit_handle_t adc2_handle = nullptr;
+static uint32_t next_probe_sample_us = 0;
+static uint32_t next_probe_publish_us = 0;
+
+
+static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit)
+{
+  return unit == ADC_UNIT_1 ? adc1_handle : adc2_handle;
+}
+
+
+static void reset_probe_window(ProbeState &state)
+{
+  state.samples = 0;
+  state.sum = 0;
+  state.min_raw = INT_MAX;
+  state.max_raw = INT_MIN;
+}
+
+
+static void setup_adc_probes()
+{
+  adc_oneshot_unit_init_cfg_t unit1_cfg = {};
+  unit1_cfg.unit_id = ADC_UNIT_1;
+
+  esp_err_t err = adc_oneshot_new_unit(&unit1_cfg, &adc1_handle);
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG, "ADC1 init failed: %s", esp_err_to_name(err));
+    adc1_handle = nullptr;
+  }
+
+  adc_oneshot_unit_init_cfg_t unit2_cfg = {};
+  unit2_cfg.unit_id = ADC_UNIT_2;
+
+  err = adc_oneshot_new_unit(&unit2_cfg, &adc2_handle);
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG, "ADC2 init failed: %s", esp_err_to_name(err));
+    adc2_handle = nullptr;
+  }
+
+  adc_oneshot_chan_cfg_t chan_cfg = {};
+  chan_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
+  chan_cfg.atten = ADC_ATTEN_DB_12;
+
+  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
+    ProbeState &state = probe_states[i];
+    reset_probe_window(state);
+
+    err = adc_oneshot_io_to_channel(
+        PROBE_GPIOS[i],
+        &state.unit,
+        &state.channel);
+
+    if (err != ESP_OK) {
+      ESP_LOGW(
+          TAG,
+          "GPIO%d is not a usable ADC input: %s",
+          PROBE_GPIOS[i],
+          esp_err_to_name(err));
+      continue;
+    }
+
+    adc_oneshot_unit_handle_t handle =
+        probe_handle_for_unit(state.unit);
+
+    if (handle == nullptr) {
+      ESP_LOGW(
+          TAG,
+          "GPIO%d ADC unit unavailable",
+          PROBE_GPIOS[i]);
+      continue;
+    }
+
+    err = adc_oneshot_config_channel(
+        handle,
+        state.channel,
+        &chan_cfg);
+
+    if (err != ESP_OK) {
+      ESP_LOGW(
+          TAG,
+          "GPIO%d ADC channel config failed: %s",
+          PROBE_GPIOS[i],
+          esp_err_to_name(err));
+      continue;
+    }
+
+    state.configured = true;
+
+    ESP_LOGI(
+        TAG,
+        "Probe GPIO%d -> ADC%d channel %d",
+        PROBE_GPIOS[i],
+        static_cast<int>(state.unit) + 1,
+        static_cast<int>(state.channel));
+  }
+
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  next_probe_sample_us = now;
+  next_probe_publish_us = now + PROBE_PUBLISH_INTERVAL_US;
+}
+
+
+void BusSniffer::sample_adc_probes_()
+{
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+
+  if (static_cast<int32_t>(now - next_probe_sample_us) < 0)
+    return;
+
+  next_probe_sample_us = now + PROBE_SAMPLE_INTERVAL_US;
+
+  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
+    ProbeState &state = probe_states[i];
+
+    if (!state.configured)
+      continue;
+
+    adc_oneshot_unit_handle_t handle =
+        probe_handle_for_unit(state.unit);
+
+    if (handle == nullptr)
+      continue;
+
+    int raw = 0;
+    const esp_err_t err = adc_oneshot_read(
+        handle,
+        state.channel,
+        &raw);
+
+    if (err != ESP_OK) {
+      this->adc_read_errors_++;
+      continue;
+    }
+
+    state.samples++;
+    state.sum += static_cast<uint32_t>(raw);
+
+    if (raw < state.min_raw)
+      state.min_raw = raw;
+
+    if (raw > state.max_raw)
+      state.max_raw = raw;
+  }
+}
+
+
+void BusSniffer::publish_adc_probes_()
+{
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+
+  if (static_cast<int32_t>(now - next_probe_publish_us) < 0)
+    return;
+
+  next_probe_publish_us = now + PROBE_PUBLISH_INTERVAL_US;
+
+  char line[512];
+  int pos = snprintf(line, sizeof(line), "ADC probes raw:");
+
+  for (uint8_t i = 0; i < PROBE_COUNT; i++) {
+    ProbeState &state = probe_states[i];
+
+    if (!state.configured) {
+      pos += snprintf(
+          line + pos,
+          sizeof(line) - pos,
+          " G%d=unavailable",
+          PROBE_GPIOS[i]);
+      continue;
+    }
+
+    if (state.samples == 0) {
+      pos += snprintf(
+          line + pos,
+          sizeof(line) - pos,
+          " G%d=no-data",
+          PROBE_GPIOS[i]);
+      continue;
+    }
+
+    const float avg =
+        static_cast<float>(state.sum) /
+        static_cast<float>(state.samples);
+
+    pos += snprintf(
+        line + pos,
+        sizeof(line) - pos,
+        " G%d avg=%.0f min=%d max=%d n=%lu",
+        PROBE_GPIOS[i],
+        avg,
+        state.min_raw,
+        state.max_raw,
+        static_cast<unsigned long>(state.samples));
+
+    if (this->probe_sensors_[i] != nullptr)
+      this->probe_sensors_[i]->publish_state(avg);
+  }
+
+  ESP_LOGI(TAG, "%s", line);
+
+  if (this->adc_read_errors_sensor_ != nullptr)
+    this->adc_read_errors_sensor_->publish_state(this->adc_read_errors_);
+
+  if (this->adc_read_errors_ != 0) {
+    ESP_LOGD(
+        TAG,
+        "ADC read errors/timeouts so far: %lu",
+        static_cast<unsigned long>(this->adc_read_errors_));
+  }
+
+  for (uint8_t i = 0; i < PROBE_COUNT; i++)
+    reset_probe_window(probe_states[i]);
+}
+
+
+/*
+ * ============================================================================
  * Setup
  * ============================================================================
  */
@@ -910,6 +1164,9 @@ void BusSniffer::setup()
 {
   last_capture_mutex =
       xSemaphoreCreateMutex();
+
+
+  setup_adc_probes();
 
 
   gpio_config_t io = {};
@@ -1073,6 +1330,10 @@ void BusSniffer::setup()
     this->frame_errors_sensor_->publish_state(0);
 
 
+  if (this->adc_read_errors_sensor_ != nullptr)
+    this->adc_read_errors_sensor_->publish_state(0);
+
+
   ESP_LOGI(
       TAG,
       "Passive CO2 sniffer ready "
@@ -1095,6 +1356,11 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
+  // Independent RT/RH discovery sampling must keep running even while there
+  // is no CO2 bus activity.
+  this->sample_adc_probes_();
+  this->publish_adc_probes_();
+
   /*
    * Capture noch aktiv?
    */
