@@ -1617,6 +1617,7 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
     static constexpr char HEADER[] =
         "measurement,train,role,count,gap_before_us,"
         "period_mean_us,period_min_us,period_max_us,"
+        "duration_ms,frequency_hz,"
         "low_mean_us,low_min_us,low_max_us,"
         "g13_delay_count,g13_delay_mean_us,g13_delay_min_us,g13_delay_max_us,"
         "d0,d1,d2,d3,d4,d5,d6,d7plus,overflow\n";
@@ -1649,10 +1650,18 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
                     static_cast<float>(t.g13_delay_count)
               : 0.0f;
 
+      const float duration_ms =
+          static_cast<float>(t.period_sum) / 1000.0f;
+
+      const float frequency_hz =
+          period_mean > 0.0f
+              ? 1000000.0f / period_mean
+              : 0.0f;
+
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%u,%s,%u,%lu,%.3f,%u,%u,%.3f,%u,%u,"
+          "%lu,%u,%s,%u,%lu,%.3f,%u,%u,%.3f,%.2f,%.3f,%u,%u,"
           "%u,%.3f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
           static_cast<unsigned long>(s.sequence),
           static_cast<unsigned>(i),
@@ -1662,6 +1671,8 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
           period_mean,
           t.count ? static_cast<unsigned>(t.period_min) : 0U,
           static_cast<unsigned>(t.period_max),
+          duration_ms,
+          frequency_hz,
           low_mean,
           t.count ? static_cast<unsigned>(t.low_min) : 0U,
           static_cast<unsigned>(t.low_max),
@@ -2029,6 +2040,25 @@ void BusSniffer::loop()
           low_mean,
           delay_mean,
           static_cast<unsigned>(t.g13_delay_count));
+
+      if (t.role == RTRH_ROLE_RH && t.count != 0) {
+        const float rh_duration_ms =
+            static_cast<float>(t.period_sum) / 1000.0f;
+
+        const float rh_frequency_hz =
+            period_mean > 0.0f
+                ? 1000000.0f / period_mean
+                : 0.0f;
+
+        ESP_LOGI(
+            TAG,
+            "RH timing PASSIVE: period=%.3f us, cycles=%u, "
+            "duration=%.3f ms, freq=%.2f Hz",
+            period_mean,
+            static_cast<unsigned>(t.count),
+            rh_duration_ms,
+            rh_frequency_hz);
+      }
     }
 
     if (s.rt_valid && s.rt_count != 0) {
