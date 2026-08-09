@@ -966,29 +966,26 @@ static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 static constexpr float RTRH_TEMP_M = -0.4163213f;
 static constexpr float RTRH_TEMP_C = 84.38101f;
 
-// Train-based passive RT/RH decoder.
-//
-// GPIO10 falling edges define oscillator cycles.  A train is a contiguous run
-// of GPIO10 cycles; >=2 ms without another GPIO10 falling edge ends the train.
-// A complete RT/RH measurement may contain several trains separated by long
-// internal pauses, so it is finalized only after 15 s without any RT/RH edge.
-// Measurements themselves occur about every 30 s.
-static constexpr uint32_t RTRH_TRAIN_GAP_US = 2000;
+// Phase-based passive RT/RH decoder.
+// Sequence: REF (~76.7 us) -> RT (~138 us) -> RH (variable).
 static constexpr uint32_t RTRH_MEASUREMENT_QUIET_US = 15000000;
-
+static constexpr uint32_t RTRH_CYCLE_GAP_US = 2000;
 static constexpr uint8_t RTRH_PASSIVE_MAX_TRAINS = 16;
-static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 8;  // d0..d6, d7plus
+static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 8;
+static constexpr uint32_t RTRH_REF_MIN_US = 60;
+static constexpr uint32_t RTRH_REF_MAX_US = 105;
+static constexpr uint32_t RTRH_RT_MIN_US = 105;
+static constexpr uint32_t RTRH_RT_MAX_US = 190;
+static constexpr uint16_t RTRH_RT_TEMP_CYCLES = 880;
+static constexpr uint16_t RTRH_RT_FORCE_END_CYCLES = 920;
+static constexpr uint8_t RTRH_PHASE_LOCK_CYCLES = 8;
 
-// Reference oscillator observed around 76.7 us.
-static constexpr float RTRH_REF_MIN_US = 72.0f;
-static constexpr float RTRH_REF_MAX_US = 82.0f;
-
-// RT oscillator is the first non-reference train(s) after REF.  Fragmented RT
-// trains are accumulated until the characteristic ~900 cycles are complete.
-static constexpr float RTRH_RT_PERIOD_MIN_US = 110.0f;
-static constexpr float RTRH_RT_PERIOD_MAX_US = 180.0f;
-static constexpr uint16_t RTRH_RT_COUNT_MIN = 850;
-static constexpr uint16_t RTRH_RT_COUNT_MAX = 1100;
+enum RtRhPhase : uint8_t {
+  RTRH_PHASE_WAIT_REF = 0,
+  RTRH_PHASE_REF = 1,
+  RTRH_PHASE_RT = 2,
+  RTRH_PHASE_RH = 3,
+};
 
 enum RtRhTrainRole : uint8_t {
   RTRH_ROLE_UNKNOWN = 0,
@@ -1048,6 +1045,10 @@ static volatile bool rtrh_passive_have_g13_rise = false;
 
 static volatile bool rtrh_passive_train_active = false;
 static volatile uint32_t rtrh_passive_last_train_end_us = 0;
+static volatile uint8_t rtrh_passive_phase = RTRH_PHASE_WAIT_REF;
+static volatile uint8_t rtrh_passive_phase_candidate_run = 0;
+static volatile uint32_t rtrh_passive_rt_temp_period_sum = 0;
+static volatile uint16_t rtrh_passive_rt_temp_count = 0;
 
 static RtRhPassiveTrain rtrh_passive_current_train;
 static RtRhPassiveTrain
@@ -1056,6 +1057,8 @@ static RtRhPassiveTrain
 static RtRhPassiveSnapshot rtrh_passive_snapshot;
 static volatile bool rtrh_passive_snapshot_ready = false;
 static volatile bool rtrh_passive_snapshot_consumed = true;
+
+static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
 
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
@@ -1114,6 +1117,10 @@ static inline void IRAM_ATTR reset_rtrh_passive_measurement(
 
   rtrh_passive_train_active = false;
   rtrh_passive_last_train_end_us = 0;
+  rtrh_passive_phase = RTRH_PHASE_WAIT_REF;
+  rtrh_passive_phase_candidate_run = 0;
+  rtrh_passive_rt_temp_period_sum = 0;
+  rtrh_passive_rt_temp_count = 0;
   clear_passive_train(rtrh_passive_current_train);
 
   for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++)
@@ -1122,18 +1129,14 @@ static inline void IRAM_ATTR reset_rtrh_passive_measurement(
 
 
 static inline void IRAM_ATTR start_rtrh_passive_train(
-    uint32_t now)
+    uint32_t now, uint8_t role)
 {
   clear_passive_train(rtrh_passive_current_train);
-
+  rtrh_passive_current_train.role = role;
   rtrh_passive_current_train.start_us = now;
-
-  if (rtrh_passive_last_train_end_us != 0) {
+  if (rtrh_passive_last_train_end_us != 0)
     rtrh_passive_current_train.gap_before_us =
-        static_cast<uint32_t>(
-            now - rtrh_passive_last_train_end_us);
-  }
-
+        static_cast<uint32_t>(now - rtrh_passive_last_train_end_us);
   rtrh_passive_train_active = true;
   rtrh_passive_last_g10_fall_us = now;
   rtrh_passive_have_g10_rise = false;
@@ -1247,109 +1250,8 @@ static inline bool rtrh_train_is_reference(
 static void classify_rtrh_passive_snapshot(
     RtRhPassiveSnapshot &s)
 {
-  s.rt_valid = false;
+  s.rt_valid = s.rt_count >= 800 && s.rt_count <= RTRH_RT_TEMP_CYCLES;
   s.rt_mixed = false;
-  s.rt_period_sum = 0;
-  s.rt_count = 0;
-
-  for (uint8_t i = 0; i < s.train_count; i++)
-    s.trains[i].role = RTRH_ROLE_UNKNOWN;
-
-  int first_ref = -1;
-
-  for (uint8_t i = 0; i < s.train_count; i++) {
-    if (rtrh_train_is_reference(s.trains[i])) {
-      first_ref = static_cast<int>(i);
-      break;
-    }
-  }
-
-  if (first_ref < 0)
-    return;
-
-  bool rt_started = false;
-  bool rt_done = false;
-  uint8_t rt_first = 0xFF;
-  uint8_t rt_last = 0xFF;
-
-  for (uint8_t i = static_cast<uint8_t>(first_ref);
-       i < s.train_count;
-       i++) {
-    RtRhPassiveTrain &t = s.trains[i];
-    const float p = rtrh_train_period_mean(t);
-
-    if (!rt_started && rtrh_train_is_reference(t)) {
-      t.role = RTRH_ROLE_REF;
-      continue;
-    }
-
-    if (!rt_done) {
-      const bool plausible_rt =
-          p >= RTRH_RT_PERIOD_MIN_US &&
-          p <= RTRH_RT_PERIOD_MAX_US;
-
-      if (!plausible_rt) {
-        t.role = RTRH_ROLE_UNKNOWN;
-        continue;
-      }
-
-      if (t.count > RTRH_RT_COUNT_MAX ||
-          static_cast<uint32_t>(s.rt_count) +
-                  static_cast<uint32_t>(t.count) >
-              RTRH_RT_COUNT_MAX) {
-        t.role = RTRH_ROLE_MIXED;
-        s.rt_mixed = true;
-
-        if (rt_first != 0xFF) {
-          for (uint8_t j = rt_first; j <= rt_last; j++) {
-            if (s.trains[j].role == RTRH_ROLE_RT)
-              s.trains[j].role = RTRH_ROLE_MIXED;
-          }
-        }
-
-        s.rt_period_sum = 0;
-        s.rt_count = 0;
-        rt_done = true;
-        continue;
-      }
-
-      t.role = RTRH_ROLE_RT;
-      rt_started = true;
-
-      if (rt_first == 0xFF)
-        rt_first = i;
-      rt_last = i;
-
-      s.rt_period_sum += t.period_sum;
-      s.rt_count =
-          static_cast<uint16_t>(
-              static_cast<uint32_t>(s.rt_count) +
-              static_cast<uint32_t>(t.count));
-
-      if (s.rt_count >= RTRH_RT_COUNT_MIN) {
-        s.rt_valid = true;
-        rt_done = true;
-      }
-
-      continue;
-    }
-
-    t.role = RTRH_ROLE_RH;
-  }
-
-  // A partial RT train at the end of a measurement is not a valid
-  // temperature conversion.
-  if (!s.rt_valid && !s.rt_mixed) {
-    s.rt_period_sum = 0;
-    s.rt_count = 0;
-
-    if (rt_first != 0xFF) {
-      for (uint8_t j = rt_first; j <= rt_last; j++) {
-        if (s.trains[j].role == RTRH_ROLE_RT)
-          s.trains[j].role = RTRH_ROLE_UNKNOWN;
-      }
-    }
-  }
 }
 
 
@@ -1378,6 +1280,8 @@ static void finalize_rtrh_passive_measurement()
       clear_passive_train(next.trains[i]);
   }
 
+  next.rt_period_sum = rtrh_passive_rt_temp_period_sum;
+  next.rt_count = rtrh_passive_rt_temp_count;
   classify_rtrh_passive_snapshot(next);
 
   rtrh_passive_snapshot = next;
@@ -1407,46 +1311,21 @@ static const char *rtrh_train_role_name(uint8_t role)
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 {
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
-  if (encoded < 1 || encoded > 4)
-    return;
-
-  const uint8_t pin_index =
-      static_cast<uint8_t>(encoded - 1);
-
-  const gpio_num_t pin =
-      static_cast<gpio_num_t>(RTRH_GPIOS[pin_index]);
-
-  const uint8_t level =
-      static_cast<uint8_t>(gpio_get_level(pin));
-
-  const uint8_t previous =
-      rtrh_pin_level[pin_index];
-
-  if (level == previous)
-    return;
-
+  if (encoded < 1 || encoded > 4) return;
+  const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
+  const gpio_num_t pin = static_cast<gpio_num_t>(RTRH_GPIOS[pin_index]);
+  const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
+  const uint8_t previous = rtrh_pin_level[pin_index];
+  if (level == previous) return;
   rtrh_pin_level[pin_index] = level;
 
-  const uint32_t now =
-      static_cast<uint32_t>(esp_timer_get_time());
-
-  /*
-   * Passive train decoder.
-   *
-   * No SHORT/LONG decision is made here.  GPIO10 falling edges delimit
-   * oscillator periods.  A >=2 ms gap closes the current train and starts
-   * another one; the large 15 s measurement boundary is handled in loop().
-   */
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   const uint8_t state = read_rtrh_state();
 
-  if (!rtrh_passive_collecting) {
-    reset_rtrh_passive_measurement(now, state);
-  } else {
-    rtrh_passive_last_any_us = now;
-  }
+  if (!rtrh_passive_collecting) reset_rtrh_passive_measurement(now, state);
+  else rtrh_passive_last_any_us = now;
 
   const uint8_t old_state = rtrh_passive_last_state;
-
   if (state != old_state) {
     const bool old_g10 = (old_state & 0x01) != 0;
     const bool new_g10 = (state & 0x01) != 0;
@@ -1456,72 +1335,97 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
     if (!old_g10 && new_g10) {
       rtrh_passive_g10_rise_us = now;
       rtrh_passive_have_g10_rise = true;
-
-      if (new_g13) {
-        rtrh_passive_g13_rise_us = now;
-        rtrh_passive_have_g13_rise = true;
-      } else {
-        rtrh_passive_have_g13_rise = false;
-      }
+      rtrh_passive_have_g13_rise = new_g13;
+      if (new_g13) rtrh_passive_g13_rise_us = now;
     }
-
-    if (!old_g13 && new_g13 &&
-        rtrh_passive_have_g10_rise) {
+    if (!old_g13 && new_g13 && rtrh_passive_have_g10_rise) {
       rtrh_passive_g13_rise_us = now;
       rtrh_passive_have_g13_rise = true;
     }
 
     if (old_g10 && !new_g10) {
-      const uint32_t previous_fall =
-          rtrh_passive_last_g10_fall_us;
-
-      if (!rtrh_passive_train_active ||
-          previous_fall == 0) {
-        start_rtrh_passive_train(now);
+      const uint32_t pf = rtrh_passive_last_g10_fall_us;
+      if (pf == 0) {
+        rtrh_passive_last_g10_fall_us = now;
       } else {
-        const uint32_t period =
-            static_cast<uint32_t>(now - previous_fall);
+        const uint32_t period = static_cast<uint32_t>(now - pf);
+        rtrh_passive_last_g10_fall_us = now;
 
-        if (period >= RTRH_TRAIN_GAP_US) {
-          append_current_rtrh_passive_train();
-          start_rtrh_passive_train(now);
-        } else if (rtrh_passive_have_g10_rise) {
+        if (period < RTRH_CYCLE_GAP_US && rtrh_passive_have_g10_rise) {
           const uint32_t low =
-              static_cast<uint32_t>(
-                  rtrh_passive_g10_rise_us -
-                  previous_fall);
-
+              static_cast<uint32_t>(rtrh_passive_g10_rise_us - pf);
           const bool have_delay =
               rtrh_passive_have_g13_rise &&
-              static_cast<int32_t>(
-                  rtrh_passive_g13_rise_us -
-                  rtrh_passive_g10_rise_us) >= 0;
+              static_cast<int32_t>(rtrh_passive_g13_rise_us -
+                                   rtrh_passive_g10_rise_us) >= 0;
+          const uint32_t delay = have_delay
+              ? static_cast<uint32_t>(rtrh_passive_g13_rise_us -
+                                      rtrh_passive_g10_rise_us)
+              : 0;
+          const bool is_ref = period >= RTRH_REF_MIN_US && period <= RTRH_REF_MAX_US;
+          const bool is_rt  = period >= RTRH_RT_MIN_US  && period <= RTRH_RT_MAX_US;
 
-          const uint32_t delay =
-              have_delay
-                  ? static_cast<uint32_t>(
-                        rtrh_passive_g13_rise_us -
-                        rtrh_passive_g10_rise_us)
-                  : 0;
+          switch (rtrh_passive_phase) {
+            case RTRH_PHASE_WAIT_REF:
+              if (is_ref) {
+                start_rtrh_passive_train(now, RTRH_ROLE_REF);
+                rtrh_passive_phase = RTRH_PHASE_REF;
+                add_rtrh_passive_cycle(period, low, have_delay, delay);
+              }
+              break;
 
-          add_rtrh_passive_cycle(
-              period,
-              low,
-              have_delay,
-              delay);
+            case RTRH_PHASE_REF:
+              if (is_ref) {
+                add_rtrh_passive_cycle(period, low, have_delay, delay);
+              } else if (is_rt) {
+                append_current_rtrh_passive_train();
+                start_rtrh_passive_train(now, RTRH_ROLE_RT);
+                rtrh_passive_phase = RTRH_PHASE_RT;
+                rtrh_passive_phase_candidate_run = 0;
+                add_rtrh_passive_cycle(period, low, have_delay, delay);
+                if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
+                  rtrh_passive_rt_temp_period_sum += period;
+                  rtrh_passive_rt_temp_count++;
+                }
+              }
+              break;
 
-          rtrh_passive_last_g10_fall_us = now;
-        } else {
-          // We lost the rise edge for this cycle.  Keep the train alive but
-          // use the new falling edge as the next period reference.
-          rtrh_passive_last_g10_fall_us = now;
+            case RTRH_PHASE_RT:
+              if (rtrh_passive_current_train.count >= RTRH_RT_FORCE_END_CYCLES) {
+                append_current_rtrh_passive_train();
+                start_rtrh_passive_train(now, RTRH_ROLE_RH);
+                rtrh_passive_phase = RTRH_PHASE_RH;
+                rtrh_passive_phase_candidate_run = 0;
+                add_rtrh_passive_cycle(period, low, have_delay, delay);
+              } else if (is_rt) {
+                rtrh_passive_phase_candidate_run = 0;
+                add_rtrh_passive_cycle(period, low, have_delay, delay);
+                if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
+                  rtrh_passive_rt_temp_period_sum += period;
+                  rtrh_passive_rt_temp_count++;
+                }
+              } else {
+                if (rtrh_passive_phase_candidate_run < 255)
+                  rtrh_passive_phase_candidate_run++;
+                if (rtrh_passive_phase_candidate_run >= RTRH_PHASE_LOCK_CYCLES) {
+                  append_current_rtrh_passive_train();
+                  start_rtrh_passive_train(now, RTRH_ROLE_RH);
+                  rtrh_passive_phase = RTRH_PHASE_RH;
+                  rtrh_passive_phase_candidate_run = 0;
+                  add_rtrh_passive_cycle(period, low, have_delay, delay);
+                }
+              }
+              break;
+
+            case RTRH_PHASE_RH:
+              add_rtrh_passive_cycle(period, low, have_delay, delay);
+              break;
+          }
         }
       }
-
       rtrh_passive_have_g10_rise = false;
       rtrh_passive_have_g13_rise = false;
     }
-
     rtrh_passive_last_state = state;
   }
 
@@ -2000,50 +1904,6 @@ void BusSniffer::setup()
 void BusSniffer::loop()
 {
   /*
-   * Close a train after 2 ms without a GPIO10 falling edge.  This is only
-   * interrupt bookkeeping; the pins remain ordinary high-impedance inputs.
-   */
-  if (rtrh_passive_collecting &&
-      rtrh_passive_train_active) {
-    const uint32_t now =
-        static_cast<uint32_t>(esp_timer_get_time());
-    const uint32_t last_fall =
-        rtrh_passive_last_g10_fall_us;
-
-    if (last_fall != 0 &&
-        static_cast<uint32_t>(now - last_fall) >
-            RTRH_TRAIN_GAP_US) {
-      gpio_intr_disable(PIN_RTRH0);
-      gpio_intr_disable(PIN_RTRH1);
-      gpio_intr_disable(PIN_RTRH2);
-      gpio_intr_disable(PIN_RTRH3);
-
-      const uint32_t now2 =
-          static_cast<uint32_t>(esp_timer_get_time());
-      const uint32_t last_fall2 =
-          rtrh_passive_last_g10_fall_us;
-
-      if (rtrh_passive_train_active &&
-          last_fall2 != 0 &&
-          static_cast<uint32_t>(now2 - last_fall2) >
-              RTRH_TRAIN_GAP_US) {
-        append_current_rtrh_passive_train();
-      }
-
-      rtrh_passive_last_state = read_rtrh_state();
-      rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
-      rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
-      rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
-      rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
-
-      gpio_intr_enable(PIN_RTRH0);
-      gpio_intr_enable(PIN_RTRH1);
-      gpio_intr_enable(PIN_RTRH2);
-      gpio_intr_enable(PIN_RTRH3);
-    }
-  }
-
-  /*
    * A whole sensor measurement may contain long internal pauses.  Only 15 s
    * without ANY RT/RH edge freezes and classifies the measurement.
    */
@@ -2098,7 +1958,7 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH passive measurement %lu: %u trains%s%s",
+        "RT/RH passive measurement %lu: %u phases%s%s",
         static_cast<unsigned long>(s.sequence),
         static_cast<unsigned>(s.train_count),
         s.overflow ? " OVERFLOW" : "",
