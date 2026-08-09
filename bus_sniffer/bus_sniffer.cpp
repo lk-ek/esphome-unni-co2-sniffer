@@ -948,16 +948,17 @@ static volatile bool rtrh_irqs_suspended = false;
  *
  * GPIO10 falling is our phase reference. The measured digital period is about
  * 76-77 us. RH testing showed that GPIO13 in SHORT mode changes most strongly
- * across the middle of the cycle, with the useful transition lying roughly
- * between +25 and +45 us.  Keep the same four-phase RAM footprint, but zoom
- * those phases into that interval:
+ * across the early/middle part of the cycle.  The 31..66 % RH sweep showed
+ * that GPIO13 is already saturated by +24 us at high humidity, so move the
+ * four phases earlier:
  *
- *   phase 0: +24 us
- *   phase 1: +30 us
- *   phase 2: +36 us
- *   phase 3: +42 us
+ *   phase 0: +12 us
+ *   phase 1: +16 us
+ *   phase 2: +20 us
+ *   phase 3: +24 us
  *
- * Eight repeats improve averaging without increasing aggregate RAM.
+ * Eight repeats are retained.  Their individual SHORT/GPIO13 raw values are
+ * also exported so cycle-to-cycle structure is not hidden by the mean.
  */
 
 static constexpr uint8_t RTRH_ADC_PHASES = 4;
@@ -993,7 +994,7 @@ static constexpr float RTRH_TEMP_C = 194.833723f;
 static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
-    24, 30, 36, 42
+    12, 16, 20, 24
 };
 static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
     10, 11, 12, 13
@@ -1027,6 +1028,14 @@ static RtRhAdcAggregate
 // Independent last-completed ADC snapshot for HTTP.
 static RtRhAdcAggregate
     rtrh_adc_snapshot[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
+
+// Individual accepted SHORT/GPIO13 samples. 0xFFFF means missing/rejected.
+// Only 4 phases x 8 repeats = 64 bytes per live/snapshot buffer.
+static uint16_t
+    rtrh_short_g13_raw[RTRH_ADC_PHASES][RTRH_ADC_REPEATS];
+static uint16_t
+    rtrh_short_g13_raw_snapshot[RTRH_ADC_PHASES][RTRH_ADC_REPEATS];
+
 static volatile bool rtrh_adc_snapshot_ready = false;
 static volatile bool rtrh_adc_snapshot_in_use = false;
 static volatile uint32_t rtrh_adc_snapshot_sequence = 0;
@@ -1107,6 +1116,12 @@ static void reset_rtrh_adc_capture()
 
 static void clear_rtrh_adc_aggregates()
 {
+  for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
+    for (uint8_t repeat = 0; repeat < RTRH_ADC_REPEATS; repeat++) {
+      rtrh_short_g13_raw[phase][repeat] = 0xFFFF;
+    }
+  }
+
   for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
     for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
       for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
@@ -1428,6 +1443,11 @@ static void rtrh_adc_task(void *arg)
           raw = 65535;
 
         const uint16_t value = static_cast<uint16_t>(raw);
+
+        if (mode == RTRH_MODE_SHORT && channel == 3 &&
+            phase < RTRH_ADC_PHASES && repeat < RTRH_ADC_REPEATS) {
+          rtrh_short_g13_raw[phase][repeat] = value;
+        }
 
         agg.sum += value;
         agg.count++;
@@ -1754,13 +1774,14 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     static constexpr char HEADER[] =
         "sequence,mode,mode_name,phase,gpio,offset_us,"
         "count,mean,min,max,period_mean_us,max_lateness_us,"
-        "rejected_late,read_errors\n";
+        "rejected_late,read_errors,"
+        "raw0,raw1,raw2,raw3,raw4,raw5,raw6,raw7\n";
 
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
-    static char chunk[128];
-    static char line[128];
+    static char chunk[256];
+    static char line[224];
     size_t used = 0;
 
     const uint32_t sequence = rtrh_adc_snapshot_sequence;
@@ -1785,10 +1806,33 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
           const uint16_t min_value =
               agg.count ? agg.min : 0;
 
+          char raw_fields[64] = ",,,,,,,,";
+          if (mode == RTRH_MODE_SHORT && channel == 3) {
+            char *rp = raw_fields;
+            size_t remain = sizeof(raw_fields);
+
+            for (uint8_t rr = 0; rr < RTRH_ADC_REPEATS; rr++) {
+              const uint16_t rv =
+                  rtrh_short_g13_raw_snapshot[phase][rr];
+
+              int rn;
+              if (rv == 0xFFFF)
+                rn = snprintf(rp, remain, ",");
+              else
+                rn = snprintf(rp, remain, ",%u", static_cast<unsigned>(rv));
+
+              if (rn <= 0 || static_cast<size_t>(rn) >= remain)
+                break;
+
+              rp += rn;
+              remain -= static_cast<size_t>(rn);
+            }
+          }
+
           const int n = snprintf(
               line,
               sizeof(line),
-              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u\n",
+              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u%s\n",
               static_cast<unsigned long>(sequence),
               static_cast<unsigned>(mode),
               mode == RTRH_MODE_SHORT ? "short" : "long",
@@ -1802,7 +1846,8 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
               static_cast<unsigned long>(period_mean),
               static_cast<unsigned>(agg.max_lateness_us),
               static_cast<unsigned>(agg.rejected_late),
-              static_cast<unsigned>(agg.read_errors));
+              static_cast<unsigned>(agg.read_errors),
+              raw_fields);
 
           if (n <= 0)
             continue;
@@ -2183,6 +2228,10 @@ void BusSniffer::loop()
           rtrh_adc_snapshot,
           rtrh_adc_agg,
           sizeof(rtrh_adc_snapshot));
+      memcpy(
+          rtrh_short_g13_raw_snapshot,
+          rtrh_short_g13_raw,
+          sizeof(rtrh_short_g13_raw_snapshot));
       rtrh_adc_snapshot_sequence = rtrh_adc_sequence;
       rtrh_adc_snapshot_ready = true;
     }
