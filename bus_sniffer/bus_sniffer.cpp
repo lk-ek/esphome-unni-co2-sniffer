@@ -977,6 +977,7 @@ static constexpr uint32_t RTRH_REF_MAX_US = 105;
 static constexpr uint32_t RTRH_RT_MIN_US = 105;
 static constexpr uint32_t RTRH_RT_MAX_US = 190;
 static constexpr uint16_t RTRH_RT_TEMP_CYCLES = 880;
+static constexpr uint16_t RTRH_RT_MIN_BEFORE_RH = 800;
 static constexpr uint16_t RTRH_RT_FORCE_END_CYCLES = 920;
 static constexpr uint8_t RTRH_PHASE_LOCK_CYCLES = 8;
 
@@ -1376,22 +1377,41 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 
             case RTRH_PHASE_REF:
               if (is_ref) {
-                add_rtrh_passive_cycle(period, low, have_delay, delay);
-              } else if (is_rt) {
-                append_current_rtrh_passive_train();
-                start_rtrh_passive_train(now, RTRH_ROLE_RT);
-                rtrh_passive_phase = RTRH_PHASE_RT;
+                // A genuine REF cycle cancels any tentative REF->RT transition.
                 rtrh_passive_phase_candidate_run = 0;
                 add_rtrh_passive_cycle(period, low, have_delay, delay);
-                if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
-                  rtrh_passive_rt_temp_period_sum += period;
-                  rtrh_passive_rt_temp_count++;
+              } else if (is_rt) {
+                // REF contains occasional isolated 140..160 us glitches.
+                // Do not leave REF until RT-like timing is stable for 8 cycles.
+                if (rtrh_passive_phase_candidate_run < 255)
+                  rtrh_passive_phase_candidate_run++;
+
+                if (rtrh_passive_phase_candidate_run >=
+                    RTRH_PHASE_LOCK_CYCLES) {
+                  append_current_rtrh_passive_train();
+                  start_rtrh_passive_train(now, RTRH_ROLE_RT);
+                  rtrh_passive_phase = RTRH_PHASE_RT;
+                  rtrh_passive_phase_candidate_run = 0;
+
+                  // The first 7 candidate cycles are intentionally discarded;
+                  // one cycle is enough to seed the confirmed RT phase.
+                  add_rtrh_passive_cycle(period, low, have_delay, delay);
+
+                  if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
+                    rtrh_passive_rt_temp_period_sum += period;
+                    rtrh_passive_rt_temp_count++;
+                  }
                 }
+              } else {
+                // Neither REF nor RT: transition/glitch, do not accumulate lock.
+                rtrh_passive_phase_candidate_run = 0;
               }
               break;
 
             case RTRH_PHASE_RT:
-              if (rtrh_passive_current_train.count >= RTRH_RT_FORCE_END_CYCLES) {
+              if (rtrh_passive_current_train.count >=
+                  RTRH_RT_FORCE_END_CYCLES) {
+                // Ambiguous RT/RH overlap: physical RT length is known.
                 append_current_rtrh_passive_train();
                 start_rtrh_passive_train(now, RTRH_ROLE_RH);
                 rtrh_passive_phase = RTRH_PHASE_RH;
@@ -1400,19 +1420,31 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
               } else if (is_rt) {
                 rtrh_passive_phase_candidate_run = 0;
                 add_rtrh_passive_cycle(period, low, have_delay, delay);
+
                 if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
                   rtrh_passive_rt_temp_period_sum += period;
                   rtrh_passive_rt_temp_count++;
                 }
               } else {
-                if (rtrh_passive_phase_candidate_run < 255)
-                  rtrh_passive_phase_candidate_run++;
-                if (rtrh_passive_phase_candidate_run >= RTRH_PHASE_LOCK_CYCLES) {
-                  append_current_rtrh_passive_train();
-                  start_rtrh_passive_train(now, RTRH_ROLE_RH);
-                  rtrh_passive_phase = RTRH_PHASE_RH;
+                // Do not permit an RT->RH transition until a physically
+                // plausible RT section has actually been collected.  This
+                // prevents transition glitches immediately after REF from
+                // turning almost the whole measurement into RH.
+                if (rtrh_passive_current_train.count <
+                    RTRH_RT_MIN_BEFORE_RH) {
                   rtrh_passive_phase_candidate_run = 0;
-                  add_rtrh_passive_cycle(period, low, have_delay, delay);
+                } else {
+                  if (rtrh_passive_phase_candidate_run < 255)
+                    rtrh_passive_phase_candidate_run++;
+
+                  if (rtrh_passive_phase_candidate_run >=
+                      RTRH_PHASE_LOCK_CYCLES) {
+                    append_current_rtrh_passive_train();
+                    start_rtrh_passive_train(now, RTRH_ROLE_RH);
+                    rtrh_passive_phase = RTRH_PHASE_RH;
+                    rtrh_passive_phase_candidate_run = 0;
+                    add_rtrh_passive_cycle(period, low, have_delay, delay);
+                  }
                 }
               }
               break;
