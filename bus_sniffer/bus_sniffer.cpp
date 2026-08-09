@@ -960,9 +960,21 @@ static volatile bool rtrh_irqs_suspended = false;
 
 static constexpr uint8_t RTRH_ADC_PHASES = 4;
 static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
-static constexpr uint8_t RTRH_ADC_REPEATS = 8;
+static constexpr uint8_t RTRH_ADC_MODES = 2;
+static constexpr uint8_t RTRH_ADC_REPEATS = 4;
 static constexpr uint16_t RTRH_ADC_SAMPLES =
-    RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
+    RTRH_ADC_MODES * RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
+
+static constexpr uint8_t RTRH_MODE_SHORT = 0;
+static constexpr uint8_t RTRH_MODE_LONG = 1;
+
+// Observed GPIO10/GPIO11 falling-edge periods.
+// 9-6: short median 77 us, long median 139 us.
+// Keep generous margins for ISR jitter without allowing the classes to overlap.
+static constexpr uint32_t RTRH_SHORT_MIN_US = 65;
+static constexpr uint32_t RTRH_SHORT_MAX_US = 100;
+static constexpr uint32_t RTRH_LONG_MIN_US = 115;
+static constexpr uint32_t RTRH_LONG_MAX_US = 175;
 static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
@@ -974,9 +986,11 @@ static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
 
 struct RtRhAdcRow {
   uint8_t repeat;
+  uint8_t mode;
   uint8_t phase;
   uint8_t channel;
   uint16_t offset_us;
+  uint16_t trigger_period_us;
   int16_t lateness_us;
   uint16_t raw;
   uint8_t valid;
@@ -1008,6 +1022,9 @@ static volatile int8_t rtrh_adc_target_index = -1;
 static volatile int8_t rtrh_adc_trigger_index = -1;
 static volatile bool rtrh_adc_sequence_start = false;
 static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
+static volatile uint32_t rtrh_last_fall_us[4] = {0, 0, 0, 0};
+static volatile uint16_t rtrh_adc_trigger_period_us = 0;
+static volatile uint8_t rtrh_adc_desired_mode = RTRH_MODE_SHORT;
 
 static TaskHandle_t rtrh_adc_task_handle = nullptr;
 
@@ -1040,6 +1057,11 @@ static void reset_rtrh_adc_capture()
   rtrh_adc_target_index = -1;
   rtrh_adc_trigger_index = -1;
   rtrh_adc_sequence_start = false;
+  rtrh_adc_trigger_period_us = 0;
+  rtrh_last_fall_us[0] = 0;
+  rtrh_last_fall_us[1] = 0;
+  rtrh_last_fall_us[2] = 0;
+  rtrh_last_fall_us[3] = 0;
 }
 
 static void setup_rtrh_adc()
@@ -1216,14 +1238,23 @@ static void rtrh_adc_task(void *arg)
         break;
       }
 
+      const uint16_t samples_per_mode =
+          RTRH_ADC_REPEATS * RTRH_ADC_PHASES * RTRH_ADC_CHANNELS;
+
+      const uint8_t mode =
+          static_cast<uint8_t>(sample_index / samples_per_mode);
+
+      const uint16_t within_mode =
+          static_cast<uint16_t>(sample_index % samples_per_mode);
+
       const uint8_t repeat =
           static_cast<uint8_t>(
-              sample_index /
+              within_mode /
               (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
 
       const uint8_t within_repeat =
           static_cast<uint8_t>(
-              sample_index %
+              within_mode %
               (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
 
       const uint8_t phase =
@@ -1251,9 +1282,11 @@ static void rtrh_adc_task(void *arg)
         RtRhAdcRow &row =
             rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
         row.repeat = repeat;
+        row.mode = mode;
         row.phase = phase;
         row.channel = channel;
         row.offset_us = offset;
+        row.trigger_period_us = 0;
         row.lateness_us = INT16_MAX;
         row.raw = 0;
         row.valid = 0;
@@ -1267,6 +1300,7 @@ static void rtrh_adc_task(void *arg)
        * Give the ADC/pad setup several complete sensor periods to settle.
        * The ISR counts REAL falling edges on the selected trigger line.
        */
+      rtrh_adc_desired_mode = mode;
       rtrh_adc_edges_to_skip = RTRH_ADC_SKIP_EDGES;
       rtrh_adc_pending = false;
       rtrh_adc_waiting_for_edge = true;
@@ -1295,9 +1329,11 @@ static void rtrh_adc_task(void *arg)
           rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
 
       row.repeat = repeat;
+      row.mode = mode;
       row.phase = phase;
       row.channel = channel;
       row.offset_us = offset;
+      row.trigger_period_us = rtrh_adc_trigger_period_us;
       row.raw = 0;
       row.valid = 0;
 
@@ -1418,26 +1454,50 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
    * Once a target ADC pad has been prepared, only the selected other pin is
    * used as timing reference. Falling edges are counted in hardware time.
    */
-  if (rtrh_adc_active &&
-      rtrh_adc_waiting_for_edge &&
-      !rtrh_adc_pending &&
-      pin_index == static_cast<uint8_t>(rtrh_adc_trigger_index) &&
-      previous && !level) {
+  if (previous && !level) {
+    const uint32_t previous_fall = rtrh_last_fall_us[pin_index];
+    rtrh_last_fall_us[pin_index] = now;
 
-    if (rtrh_adc_edges_to_skip > 0) {
-      rtrh_adc_edges_to_skip--;
-    } else {
-      rtrh_adc_reference_edge_us = now;
-      rtrh_adc_pending = true;
-      rtrh_adc_waiting_for_edge = false;
+    if (rtrh_adc_active &&
+        rtrh_adc_waiting_for_edge &&
+        !rtrh_adc_pending &&
+        pin_index == static_cast<uint8_t>(rtrh_adc_trigger_index) &&
+        previous_fall != 0) {
 
-      if (rtrh_adc_task_handle != nullptr) {
-        BaseType_t higher_priority_woken = pdFALSE;
-        vTaskNotifyGiveFromISR(
-            rtrh_adc_task_handle,
-            &higher_priority_woken);
-        if (higher_priority_woken)
-          portYIELD_FROM_ISR();
+      const uint32_t period =
+          static_cast<uint32_t>(now - previous_fall);
+
+      bool wanted = false;
+
+      if (rtrh_adc_desired_mode == RTRH_MODE_SHORT) {
+        wanted =
+            period >= RTRH_SHORT_MIN_US &&
+            period <= RTRH_SHORT_MAX_US;
+      } else {
+        wanted =
+            period >= RTRH_LONG_MIN_US &&
+            period <= RTRH_LONG_MAX_US;
+      }
+
+      if (wanted) {
+        if (rtrh_adc_edges_to_skip > 0) {
+          rtrh_adc_edges_to_skip--;
+        } else {
+          rtrh_adc_reference_edge_us = now;
+          rtrh_adc_trigger_period_us =
+              period > 65535U ? 65535U : static_cast<uint16_t>(period);
+          rtrh_adc_pending = true;
+          rtrh_adc_waiting_for_edge = false;
+
+          if (rtrh_adc_task_handle != nullptr) {
+            BaseType_t higher_priority_woken = pdFALSE;
+            vTaskNotifyGiveFromISR(
+                rtrh_adc_task_handle,
+                &higher_priority_woken);
+            if (higher_priority_woken)
+              portYIELD_FROM_ISR();
+          }
+        }
       }
     }
   }
@@ -1603,14 +1663,14 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
         "attachment; filename=\"rt_rh_adc.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,sample,repeat,phase,channel,gpio,offset_us,"
-        "lateness_us,raw,valid\n";
+        "sequence,sample,repeat,mode,mode_name,phase,channel,gpio,"
+        "offset_us,trigger_period_us,lateness_us,raw,valid\n";
 
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
     static char chunk[256];
-    static char line[128];
+    static char line[160];
     size_t used = 0;
 
     const uint32_t sequence = rtrh_adc_sequence;
@@ -1621,14 +1681,17 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%u,%u,%u,%u,%d,%u,%d,%u,%u\n",
+          "%lu,%u,%u,%u,%s,%u,%u,%d,%u,%u,%d,%u,%u\n",
           static_cast<unsigned long>(sequence),
           static_cast<unsigned>(i),
           static_cast<unsigned>(row.repeat),
+          static_cast<unsigned>(row.mode),
+          row.mode == RTRH_MODE_SHORT ? "short" : "long",
           static_cast<unsigned>(row.phase),
           static_cast<unsigned>(row.channel),
           RTRH_ADC_GPIOS[row.channel],
           static_cast<unsigned>(row.offset_us),
+          static_cast<unsigned>(row.trigger_period_us),
           static_cast<int>(row.lateness_us),
           static_cast<unsigned>(row.raw),
           static_cast<unsigned>(row.valid));
@@ -1921,44 +1984,55 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH pre-armed ADC ready: %u samples, sequence %lu",
+        "RT/RH mode ADC ready: %u samples, sequence %lu",
         RTRH_ADC_SAMPLES,
         static_cast<unsigned long>(rtrh_adc_sequence));
 
-    for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-      uint64_t sum[RTRH_ADC_CHANNELS] = {};
-      uint16_t n[RTRH_ADC_CHANNELS] = {};
-      int32_t max_late = 0;
+    for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
+      for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
+        uint64_t sum[RTRH_ADC_CHANNELS] = {};
+        uint16_t n[RTRH_ADC_CHANNELS] = {};
+        uint32_t period_sum = 0;
+        uint16_t period_n = 0;
+        int32_t max_late = 0;
 
-      for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES; i++) {
-        const RtRhAdcRow &row = rtrh_adc_rows[i];
+        for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES; i++) {
+          const RtRhAdcRow &row = rtrh_adc_rows[i];
 
-        if (row.phase != phase)
-          continue;
+          if (row.mode != mode || row.phase != phase)
+            continue;
 
-        const int32_t abs_late =
-            row.lateness_us < 0 ? -row.lateness_us : row.lateness_us;
-        if (abs_late > max_late)
-          max_late = abs_late;
+          const int32_t abs_late =
+              row.lateness_us < 0 ? -row.lateness_us : row.lateness_us;
+          if (abs_late > max_late)
+            max_late = abs_late;
 
-        if (!row.valid || abs_late > 10)
-          continue;
+          if (!row.valid || abs_late > 10)
+            continue;
 
-        sum[row.channel] += row.raw;
-        n[row.channel]++;
+          sum[row.channel] += row.raw;
+          n[row.channel]++;
+
+          if (row.trigger_period_us != 0) {
+            period_sum += row.trigger_period_us;
+            period_n++;
+          }
+        }
+
+        ESP_LOGI(
+            TAG,
+            "RT/RH %s phase %u (+%u us, period~%lu): "
+            "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%ld us",
+            mode == RTRH_MODE_SHORT ? "SHORT" : "LONG",
+            phase,
+            RTRH_ADC_OFFSETS_US[phase],
+            period_n ? static_cast<unsigned long>(period_sum / period_n) : 0UL,
+            n[0] ? static_cast<unsigned long>(sum[0] / n[0]) : 0UL, n[0],
+            n[1] ? static_cast<unsigned long>(sum[1] / n[1]) : 0UL, n[1],
+            n[2] ? static_cast<unsigned long>(sum[2] / n[2]) : 0UL, n[2],
+            n[3] ? static_cast<unsigned long>(sum[3] / n[3]) : 0UL, n[3],
+            static_cast<long>(max_late));
       }
-
-      ESP_LOGI(
-          TAG,
-          "RT/RH ADC phase %u (+%u us): "
-          "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%ld us",
-          phase,
-          RTRH_ADC_OFFSETS_US[phase],
-          n[0] ? static_cast<unsigned long>(sum[0] / n[0]) : 0UL, n[0],
-          n[1] ? static_cast<unsigned long>(sum[1] / n[1]) : 0UL, n[1],
-          n[2] ? static_cast<unsigned long>(sum[2] / n[2]) : 0UL, n[2],
-          n[3] ? static_cast<unsigned long>(sum[3] / n[3]) : 0UL, n[3],
-          static_cast<long>(max_late));
     }
   }
 
