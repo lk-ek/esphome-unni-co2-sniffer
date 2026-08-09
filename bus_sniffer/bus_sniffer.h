@@ -23,11 +23,17 @@ class BusSniffer : public Component {
     this->frame_errors_sensor_ = sensor;
   }
 
-
  protected:
+  // ESPHome entities
+  sensor::Sensor *co2_sensor_{nullptr};
+  sensor::Sensor *crc_errors_sensor_{nullptr};
+  sensor::Sensor *frame_errors_sensor_{nullptr};
+
+  // Last successfully published CO2 value
   bool have_last_ppm_{false};
   uint16_t last_ppm_{0};
 
+  // Diagnostics
   uint32_t crc_errors_{0};
   uint32_t frame_errors_{0};
 };
