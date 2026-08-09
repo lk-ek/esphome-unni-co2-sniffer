@@ -958,10 +958,13 @@ static volatile bool rtrh_irqs_suspended = false;
  * 32 periods -> 8 observations of each phase, then acquisition stops.
  */
 
-static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
 static constexpr uint8_t RTRH_ADC_PHASES = 4;
-static constexpr uint8_t RTRH_ADC_CYCLES = 32;
+static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
+static constexpr uint8_t RTRH_ADC_REPEATS = 4;
+static constexpr uint16_t RTRH_ADC_SAMPLES =
+    RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
 static constexpr uint32_t RTRH_ADC_PERIOD_US = 77;
+static constexpr uint32_t RTRH_ADC_GAP_PERIODS = 4;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
     8, 25, 45, 62
 };
@@ -970,11 +973,13 @@ static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
 };
 
 struct RtRhAdcRow {
-  uint16_t cycle;
+  uint8_t repeat;
+  uint8_t phase;
+  uint8_t channel;
   uint16_t offset_us;
   int16_t lateness_us;
-  uint16_t raw[RTRH_ADC_CHANNELS];
-  uint8_t valid_mask;
+  uint16_t raw;
+  uint8_t valid;
 };
 
 struct RtRhAdcChannel {
@@ -987,7 +992,7 @@ static RtRhAdcChannel rtrh_adc_channels[RTRH_ADC_CHANNELS];
 static adc_oneshot_unit_handle_t rtrh_adc1_handle = nullptr;
 static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
 
-static RtRhAdcRow rtrh_adc_rows[RTRH_ADC_CYCLES];
+static RtRhAdcRow rtrh_adc_rows[RTRH_ADC_SAMPLES];
 
 static volatile bool rtrh_adc_active = false;
 static volatile bool rtrh_adc_ready = false;
@@ -1145,10 +1150,6 @@ static void rtrh_adc_task(void *arg)
     if (!rtrh_adc_pending || !rtrh_adc_active || rtrh_adc_ready)
       continue;
 
-    /*
-     * Freeze RT/RH digital IRQs while the ADC owns these pads. The normal
-     * I2C/CO2 interrupts on GPIO39/40 are untouched.
-     */
     gpio_intr_disable(PIN_RTRH0);
     gpio_intr_disable(PIN_RTRH1);
     gpio_intr_disable(PIN_RTRH2);
@@ -1166,78 +1167,85 @@ static void rtrh_adc_task(void *arg)
     }
 
     /*
-     * Channel configuration itself costs some time. Move to the next future
-     * 77-us period boundary relative to the captured GPIO10 falling edge, plus
-     * one guard period. This keeps all requested offsets in the future.
+     * adc_oneshot_config_channel() itself costs time, so choose a future
+     * period boundary after configuration has finished. Every conversion
+     * below is then scheduled from this absolute base; latency never
+     * accumulates from one measurement to the next.
      */
     uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
     uint32_t elapsed = static_cast<uint32_t>(now - reference_edge);
-    uint32_t skip_periods = elapsed / RTRH_ADC_PERIOD_US + 2U;
-    uint32_t base_edge =
+    uint32_t skip_periods = elapsed / RTRH_ADC_PERIOD_US + 3U;
+
+    const uint32_t base_edge =
         static_cast<uint32_t>(
             reference_edge + skip_periods * RTRH_ADC_PERIOD_US);
 
-    for (uint16_t cycle = 0; cycle < RTRH_ADC_CYCLES; cycle++) {
-      const uint16_t offset =
-          RTRH_ADC_OFFSETS_US[cycle % RTRH_ADC_PHASES];
+    uint16_t sample_index = 0;
 
-      const uint32_t target =
-          static_cast<uint32_t>(
-              base_edge +
-              static_cast<uint32_t>(cycle) * RTRH_ADC_PERIOD_US +
-              offset);
+    for (uint8_t repeat = 0; repeat < RTRH_ADC_REPEATS; repeat++) {
+      for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
+        for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
+          RtRhAdcRow &row = rtrh_adc_rows[sample_index];
 
-      while (static_cast<int32_t>(
-                 target -
-                 static_cast<uint32_t>(esp_timer_get_time())) > 0) {
-        // intentional short spin; burst lasts only about 2.5 ms
-      }
+          row.repeat = repeat;
+          row.phase = phase;
+          row.channel = channel;
+          row.offset_us = RTRH_ADC_OFFSETS_US[phase];
+          row.raw = 0;
+          row.valid = 0;
 
-      RtRhAdcRow &row = rtrh_adc_rows[cycle];
-      row.cycle = cycle;
-      row.offset_us = offset;
+          const uint32_t measurement_period =
+              static_cast<uint32_t>(sample_index) * RTRH_ADC_GAP_PERIODS;
 
-      const uint32_t actual =
-          static_cast<uint32_t>(esp_timer_get_time());
+          const uint32_t target =
+              static_cast<uint32_t>(
+                  base_edge +
+                  measurement_period * RTRH_ADC_PERIOD_US +
+                  row.offset_us);
 
-      int32_t late = static_cast<int32_t>(actual - target);
-      if (late > INT16_MAX)
-        late = INT16_MAX;
-      if (late < INT16_MIN)
-        late = INT16_MIN;
+          while (static_cast<int32_t>(
+                     target -
+                     static_cast<uint32_t>(esp_timer_get_time())) > 0) {
+            // intentional short spin
+          }
 
-      row.lateness_us = static_cast<int16_t>(late);
-      row.valid_mask = 0;
+          const uint32_t actual =
+              static_cast<uint32_t>(esp_timer_get_time());
 
-      for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
-        row.raw[i] = 0;
+          int32_t late = static_cast<int32_t>(actual - target);
+          if (late > INT16_MAX)
+            late = INT16_MAX;
+          if (late < INT16_MIN)
+            late = INT16_MIN;
+          row.lateness_us = static_cast<int16_t>(late);
 
-        const RtRhAdcChannel &ch = rtrh_adc_channels[i];
-        if (!ch.configured)
-          continue;
+          const RtRhAdcChannel &ch = rtrh_adc_channels[channel];
+          if (ch.configured) {
+            adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
 
-        adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
-        if (handle == nullptr)
-          continue;
+            if (handle != nullptr) {
+              int raw = 0;
+              if (adc_oneshot_read(handle, ch.channel, &raw) == ESP_OK) {
+                if (raw < 0)
+                  raw = 0;
+                if (raw > 65535)
+                  raw = 65535;
 
-        int raw = 0;
-        if (adc_oneshot_read(handle, ch.channel, &raw) != ESP_OK)
-          continue;
+                row.raw = static_cast<uint16_t>(raw);
+                row.valid = 1;
+              }
+            }
+          }
 
-        if (raw < 0)
-          raw = 0;
-        if (raw > 65535)
-          raw = 65535;
-
-        row.raw[i] = static_cast<uint16_t>(raw);
-        row.valid_mask |= static_cast<uint8_t>(1U << i);
+          sample_index++;
+        }
       }
     }
 
     rtrh_adc_pending = false;
     rtrh_adc_active = false;
     rtrh_adc_ready = true;
-    rtrh_adc_cycle = RTRH_ADC_CYCLES;
+    rtrh_adc_cycle = RTRH_ADC_SAMPLES;
     rtrh_adc_sequence++;
 
     restore_rtrh_digital_inputs();
@@ -1442,8 +1450,8 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
         "attachment; filename=\"rt_rh_adc.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,cycle,phase,offset_us,lateness_us,"
-        "gpio10,gpio11,gpio12,gpio13,valid_mask,missed_edges\n";
+        "sequence,sample,repeat,phase,channel,gpio,offset_us,"
+        "lateness_us,raw,valid\n";
 
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
@@ -1453,26 +1461,24 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     size_t used = 0;
 
     const uint32_t sequence = rtrh_adc_sequence;
-    const uint32_t missed = rtrh_adc_missed_edges;
 
-    for (uint16_t i = 0; i < RTRH_ADC_CYCLES && err == ESP_OK; i++) {
+    for (uint16_t i = 0; i < RTRH_ADC_SAMPLES && err == ESP_OK; i++) {
       const RtRhAdcRow &row = rtrh_adc_rows[i];
 
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%u,%u,%u,%d,%u,%u,%u,%u,0x%02X,%lu\n",
+          "%lu,%u,%u,%u,%u,%d,%u,%d,%u,%u\n",
           static_cast<unsigned long>(sequence),
-          static_cast<unsigned>(row.cycle),
-          static_cast<unsigned>(row.cycle % RTRH_ADC_PHASES),
+          static_cast<unsigned>(i),
+          static_cast<unsigned>(row.repeat),
+          static_cast<unsigned>(row.phase),
+          static_cast<unsigned>(row.channel),
+          RTRH_ADC_GPIOS[row.channel],
           static_cast<unsigned>(row.offset_us),
           static_cast<int>(row.lateness_us),
-          static_cast<unsigned>(row.raw[0]),
-          static_cast<unsigned>(row.raw[1]),
-          static_cast<unsigned>(row.raw[2]),
-          static_cast<unsigned>(row.raw[3]),
-          static_cast<unsigned>(row.valid_mask),
-          static_cast<unsigned long>(missed));
+          static_cast<unsigned>(row.raw),
+          static_cast<unsigned>(row.valid));
 
       if (n <= 0)
         continue;
@@ -1754,35 +1760,44 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH phase ADC ready: %u cycles @ %lu us, sequence %lu",
-        RTRH_ADC_CYCLES,
-        static_cast<unsigned long>(RTRH_ADC_PERIOD_US),
+        "RT/RH sparse ADC ready: %u samples, sequence %lu",
+        RTRH_ADC_SAMPLES,
         static_cast<unsigned long>(rtrh_adc_sequence));
 
     for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
       uint64_t sum[RTRH_ADC_CHANNELS] = {};
       uint16_t n[RTRH_ADC_CHANNELS] = {};
+      int32_t max_late = 0;
 
-      for (uint16_t i = phase; i < RTRH_ADC_CYCLES; i += RTRH_ADC_PHASES) {
+      for (uint16_t i = 0; i < RTRH_ADC_SAMPLES; i++) {
         const RtRhAdcRow &row = rtrh_adc_rows[i];
 
-        for (uint8_t ch = 0; ch < RTRH_ADC_CHANNELS; ch++) {
-          if (row.valid_mask & (1U << ch)) {
-            sum[ch] += row.raw[ch];
-            n[ch]++;
-          }
-        }
+        if (row.phase != phase)
+          continue;
+
+        const int32_t abs_late =
+            row.lateness_us < 0 ? -row.lateness_us : row.lateness_us;
+        if (abs_late > max_late)
+          max_late = abs_late;
+
+        if (!row.valid || abs_late > 10)
+          continue;
+
+        sum[row.channel] += row.raw;
+        n[row.channel]++;
       }
 
       ESP_LOGI(
           TAG,
-          "RT/RH ADC phase %u (+%u us): G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u)",
+          "RT/RH ADC phase %u (+%u us): "
+          "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%ld us",
           phase,
           RTRH_ADC_OFFSETS_US[phase],
           n[0] ? static_cast<unsigned long>(sum[0] / n[0]) : 0UL, n[0],
           n[1] ? static_cast<unsigned long>(sum[1] / n[1]) : 0UL, n[1],
           n[2] ? static_cast<unsigned long>(sum[2] / n[2]) : 0UL, n[2],
-          n[3] ? static_cast<unsigned long>(sum[3] / n[3]) : 0UL, n[3]);
+          n[3] ? static_cast<unsigned long>(sum[3] / n[3]) : 0UL, n[3],
+          static_cast<long>(max_late));
     }
   }
 
