@@ -962,6 +962,11 @@ static constexpr uint8_t RTRH_ADC_PHASES = 4;
 static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
 static constexpr uint8_t RTRH_ADC_MODES = 2;
 static constexpr uint8_t RTRH_ADC_REPEATS = 4;
+
+// A valid SHORT/LONG reference edge normally arrives within << 1 ms.
+// Never let one missed edge or an out-of-range sensor cycle block the ADC task
+// forever.  100 ms is deliberately very generous compared with 76..175 us.
+static constexpr uint32_t RTRH_ADC_EDGE_TIMEOUT_MS = 100;
 static constexpr uint16_t RTRH_ADC_SAMPLES =
     RTRH_ADC_MODES * RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
 
@@ -1061,22 +1066,39 @@ static adc_oneshot_unit_handle_t rtrh_adc_handle(adc_unit_t unit)
 
 static void reset_rtrh_adc_capture()
 {
-  rtrh_adc_active = false;
-  rtrh_adc_ready = false;
+  /*
+   * rtrh_adc_ready is also the ISR's start gate.
+   *
+   * Keep that gate CLOSED while resetting the shared state.  In the previous
+   * version active=false/ready=false were written first, so a GPIO10 falling
+   * edge could start a new sequence halfway through this function and the
+   * remaining writes would then destroy parts of the freshly-started state.
+   *
+   * ESP32-S2 is single-core, so this ordering is sufficient: the ISR may
+   * preempt us, but it will see ready=true until every field is clean.
+   */
+  rtrh_adc_ready = true;
+
   rtrh_adc_pending = false;
+  rtrh_adc_waiting_for_edge = false;
+  rtrh_adc_sequence_start = false;
+
   rtrh_adc_cycle = 0;
   rtrh_adc_missed_edges = 0;
   rtrh_adc_reference_edge_us = 0;
   rtrh_adc_edges_to_skip = 0;
-  rtrh_adc_waiting_for_edge = false;
   rtrh_adc_target_index = -1;
   rtrh_adc_trigger_index = -1;
-  rtrh_adc_sequence_start = false;
   rtrh_adc_trigger_period_us = 0;
+
   rtrh_last_fall_us[0] = 0;
   rtrh_last_fall_us[1] = 0;
   rtrh_last_fall_us[2] = 0;
   rtrh_last_fall_us[3] = 0;
+
+  // Open the start gate only after all shared state is known-good.
+  rtrh_adc_active = false;
+  rtrh_adc_ready = false;
 }
 
 static void clear_rtrh_adc_aggregates()
@@ -1323,12 +1345,44 @@ static void rtrh_adc_task(void *arg)
 
       /*
        * Sleep until ISR captures the selected real falling edge.
+       *
+       * Do NOT wait forever: a missed edge, an unexpected period, or a pad
+       * restore race must not leave rtrh_adc_active stuck true indefinitely.
        */
-      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+      const uint32_t notified =
+          ulTaskNotifyTake(
+              pdTRUE,
+              pdMS_TO_TICKS(RTRH_ADC_EDGE_TIMEOUT_MS));
+
+      if (notified == 0) {
+        rtrh_adc_agg[mode][phase][channel].read_errors++;
+
+        restore_rtrh_pin_digital(channel);
+
+        ESP_LOGW(
+            TAG,
+            "RT/RH ADC edge timeout: mode=%s phase=%u GPIO%d; abort/rearm",
+            mode == RTRH_MODE_SHORT ? "SHORT" : "LONG",
+            static_cast<unsigned>(phase),
+            RTRH_ADC_GPIOS[channel]);
+
+        /*
+         * Abort only this acquisition sequence.  The next real GPIO10 falling
+         * edge may immediately start a fresh one.
+         */
+        reset_rtrh_adc_capture();
+        break;
+      }
 
       if (!rtrh_adc_pending || !rtrh_adc_active) {
         restore_rtrh_pin_digital(channel);
-        continue;
+
+        /*
+         * State changed while sleeping.  Rearm cleanly instead of looping with
+         * a half-valid target/trigger setup.
+         */
+        reset_rtrh_adc_capture();
+        break;
       }
 
       const uint32_t edge = rtrh_adc_reference_edge_us;
