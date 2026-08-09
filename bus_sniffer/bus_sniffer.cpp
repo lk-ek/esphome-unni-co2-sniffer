@@ -947,21 +947,23 @@ static volatile bool rtrh_irqs_suspended = false;
  * ============================================================================
  *
  * GPIO10 falling is our phase reference. The measured digital period is about
- * 76-77 us. To keep CPU/ADC2 load very small, one ADC phase is sampled per
- * period, rotating through four offsets:
+ * 76-77 us. RH testing showed that GPIO13 in SHORT mode changes most strongly
+ * across the middle of the cycle, with the useful transition lying roughly
+ * between +25 and +45 us.  Keep the same four-phase RAM footprint, but zoom
+ * those phases into that interval:
  *
- *   phase 0: +8 us
- *   phase 1: +25 us
- *   phase 2: +45 us
- *   phase 3: +62 us
+ *   phase 0: +24 us
+ *   phase 1: +30 us
+ *   phase 2: +36 us
+ *   phase 3: +42 us
  *
- * 32 periods -> 8 observations of each phase, then acquisition stops.
+ * Eight repeats improve averaging without increasing aggregate RAM.
  */
 
 static constexpr uint8_t RTRH_ADC_PHASES = 4;
 static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
 static constexpr uint8_t RTRH_ADC_MODES = 2;
-static constexpr uint8_t RTRH_ADC_REPEATS = 4;
+static constexpr uint8_t RTRH_ADC_REPEATS = 8;
 
 // A valid SHORT/LONG reference edge normally arrives within << 1 ms.
 // Never let one missed edge or an out-of-range sensor cycle block the ADC task
@@ -981,15 +983,17 @@ static constexpr uint32_t RTRH_SHORT_MAX_US = 100;
 static constexpr uint32_t RTRH_LONG_MIN_US = 115;
 static constexpr uint32_t RTRH_LONG_MAX_US = 175;
 
-// Empirical calibration from the 2026-08-09 heat/cool series:
-// 11 display-reference points, 27.4..38.8 degC.
-// Linear fit: T[degC] = intercept + slope * LONG_period_us
-static constexpr float RTRH_TEMP_SLOPE = -0.49395309f;
-static constexpr float RTRH_TEMP_INTERCEPT = 96.61457803f;
+// Empirical calibration from the combined 2026-08-09 heat/cool + RH series.
+// The NTC/RC relation is measurably nonlinear over the observed range, so use
+// the quadratic fit instead of the earlier linear approximation:
+//   T[degC] = A*t^2 + B*t + C, t = LONG period in us.
+static constexpr float RTRH_TEMP_A = 0.00595169f;
+static constexpr float RTRH_TEMP_B = -2.025624f;
+static constexpr float RTRH_TEMP_C = 194.833723f;
 static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
-    8, 25, 45, 62
+    24, 30, 36, 42
 };
 static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
     10, 11, 12, 13
@@ -2116,8 +2120,9 @@ void BusSniffer::loop()
           static_cast<float>(long_period_count);
 
       const float temperature_c =
-          RTRH_TEMP_INTERCEPT +
-          RTRH_TEMP_SLOPE * long_period_us;
+          RTRH_TEMP_A * long_period_us * long_period_us +
+          RTRH_TEMP_B * long_period_us +
+          RTRH_TEMP_C;
 
       ESP_LOGI(
           TAG,
