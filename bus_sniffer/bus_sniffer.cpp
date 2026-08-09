@@ -4,7 +4,6 @@
 #include "esphome/components/web_server_base/web_server_base.h"
 
 #include "driver/gpio.h"
-#include "esp_adc/adc_oneshot.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
 
@@ -939,7 +938,6 @@ static volatile bool rtrh_capturing = false;
 static volatile bool rtrh_capture_ready = false;
 static volatile bool rtrh_overflow = false;
 static volatile uint32_t rtrh_sequence = 0;
-static volatile bool rtrh_irqs_suspended = false;
 
 /*
  * ============================================================================
@@ -961,69 +959,47 @@ static volatile bool rtrh_irqs_suspended = false;
  * also exported so cycle-to-cycle structure is not hidden by the mean.
  */
 
-static constexpr uint8_t RTRH_ADC_PHASES = 4;
-static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
-static constexpr uint8_t RTRH_ADC_MODES = 2;
+static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 
-// Legacy ADC diagnostics are disabled in this passive-only build, but the
-// old helper functions remain compiled. Keep their GPIO lookup table so the
-// dead code still parses.
-static constexpr int RTRH_ADC_GPIOS[4] = {10, 11, 12, 13};
-
-static constexpr uint8_t RTRH_ADC_REPEATS = 8;
-
-// A valid SHORT/LONG reference edge normally arrives within << 1 ms.
-// Never let one missed edge or an out-of-range sensor cycle block the ADC task
-// forever.  100 ms is deliberately very generous compared with 76..175 us.
-static constexpr uint32_t RTRH_ADC_EDGE_TIMEOUT_MS = 100;
-static constexpr uint16_t RTRH_ADC_SAMPLES =
-    RTRH_ADC_MODES * RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
-
-static constexpr uint8_t RTRH_MODE_SHORT = 0;
-static constexpr uint8_t RTRH_MODE_LONG = 1;
-
-// Observed GPIO10/GPIO11 falling-edge periods.
-// 9-6: short median 77 us, long median 139 us.
-// Keep generous margins for ISR jitter without allowing the classes to overlap.
-static constexpr uint32_t RTRH_SHORT_MIN_US = 65;
-static constexpr uint32_t RTRH_SHORT_MAX_US = 100;
-static constexpr uint32_t RTRH_LONG_MIN_US = 115;
-static constexpr uint32_t RTRH_LONG_MAX_US = 175;
-
-// Preliminary calibration for completely passive LONG timing.
-// T[°C] = M * LONG_period_us + C
+// Preliminary calibration for completely passive RT timing.
+// T[°C] = M * RT_period_us + C
 static constexpr float RTRH_TEMP_M = -0.4163213f;
 static constexpr float RTRH_TEMP_C = 84.38101f;
 
-static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
-static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
-static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
-    12, 16, 20, 24
-};
+// Train-based passive RT/RH decoder.
+//
+// GPIO10 falling edges define oscillator cycles.  A train is a contiguous run
+// of GPIO10 cycles; >=2 ms without another GPIO10 falling edge ends the train.
+// A complete RT/RH measurement may contain several trains separated by long
+// internal pauses, so it is finalized only after 15 s without any RT/RH edge.
+// Measurements themselves occur about every 30 s.
+static constexpr uint32_t RTRH_TRAIN_GAP_US = 2000;
+static constexpr uint32_t RTRH_MEASUREMENT_QUIET_US = 15000000;
 
-/*
- * Passive timing probe.
- *
- * Before any GPIO is switched to ADC mode, observe a handful of completely
- * untouched RT/RH cycles:
- *
- *   - GPIO10 falling-to-falling period -> SHORT/LONG classification
- *   - GPIO10 rising -> GPIO13 rising delay -> passive RH threshold timing
- *
- * After enough SHORT and LONG cycles have been observed, one ADC sequence is
- * allowed for the burst.  This prevents ADC pad reconfiguration from biasing
- * the timing values used for RT/RH decoding.
- */
-// The physical RT/RH conversion contains an occasional >100 ms pause
-// inside the LONG section.  Use 1 s as end-of-burst silence; measurements
-// themselves are ~30 s apart, so this still leaves a very large margin.
-static constexpr uint32_t RTRH_PASSIVE_QUIET_US = 10000000;
-static constexpr uint8_t RTRH_PASSIVE_LOCK_CYCLES = 8;
-static constexpr uint8_t RTRH_PASSIVE_MAX_BLOCKS = 16;
+static constexpr uint8_t RTRH_PASSIVE_MAX_TRAINS = 16;
 static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 8;  // d0..d6, d7plus
 
-struct RtRhPassiveBlock {
-  uint8_t mode{0xFF};
+// Reference oscillator observed around 76.7 us.
+static constexpr float RTRH_REF_MIN_US = 72.0f;
+static constexpr float RTRH_REF_MAX_US = 82.0f;
+
+// RT oscillator is the first non-reference train(s) after REF.  Fragmented RT
+// trains are accumulated until the characteristic ~900 cycles are complete.
+static constexpr float RTRH_RT_PERIOD_MIN_US = 110.0f;
+static constexpr float RTRH_RT_PERIOD_MAX_US = 180.0f;
+static constexpr uint16_t RTRH_RT_COUNT_MIN = 850;
+static constexpr uint16_t RTRH_RT_COUNT_MAX = 1100;
+
+enum RtRhTrainRole : uint8_t {
+  RTRH_ROLE_UNKNOWN = 0,
+  RTRH_ROLE_REF = 1,
+  RTRH_ROLE_RT = 2,
+  RTRH_ROLE_RH = 3,
+  RTRH_ROLE_MIXED = 4,
+};
+
+struct RtRhPassiveTrain {
+  uint8_t role{RTRH_ROLE_UNKNOWN};
   uint16_t count{0};
 
   uint32_t period_sum{0};
@@ -1039,14 +1015,27 @@ struct RtRhPassiveBlock {
   uint16_t g13_delay_max{0};
 
   uint16_t g13_delay_hist[RTRH_PASSIVE_DELAY_BINS]{};
+
+  uint32_t start_us{0};
+  uint32_t end_us{0};
+  uint32_t gap_before_us{0};
 };
 
 struct RtRhPassiveSnapshot {
-  RtRhPassiveBlock blocks[RTRH_PASSIVE_MAX_BLOCKS];
-  uint8_t block_count{0};
+  RtRhPassiveTrain trains[RTRH_PASSIVE_MAX_TRAINS];
+  uint8_t train_count{0};
   bool overflow{false};
   uint32_t sequence{0};
+
+  bool rt_valid{false};
+  bool rt_mixed{false};
+  uint32_t rt_period_sum{0};
+  uint16_t rt_count{0};
 };
+
+static volatile bool rtrh_passive_collecting = false;
+static volatile bool rtrh_passive_overflow = false;
+static volatile uint8_t rtrh_passive_train_count = 0;
 
 static volatile uint32_t rtrh_passive_last_any_us = 0;
 static volatile uint8_t rtrh_passive_last_state = 0;
@@ -1057,81 +1046,16 @@ static volatile uint32_t rtrh_passive_g13_rise_us = 0;
 static volatile bool rtrh_passive_have_g10_rise = false;
 static volatile bool rtrh_passive_have_g13_rise = false;
 
-static volatile uint8_t rtrh_passive_current_mode = 0xFF;
-static volatile uint8_t rtrh_passive_candidate_mode = 0xFF;
-static volatile uint8_t rtrh_passive_candidate_run = 0;
+static volatile bool rtrh_passive_train_active = false;
+static volatile uint32_t rtrh_passive_last_train_end_us = 0;
 
-static volatile bool rtrh_passive_collecting = false;
-static volatile bool rtrh_passive_overflow = false;
-static volatile uint8_t rtrh_passive_block_count = 0;
-
-static RtRhPassiveBlock
-    rtrh_passive_blocks[RTRH_PASSIVE_MAX_BLOCKS];
+static RtRhPassiveTrain rtrh_passive_current_train;
+static RtRhPassiveTrain
+    rtrh_passive_trains[RTRH_PASSIVE_MAX_TRAINS];
 
 static RtRhPassiveSnapshot rtrh_passive_snapshot;
 static volatile bool rtrh_passive_snapshot_ready = false;
 static volatile bool rtrh_passive_snapshot_consumed = true;
-
-struct RtRhAdcAggregate {
-  uint16_t sum{0};
-  uint16_t period_sum{0};
-  uint16_t min{0xFFFF};
-  uint16_t max{0};
-  uint16_t count{0};
-  uint16_t period_count{0};
-  uint16_t max_lateness_us{0};
-  uint16_t rejected_late{0};
-  uint16_t read_errors{0};
-};
-
-struct RtRhAdcChannel {
-  adc_unit_t unit{ADC_UNIT_1};
-  adc_channel_t channel{ADC_CHANNEL_0};
-  bool configured{false};
-};
-
-static RtRhAdcChannel rtrh_adc_channels[RTRH_ADC_CHANNELS];
-static adc_oneshot_unit_handle_t rtrh_adc1_handle = nullptr;
-static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
-
-static RtRhAdcAggregate
-    rtrh_adc_agg[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
-
-// Independent last-completed ADC snapshot for HTTP.
-static RtRhAdcAggregate
-    rtrh_adc_snapshot[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
-
-// Individual accepted SHORT/GPIO13 samples. 0xFFFF means missing/rejected.
-// Only 4 phases x 8 repeats = 64 bytes per live/snapshot buffer.
-static uint16_t
-    rtrh_short_g13_raw[RTRH_ADC_PHASES][RTRH_ADC_REPEATS];
-static uint16_t
-    rtrh_short_g13_raw_snapshot[RTRH_ADC_PHASES][RTRH_ADC_REPEATS];
-
-static volatile bool rtrh_adc_snapshot_ready = false;
-static volatile bool rtrh_adc_snapshot_in_use = false;
-static volatile uint32_t rtrh_adc_snapshot_sequence = 0;
-static portMUX_TYPE rtrh_adc_snapshot_mux = portMUX_INITIALIZER_UNLOCKED;
-
-static volatile bool rtrh_adc_active = false;
-static volatile bool rtrh_adc_ready = false;
-static volatile bool rtrh_adc_pending = false;
-static volatile uint16_t rtrh_adc_cycle = 0;
-static volatile uint32_t rtrh_adc_edge_us = 0;
-static volatile uint32_t rtrh_adc_sequence = 0;
-static volatile uint32_t rtrh_adc_missed_edges = 0;
-static volatile uint32_t rtrh_adc_reference_edge_us = 0;
-static volatile uint8_t rtrh_adc_edges_to_skip = 0;
-static volatile bool rtrh_adc_waiting_for_edge = false;
-static volatile int8_t rtrh_adc_target_index = -1;
-static volatile int8_t rtrh_adc_trigger_index = -1;
-static volatile bool rtrh_adc_sequence_start = false;
-static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
-static volatile uint32_t rtrh_last_fall_us[4] = {0, 0, 0, 0};
-static volatile uint16_t rtrh_adc_trigger_period_us = 0;
-static volatile uint8_t rtrh_adc_desired_mode = RTRH_MODE_SHORT;
-
-static TaskHandle_t rtrh_adc_task_handle = nullptr;
 
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
@@ -1144,468 +1068,43 @@ static inline uint8_t IRAM_ATTR read_rtrh_state()
 }
 
 
-static adc_oneshot_unit_handle_t rtrh_adc_handle(adc_unit_t unit)
+static inline void IRAM_ATTR clear_passive_train(
+    RtRhPassiveTrain &t)
 {
-  return unit == ADC_UNIT_1 ? rtrh_adc1_handle : rtrh_adc2_handle;
-}
-
-static void reset_rtrh_adc_capture()
-{
-  /*
-   * rtrh_adc_ready is also the ISR's start gate.
-   *
-   * Keep that gate CLOSED while resetting the shared state.  In the previous
-   * version active=false/ready=false were written first, so a GPIO10 falling
-   * edge could start a new sequence halfway through this function and the
-   * remaining writes would then destroy parts of the freshly-started state.
-   *
-   * ESP32-S2 is single-core, so this ordering is sufficient: the ISR may
-   * preempt us, but it will see ready=true until every field is clean.
-   */
-  rtrh_adc_ready = true;
-
-  rtrh_adc_pending = false;
-  rtrh_adc_waiting_for_edge = false;
-  rtrh_adc_sequence_start = false;
-
-  rtrh_adc_cycle = 0;
-  rtrh_adc_missed_edges = 0;
-  rtrh_adc_reference_edge_us = 0;
-  rtrh_adc_edges_to_skip = 0;
-  rtrh_adc_target_index = -1;
-  rtrh_adc_trigger_index = -1;
-  rtrh_adc_trigger_period_us = 0;
-
-  rtrh_last_fall_us[0] = 0;
-  rtrh_last_fall_us[1] = 0;
-  rtrh_last_fall_us[2] = 0;
-  rtrh_last_fall_us[3] = 0;
-
-  // Open the start gate only after all shared state is known-good.
-  rtrh_adc_active = false;
-  rtrh_adc_ready = false;
-}
-
-static void clear_rtrh_adc_aggregates()
-{
-  for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-    for (uint8_t repeat = 0; repeat < RTRH_ADC_REPEATS; repeat++) {
-      rtrh_short_g13_raw[phase][repeat] = 0xFFFF;
-    }
-  }
-
-  for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
-    for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-      for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
-        rtrh_adc_agg[mode][phase][channel] = RtRhAdcAggregate{};
-      }
-    }
-  }
-}
-
-
-static void setup_rtrh_adc()
-{
-  adc_oneshot_unit_init_cfg_t unit1_cfg = {};
-  unit1_cfg.unit_id = ADC_UNIT_1;
-
-  esp_err_t err = adc_oneshot_new_unit(&unit1_cfg, &rtrh_adc1_handle);
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "RT/RH ADC1 init failed: %s", esp_err_to_name(err));
-    rtrh_adc1_handle = nullptr;
-  }
-
-  adc_oneshot_unit_init_cfg_t unit2_cfg = {};
-  unit2_cfg.unit_id = ADC_UNIT_2;
-
-  err = adc_oneshot_new_unit(&unit2_cfg, &rtrh_adc2_handle);
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "RT/RH ADC2 init failed: %s", esp_err_to_name(err));
-    rtrh_adc2_handle = nullptr;
-  }
-
-  /*
-   * IMPORTANT:
-   * Only map GPIO -> ADC channel here. adc_oneshot_config_channel() is
-   * deliberately deferred until a measurement burst has actually started.
-   * Configuring the channels here would put GPIO10..13 into analog mode and
-   * kill the ANYEDGE interrupts that trigger the capture.
-   */
-  for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
-    RtRhAdcChannel &ch = rtrh_adc_channels[i];
-
-    err = adc_oneshot_io_to_channel(
-        RTRH_ADC_GPIOS[i],
-        &ch.unit,
-        &ch.channel);
-
-    if (err != ESP_OK) {
-      ESP_LOGW(
-          TAG,
-          "RT/RH GPIO%d ADC mapping failed: %s",
-          RTRH_ADC_GPIOS[i],
-          esp_err_to_name(err));
-      continue;
-    }
-
-    ch.configured = true;
-
-    ESP_LOGI(
-        TAG,
-        "RT/RH GPIO%d mapped to ADC%d channel %d (deferred config)",
-        RTRH_ADC_GPIOS[i],
-        static_cast<int>(ch.unit) + 1,
-        static_cast<int>(ch.channel));
-  }
-}
-
-static bool configure_rtrh_pin_for_adc(uint8_t index)
-{
-  if (index >= RTRH_ADC_CHANNELS)
-    return false;
-
-  const RtRhAdcChannel &ch = rtrh_adc_channels[index];
-  if (!ch.configured)
-    return false;
-
-  adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
-  if (handle == nullptr)
-    return false;
-
-  adc_oneshot_chan_cfg_t cfg = {};
-  cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
-  cfg.atten = ADC_ATTEN_DB_12;
-
-  const esp_err_t err =
-      adc_oneshot_config_channel(handle, ch.channel, &cfg);
-
-  if (err != ESP_OK) {
-    ESP_LOGW(
-        TAG,
-        "RT/RH GPIO%d ADC config failed: %s",
-        RTRH_ADC_GPIOS[index],
-        esp_err_to_name(err));
-    return false;
-  }
-
-  gpio_intr_disable(static_cast<gpio_num_t>(RTRH_ADC_GPIOS[index]));
-  return true;
-}
-
-static void restore_rtrh_pin_digital(uint8_t index)
-{
-  if (index >= RTRH_ADC_CHANNELS)
-    return;
-
-  const gpio_num_t pin =
-      static_cast<gpio_num_t>(RTRH_ADC_GPIOS[index]);
-
-  gpio_config_t io = {};
-  io.mode = GPIO_MODE_INPUT;
-  io.pull_up_en = GPIO_PULLUP_DISABLE;
-  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io.intr_type = GPIO_INTR_ANYEDGE;
-  io.pin_bit_mask = 1ULL << pin;
-
-  const esp_err_t err = gpio_config(&io);
-  if (err != ESP_OK) {
-    ESP_LOGE(
-        TAG,
-        "RT/RH GPIO%d digital restore failed: %s",
-        RTRH_ADC_GPIOS[index],
-        esp_err_to_name(err));
-    return;
-  }
-
-  rtrh_pin_level[index] =
-      static_cast<uint8_t>(gpio_get_level(pin));
-
-  gpio_intr_enable(pin);
-}
-
-static void restore_rtrh_digital_inputs()
-{
-  gpio_config_t io = {};
-  io.mode = GPIO_MODE_INPUT;
-  io.pull_up_en = GPIO_PULLUP_DISABLE;
-  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
-  io.intr_type = GPIO_INTR_ANYEDGE;
-  io.pin_bit_mask =
-      (1ULL << PIN_RTRH0) |
-      (1ULL << PIN_RTRH1) |
-      (1ULL << PIN_RTRH2) |
-      (1ULL << PIN_RTRH3);
-
-  const esp_err_t err = gpio_config(&io);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "RT/RH digital restore failed: %s", esp_err_to_name(err));
-    return;
-  }
-
-  rtrh_last_value = read_rtrh_state();
-  rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
-  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
-  rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
-  rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
-  rtrh_irqs_suspended = false;
-}
-
-static void rtrh_adc_task(void *arg)
-{
-  while (true) {
-    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-    /*
-     * First notification starts the sequence. All later notifications are
-     * real falling edges from the currently selected digital trigger pin.
-     */
-    if (rtrh_adc_sequence_start) {
-      rtrh_adc_sequence_start = false;
-    } else if (!rtrh_adc_pending) {
-      continue;
-    }
-
-    while (rtrh_adc_active && !rtrh_adc_ready) {
-      const uint16_t sample_index = rtrh_adc_cycle;
-
-      if (sample_index >= RTRH_ADC_SAMPLES) {
-        rtrh_adc_active = false;
-        rtrh_adc_ready = true;
-        rtrh_adc_sequence++;
-        rtrh_adc_waiting_for_edge = false;
-        rtrh_adc_target_index = -1;
-        rtrh_adc_trigger_index = -1;
-        break;
-      }
-
-      const uint16_t samples_per_mode =
-          RTRH_ADC_REPEATS * RTRH_ADC_PHASES * RTRH_ADC_CHANNELS;
-
-      const uint8_t mode =
-          static_cast<uint8_t>(sample_index / samples_per_mode);
-
-      const uint16_t within_mode =
-          static_cast<uint16_t>(sample_index % samples_per_mode);
-
-      const uint8_t repeat =
-          static_cast<uint8_t>(
-              within_mode /
-              (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
-
-      const uint8_t within_repeat =
-          static_cast<uint8_t>(
-              within_mode %
-              (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
-
-      const uint8_t phase =
-          static_cast<uint8_t>(
-              within_repeat / RTRH_ADC_CHANNELS);
-
-      const uint8_t channel =
-          static_cast<uint8_t>(
-              within_repeat % RTRH_ADC_CHANNELS);
-
-      const uint16_t offset = RTRH_ADC_OFFSETS_US[phase];
-
-      /*
-       * Prepare ONLY the target pad for ADC before the timing reference.
-       * A different, still-digital line supplies the falling-edge trigger.
-       *
-       * GPIO10 target -> trigger on GPIO11
-       * GPIO11/12/13 target -> trigger on GPIO10
-       */
-      rtrh_adc_target_index = static_cast<int8_t>(channel);
-      rtrh_adc_trigger_index =
-          static_cast<int8_t>(channel == 0 ? 1 : 0);
-
-      if (!configure_rtrh_pin_for_adc(channel)) {
-        rtrh_adc_agg[mode][phase][channel].read_errors++;
-        rtrh_adc_cycle =
-            static_cast<uint16_t>(sample_index + 1);
-        continue;
-      }
-
-      /*
-       * Give the ADC/pad setup several complete sensor periods to settle.
-       * The ISR counts REAL falling edges on the selected trigger line.
-       */
-      rtrh_adc_desired_mode = mode;
-      rtrh_adc_edges_to_skip = RTRH_ADC_SKIP_EDGES;
-      rtrh_adc_pending = false;
-      rtrh_adc_waiting_for_edge = true;
-
-      /*
-       * Sleep until ISR captures the selected real falling edge.
-       *
-       * Do NOT wait forever: a missed edge, an unexpected period, or a pad
-       * restore race must not leave rtrh_adc_active stuck true indefinitely.
-       */
-      const uint32_t notified =
-          ulTaskNotifyTake(
-              pdTRUE,
-              pdMS_TO_TICKS(RTRH_ADC_EDGE_TIMEOUT_MS));
-
-      if (notified == 0) {
-        rtrh_adc_agg[mode][phase][channel].read_errors++;
-
-        restore_rtrh_pin_digital(channel);
-
-        ESP_LOGW(
-            TAG,
-            "RT/RH ADC edge timeout: mode=%s phase=%u GPIO%d; abort/rearm",
-            mode == RTRH_MODE_SHORT ? "SHORT" : "LONG",
-            static_cast<unsigned>(phase),
-            RTRH_ADC_GPIOS[channel]);
-
-        /*
-         * Abort only this acquisition sequence.  The next real GPIO10 falling
-         * edge may immediately start a fresh one.
-         */
-        reset_rtrh_adc_capture();
-        break;
-      }
-
-      if (!rtrh_adc_pending || !rtrh_adc_active) {
-        restore_rtrh_pin_digital(channel);
-
-        /*
-         * State changed while sleeping.  Rearm cleanly instead of looping with
-         * a half-valid target/trigger setup.
-         */
-        reset_rtrh_adc_capture();
-        break;
-      }
-
-      const uint32_t edge = rtrh_adc_reference_edge_us;
-      const uint32_t target =
-          static_cast<uint32_t>(edge + offset);
-
-      while (static_cast<int32_t>(
-                 target -
-                 static_cast<uint32_t>(esp_timer_get_time())) > 0) {
-        // intentional short spin
-      }
-
-      const uint32_t actual =
-          static_cast<uint32_t>(esp_timer_get_time());
-
-      int32_t late = static_cast<int32_t>(actual - target);
-      if (late < 0)
-        late = -late;
-
-      RtRhAdcAggregate &agg =
-          rtrh_adc_agg[mode][phase][channel];
-
-      if (late > agg.max_lateness_us && late <= 65535)
-        agg.max_lateness_us = static_cast<uint16_t>(late);
-
-      const RtRhAdcChannel &ch = rtrh_adc_channels[channel];
-      adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
-
-      int raw = 0;
-      if (handle == nullptr ||
-          adc_oneshot_read(handle, ch.channel, &raw) != ESP_OK) {
-        agg.read_errors++;
-      } else if (late > 10) {
-        agg.rejected_late++;
-      } else {
-        if (raw < 0)
-          raw = 0;
-        if (raw > 65535)
-          raw = 65535;
-
-        const uint16_t value = static_cast<uint16_t>(raw);
-
-        if (mode == RTRH_MODE_SHORT && channel == 3 &&
-            phase < RTRH_ADC_PHASES && repeat < RTRH_ADC_REPEATS) {
-          rtrh_short_g13_raw[phase][repeat] = value;
-        }
-
-        agg.sum += value;
-        agg.count++;
-
-        if (value < agg.min)
-          agg.min = value;
-        if (value > agg.max)
-          agg.max = value;
-
-        if (rtrh_adc_trigger_period_us != 0) {
-          agg.period_sum += rtrh_adc_trigger_period_us;
-          agg.period_count++;
-        }
-      }
-
-      /*
-       * Return the measured pin to ordinary digital input immediately.
-       * The next iteration can then choose another target/trigger pair.
-       */
-      restore_rtrh_pin_digital(channel);
-
-      rtrh_adc_pending = false;
-      rtrh_adc_waiting_for_edge = false;
-      rtrh_adc_cycle =
-          static_cast<uint16_t>(sample_index + 1);
-    }
-  }
-}
-
-static void suspend_rtrh_irqs()
-{
-  if (rtrh_irqs_suspended)
-    return;
-
-  gpio_intr_disable(PIN_RTRH0);
-  gpio_intr_disable(PIN_RTRH1);
-  gpio_intr_disable(PIN_RTRH2);
-  gpio_intr_disable(PIN_RTRH3);
-  rtrh_irqs_suspended = true;
-}
-
-static void resume_rtrh_irqs()
-{
-  rtrh_last_value = read_rtrh_state();
-
-  gpio_intr_enable(PIN_RTRH0);
-  gpio_intr_enable(PIN_RTRH1);
-  gpio_intr_enable(PIN_RTRH2);
-  gpio_intr_enable(PIN_RTRH3);
-
-  rtrh_irqs_suspended = false;
-}
-
-
-static inline void IRAM_ATTR clear_passive_block(
-    RtRhPassiveBlock &b)
-{
-  b.mode = 0xFF;
-  b.count = 0;
-  b.period_sum = 0;
-  b.low_sum = 0;
-  b.g13_delay_sum = 0;
-  b.g13_delay_count = 0;
-
-  b.period_min = 0xFFFF;
-  b.period_max = 0;
-  b.low_min = 0xFFFF;
-  b.low_max = 0;
-  b.g13_delay_min = 0xFFFF;
-  b.g13_delay_max = 0;
+  t.role = RTRH_ROLE_UNKNOWN;
+  t.count = 0;
+
+  t.period_sum = 0;
+  t.low_sum = 0;
+  t.g13_delay_sum = 0;
+  t.g13_delay_count = 0;
+
+  t.period_min = 0xFFFF;
+  t.period_max = 0;
+  t.low_min = 0xFFFF;
+  t.low_max = 0;
+  t.g13_delay_min = 0xFFFF;
+  t.g13_delay_max = 0;
 
   for (uint8_t i = 0; i < RTRH_PASSIVE_DELAY_BINS; i++)
-    b.g13_delay_hist[i] = 0;
+    t.g13_delay_hist[i] = 0;
+
+  t.start_us = 0;
+  t.end_us = 0;
+  t.gap_before_us = 0;
 }
 
-static inline void IRAM_ATTR reset_rtrh_passive_working(
+
+static inline void IRAM_ATTR reset_rtrh_passive_measurement(
     uint32_t now,
     uint8_t state)
 {
   rtrh_passive_collecting = true;
   rtrh_passive_overflow = false;
-  rtrh_passive_block_count = 0;
+  rtrh_passive_train_count = 0;
 
-  rtrh_passive_current_mode = 0xFF;
-  rtrh_passive_candidate_mode = 0xFF;
-  rtrh_passive_candidate_run = 0;
+  rtrh_passive_last_any_us = now;
+  rtrh_passive_last_state = state;
 
   rtrh_passive_last_g10_fall_us = 0;
   rtrh_passive_g10_rise_us = 0;
@@ -1613,106 +1112,297 @@ static inline void IRAM_ATTR reset_rtrh_passive_working(
   rtrh_passive_have_g10_rise = false;
   rtrh_passive_have_g13_rise = false;
 
-  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_BLOCKS; i++)
-    clear_passive_block(rtrh_passive_blocks[i]);
+  rtrh_passive_train_active = false;
+  rtrh_passive_last_train_end_us = 0;
+  clear_passive_train(rtrh_passive_current_train);
 
-  rtrh_passive_last_any_us = now;
-  rtrh_passive_last_state = state;
+  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++)
+    clear_passive_train(rtrh_passive_trains[i]);
 }
 
-static inline void IRAM_ATTR start_passive_block(uint8_t mode)
+
+static inline void IRAM_ATTR start_rtrh_passive_train(
+    uint32_t now)
 {
-  if (rtrh_passive_block_count >= RTRH_PASSIVE_MAX_BLOCKS) {
-    rtrh_passive_overflow = true;
-    // Do not point current_mode at a block that was not actually stored.
-    rtrh_passive_current_mode = 0xFF;
-    return;
+  clear_passive_train(rtrh_passive_current_train);
+
+  rtrh_passive_current_train.start_us = now;
+
+  if (rtrh_passive_last_train_end_us != 0) {
+    rtrh_passive_current_train.gap_before_us =
+        static_cast<uint32_t>(
+            now - rtrh_passive_last_train_end_us);
   }
 
-  RtRhPassiveBlock &b =
-      rtrh_passive_blocks[rtrh_passive_block_count++];
-  clear_passive_block(b);
-  b.mode = mode;
-  rtrh_passive_current_mode = mode;
+  rtrh_passive_train_active = true;
+  rtrh_passive_last_g10_fall_us = now;
+  rtrh_passive_have_g10_rise = false;
+  rtrh_passive_have_g13_rise = false;
 }
 
-static inline void IRAM_ATTR add_passive_cycle(
-    RtRhPassiveBlock &b,
+
+static inline void IRAM_ATTR append_current_rtrh_passive_train()
+{
+  if (!rtrh_passive_train_active)
+    return;
+
+  RtRhPassiveTrain &cur = rtrh_passive_current_train;
+
+  if (cur.count != 0) {
+    cur.end_us = rtrh_passive_last_g10_fall_us;
+
+    if (rtrh_passive_train_count < RTRH_PASSIVE_MAX_TRAINS) {
+      rtrh_passive_trains[rtrh_passive_train_count++] = cur;
+    } else {
+      rtrh_passive_overflow = true;
+    }
+
+    rtrh_passive_last_train_end_us = cur.end_us;
+  }
+
+  clear_passive_train(rtrh_passive_current_train);
+  rtrh_passive_train_active = false;
+  rtrh_passive_last_g10_fall_us = 0;
+  rtrh_passive_have_g10_rise = false;
+  rtrh_passive_have_g13_rise = false;
+}
+
+
+static inline void IRAM_ATTR add_rtrh_passive_cycle(
     uint32_t period,
     uint32_t low,
     bool have_delay,
     uint32_t delay)
 {
+  if (!rtrh_passive_train_active)
+    return;
+
+  RtRhPassiveTrain &t = rtrh_passive_current_train;
+
   const uint16_t p =
       period > 65535U ? 65535U : static_cast<uint16_t>(period);
   const uint16_t l =
       low > 65535U ? 65535U : static_cast<uint16_t>(low);
 
-  if (b.count != 0xFFFF)
-    b.count++;
+  if (t.count != 0xFFFF)
+    t.count++;
 
-  b.period_sum += p;
-  b.low_sum += l;
+  t.period_sum += p;
+  t.low_sum += l;
 
-  if (p < b.period_min)
-    b.period_min = p;
-  if (p > b.period_max)
-    b.period_max = p;
+  if (p < t.period_min)
+    t.period_min = p;
+  if (p > t.period_max)
+    t.period_max = p;
 
-  if (l < b.low_min)
-    b.low_min = l;
-  if (l > b.low_max)
-    b.low_max = l;
+  if (l < t.low_min)
+    t.low_min = l;
+  if (l > t.low_max)
+    t.low_max = l;
 
   if (have_delay && delay <= 65535U) {
     const uint16_t d = static_cast<uint16_t>(delay);
-    b.g13_delay_sum += d;
 
-    if (b.g13_delay_count != 0xFFFF)
-      b.g13_delay_count++;
+    t.g13_delay_sum += d;
+    if (t.g13_delay_count != 0xFFFF)
+      t.g13_delay_count++;
 
-    if (d < b.g13_delay_min)
-      b.g13_delay_min = d;
-    if (d > b.g13_delay_max)
-      b.g13_delay_max = d;
+    if (d < t.g13_delay_min)
+      t.g13_delay_min = d;
+    if (d > t.g13_delay_max)
+      t.g13_delay_max = d;
 
     const uint8_t bin =
         d < (RTRH_PASSIVE_DELAY_BINS - 1)
             ? static_cast<uint8_t>(d)
             : static_cast<uint8_t>(RTRH_PASSIVE_DELAY_BINS - 1);
 
-    if (b.g13_delay_hist[bin] != 0xFFFF)
-      b.g13_delay_hist[bin]++;
+    if (t.g13_delay_hist[bin] != 0xFFFF)
+      t.g13_delay_hist[bin]++;
   }
 }
 
-/*
- * Called from loop() only after the four lines have been quiet for >100 ms.
- * At that point the physical measurement burst is over, so copying the small
- * summary is safe and does not perturb the live waveform.
- */
-static void finalize_rtrh_passive_burst()
+
+static inline float rtrh_train_period_mean(
+    const RtRhPassiveTrain &t)
 {
-  if (!rtrh_passive_collecting || rtrh_passive_block_count == 0)
-    return;
+  return t.count
+      ? static_cast<float>(t.period_sum) /
+            static_cast<float>(t.count)
+      : 0.0f;
+}
 
-  const uint8_t n = rtrh_passive_block_count;
 
-  rtrh_passive_snapshot.block_count = n;
-  rtrh_passive_snapshot.overflow = rtrh_passive_overflow;
+static inline bool rtrh_train_is_reference(
+    const RtRhPassiveTrain &t)
+{
+  if (t.count < 8)
+    return false;
 
-  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_BLOCKS; i++) {
-    if (i < n)
-      rtrh_passive_snapshot.blocks[i] = rtrh_passive_blocks[i];
-    else
-      clear_passive_block(rtrh_passive_snapshot.blocks[i]);
+  const float p = rtrh_train_period_mean(t);
+  return p >= RTRH_REF_MIN_US && p <= RTRH_REF_MAX_US;
+}
+
+
+static void classify_rtrh_passive_snapshot(
+    RtRhPassiveSnapshot &s)
+{
+  s.rt_valid = false;
+  s.rt_mixed = false;
+  s.rt_period_sum = 0;
+  s.rt_count = 0;
+
+  for (uint8_t i = 0; i < s.train_count; i++)
+    s.trains[i].role = RTRH_ROLE_UNKNOWN;
+
+  int first_ref = -1;
+
+  for (uint8_t i = 0; i < s.train_count; i++) {
+    if (rtrh_train_is_reference(s.trains[i])) {
+      first_ref = static_cast<int>(i);
+      break;
+    }
   }
 
-  rtrh_passive_snapshot.sequence++;
+  if (first_ref < 0)
+    return;
+
+  bool rt_started = false;
+  bool rt_done = false;
+  uint8_t rt_first = 0xFF;
+  uint8_t rt_last = 0xFF;
+
+  for (uint8_t i = static_cast<uint8_t>(first_ref);
+       i < s.train_count;
+       i++) {
+    RtRhPassiveTrain &t = s.trains[i];
+    const float p = rtrh_train_period_mean(t);
+
+    if (!rt_started && rtrh_train_is_reference(t)) {
+      t.role = RTRH_ROLE_REF;
+      continue;
+    }
+
+    if (!rt_done) {
+      const bool plausible_rt =
+          p >= RTRH_RT_PERIOD_MIN_US &&
+          p <= RTRH_RT_PERIOD_MAX_US;
+
+      if (!plausible_rt) {
+        t.role = RTRH_ROLE_UNKNOWN;
+        continue;
+      }
+
+      if (t.count > RTRH_RT_COUNT_MAX ||
+          static_cast<uint32_t>(s.rt_count) +
+                  static_cast<uint32_t>(t.count) >
+              RTRH_RT_COUNT_MAX) {
+        t.role = RTRH_ROLE_MIXED;
+        s.rt_mixed = true;
+
+        if (rt_first != 0xFF) {
+          for (uint8_t j = rt_first; j <= rt_last; j++) {
+            if (s.trains[j].role == RTRH_ROLE_RT)
+              s.trains[j].role = RTRH_ROLE_MIXED;
+          }
+        }
+
+        s.rt_period_sum = 0;
+        s.rt_count = 0;
+        rt_done = true;
+        continue;
+      }
+
+      t.role = RTRH_ROLE_RT;
+      rt_started = true;
+
+      if (rt_first == 0xFF)
+        rt_first = i;
+      rt_last = i;
+
+      s.rt_period_sum += t.period_sum;
+      s.rt_count =
+          static_cast<uint16_t>(
+              static_cast<uint32_t>(s.rt_count) +
+              static_cast<uint32_t>(t.count));
+
+      if (s.rt_count >= RTRH_RT_COUNT_MIN) {
+        s.rt_valid = true;
+        rt_done = true;
+      }
+
+      continue;
+    }
+
+    t.role = RTRH_ROLE_RH;
+  }
+
+  // A partial RT train at the end of a measurement is not a valid
+  // temperature conversion.
+  if (!s.rt_valid && !s.rt_mixed) {
+    s.rt_period_sum = 0;
+    s.rt_count = 0;
+
+    if (rt_first != 0xFF) {
+      for (uint8_t j = rt_first; j <= rt_last; j++) {
+        if (s.trains[j].role == RTRH_ROLE_RT)
+          s.trains[j].role = RTRH_ROLE_UNKNOWN;
+      }
+    }
+  }
+}
+
+
+static void finalize_rtrh_passive_measurement()
+{
+  if (!rtrh_passive_collecting)
+    return;
+
+  append_current_rtrh_passive_train();
+
+  if (rtrh_passive_train_count == 0) {
+    rtrh_passive_collecting = false;
+    return;
+  }
+
+  RtRhPassiveSnapshot next{};
+
+  next.train_count = rtrh_passive_train_count;
+  next.overflow = rtrh_passive_overflow;
+  next.sequence = rtrh_passive_snapshot.sequence + 1;
+
+  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++) {
+    if (i < next.train_count)
+      next.trains[i] = rtrh_passive_trains[i];
+    else
+      clear_passive_train(next.trains[i]);
+  }
+
+  classify_rtrh_passive_snapshot(next);
+
+  rtrh_passive_snapshot = next;
   rtrh_passive_snapshot_ready = true;
   rtrh_passive_snapshot_consumed = false;
   rtrh_passive_collecting = false;
 }
+
+
+static const char *rtrh_train_role_name(uint8_t role)
+{
+  switch (role) {
+    case RTRH_ROLE_REF:
+      return "ref";
+    case RTRH_ROLE_RT:
+      return "rt";
+    case RTRH_ROLE_RH:
+      return "rh";
+    case RTRH_ROLE_MIXED:
+      return "mixed";
+    default:
+      return "unknown";
+  }
+}
+
 
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 {
@@ -1724,7 +1414,7 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       static_cast<uint8_t>(encoded - 1);
 
   const gpio_num_t pin =
-      static_cast<gpio_num_t>(RTRH_ADC_GPIOS[pin_index]);
+      static_cast<gpio_num_t>(RTRH_GPIOS[pin_index]);
 
   const uint8_t level =
       static_cast<uint8_t>(gpio_get_level(pin));
@@ -1741,24 +1431,22 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       static_cast<uint32_t>(esp_timer_get_time());
 
   /*
-   * Passive complete-burst decoder.
+   * Passive train decoder.
    *
-   * A mode is accepted only after 8 consecutive cycles of the same class.
-   * A one-off 140..160 us glitch inside a SHORT block therefore cannot create
-   * a fake LONG block.
+   * No SHORT/LONG decision is made here.  GPIO10 falling edges delimit
+   * oscillator periods.  A >=2 ms gap closes the current train and starts
+   * another one; the large 15 s measurement boundary is handled in loop().
    */
   const uint8_t state = read_rtrh_state();
 
-  const uint32_t previous_any = rtrh_passive_last_any_us;
-  if (!rtrh_passive_collecting ||
-      previous_any == 0 ||
-      static_cast<uint32_t>(now - previous_any) > RTRH_PASSIVE_QUIET_US) {
-    reset_rtrh_passive_working(now, state);
+  if (!rtrh_passive_collecting) {
+    reset_rtrh_passive_measurement(now, state);
   } else {
     rtrh_passive_last_any_us = now;
   }
 
   const uint8_t old_state = rtrh_passive_last_state;
+
   if (state != old_state) {
     const bool old_g10 = (old_state & 0x01) != 0;
     const bool new_g10 = (state & 0x01) != 0;
@@ -1777,155 +1465,65 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       }
     }
 
-    if (!old_g13 && new_g13 && rtrh_passive_have_g10_rise) {
+    if (!old_g13 && new_g13 &&
+        rtrh_passive_have_g10_rise) {
       rtrh_passive_g13_rise_us = now;
       rtrh_passive_have_g13_rise = true;
     }
 
     if (old_g10 && !new_g10) {
-      const uint32_t previous_fall = rtrh_passive_last_g10_fall_us;
+      const uint32_t previous_fall =
+          rtrh_passive_last_g10_fall_us;
 
-      if (previous_fall != 0 &&
-          rtrh_passive_have_g10_rise) {
+      if (!rtrh_passive_train_active ||
+          previous_fall == 0) {
+        start_rtrh_passive_train(now);
+      } else {
         const uint32_t period =
             static_cast<uint32_t>(now - previous_fall);
-        const uint32_t low =
-            static_cast<uint32_t>(
-                rtrh_passive_g10_rise_us - previous_fall);
 
-        const bool have_delay =
-            rtrh_passive_have_g13_rise &&
-            static_cast<int32_t>(
-                rtrh_passive_g13_rise_us -
-                rtrh_passive_g10_rise_us) >= 0;
+        if (period >= RTRH_TRAIN_GAP_US) {
+          append_current_rtrh_passive_train();
+          start_rtrh_passive_train(now);
+        } else if (rtrh_passive_have_g10_rise) {
+          const uint32_t low =
+              static_cast<uint32_t>(
+                  rtrh_passive_g10_rise_us -
+                  previous_fall);
 
-        const uint32_t delay =
-            have_delay
-                ? static_cast<uint32_t>(
-                      rtrh_passive_g13_rise_us -
-                      rtrh_passive_g10_rise_us)
-                : 0;
+          const bool have_delay =
+              rtrh_passive_have_g13_rise &&
+              static_cast<int32_t>(
+                  rtrh_passive_g13_rise_us -
+                  rtrh_passive_g10_rise_us) >= 0;
 
-        uint8_t mode = 0xFF;
-        if (period >= RTRH_SHORT_MIN_US &&
-            period <= RTRH_SHORT_MAX_US)
-          mode = RTRH_MODE_SHORT;
-        else if (period >= RTRH_LONG_MIN_US &&
-                 period <= RTRH_LONG_MAX_US)
-          mode = RTRH_MODE_LONG;
+          const uint32_t delay =
+              have_delay
+                  ? static_cast<uint32_t>(
+                        rtrh_passive_g13_rise_us -
+                        rtrh_passive_g10_rise_us)
+                  : 0;
 
-        if (mode == 0xFF) {
-          // Invalid single cycles are ignored and do not terminate a block.
-          rtrh_passive_candidate_mode = 0xFF;
-          rtrh_passive_candidate_run = 0;
-        } else if (mode == rtrh_passive_current_mode &&
-                   rtrh_passive_block_count != 0) {
-          // Returned to the current block before a different mode achieved
-          // the 8-cycle lock: treat the excursion as a glitch.
-          rtrh_passive_candidate_mode = 0xFF;
-          rtrh_passive_candidate_run = 0;
-
-          add_passive_cycle(
-              rtrh_passive_blocks[rtrh_passive_block_count - 1],
+          add_rtrh_passive_cycle(
               period,
               low,
               have_delay,
               delay);
+
+          rtrh_passive_last_g10_fall_us = now;
         } else {
-          if (mode == rtrh_passive_candidate_mode) {
-            if (rtrh_passive_candidate_run < 255)
-              rtrh_passive_candidate_run++;
-          } else {
-            rtrh_passive_candidate_mode = mode;
-            rtrh_passive_candidate_run = 1;
-          }
-
-          if (rtrh_passive_candidate_run >= RTRH_PASSIVE_LOCK_CYCLES) {
-            start_passive_block(mode);
-            rtrh_passive_candidate_mode = 0xFF;
-            rtrh_passive_candidate_run = 0;
-
-            if (rtrh_passive_block_count != 0 &&
-                rtrh_passive_block_count <= RTRH_PASSIVE_MAX_BLOCKS) {
-              add_passive_cycle(
-                  rtrh_passive_blocks[rtrh_passive_block_count - 1],
-                  period,
-                  low,
-                  have_delay,
-                  delay);
-            }
-          }
+          // We lost the rise edge for this cycle.  Keep the train alive but
+          // use the new falling edge as the next period reference.
+          rtrh_passive_last_g10_fall_us = now;
         }
       }
 
-      rtrh_passive_last_g10_fall_us = now;
       rtrh_passive_have_g10_rise = false;
       rtrh_passive_have_g13_rise = false;
     }
 
     rtrh_passive_last_state = state;
   }
-
-  /*
-   * Once a target ADC pad has been prepared, only the selected other pin is
-   * used as timing reference. Falling edges are counted in hardware time.
-   */
-  if (false && previous && !level) {
-    const uint32_t previous_fall = rtrh_last_fall_us[pin_index];
-    rtrh_last_fall_us[pin_index] = now;
-
-    if (rtrh_adc_active &&
-        rtrh_adc_waiting_for_edge &&
-        !rtrh_adc_pending &&
-        pin_index == static_cast<uint8_t>(rtrh_adc_trigger_index) &&
-        previous_fall != 0) {
-
-      const uint32_t period =
-          static_cast<uint32_t>(now - previous_fall);
-
-      bool wanted = false;
-
-      if (rtrh_adc_desired_mode == RTRH_MODE_SHORT) {
-        wanted =
-            period >= RTRH_SHORT_MIN_US &&
-            period <= RTRH_SHORT_MAX_US;
-      } else {
-        wanted =
-            period >= RTRH_LONG_MIN_US &&
-            period <= RTRH_LONG_MAX_US;
-      }
-
-      if (wanted) {
-        if (rtrh_adc_edges_to_skip > 0) {
-          rtrh_adc_edges_to_skip--;
-        } else {
-          rtrh_adc_reference_edge_us = now;
-          rtrh_adc_trigger_period_us =
-              period > 65535U ? 65535U : static_cast<uint16_t>(period);
-          rtrh_adc_pending = true;
-          rtrh_adc_waiting_for_edge = false;
-
-          if (rtrh_adc_task_handle != nullptr) {
-            BaseType_t higher_priority_woken = pdFALSE;
-            vTaskNotifyGiveFromISR(
-                rtrh_adc_task_handle,
-                &higher_priority_woken);
-            if (higher_priority_woken)
-              portYIELD_FROM_ISR();
-          }
-        }
-      }
-    }
-  }
-
-  /*
-   * Don't try to build a four-line digital state trace while one of those
-   * four pads is intentionally in analog mode. The earlier digital captures
-   * have already characterized the ~13 kHz waveform; ADC timing is the goal
-   * during this acquisition.
-   */
-  if (rtrh_adc_active)
-    return;
 
   if (rtrh_capture_ready)
     return;
@@ -2043,7 +1641,6 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     rtrh_overflow = false;
     rtrh_capture_ready = false;
     rtrh_capturing = false;
-    resume_rtrh_irqs();
 
     if (err != ESP_OK)
       ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
@@ -2052,56 +1649,21 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
 
 static RtRhCaptureHandler rtrh_capture_handler;
 
-static uint16_t median_u16_ignore_missing(
-    const uint16_t *values,
-    uint8_t count)
-{
-  uint16_t tmp[RTRH_ADC_REPEATS];
-  uint8_t n = 0;
-
-  for (uint8_t i = 0; i < count && i < RTRH_ADC_REPEATS; i++) {
-    if (values[i] != 0xFFFF)
-      tmp[n++] = values[i];
-  }
-
-  if (n == 0)
-    return 0;
-
-  // Tiny insertion sort; n <= 8.
-  for (uint8_t i = 1; i < n; i++) {
-    const uint16_t v = tmp[i];
-    int j = static_cast<int>(i) - 1;
-
-    while (j >= 0 && tmp[j] > v) {
-      tmp[j + 1] = tmp[j];
-      j--;
-    }
-
-    tmp[j + 1] = v;
-  }
-
-  if (n & 1)
-    return tmp[n / 2];
-
-  return static_cast<uint16_t>(
-      (static_cast<uint32_t>(tmp[n / 2 - 1]) +
-       static_cast<uint32_t>(tmp[n / 2])) / 2U);
-}
-
-
 class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
   {
     if (request->method() != HTTP_GET)
       return false;
+
     char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
     return request->url_to(url) == "/rt_rh_timing.csv";
   }
 
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
   {
-    if (!rtrh_passive_snapshot_ready || rtrh_passive_snapshot_consumed) {
+    if (!rtrh_passive_snapshot_ready ||
+        rtrh_passive_snapshot_consumed) {
       request->send(204, "text/plain", nullptr);
       return;
     }
@@ -2117,7 +1679,7 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
         "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,block,mode,mode_name,count,"
+        "measurement,train,role,count,gap_before_us,"
         "period_mean_us,period_min_us,period_max_us,"
         "low_mean_us,low_min_us,low_max_us,"
         "g13_delay_count,g13_delay_mean_us,g13_delay_min_us,g13_delay_max_us,"
@@ -2126,63 +1688,65 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
-    static char line[256];
+    static char line[320];
 
-    for (uint8_t i = 0; i < s.block_count && err == ESP_OK; i++) {
-      const RtRhPassiveBlock &b = s.blocks[i];
+    for (uint8_t i = 0;
+         i < s.train_count && err == ESP_OK;
+         i++) {
+      const RtRhPassiveTrain &t = s.trains[i];
 
       const float period_mean =
-          b.count
-              ? static_cast<float>(b.period_sum) /
-                    static_cast<float>(b.count)
+          t.count
+              ? static_cast<float>(t.period_sum) /
+                    static_cast<float>(t.count)
               : 0.0f;
 
       const float low_mean =
-          b.count
-              ? static_cast<float>(b.low_sum) /
-                    static_cast<float>(b.count)
+          t.count
+              ? static_cast<float>(t.low_sum) /
+                    static_cast<float>(t.count)
               : 0.0f;
 
       const float delay_mean =
-          b.g13_delay_count
-              ? static_cast<float>(b.g13_delay_sum) /
-                    static_cast<float>(b.g13_delay_count)
+          t.g13_delay_count
+              ? static_cast<float>(t.g13_delay_sum) /
+                    static_cast<float>(t.g13_delay_count)
               : 0.0f;
 
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%u,%u,%s,%u,%.3f,%u,%u,%.3f,%u,%u,"
+          "%lu,%u,%s,%u,%lu,%.3f,%u,%u,%.3f,%u,%u,"
           "%u,%.3f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
           static_cast<unsigned long>(s.sequence),
           static_cast<unsigned>(i),
-          static_cast<unsigned>(b.mode),
-          b.mode == RTRH_MODE_SHORT ? "short" :
-              (b.mode == RTRH_MODE_LONG ? "long" : "unknown"),
-          static_cast<unsigned>(b.count),
+          rtrh_train_role_name(t.role),
+          static_cast<unsigned>(t.count),
+          static_cast<unsigned long>(t.gap_before_us),
           period_mean,
-          b.count ? static_cast<unsigned>(b.period_min) : 0U,
-          static_cast<unsigned>(b.period_max),
+          t.count ? static_cast<unsigned>(t.period_min) : 0U,
+          static_cast<unsigned>(t.period_max),
           low_mean,
-          b.count ? static_cast<unsigned>(b.low_min) : 0U,
-          static_cast<unsigned>(b.low_max),
-          static_cast<unsigned>(b.g13_delay_count),
+          t.count ? static_cast<unsigned>(t.low_min) : 0U,
+          static_cast<unsigned>(t.low_max),
+          static_cast<unsigned>(t.g13_delay_count),
           delay_mean,
-          b.g13_delay_count
-              ? static_cast<unsigned>(b.g13_delay_min)
+          t.g13_delay_count
+              ? static_cast<unsigned>(t.g13_delay_min)
               : 0U,
-          static_cast<unsigned>(b.g13_delay_max),
-          static_cast<unsigned>(b.g13_delay_hist[0]),
-          static_cast<unsigned>(b.g13_delay_hist[1]),
-          static_cast<unsigned>(b.g13_delay_hist[2]),
-          static_cast<unsigned>(b.g13_delay_hist[3]),
-          static_cast<unsigned>(b.g13_delay_hist[4]),
-          static_cast<unsigned>(b.g13_delay_hist[5]),
-          static_cast<unsigned>(b.g13_delay_hist[6]),
-          static_cast<unsigned>(b.g13_delay_hist[7]),
+          static_cast<unsigned>(t.g13_delay_max),
+          static_cast<unsigned>(t.g13_delay_hist[0]),
+          static_cast<unsigned>(t.g13_delay_hist[1]),
+          static_cast<unsigned>(t.g13_delay_hist[2]),
+          static_cast<unsigned>(t.g13_delay_hist[3]),
+          static_cast<unsigned>(t.g13_delay_hist[4]),
+          static_cast<unsigned>(t.g13_delay_hist[5]),
+          static_cast<unsigned>(t.g13_delay_hist[6]),
+          static_cast<unsigned>(t.g13_delay_hist[7]),
           s.overflow ? 1U : 0U);
 
-      if (n <= 0 || static_cast<size_t>(n) >= sizeof(line)) {
+      if (n <= 0 ||
+          static_cast<size_t>(n) >= sizeof(line)) {
         err = ESP_FAIL;
         break;
       }
@@ -2199,172 +1763,6 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
 };
 
 static RtRhTimingHandler rtrh_timing_handler;
-
-class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
- public:
-  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
-  {
-    if (request->method() != HTTP_GET)
-      return false;
-
-    char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
-    return request->url_to(url) == "/rt_rh_adc.csv";
-  }
-
-  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
-  {
-    bool have_snapshot = false;
-
-    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
-    if (rtrh_adc_snapshot_ready && !rtrh_adc_snapshot_in_use) {
-      rtrh_adc_snapshot_in_use = true;
-      have_snapshot = true;
-    }
-    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
-
-    if (!have_snapshot) {
-      request->send(204, "text/plain", nullptr);
-      return;
-    }
-
-    httpd_req_t *req = *request;
-    httpd_resp_set_status(req, "200 OK");
-    httpd_resp_set_type(req, "text/csv");
-    httpd_resp_set_hdr(
-        req,
-        "Content-Disposition",
-        "attachment; filename=\"rt_rh_adc.csv\"");
-
-    static constexpr char HEADER[] =
-        "sequence,mode,mode_name,phase,gpio,offset_us,"
-        "count,mean,min,max,period_mean_us,max_lateness_us,"
-        "rejected_late,read_errors,median,"
-        "raw0,raw1,raw2,raw3,raw4,raw5,raw6,raw7\n";
-
-    esp_err_t err =
-        httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
-
-    static char chunk[256];
-    static char line[224];
-    size_t used = 0;
-
-    const uint32_t sequence = rtrh_adc_snapshot_sequence;
-
-    for (uint8_t mode = 0; mode < RTRH_ADC_MODES && err == ESP_OK; mode++) {
-      for (uint8_t phase = 0; phase < RTRH_ADC_PHASES && err == ESP_OK; phase++) {
-        for (uint8_t channel = 0;
-             channel < RTRH_ADC_CHANNELS && err == ESP_OK;
-             channel++) {
-
-          const RtRhAdcAggregate &agg =
-              rtrh_adc_snapshot[mode][phase][channel];
-
-          const uint32_t mean =
-              agg.count ? agg.sum / agg.count : 0;
-
-          const uint32_t period_mean =
-              agg.period_count
-                  ? agg.period_sum / agg.period_count
-                  : 0;
-
-          const uint16_t min_value =
-              agg.count ? agg.min : 0;
-
-          uint16_t median_value = 0;
-
-          if (mode == RTRH_MODE_SHORT && channel == 3) {
-            median_value =
-                median_u16_ignore_missing(
-                    rtrh_short_g13_raw_snapshot[phase],
-                    RTRH_ADC_REPEATS);
-          }
-
-          char raw_fields[64] = ",,,,,,,,";
-          if (mode == RTRH_MODE_SHORT && channel == 3) {
-            char *rp = raw_fields;
-            size_t remain = sizeof(raw_fields);
-
-            for (uint8_t rr = 0; rr < RTRH_ADC_REPEATS; rr++) {
-              const uint16_t rv =
-                  rtrh_short_g13_raw_snapshot[phase][rr];
-
-              int rn;
-              if (rv == 0xFFFF)
-                rn = snprintf(rp, remain, ",");
-              else
-                rn = snprintf(rp, remain, ",%u", static_cast<unsigned>(rv));
-
-              if (rn <= 0 || static_cast<size_t>(rn) >= remain)
-                break;
-
-              rp += rn;
-              remain -= static_cast<size_t>(rn);
-            }
-          }
-
-          const int n = snprintf(
-              line,
-              sizeof(line),
-              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u,%u%s\n",
-              static_cast<unsigned long>(sequence),
-              static_cast<unsigned>(mode),
-              mode == RTRH_MODE_SHORT ? "short" : "long",
-              static_cast<unsigned>(phase),
-              RTRH_ADC_GPIOS[channel],
-              static_cast<unsigned>(RTRH_ADC_OFFSETS_US[phase]),
-              static_cast<unsigned>(agg.count),
-              static_cast<unsigned long>(mean),
-              static_cast<unsigned>(min_value),
-              static_cast<unsigned>(agg.max),
-              static_cast<unsigned long>(period_mean),
-              static_cast<unsigned>(agg.max_lateness_us),
-              static_cast<unsigned>(agg.rejected_late),
-              static_cast<unsigned>(agg.read_errors),
-              static_cast<unsigned>(median_value),
-              raw_fields);
-
-          if (n <= 0)
-            continue;
-
-          const size_t len = static_cast<size_t>(n);
-
-          if (used + len > sizeof(chunk)) {
-            err = httpd_resp_send_chunk(req, chunk, used);
-            used = 0;
-          }
-
-          if (err == ESP_OK && len <= sizeof(chunk)) {
-            memcpy(chunk + used, line, len);
-            used += len;
-          }
-        }
-      }
-    }
-
-    if (err == ESP_OK && used != 0)
-      err = httpd_resp_send_chunk(req, chunk, used);
-
-    if (err == ESP_OK)
-      httpd_resp_send_chunk(req, nullptr, 0);
-
-    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
-    rtrh_adc_snapshot_in_use = false;
-
-    // A successfully downloaded snapshot is consumed.  Until the next
-    // completed ADC sequence arrives, repeated GETs return 204 instead of
-    // silently serving stale data under a new display label.
-    if (err == ESP_OK)
-      rtrh_adc_snapshot_ready = false;
-
-    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
-
-    if (err != ESP_OK)
-      ESP_LOGW(TAG, "rt_rh_adc.csv client disconnected (%d)", err);
-  }
-};
-
-static RtRhAdcHandler rtrh_adc_handler;
-
 
 /*
  * ============================================================================
@@ -2457,9 +1855,7 @@ void BusSniffer::setup()
   rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
   rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
 
-  // Passive-block build: do not initialize ADC units and do not start the
-  // ADC worker. GPIO10..13 remain ordinary digital inputs for the entire run.
-  reset_rtrh_adc_capture();
+  // GPIO10..13 stay ordinary high-impedance digital inputs for the entire run.
 
 
   last_edge =
@@ -2590,7 +1986,7 @@ void BusSniffer::setup()
 
   ESP_LOGD(
       TAG,
-      "Raw captures at /capture; RT/RH edges /rt_rh_capture.csv; phase ADC /rt_rh_adc.csv"
+      "Raw captures at /capture; RT/RH edges /rt_rh_capture.csv; trains /rt_rh_timing.csv"
   );
 }
 
@@ -2604,197 +2000,175 @@ void BusSniffer::setup()
 void BusSniffer::loop()
 {
   /*
-   * End-of-burst detector.  The ISR only accumulates tiny block summaries.
-   * Once the lines have been quiet for 100 ms, freeze the complete burst.
+   * Close a train after 2 ms without a GPIO10 falling edge.  This is only
+   * interrupt bookkeeping; the pins remain ordinary high-impedance inputs.
    */
   if (rtrh_passive_collecting &&
-      rtrh_passive_block_count != 0) {
+      rtrh_passive_train_active) {
     const uint32_t now =
         static_cast<uint32_t>(esp_timer_get_time());
-    const uint32_t last = rtrh_passive_last_any_us;
+    const uint32_t last_fall =
+        rtrh_passive_last_g10_fall_us;
 
-    if (last != 0 &&
-        static_cast<uint32_t>(now - last) > RTRH_PASSIVE_QUIET_US) {
-      finalize_rtrh_passive_burst();
+    if (last_fall != 0 &&
+        static_cast<uint32_t>(now - last_fall) >
+            RTRH_TRAIN_GAP_US) {
+      gpio_intr_disable(PIN_RTRH0);
+      gpio_intr_disable(PIN_RTRH1);
+      gpio_intr_disable(PIN_RTRH2);
+      gpio_intr_disable(PIN_RTRH3);
+
+      const uint32_t now2 =
+          static_cast<uint32_t>(esp_timer_get_time());
+      const uint32_t last_fall2 =
+          rtrh_passive_last_g10_fall_us;
+
+      if (rtrh_passive_train_active &&
+          last_fall2 != 0 &&
+          static_cast<uint32_t>(now2 - last_fall2) >
+              RTRH_TRAIN_GAP_US) {
+        append_current_rtrh_passive_train();
+      }
+
+      rtrh_passive_last_state = read_rtrh_state();
+      rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
+      rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
+      rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
+      rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
+
+      gpio_intr_enable(PIN_RTRH0);
+      gpio_intr_enable(PIN_RTRH1);
+      gpio_intr_enable(PIN_RTRH2);
+      gpio_intr_enable(PIN_RTRH3);
+    }
+  }
+
+  /*
+   * A whole sensor measurement may contain long internal pauses.  Only 15 s
+   * without ANY RT/RH edge freezes and classifies the measurement.
+   */
+  if (rtrh_passive_collecting) {
+    const uint32_t now =
+        static_cast<uint32_t>(esp_timer_get_time());
+    const uint32_t last_any =
+        rtrh_passive_last_any_us;
+
+    if (last_any != 0 &&
+        static_cast<uint32_t>(now - last_any) >
+            RTRH_MEASUREMENT_QUIET_US) {
+      gpio_intr_disable(PIN_RTRH0);
+      gpio_intr_disable(PIN_RTRH1);
+      gpio_intr_disable(PIN_RTRH2);
+      gpio_intr_disable(PIN_RTRH3);
+
+      const uint32_t now2 =
+          static_cast<uint32_t>(esp_timer_get_time());
+      const uint32_t last_any2 =
+          rtrh_passive_last_any_us;
+
+      if (rtrh_passive_collecting &&
+          last_any2 != 0 &&
+          static_cast<uint32_t>(now2 - last_any2) >
+              RTRH_MEASUREMENT_QUIET_US) {
+        finalize_rtrh_passive_measurement();
+      }
+
+      rtrh_passive_last_state = read_rtrh_state();
+      rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
+      rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
+      rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
+      rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
+
+      gpio_intr_enable(PIN_RTRH0);
+      gpio_intr_enable(PIN_RTRH1);
+      gpio_intr_enable(PIN_RTRH2);
+      gpio_intr_enable(PIN_RTRH3);
     }
   }
 
   static uint32_t last_passive_sequence = 0;
 
   if (rtrh_passive_snapshot_ready &&
-      rtrh_passive_snapshot.sequence != last_passive_sequence) {
-    const RtRhPassiveSnapshot s = rtrh_passive_snapshot;
+      rtrh_passive_snapshot.sequence !=
+          last_passive_sequence) {
+    const RtRhPassiveSnapshot s =
+        rtrh_passive_snapshot;
+
     last_passive_sequence = s.sequence;
 
     ESP_LOGI(
         TAG,
-        "RT/RH passive burst %lu: %u stable blocks%s",
+        "RT/RH passive measurement %lu: %u trains%s%s",
         static_cast<unsigned long>(s.sequence),
-        static_cast<unsigned>(s.block_count),
-        s.overflow ? " OVERFLOW" : "");
+        static_cast<unsigned>(s.train_count),
+        s.overflow ? " OVERFLOW" : "",
+        s.rt_mixed ? " RT/RH-MIXED" : "");
 
-    for (uint8_t i = 0; i < s.block_count; i++) {
-      const RtRhPassiveBlock &b = s.blocks[i];
+    for (uint8_t i = 0; i < s.train_count; i++) {
+      const RtRhPassiveTrain &t = s.trains[i];
 
       const float period_mean =
-          b.count
-              ? static_cast<float>(b.period_sum) /
-                    static_cast<float>(b.count)
+          t.count
+              ? static_cast<float>(t.period_sum) /
+                    static_cast<float>(t.count)
               : 0.0f;
 
-      if (b.mode == RTRH_MODE_LONG && b.count >= 850 && b.count <= 1000) {
-  const float temperature_c =
-      RTRH_TEMP_M * period_mean + RTRH_TEMP_C;
-
-  ESP_LOGI(
-      TAG,
-      "RT temperature PASSIVE: %.2f C from LONG %.3f us (%u cycles)",
-      temperature_c,
-      period_mean,
-      static_cast<unsigned>(b.count));
-
-  if (this->rt_temperature_sensor_ != nullptr)
-    this->rt_temperature_sensor_->publish_state(temperature_c);
-}
-
       const float low_mean =
-          b.count
-              ? static_cast<float>(b.low_sum) /
-                    static_cast<float>(b.count)
+          t.count
+              ? static_cast<float>(t.low_sum) /
+                    static_cast<float>(t.count)
               : 0.0f;
 
       const float delay_mean =
-          b.g13_delay_count
-              ? static_cast<float>(b.g13_delay_sum) /
-                    static_cast<float>(b.g13_delay_count)
+          t.g13_delay_count
+              ? static_cast<float>(t.g13_delay_sum) /
+                    static_cast<float>(t.g13_delay_count)
               : 0.0f;
 
       ESP_LOGI(
           TAG,
-          "  block %u %s: n=%u period=%.3f us low=%.3f us G13delay=%.3f us (%u)",
+          "  train %u %-7s: n=%u gap=%lu us period=%.3f us "
+          "low=%.3f us G13delay=%.3f us (%u)",
           static_cast<unsigned>(i),
-          b.mode == RTRH_MODE_SHORT ? "SHORT" :
-              (b.mode == RTRH_MODE_LONG ? "LONG" : "?"),
-          static_cast<unsigned>(b.count),
+          rtrh_train_role_name(t.role),
+          static_cast<unsigned>(t.count),
+          static_cast<unsigned long>(t.gap_before_us),
           period_mean,
           low_mean,
           delay_mean,
-          static_cast<unsigned>(b.g13_delay_count));
-    }
-  }
-
-  /*
-   * Diagnostic build: do not publish RT Temperature yet.  We first need to
-   * identify which LONG block is the actual RT conversion.
-   */
-  static uint32_t last_logged_adc_sequence = 0;
-
-  if (false && rtrh_adc_ready &&
-      rtrh_adc_sequence != last_logged_adc_sequence) {
-    last_logged_adc_sequence = rtrh_adc_sequence;
-
-    ESP_LOGI(
-        TAG,
-        "RT/RH mode ADC ready: %u samples, sequence %lu",
-        RTRH_ADC_SAMPLES,
-        static_cast<unsigned long>(rtrh_adc_sequence));
-
-    // The LONG cycle duration tracks the NTC temperature almost perfectly.
-    // Average all valid LONG-period observations from this sequence.
-    uint32_t long_period_sum = 0;
-    uint32_t long_period_count = 0;
-
-    for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-      for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
-        const RtRhAdcAggregate &agg =
-            rtrh_adc_agg[RTRH_MODE_LONG][phase][channel];
-
-        long_period_sum += agg.period_sum;
-        long_period_count += agg.period_count;
-      }
+          static_cast<unsigned>(t.g13_delay_count));
     }
 
-    if (long_period_count != 0) {
-      const float long_period_us =
-          static_cast<float>(long_period_sum) /
-          static_cast<float>(long_period_count);
+    if (s.rt_valid && s.rt_count != 0) {
+      const float rt_period_us =
+          static_cast<float>(s.rt_period_sum) /
+          static_cast<float>(s.rt_count);
 
       const float temperature_c =
-	  RTRH_TEMP_C + RTRH_TEMP_M * long_period_us;
+          RTRH_TEMP_M * rt_period_us +
+          RTRH_TEMP_C;
 
-      ESP_LOGD(
+      ESP_LOGI(
           TAG,
-          "ADC LONG period diagnostic: %.2f us -> %.2f C (%lu observations)",
-          long_period_us,
+          "RT temperature PASSIVE: %.2f C from RT %.3f us "
+          "(%u cycles)",
           temperature_c,
-          static_cast<unsigned long>(long_period_count));
-    } else {
-      ESP_LOGW(TAG, "RT temperature unavailable: no valid LONG period");
+          rt_period_us,
+          static_cast<unsigned>(s.rt_count));
+
+      if (this->rt_temperature_sensor_ != nullptr)
+        this->rt_temperature_sensor_->
+            publish_state(temperature_c);
+    } else if (s.rt_mixed) {
+      ESP_LOGW(
+          TAG,
+          "RT temperature not published: RT/RH trains could "
+          "not be separated");
     }
-
-    for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
-      for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-        const RtRhAdcAggregate &a0 = rtrh_adc_agg[mode][phase][0];
-        const RtRhAdcAggregate &a1 = rtrh_adc_agg[mode][phase][1];
-        const RtRhAdcAggregate &a2 = rtrh_adc_agg[mode][phase][2];
-        const RtRhAdcAggregate &a3 = rtrh_adc_agg[mode][phase][3];
-
-        const uint32_t period_sum =
-            a0.period_sum + a1.period_sum + a2.period_sum + a3.period_sum;
-        const uint32_t period_count =
-            a0.period_count + a1.period_count +
-            a2.period_count + a3.period_count;
-
-        uint16_t max_late = a0.max_lateness_us;
-        if (a1.max_lateness_us > max_late) max_late = a1.max_lateness_us;
-        if (a2.max_lateness_us > max_late) max_late = a2.max_lateness_us;
-        if (a3.max_lateness_us > max_late) max_late = a3.max_lateness_us;
-
-        ESP_LOGI(
-            TAG,
-            "RT/RH %s phase %u (+%u us, period~%lu): "
-            "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%u us",
-            mode == RTRH_MODE_SHORT ? "SHORT" : "LONG",
-            phase,
-            RTRH_ADC_OFFSETS_US[phase],
-            period_count
-                ? static_cast<unsigned long>(period_sum / period_count)
-                : 0UL,
-            a0.count ? static_cast<unsigned long>(a0.sum / a0.count) : 0UL,
-            a0.count,
-            a1.count ? static_cast<unsigned long>(a1.sum / a1.count) : 0UL,
-            a1.count,
-            a2.count ? static_cast<unsigned long>(a2.sum / a2.count) : 0UL,
-            a2.count,
-            a3.count ? static_cast<unsigned long>(a3.sum / a3.count) : 0UL,
-            a3.count,
-            max_late);
-      }
-    }
-    // Preserve newest completed result for HTTP without blocking acquisition.
-    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
-    if (!rtrh_adc_snapshot_in_use) {
-      memcpy(
-          rtrh_adc_snapshot,
-          rtrh_adc_agg,
-          sizeof(rtrh_adc_snapshot));
-      memcpy(
-          rtrh_short_g13_raw_snapshot,
-          rtrh_short_g13_raw,
-          sizeof(rtrh_short_g13_raw_snapshot));
-      rtrh_adc_snapshot_sequence = rtrh_adc_sequence;
-      rtrh_adc_snapshot_ready = true;
-    }
-    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
-
-    // Measurement state is independent of HTTP now.
-    reset_rtrh_adc_capture();
-
   }
 
-  // A completed digital trace stays frozen for HTTP, but the GPIO IRQs stay
-  // enabled because the autonomous RT/RH timing/ADC engine uses the same edges.
-  if (rtrh_capture_ready && !rtrh_adc_active) {
+  // A completed digital trace stays frozen for HTTP; train decoding continues.
+  if (rtrh_capture_ready) {
     static uint32_t last_reported_rtrh_sequence = UINT32_MAX;
 
     if (last_reported_rtrh_sequence != rtrh_sequence) {
