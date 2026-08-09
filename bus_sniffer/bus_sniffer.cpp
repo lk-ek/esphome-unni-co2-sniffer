@@ -6,6 +6,7 @@
 #include "driver/gpio.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_timer.h"
+#include "esp_http_server.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -1373,6 +1374,7 @@ class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
 
     const uint16_t count = analog_capture_count;
     const uint32_t sequence = analog_capture_sequence;
+    const uint16_t trigger_pos = analog_capture_trigger_pos;
 
     if (count == 0) {
       xSemaphoreGive(analog_capture_mutex);
@@ -1380,15 +1382,31 @@ class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
       return;
     }
 
-    std::string output;
-    output.reserve(static_cast<size_t>(count) * 42 + 128);
-    output += "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask,trigger\n";
+    // Do not build the complete CSV in a std::string. On the ESP32-S2 that
+    // would require tens of kilobytes of contiguous heap and beginResponse()
+    // would make another copy. Stream the file directly through ESP-IDF's
+    // chunked HTTP API instead.
+    httpd_req_t *req = *request;
+
+    httpd_resp_set_status(req, "200 OK");
+    httpd_resp_set_type(req, "text/csv");
+    httpd_resp_set_hdr(
+        req,
+        "Content-Disposition",
+        "attachment; filename=\"analog_capture.csv\"");
+
+    static constexpr char HEADER[] =
+        "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask,trigger\n";
+
+    esp_err_t err = httpd_resp_send_chunk(
+        req, HEADER, sizeof(HEADER) - 1);
 
     char line[128];
 
-    for (uint16_t i = 0; i < count; i++) {
+    for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
       const AnalogSample &sample = analog_capture[i];
-      const uint32_t rel = static_cast<uint32_t>(i) * ANALOG_SAMPLE_PERIOD_US;
+      const uint32_t rel =
+          static_cast<uint32_t>(i) * ANALOG_SAMPLE_PERIOD_US;
 
       const int n = snprintf(
           line,
@@ -1401,19 +1419,26 @@ class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
           sample.raw[2],
           sample.raw[3],
           sample.valid_mask,
-          i == analog_capture_trigger_pos ? 1U : 0U);
+          i == trigger_pos ? 1U : 0U);
 
-      if (n > 0)
-        output.append(line, static_cast<size_t>(n));
+      if (n > 0) {
+        const size_t len =
+            static_cast<size_t>(n) < sizeof(line)
+                ? static_cast<size_t>(n)
+                : sizeof(line) - 1;
+        err = httpd_resp_send_chunk(req, line, len);
+      }
     }
+
+    // A zero-length chunk terminates the HTTP response.
+    if (err == ESP_OK)
+      httpd_resp_send_chunk(req, nullptr, 0);
 
     xSemaphoreGive(analog_capture_mutex);
 
-    auto *response = request->beginResponse(200, "text/csv", output);
-    response->addHeader(
-        "Content-Disposition",
-        "attachment; filename=\"analog_capture.csv\"");
-    request->send(response);
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "analog_capture.csv client disconnected (%d)", err);
+    }
   }
 };
 
