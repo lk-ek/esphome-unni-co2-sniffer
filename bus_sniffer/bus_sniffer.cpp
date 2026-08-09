@@ -975,6 +975,12 @@ static constexpr uint32_t RTRH_SHORT_MIN_US = 65;
 static constexpr uint32_t RTRH_SHORT_MAX_US = 100;
 static constexpr uint32_t RTRH_LONG_MIN_US = 115;
 static constexpr uint32_t RTRH_LONG_MAX_US = 175;
+
+// Empirical calibration from the 2026-08-09 heat/cool series:
+// 11 display-reference points, 27.4..38.8 degC.
+// Linear fit: T[degC] = intercept + slope * LONG_period_us
+static constexpr float RTRH_TEMP_SLOPE = -0.49395309f;
+static constexpr float RTRH_TEMP_INTERCEPT = 96.61457803f;
 static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
@@ -2016,6 +2022,43 @@ void BusSniffer::loop()
         "RT/RH mode ADC ready: %u samples, sequence %lu",
         RTRH_ADC_SAMPLES,
         static_cast<unsigned long>(rtrh_adc_sequence));
+
+    // The LONG cycle duration tracks the NTC temperature almost perfectly.
+    // Average all valid LONG-period observations from this sequence.
+    uint32_t long_period_sum = 0;
+    uint32_t long_period_count = 0;
+
+    for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
+      for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
+        const RtRhAdcAggregate &agg =
+            rtrh_adc_agg[RTRH_MODE_LONG][phase][channel];
+
+        long_period_sum += agg.period_sum;
+        long_period_count += agg.period_count;
+      }
+    }
+
+    if (long_period_count != 0) {
+      const float long_period_us =
+          static_cast<float>(long_period_sum) /
+          static_cast<float>(long_period_count);
+
+      const float temperature_c =
+          RTRH_TEMP_INTERCEPT +
+          RTRH_TEMP_SLOPE * long_period_us;
+
+      ESP_LOGI(
+          TAG,
+          "RT temperature: %.2f C from LONG period %.2f us (%lu observations)",
+          temperature_c,
+          long_period_us,
+          static_cast<unsigned long>(long_period_count));
+
+      if (this->rt_temperature_sensor_ != nullptr)
+        this->rt_temperature_sensor_->publish_state(temperature_c);
+    } else {
+      ESP_LOGW(TAG, "RT temperature unavailable: no valid LONG period");
+    }
 
     for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
       for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
