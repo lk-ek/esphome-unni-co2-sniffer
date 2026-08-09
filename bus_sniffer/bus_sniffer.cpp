@@ -1063,6 +1063,40 @@ static RtRhPassiveSnapshot rtrh_passive_snapshot;
 static volatile bool rtrh_passive_snapshot_ready = false;
 static volatile bool rtrh_passive_snapshot_consumed = true;
 
+/*
+ * Legacy ADC declarations.
+ *
+ * The passive-block firmware never starts the ADC task and never registers the
+ * ADC HTTP handler, but the old diagnostic helper functions remain compiled.
+ * C++ still needs their types/globals to be declared even though they are
+ * unreachable at runtime.
+ */
+static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
+    10, 11, 12, 13
+};
+
+struct RtRhAdcAggregate {
+  uint16_t sum{0};
+  uint16_t period_sum{0};
+  uint16_t min{0xFFFF};
+  uint16_t max{0};
+  uint16_t count{0};
+  uint16_t period_count{0};
+  uint16_t max_lateness_us{0};
+  uint16_t rejected_late{0};
+  uint16_t read_errors{0};
+};
+
+struct RtRhAdcChannel {
+  adc_unit_t unit{ADC_UNIT_1};
+  adc_channel_t channel{ADC_CHANNEL_0};
+  bool configured{false};
+};
+
+static RtRhAdcChannel rtrh_adc_channels[RTRH_ADC_CHANNELS];
+static adc_oneshot_unit_handle_t rtrh_adc1_handle = nullptr;
+static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
+
 static RtRhAdcAggregate
     rtrh_adc_agg[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
 
@@ -2414,19 +2448,9 @@ void BusSniffer::setup()
   rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
   rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
 
-  setup_rtrh_adc();
+  // Passive-block build: do not initialize ADC units and do not start the
+  // ADC worker. GPIO10..13 remain ordinary digital inputs for the entire run.
   reset_rtrh_adc_capture();
-
-  if (xTaskCreate(
-          rtrh_adc_task,
-          "rtrh_adc",
-          3072,
-          nullptr,
-          18,
-          &rtrh_adc_task_handle) != pdPASS) {
-    ESP_LOGE(TAG, "Failed to create RT/RH ADC task");
-    rtrh_adc_task_handle = nullptr;
-  }
 
 
   last_edge =
@@ -2526,9 +2550,6 @@ void BusSniffer::setup()
 
     web_server_base::global_web_server_base->add_handler(
         &rtrh_timing_handler);
-
-    web_server_base::global_web_server_base->add_handler(
-        &rtrh_adc_handler);
 
   } else {
 
