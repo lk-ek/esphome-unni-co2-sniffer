@@ -961,6 +961,7 @@ static volatile bool rtrh_irqs_suspended = false;
 static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
 static constexpr uint8_t RTRH_ADC_PHASES = 4;
 static constexpr uint8_t RTRH_ADC_CYCLES = 32;
+static constexpr uint32_t RTRH_ADC_PERIOD_US = 77;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
     8, 25, 45, 62
 };
@@ -1043,10 +1044,13 @@ static void setup_rtrh_adc()
     rtrh_adc2_handle = nullptr;
   }
 
-  adc_oneshot_chan_cfg_t cfg = {};
-  cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
-  cfg.atten = ADC_ATTEN_DB_12;
-
+  /*
+   * IMPORTANT:
+   * Only map GPIO -> ADC channel here. adc_oneshot_config_channel() is
+   * deliberately deferred until a measurement burst has actually started.
+   * Configuring the channels here would put GPIO10..13 into analog mode and
+   * kill the ANYEDGE interrupts that trigger the capture.
+   */
   for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
     RtRhAdcChannel &ch = rtrh_adc_channels[i];
 
@@ -1064,11 +1068,37 @@ static void setup_rtrh_adc()
       continue;
     }
 
+    ch.configured = true;
+
+    ESP_LOGI(
+        TAG,
+        "RT/RH GPIO%d mapped to ADC%d channel %d (deferred config)",
+        RTRH_ADC_GPIOS[i],
+        static_cast<int>(ch.unit) + 1,
+        static_cast<int>(ch.channel));
+  }
+}
+
+static bool configure_rtrh_pins_for_adc()
+{
+  adc_oneshot_chan_cfg_t cfg = {};
+  cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
+  cfg.atten = ADC_ATTEN_DB_12;
+
+  bool any = false;
+
+  for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
+    const RtRhAdcChannel &ch = rtrh_adc_channels[i];
+    if (!ch.configured)
+      continue;
+
     adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
     if (handle == nullptr)
       continue;
 
-    err = adc_oneshot_config_channel(handle, ch.channel, &cfg);
+    const esp_err_t err =
+        adc_oneshot_config_channel(handle, ch.channel, &cfg);
+
     if (err != ESP_OK) {
       ESP_LOGW(
           TAG,
@@ -1078,15 +1108,33 @@ static void setup_rtrh_adc()
       continue;
     }
 
-    ch.configured = true;
-
-    ESP_LOGI(
-        TAG,
-        "RT/RH GPIO%d -> ADC%d channel %d",
-        RTRH_ADC_GPIOS[i],
-        static_cast<int>(ch.unit) + 1,
-        static_cast<int>(ch.channel));
+    any = true;
   }
+
+  return any;
+}
+
+static void restore_rtrh_digital_inputs()
+{
+  gpio_config_t io = {};
+  io.mode = GPIO_MODE_INPUT;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io.intr_type = GPIO_INTR_ANYEDGE;
+  io.pin_bit_mask =
+      (1ULL << PIN_RTRH0) |
+      (1ULL << PIN_RTRH1) |
+      (1ULL << PIN_RTRH2) |
+      (1ULL << PIN_RTRH3);
+
+  const esp_err_t err = gpio_config(&io);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "RT/RH digital restore failed: %s", esp_err_to_name(err));
+    return;
+  }
+
+  rtrh_last_value = read_rtrh_state();
+  rtrh_irqs_suspended = false;
 }
 
 static void rtrh_adc_task(void *arg)
@@ -1097,75 +1145,102 @@ static void rtrh_adc_task(void *arg)
     if (!rtrh_adc_pending || !rtrh_adc_active || rtrh_adc_ready)
       continue;
 
-    const uint16_t cycle = rtrh_adc_cycle;
-    if (cycle >= RTRH_ADC_CYCLES) {
+    /*
+     * Freeze RT/RH digital IRQs while the ADC owns these pads. The normal
+     * I2C/CO2 interrupts on GPIO39/40 are untouched.
+     */
+    gpio_intr_disable(PIN_RTRH0);
+    gpio_intr_disable(PIN_RTRH1);
+    gpio_intr_disable(PIN_RTRH2);
+    gpio_intr_disable(PIN_RTRH3);
+    rtrh_irqs_suspended = true;
+
+    const uint32_t reference_edge = rtrh_adc_edge_us;
+
+    if (!configure_rtrh_pins_for_adc()) {
+      ESP_LOGW(TAG, "RT/RH ADC burst aborted: no ADC channels configured");
       rtrh_adc_pending = false;
+      rtrh_adc_active = false;
+      restore_rtrh_digital_inputs();
       continue;
     }
 
-    const uint16_t offset =
-        RTRH_ADC_OFFSETS_US[cycle % RTRH_ADC_PHASES];
+    /*
+     * Channel configuration itself costs some time. Move to the next future
+     * 77-us period boundary relative to the captured GPIO10 falling edge, plus
+     * one guard period. This keeps all requested offsets in the future.
+     */
+    uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+    uint32_t elapsed = static_cast<uint32_t>(now - reference_edge);
+    uint32_t skip_periods = elapsed / RTRH_ADC_PERIOD_US + 2U;
+    uint32_t base_edge =
+        static_cast<uint32_t>(
+            reference_edge + skip_periods * RTRH_ADC_PERIOD_US);
 
-    const uint32_t target =
-        static_cast<uint32_t>(rtrh_adc_edge_us + offset);
+    for (uint16_t cycle = 0; cycle < RTRH_ADC_CYCLES; cycle++) {
+      const uint16_t offset =
+          RTRH_ADC_OFFSETS_US[cycle % RTRH_ADC_PHASES];
 
-    // This task only runs for a few milliseconds once per sensor burst.
-    // Busy-waiting here gives much better phase repeatability than vTaskDelay.
-    while (static_cast<int32_t>(
-               target - static_cast<uint32_t>(esp_timer_get_time())) > 0) {
-      // intentional short spin
-    }
+      const uint32_t target =
+          static_cast<uint32_t>(
+              base_edge +
+              static_cast<uint32_t>(cycle) * RTRH_ADC_PERIOD_US +
+              offset);
 
-    RtRhAdcRow &row = rtrh_adc_rows[cycle];
-    row.cycle = cycle;
-    row.offset_us = offset;
+      while (static_cast<int32_t>(
+                 target -
+                 static_cast<uint32_t>(esp_timer_get_time())) > 0) {
+        // intentional short spin; burst lasts only about 2.5 ms
+      }
 
-    const uint32_t actual =
-        static_cast<uint32_t>(esp_timer_get_time());
+      RtRhAdcRow &row = rtrh_adc_rows[cycle];
+      row.cycle = cycle;
+      row.offset_us = offset;
 
-    int32_t late = static_cast<int32_t>(actual - target);
-    if (late > INT16_MAX)
-      late = INT16_MAX;
-    if (late < INT16_MIN)
-      late = INT16_MIN;
+      const uint32_t actual =
+          static_cast<uint32_t>(esp_timer_get_time());
 
-    row.lateness_us = static_cast<int16_t>(late);
-    row.valid_mask = 0;
+      int32_t late = static_cast<int32_t>(actual - target);
+      if (late > INT16_MAX)
+        late = INT16_MAX;
+      if (late < INT16_MIN)
+        late = INT16_MIN;
 
-    for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
-      row.raw[i] = 0;
+      row.lateness_us = static_cast<int16_t>(late);
+      row.valid_mask = 0;
 
-      const RtRhAdcChannel &ch = rtrh_adc_channels[i];
-      if (!ch.configured)
-        continue;
+      for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
+        row.raw[i] = 0;
 
-      adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
-      if (handle == nullptr)
-        continue;
+        const RtRhAdcChannel &ch = rtrh_adc_channels[i];
+        if (!ch.configured)
+          continue;
 
-      int raw = 0;
-      if (adc_oneshot_read(handle, ch.channel, &raw) != ESP_OK)
-        continue;
+        adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
+        if (handle == nullptr)
+          continue;
 
-      if (raw < 0)
-        raw = 0;
-      if (raw > 65535)
-        raw = 65535;
+        int raw = 0;
+        if (adc_oneshot_read(handle, ch.channel, &raw) != ESP_OK)
+          continue;
 
-      row.raw[i] = static_cast<uint16_t>(raw);
-      row.valid_mask |= static_cast<uint8_t>(1U << i);
+        if (raw < 0)
+          raw = 0;
+        if (raw > 65535)
+          raw = 65535;
+
+        row.raw[i] = static_cast<uint16_t>(raw);
+        row.valid_mask |= static_cast<uint8_t>(1U << i);
+      }
     }
 
     rtrh_adc_pending = false;
+    rtrh_adc_active = false;
+    rtrh_adc_ready = true;
+    rtrh_adc_cycle = RTRH_ADC_CYCLES;
+    rtrh_adc_sequence++;
 
-    const uint16_t next_cycle = static_cast<uint16_t>(cycle + 1);
-    rtrh_adc_cycle = next_cycle;
-
-    if (next_cycle >= RTRH_ADC_CYCLES) {
-      rtrh_adc_active = false;
-      rtrh_adc_ready = true;
-      rtrh_adc_sequence++;
-    }
+    restore_rtrh_digital_inputs();
   }
 }
 
@@ -1207,30 +1282,22 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   const uint8_t previous = rtrh_last_value;
   rtrh_last_value = value;
 
-  // GPIO10 falling is the phase reference for the ADC probe.
-  if ((previous & 0x01) && !(value & 0x01) && !rtrh_adc_ready) {
-    if (!rtrh_adc_active) {
-      rtrh_adc_active = true;
-      rtrh_adc_cycle = 0;
-      rtrh_adc_missed_edges = 0;
-    }
+  // First GPIO10 falling edge starts one short phase-synchronous ADC burst.
+  if ((previous & 0x01) && !(value & 0x01) &&
+      !rtrh_adc_ready && !rtrh_adc_active && !rtrh_adc_pending) {
+    rtrh_adc_active = true;
+    rtrh_adc_cycle = 0;
+    rtrh_adc_missed_edges = 0;
+    rtrh_adc_edge_us = now;
+    rtrh_adc_pending = true;
 
-    if (rtrh_adc_cycle < RTRH_ADC_CYCLES) {
-      if (!rtrh_adc_pending) {
-        rtrh_adc_edge_us = now;
-        rtrh_adc_pending = true;
-
-        if (rtrh_adc_task_handle != nullptr) {
-          BaseType_t higher_priority_woken = pdFALSE;
-          vTaskNotifyGiveFromISR(
-              rtrh_adc_task_handle,
-              &higher_priority_woken);
-          if (higher_priority_woken)
-            portYIELD_FROM_ISR();
-        }
-      } else {
-        rtrh_adc_missed_edges++;
-      }
+    if (rtrh_adc_task_handle != nullptr) {
+      BaseType_t higher_priority_woken = pdFALSE;
+      vTaskNotifyGiveFromISR(
+          rtrh_adc_task_handle,
+          &higher_priority_woken);
+      if (higher_priority_woken)
+        portYIELD_FROM_ISR();
     }
   }
 
@@ -1687,10 +1754,10 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH phase ADC ready: %u cycles, sequence %lu, missed=%lu",
+        "RT/RH phase ADC ready: %u cycles @ %lu us, sequence %lu",
         RTRH_ADC_CYCLES,
-        static_cast<unsigned long>(rtrh_adc_sequence),
-        static_cast<unsigned long>(rtrh_adc_missed_edges));
+        static_cast<unsigned long>(RTRH_ADC_PERIOD_US),
+        static_cast<unsigned long>(rtrh_adc_sequence));
 
     for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
       uint64_t sum[RTRH_ADC_CHANNELS] = {};
@@ -1722,7 +1789,7 @@ void BusSniffer::loop()
   // Finalize RT/RH capture either on timeout or on buffer overflow.
   // Crucially, disable the four GPIO interrupts while the frozen capture waits
   // for download. Otherwise these very active lines can generate ~40k ISR/s.
-  if (rtrh_capture_ready && !rtrh_irqs_suspended) {
+  if (rtrh_capture_ready && !rtrh_irqs_suspended && !rtrh_adc_active) {
     suspend_rtrh_irqs();
 
     ESP_LOGI(
