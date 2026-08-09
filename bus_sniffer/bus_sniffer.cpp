@@ -9,6 +9,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
 
 #include <climits>
 #include <cstdio>
@@ -944,6 +945,161 @@ static uint32_t next_probe_sample_us = 0;
 static uint32_t next_probe_publish_us = 0;
 
 
+/*
+ * ============================================================================
+ * High-speed analog trigger capture
+ * ============================================================================
+ *
+ * A dedicated FreeRTOS task samples GPIO10..13 at roughly 1 kHz per channel.
+ * When any valid ADC reading rises above ANALOG_TRIGGER_RAW, the ring buffer is
+ * frozen after a post-trigger interval.  The finished waveform remains
+ * available as CSV at /analog_capture.csv while acquisition immediately
+ * rearms for the next measurement burst.
+ */
+
+static constexpr uint32_t ANALOG_SAMPLE_PERIOD_US = 1000;
+static constexpr uint16_t ANALOG_RING_SAMPLES = 4096;
+static constexpr uint16_t ANALOG_PRETRIGGER_SAMPLES = 500;
+static constexpr uint16_t ANALOG_POSTTRIGGER_SAMPLES = 3000;
+static constexpr int ANALOG_TRIGGER_RAW = 100;
+static constexpr uint16_t ANALOG_REARM_QUIET_SAMPLES = 250;
+
+struct AnalogSample {
+  uint32_t t;
+  uint16_t raw[PROBE_COUNT];
+  uint8_t valid_mask;
+};
+
+static AnalogSample analog_ring[ANALOG_RING_SAMPLES];
+static AnalogSample analog_capture[ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES];
+
+static volatile uint16_t analog_write_index = 0;
+static volatile uint32_t analog_total_samples = 0;
+static volatile bool analog_triggered = false;
+static volatile uint16_t analog_trigger_index = 0;
+static volatile uint16_t analog_post_remaining = 0;
+static volatile bool analog_armed = true;
+static volatile uint16_t analog_quiet_samples = 0;
+
+static uint16_t analog_capture_count = 0;
+static uint32_t analog_capture_sequence = 0;
+static SemaphoreHandle_t analog_capture_mutex = nullptr;
+static TaskHandle_t analog_capture_task_handle = nullptr;
+static esp_timer_handle_t analog_sample_timer = nullptr;
+
+static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit);
+
+
+static void analog_snapshot_capture()
+{
+  const uint16_t wanted =
+      ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES;
+
+  uint16_t available = ANALOG_RING_SAMPLES;
+  if (analog_total_samples < ANALOG_RING_SAMPLES)
+    available = static_cast<uint16_t>(analog_total_samples);
+
+  uint16_t count = wanted;
+  if (count > available)
+    count = available;
+
+  // The newest sample is the one immediately before analog_write_index.
+  uint16_t start = static_cast<uint16_t>(
+      (analog_write_index + ANALOG_RING_SAMPLES - count) % ANALOG_RING_SAMPLES);
+
+  if (analog_capture_mutex != nullptr &&
+      xSemaphoreTake(analog_capture_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    for (uint16_t i = 0; i < count; i++) {
+      analog_capture[i] = analog_ring[(start + i) % ANALOG_RING_SAMPLES];
+    }
+    analog_capture_count = count;
+    analog_capture_sequence++;
+    xSemaphoreGive(analog_capture_mutex);
+  }
+}
+
+
+static void analog_capture_task(void *arg)
+{
+  while (true) {
+    // Woken by an esp_timer at 1 kHz, independent of the FreeRTOS tick rate.
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    AnalogSample sample{};
+    sample.t = static_cast<uint32_t>(esp_timer_get_time());
+
+    bool above_trigger = false;
+
+    for (uint8_t i = 0; i < PROBE_COUNT; i++) {
+      ProbeState &state = probe_states[i];
+      if (!state.configured)
+        continue;
+
+      adc_oneshot_unit_handle_t handle = probe_handle_for_unit(state.unit);
+      if (handle == nullptr)
+        continue;
+
+      int raw = 0;
+      if (adc_oneshot_read(handle, state.channel, &raw) != ESP_OK)
+        continue;
+
+      if (raw < 0)
+        raw = 0;
+      if (raw > 65535)
+        raw = 65535;
+
+      sample.raw[i] = static_cast<uint16_t>(raw);
+      sample.valid_mask |= static_cast<uint8_t>(1U << i);
+
+      if (raw > ANALOG_TRIGGER_RAW)
+        above_trigger = true;
+    }
+
+    const uint16_t this_index = analog_write_index;
+    analog_ring[this_index] = sample;
+    analog_write_index = static_cast<uint16_t>((this_index + 1) % ANALOG_RING_SAMPLES);
+    analog_total_samples++;
+
+    if (analog_armed && !analog_triggered && above_trigger) {
+      analog_triggered = true;
+      analog_trigger_index = this_index;
+      analog_post_remaining = ANALOG_POSTTRIGGER_SAMPLES;
+      analog_armed = false;
+      analog_quiet_samples = 0;
+      ESP_LOGI(TAG, "Analog trigger detected");
+    } else if (analog_triggered) {
+      if (analog_post_remaining > 0)
+        analog_post_remaining--;
+
+      if (analog_post_remaining == 0) {
+        analog_triggered = false;
+        analog_snapshot_capture();
+        ESP_LOGI(
+            TAG,
+            "Analog capture ready: %u samples, sequence %lu",
+            analog_capture_count,
+            static_cast<unsigned long>(analog_capture_sequence));
+      }
+    } else if (!analog_armed) {
+      if (above_trigger) {
+        analog_quiet_samples = 0;
+      } else if (++analog_quiet_samples >= ANALOG_REARM_QUIET_SAMPLES) {
+        analog_armed = true;
+        analog_quiet_samples = 0;
+        ESP_LOGD(TAG, "Analog trigger rearmed");
+      }
+    }
+
+  }
+}
+
+
+static void analog_sample_timer_callback(void *arg)
+{
+  if (analog_capture_task_handle != nullptr)
+    xTaskNotifyGive(analog_capture_task_handle);
+}
+
+
 static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit)
 {
   return unit == ADC_UNIT_1 ? adc1_handle : adc2_handle;
@@ -1154,6 +1310,81 @@ void BusSniffer::publish_adc_probes_()
 }
 
 
+
+/*
+ * ============================================================================
+ * HTTP /analog_capture.csv
+ * ============================================================================
+ */
+
+class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
+ public:
+  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
+  {
+    if (request->method() != HTTP_GET)
+      return false;
+
+    char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    return request->url_to(url) == "/analog_capture.csv";
+  }
+
+  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
+  {
+    if (analog_capture_mutex == nullptr ||
+        xSemaphoreTake(analog_capture_mutex, pdMS_TO_TICKS(200)) != pdTRUE) {
+      request->send(503, "text/plain", "capture busy");
+      return;
+    }
+
+    const uint16_t count = analog_capture_count;
+    const uint32_t sequence = analog_capture_sequence;
+
+    if (count == 0) {
+      xSemaphoreGive(analog_capture_mutex);
+      request->send(204, "text/plain", nullptr);
+      return;
+    }
+
+    std::string output;
+    output.reserve(static_cast<size_t>(count) * 42 + 128);
+    output += "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask\n";
+
+    const uint32_t base = analog_capture[0].t;
+    char line[128];
+
+    for (uint16_t i = 0; i < count; i++) {
+      const AnalogSample &sample = analog_capture[i];
+      const uint32_t rel = static_cast<uint32_t>(sample.t - base);
+
+      const int n = snprintf(
+          line,
+          sizeof(line),
+          "%lu,%lu,%u,%u,%u,%u,0x%02X\n",
+          static_cast<unsigned long>(sequence),
+          static_cast<unsigned long>(rel),
+          sample.raw[0],
+          sample.raw[1],
+          sample.raw[2],
+          sample.raw[3],
+          sample.valid_mask);
+
+      if (n > 0)
+        output.append(line, static_cast<size_t>(n));
+    }
+
+    xSemaphoreGive(analog_capture_mutex);
+
+    auto *response = request->beginResponse(200, "text/csv", output);
+    response->addHeader(
+        "Content-Disposition",
+        "attachment; filename=\"analog_capture.csv\"");
+    request->send(response);
+  }
+};
+
+static AnalogCaptureHandler analog_capture_handler;
+
+
 /*
  * ============================================================================
  * Setup
@@ -1167,6 +1398,46 @@ void BusSniffer::setup()
 
 
   setup_adc_probes();
+
+  analog_capture_mutex = xSemaphoreCreateMutex();
+
+  if (analog_capture_mutex == nullptr) {
+    ESP_LOGE(TAG, "Failed to create analog capture mutex");
+  } else {
+    const BaseType_t task_result = xTaskCreate(
+        analog_capture_task,
+        "analog_capture",
+        4096,
+        nullptr,
+        1,
+        &analog_capture_task_handle);
+
+    if (task_result != pdPASS) {
+      analog_capture_task_handle = nullptr;
+      ESP_LOGE(TAG, "Failed to start analog capture task");
+    } else {
+      esp_timer_create_args_t timer_args = {};
+      timer_args.callback = &analog_sample_timer_callback;
+      timer_args.arg = nullptr;
+      timer_args.dispatch_method = ESP_TIMER_TASK;
+      timer_args.name = "analog_sample";
+
+      esp_err_t timer_err = esp_timer_create(&timer_args, &analog_sample_timer);
+      if (timer_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create analog sample timer: %s", esp_err_to_name(timer_err));
+      } else {
+        timer_err = esp_timer_start_periodic(analog_sample_timer, ANALOG_SAMPLE_PERIOD_US);
+        if (timer_err != ESP_OK) {
+          ESP_LOGE(TAG, "Failed to start analog sample timer: %s", esp_err_to_name(timer_err));
+        } else {
+          ESP_LOGI(
+              TAG,
+              "Analog trigger capture: GPIO10..13 @ 1 kHz, trigger raw>%d",
+              ANALOG_TRIGGER_RAW);
+        }
+      }
+    }
+  }
 
 
   gpio_config_t io = {};
@@ -1309,6 +1580,9 @@ void BusSniffer::setup()
             &capture_handler
         );
 
+    web_server_base::global_web_server_base->add_handler(
+        &analog_capture_handler);
+
   } else {
 
     ESP_LOGW(
@@ -1343,7 +1617,7 @@ void BusSniffer::setup()
 
   ESP_LOGD(
       TAG,
-      "Raw captures available at /capture"
+      "Raw captures available at /capture; analog at /analog_capture.csv"
   );
 }
 
