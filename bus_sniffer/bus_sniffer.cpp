@@ -1004,6 +1004,10 @@ static volatile uint32_t rtrh_adc_missed_edges = 0;
 static volatile uint32_t rtrh_adc_reference_edge_us = 0;
 static volatile uint8_t rtrh_adc_edges_to_skip = 0;
 static volatile bool rtrh_adc_waiting_for_edge = false;
+static volatile int8_t rtrh_adc_target_index = -1;
+static volatile int8_t rtrh_adc_trigger_index = -1;
+static volatile bool rtrh_adc_sequence_start = false;
+static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
 
 static TaskHandle_t rtrh_adc_task_handle = nullptr;
 
@@ -1033,6 +1037,9 @@ static void reset_rtrh_adc_capture()
   rtrh_adc_reference_edge_us = 0;
   rtrh_adc_edges_to_skip = 0;
   rtrh_adc_waiting_for_edge = false;
+  rtrh_adc_target_index = -1;
+  rtrh_adc_trigger_index = -1;
+  rtrh_adc_sequence_start = false;
 }
 
 static void setup_rtrh_adc()
@@ -1090,39 +1097,68 @@ static void setup_rtrh_adc()
   }
 }
 
-static bool configure_rtrh_pins_for_adc()
+static bool configure_rtrh_pin_for_adc(uint8_t index)
 {
+  if (index >= RTRH_ADC_CHANNELS)
+    return false;
+
+  const RtRhAdcChannel &ch = rtrh_adc_channels[index];
+  if (!ch.configured)
+    return false;
+
+  adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
+  if (handle == nullptr)
+    return false;
+
   adc_oneshot_chan_cfg_t cfg = {};
   cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
   cfg.atten = ADC_ATTEN_DB_12;
 
-  bool any = false;
+  const esp_err_t err =
+      adc_oneshot_config_channel(handle, ch.channel, &cfg);
 
-  for (uint8_t i = 0; i < RTRH_ADC_CHANNELS; i++) {
-    const RtRhAdcChannel &ch = rtrh_adc_channels[i];
-    if (!ch.configured)
-      continue;
-
-    adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
-    if (handle == nullptr)
-      continue;
-
-    const esp_err_t err =
-        adc_oneshot_config_channel(handle, ch.channel, &cfg);
-
-    if (err != ESP_OK) {
-      ESP_LOGW(
-          TAG,
-          "RT/RH GPIO%d ADC config failed: %s",
-          RTRH_ADC_GPIOS[i],
-          esp_err_to_name(err));
-      continue;
-    }
-
-    any = true;
+  if (err != ESP_OK) {
+    ESP_LOGW(
+        TAG,
+        "RT/RH GPIO%d ADC config failed: %s",
+        RTRH_ADC_GPIOS[index],
+        esp_err_to_name(err));
+    return false;
   }
 
-  return any;
+  gpio_intr_disable(static_cast<gpio_num_t>(RTRH_ADC_GPIOS[index]));
+  return true;
+}
+
+static void restore_rtrh_pin_digital(uint8_t index)
+{
+  if (index >= RTRH_ADC_CHANNELS)
+    return;
+
+  const gpio_num_t pin =
+      static_cast<gpio_num_t>(RTRH_ADC_GPIOS[index]);
+
+  gpio_config_t io = {};
+  io.mode = GPIO_MODE_INPUT;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io.intr_type = GPIO_INTR_ANYEDGE;
+  io.pin_bit_mask = 1ULL << pin;
+
+  const esp_err_t err = gpio_config(&io);
+  if (err != ESP_OK) {
+    ESP_LOGE(
+        TAG,
+        "RT/RH GPIO%d digital restore failed: %s",
+        RTRH_ADC_GPIOS[index],
+        esp_err_to_name(err));
+    return;
+  }
+
+  rtrh_pin_level[index] =
+      static_cast<uint8_t>(gpio_get_level(pin));
+
+  gpio_intr_enable(pin);
 }
 
 static void restore_rtrh_digital_inputs()
@@ -1145,6 +1181,10 @@ static void restore_rtrh_digital_inputs()
   }
 
   rtrh_last_value = read_rtrh_state();
+  rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
+  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
+  rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
+  rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
   rtrh_irqs_suspended = false;
 }
 
@@ -1153,92 +1193,126 @@ static void rtrh_adc_task(void *arg)
   while (true) {
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    if (!rtrh_adc_pending || !rtrh_adc_active || rtrh_adc_ready)
-      continue;
-
     /*
-     * The first GPIO10 falling edge only wakes us. We then switch the pads
-     * briefly to ADC mode, take exactly ONE conversion, restore digital mode,
-     * and wait for another real GPIO10 falling edge. Every measurement is
-     * therefore phase-locked to a real edge; there is no synthetic 76/77-us
-     * period assumption and no accumulated phase drift.
+     * First notification starts the sequence. All later notifications are
+     * real falling edges from the currently selected digital trigger pin.
      */
-
-    const uint16_t sample_index = rtrh_adc_cycle;
-    if (sample_index >= RTRH_ADC_SAMPLES) {
-      rtrh_adc_pending = false;
-      rtrh_adc_active = false;
-      rtrh_adc_ready = true;
-      rtrh_adc_sequence++;
+    if (rtrh_adc_sequence_start) {
+      rtrh_adc_sequence_start = false;
+    } else if (!rtrh_adc_pending) {
       continue;
     }
 
-    const uint8_t repeat =
-        static_cast<uint8_t>(
-            sample_index /
-            (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
+    while (rtrh_adc_active && !rtrh_adc_ready) {
+      const uint16_t sample_index = rtrh_adc_cycle;
 
-    const uint8_t within_repeat =
-        static_cast<uint8_t>(
-            sample_index %
-            (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
+      if (sample_index >= RTRH_ADC_SAMPLES) {
+        rtrh_adc_active = false;
+        rtrh_adc_ready = true;
+        rtrh_adc_sequence++;
+        rtrh_adc_waiting_for_edge = false;
+        rtrh_adc_target_index = -1;
+        rtrh_adc_trigger_index = -1;
+        break;
+      }
 
-    const uint8_t phase =
-        static_cast<uint8_t>(
-            within_repeat / RTRH_ADC_CHANNELS);
+      const uint8_t repeat =
+          static_cast<uint8_t>(
+              sample_index /
+              (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
 
-    const uint8_t channel =
-        static_cast<uint8_t>(
-            within_repeat % RTRH_ADC_CHANNELS);
+      const uint8_t within_repeat =
+          static_cast<uint8_t>(
+              sample_index %
+              (RTRH_ADC_PHASES * RTRH_ADC_CHANNELS));
 
-    const uint16_t offset = RTRH_ADC_OFFSETS_US[phase];
-    const uint32_t edge = rtrh_adc_reference_edge_us;
+      const uint8_t phase =
+          static_cast<uint8_t>(
+              within_repeat / RTRH_ADC_CHANNELS);
 
-    // Disable RT/RH IRQs only while ADC owns the pads.
-    gpio_intr_disable(PIN_RTRH0);
-    gpio_intr_disable(PIN_RTRH1);
-    gpio_intr_disable(PIN_RTRH2);
-    gpio_intr_disable(PIN_RTRH3);
-    rtrh_irqs_suspended = true;
+      const uint8_t channel =
+          static_cast<uint8_t>(
+              within_repeat % RTRH_ADC_CHANNELS);
 
-    RtRhAdcRow &row = rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
-    row.repeat = repeat;
-    row.phase = phase;
-    row.channel = channel;
-    row.offset_us = offset;
-    row.raw = 0;
-    row.valid = 0;
+      const uint16_t offset = RTRH_ADC_OFFSETS_US[phase];
 
-    if (!configure_rtrh_pins_for_adc()) {
-      ESP_LOGW(TAG, "RT/RH ADC sample aborted: ADC config failed");
-      row.lateness_us = INT16_MAX;
+      /*
+       * Prepare ONLY the target pad for ADC before the timing reference.
+       * A different, still-digital line supplies the falling-edge trigger.
+       *
+       * GPIO10 target -> trigger on GPIO11
+       * GPIO11/12/13 target -> trigger on GPIO10
+       */
+      rtrh_adc_target_index = static_cast<int8_t>(channel);
+      rtrh_adc_trigger_index =
+          static_cast<int8_t>(channel == 0 ? 1 : 0);
+
+      if (!configure_rtrh_pin_for_adc(channel)) {
+        RtRhAdcRow &row =
+            rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
+        row.repeat = repeat;
+        row.phase = phase;
+        row.channel = channel;
+        row.offset_us = offset;
+        row.lateness_us = INT16_MAX;
+        row.raw = 0;
+        row.valid = 0;
+
+        rtrh_adc_cycle =
+            static_cast<uint16_t>(sample_index + 1);
+        continue;
+      }
+
+      /*
+       * Give the ADC/pad setup several complete sensor periods to settle.
+       * The ISR counts REAL falling edges on the selected trigger line.
+       */
+      rtrh_adc_edges_to_skip = RTRH_ADC_SKIP_EDGES;
       rtrh_adc_pending = false;
-      rtrh_adc_active = false;
-      restore_rtrh_digital_inputs();
-      continue;
-    }
+      rtrh_adc_waiting_for_edge = true;
 
-    const uint32_t target =
-        static_cast<uint32_t>(edge + offset);
+      /*
+       * Sleep until ISR captures the selected real falling edge.
+       */
+      ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    while (static_cast<int32_t>(
-               target - static_cast<uint32_t>(esp_timer_get_time())) > 0) {
-      // intentional short spin
-    }
+      if (!rtrh_adc_pending || !rtrh_adc_active) {
+        restore_rtrh_pin_digital(channel);
+        continue;
+      }
 
-    const uint32_t actual =
-        static_cast<uint32_t>(esp_timer_get_time());
+      const uint32_t edge = rtrh_adc_reference_edge_us;
+      const uint32_t target =
+          static_cast<uint32_t>(edge + offset);
 
-    int32_t late = static_cast<int32_t>(actual - target);
-    if (late > INT16_MAX)
-      late = INT16_MAX;
-    if (late < INT16_MIN)
-      late = INT16_MIN;
+      while (static_cast<int32_t>(
+                 target -
+                 static_cast<uint32_t>(esp_timer_get_time())) > 0) {
+        // intentional short spin
+      }
 
-    row.lateness_us = static_cast<int16_t>(late);
+      RtRhAdcRow &row =
+          rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
 
-    const RtRhAdcChannel &ch = rtrh_adc_channels[channel];
-    if (ch.configured) {
+      row.repeat = repeat;
+      row.phase = phase;
+      row.channel = channel;
+      row.offset_us = offset;
+      row.raw = 0;
+      row.valid = 0;
+
+      const uint32_t actual =
+          static_cast<uint32_t>(esp_timer_get_time());
+
+      int32_t late = static_cast<int32_t>(actual - target);
+      if (late > INT16_MAX)
+        late = INT16_MAX;
+      if (late < INT16_MIN)
+        late = INT16_MIN;
+
+      row.lateness_us = static_cast<int16_t>(late);
+
+      const RtRhAdcChannel &ch = rtrh_adc_channels[channel];
       adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
 
       if (handle != nullptr) {
@@ -1253,23 +1327,17 @@ static void rtrh_adc_task(void *arg)
           row.valid = 1;
         }
       }
-    }
 
-    // Restore GPIO edge capture before waiting for the next real reference.
-    restore_rtrh_digital_inputs();
+      /*
+       * Return the measured pin to ordinary digital input immediately.
+       * The next iteration can then choose another target/trigger pair.
+       */
+      restore_rtrh_pin_digital(channel);
 
-    rtrh_adc_pending = false;
-    rtrh_adc_cycle =
-        static_cast<uint16_t>(sample_index + 1);
-
-    if (rtrh_adc_cycle >= RTRH_ADC_SAMPLES) {
-      rtrh_adc_active = false;
-      rtrh_adc_ready = true;
-      rtrh_adc_sequence++;
+      rtrh_adc_pending = false;
       rtrh_adc_waiting_for_edge = false;
-    } else {
-      rtrh_adc_edges_to_skip = RTRH_ADC_SKIP_EDGES;
-      rtrh_adc_waiting_for_edge = true;
+      rtrh_adc_cycle =
+          static_cast<uint16_t>(sample_index + 1);
     }
   }
 }
@@ -1300,50 +1368,98 @@ static void resume_rtrh_irqs()
 
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 {
+  const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
+  if (encoded < 1 || encoded > 4)
+    return;
+
+  const uint8_t pin_index =
+      static_cast<uint8_t>(encoded - 1);
+
+  const gpio_num_t pin =
+      static_cast<gpio_num_t>(RTRH_ADC_GPIOS[pin_index]);
+
+  const uint8_t level =
+      static_cast<uint8_t>(gpio_get_level(pin));
+
+  const uint8_t previous =
+      rtrh_pin_level[pin_index];
+
+  if (level == previous)
+    return;
+
+  rtrh_pin_level[pin_index] = level;
+
+  const uint32_t now =
+      static_cast<uint32_t>(esp_timer_get_time());
+
+  /*
+   * Start one ADC sequence from the first observed GPIO10 falling edge.
+   * The task then pre-arms each target channel BEFORE waiting for its own
+   * timing reference edge.
+   */
+  if (!rtrh_adc_ready && !rtrh_adc_active &&
+      pin_index == 0 && previous && !level) {
+    rtrh_adc_active = true;
+    rtrh_adc_cycle = 0;
+    rtrh_adc_missed_edges = 0;
+    rtrh_adc_sequence_start = true;
+
+    if (rtrh_adc_task_handle != nullptr) {
+      BaseType_t higher_priority_woken = pdFALSE;
+      vTaskNotifyGiveFromISR(
+          rtrh_adc_task_handle,
+          &higher_priority_woken);
+      if (higher_priority_woken)
+        portYIELD_FROM_ISR();
+    }
+  }
+
+  /*
+   * Once a target ADC pad has been prepared, only the selected other pin is
+   * used as timing reference. Falling edges are counted in hardware time.
+   */
+  if (rtrh_adc_active &&
+      rtrh_adc_waiting_for_edge &&
+      !rtrh_adc_pending &&
+      pin_index == static_cast<uint8_t>(rtrh_adc_trigger_index) &&
+      previous && !level) {
+
+    if (rtrh_adc_edges_to_skip > 0) {
+      rtrh_adc_edges_to_skip--;
+    } else {
+      rtrh_adc_reference_edge_us = now;
+      rtrh_adc_pending = true;
+      rtrh_adc_waiting_for_edge = false;
+
+      if (rtrh_adc_task_handle != nullptr) {
+        BaseType_t higher_priority_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(
+            rtrh_adc_task_handle,
+            &higher_priority_woken);
+        if (higher_priority_woken)
+          portYIELD_FROM_ISR();
+      }
+    }
+  }
+
+  /*
+   * Don't try to build a four-line digital state trace while one of those
+   * four pads is intentionally in analog mode. The earlier digital captures
+   * have already characterized the ~13 kHz waveform; ADC timing is the goal
+   * during this acquisition.
+   */
+  if (rtrh_adc_active)
+    return;
+
   if (rtrh_capture_ready)
     return;
 
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   const uint8_t value = read_rtrh_state();
 
   if (value == rtrh_last_value)
     return;
 
-  const uint8_t previous = rtrh_last_value;
   rtrh_last_value = value;
-
-  // Every ADC sample is synchronized to a REAL GPIO10 falling edge.
-  if ((previous & 0x01) && !(value & 0x01) && !rtrh_adc_ready) {
-    if (!rtrh_adc_active) {
-      rtrh_adc_active = true;
-      rtrh_adc_cycle = 0;
-      rtrh_adc_missed_edges = 0;
-      rtrh_adc_edges_to_skip = 0;
-      rtrh_adc_waiting_for_edge = true;
-    }
-
-    if (rtrh_adc_waiting_for_edge &&
-        !rtrh_adc_pending &&
-        rtrh_adc_cycle < RTRH_ADC_SAMPLES) {
-
-      if (rtrh_adc_edges_to_skip > 0) {
-        rtrh_adc_edges_to_skip--;
-      } else {
-        rtrh_adc_reference_edge_us = now;
-        rtrh_adc_pending = true;
-        rtrh_adc_waiting_for_edge = false;
-
-        if (rtrh_adc_task_handle != nullptr) {
-          BaseType_t higher_priority_woken = pdFALSE;
-          vTaskNotifyGiveFromISR(
-              rtrh_adc_task_handle,
-              &higher_priority_woken);
-          if (higher_priority_woken)
-            portYIELD_FROM_ISR();
-        }
-      }
-    }
-  }
 
   if (!rtrh_capturing) {
     rtrh_capturing = true;
@@ -1361,7 +1477,8 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
     return;
   }
 
-  rtrh_samples[index].t_us = static_cast<uint32_t>(now - rtrh_start_us);
+  rtrh_samples[index].t_us =
+      static_cast<uint32_t>(now - rtrh_start_us);
   rtrh_samples[index].value = value;
   rtrh_sample_count = index + 1;
 }
@@ -1635,6 +1752,10 @@ void BusSniffer::setup()
       last_value;
 
   rtrh_last_value = read_rtrh_state();
+  rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
+  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
+  rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
+  rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
 
   setup_rtrh_adc();
   reset_rtrh_adc_capture();
@@ -1719,8 +1840,12 @@ void BusSniffer::setup()
   static constexpr gpio_num_t RTRH_PINS[] = {
       PIN_RTRH0, PIN_RTRH1, PIN_RTRH2, PIN_RTRH3};
 
-  for (gpio_num_t pin : RTRH_PINS) {
-    err = gpio_isr_handler_add(pin, rtrh_gpio_isr, nullptr);
+  for (uint8_t i = 0; i < 4; i++) {
+    const gpio_num_t pin = RTRH_PINS[i];
+    err = gpio_isr_handler_add(
+        pin,
+        rtrh_gpio_isr,
+        reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "RT/RH ISR GPIO%d failed: %d", static_cast<int>(pin), err);
       return;
@@ -1796,7 +1921,7 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH edge-synced ADC ready: %u samples, sequence %lu",
+        "RT/RH pre-armed ADC ready: %u samples, sequence %lu",
         RTRH_ADC_SAMPLES,
         static_cast<unsigned long>(rtrh_adc_sequence));
 
