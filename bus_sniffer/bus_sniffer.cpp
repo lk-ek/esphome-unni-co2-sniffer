@@ -990,13 +990,11 @@ static constexpr uint32_t RTRH_SHORT_MAX_US = 100;
 static constexpr uint32_t RTRH_LONG_MIN_US = 115;
 static constexpr uint32_t RTRH_LONG_MAX_US = 175;
 
-// Empirical calibration from the combined 2026-08-09 heat/cool + RH series.
-// The NTC/RC relation is measurably nonlinear over the observed range, so use
-// the quadratic fit instead of the earlier linear approximation:
-//   T[degC] = A*t^2 + B*t + C, t = LONG period in us.
-static constexpr float RTRH_TEMP_A = 0.00595169f;
-static constexpr float RTRH_TEMP_B = -2.025624f;
-static constexpr float RTRH_TEMP_C = 194.833723f;
+// Preliminary calibration for completely passive LONG timing.
+// T[°C] = M * LONG_period_us + C
+static constexpr float RTRH_TEMP_M = -0.4163213f;
+static constexpr float RTRH_TEMP_C = 84.38101f;
+
 static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
@@ -1016,7 +1014,10 @@ static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
  * allowed for the burst.  This prevents ADC pad reconfiguration from biasing
  * the timing values used for RT/RH decoding.
  */
-static constexpr uint32_t RTRH_PASSIVE_QUIET_US = 100000;
+// The physical RT/RH conversion contains an occasional >100 ms pause
+// inside the LONG section.  Use 1 s as end-of-burst silence; measurements
+// themselves are ~30 s apart, so this still leaves a very large margin.
+static constexpr uint32_t RTRH_PASSIVE_QUIET_US = 10000000;
 static constexpr uint8_t RTRH_PASSIVE_LOCK_CYCLES = 8;
 static constexpr uint8_t RTRH_PASSIVE_MAX_BLOCKS = 16;
 static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 8;  // d0..d6, d7plus
@@ -2641,6 +2642,21 @@ void BusSniffer::loop()
                     static_cast<float>(b.count)
               : 0.0f;
 
+      if (b.mode == RTRH_MODE_LONG && b.count >= 850 && b.count <= 1000) {
+  const float temperature_c =
+      RTRH_TEMP_M * period_mean + RTRH_TEMP_C;
+
+  ESP_LOGI(
+      TAG,
+      "RT temperature PASSIVE: %.2f C from LONG %.3f us (%u cycles)",
+      temperature_c,
+      period_mean,
+      static_cast<unsigned>(b.count));
+
+  if (this->rt_temperature_sensor_ != nullptr)
+    this->rt_temperature_sensor_->publish_state(temperature_c);
+}
+
       const float low_mean =
           b.count
               ? static_cast<float>(b.low_sum) /
@@ -2704,9 +2720,7 @@ void BusSniffer::loop()
           static_cast<float>(long_period_count);
 
       const float temperature_c =
-          RTRH_TEMP_A * long_period_us * long_period_us +
-          RTRH_TEMP_B * long_period_us +
-          RTRH_TEMP_C;
+	  RTRH_TEMP_C + RTRH_TEMP_M * long_period_us;
 
       ESP_LOGD(
           TAG,
