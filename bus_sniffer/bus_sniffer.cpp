@@ -1015,6 +1015,14 @@ static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
 static RtRhAdcAggregate
     rtrh_adc_agg[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
 
+// Independent last-completed ADC snapshot for HTTP.
+static RtRhAdcAggregate
+    rtrh_adc_snapshot[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
+static volatile bool rtrh_adc_snapshot_ready = false;
+static volatile bool rtrh_adc_snapshot_in_use = false;
+static volatile uint32_t rtrh_adc_snapshot_sequence = 0;
+static portMUX_TYPE rtrh_adc_snapshot_mux = portMUX_INITIALIZER_UNLOCKED;
+
 static volatile bool rtrh_adc_active = false;
 static volatile bool rtrh_adc_ready = false;
 static volatile bool rtrh_adc_pending = false;
@@ -1663,7 +1671,16 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
 
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
   {
-    if (!rtrh_adc_ready) {
+    bool have_snapshot = false;
+
+    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
+    if (rtrh_adc_snapshot_ready && !rtrh_adc_snapshot_in_use) {
+      rtrh_adc_snapshot_in_use = true;
+      have_snapshot = true;
+    }
+    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
+
+    if (!have_snapshot) {
       request->send(204, "text/plain", nullptr);
       return;
     }
@@ -1688,7 +1705,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     static char line[128];
     size_t used = 0;
 
-    const uint32_t sequence = rtrh_adc_sequence;
+    const uint32_t sequence = rtrh_adc_snapshot_sequence;
 
     for (uint8_t mode = 0; mode < RTRH_ADC_MODES && err == ESP_OK; mode++) {
       for (uint8_t phase = 0; phase < RTRH_ADC_PHASES && err == ESP_OK; phase++) {
@@ -1697,7 +1714,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
              channel++) {
 
           const RtRhAdcAggregate &agg =
-              rtrh_adc_agg[mode][phase][channel];
+              rtrh_adc_snapshot[mode][phase][channel];
 
           const uint32_t mean =
               agg.count ? agg.sum / agg.count : 0;
@@ -1753,11 +1770,12 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     if (err == ESP_OK)
       httpd_resp_send_chunk(req, nullptr, 0);
 
-    if (err == ESP_OK) {
-      reset_rtrh_adc_capture();
-    } else {
+    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
+    rtrh_adc_snapshot_in_use = false;
+    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
+
+    if (err != ESP_OK)
       ESP_LOGW(TAG, "rt_rh_adc.csv client disconnected (%d)", err);
-    }
   }
 };
 
@@ -2099,20 +2117,38 @@ void BusSniffer::loop()
             max_late);
       }
     }
+    // Preserve newest completed result for HTTP without blocking acquisition.
+    portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
+    if (!rtrh_adc_snapshot_in_use) {
+      memcpy(
+          rtrh_adc_snapshot,
+          rtrh_adc_agg,
+          sizeof(rtrh_adc_snapshot));
+      rtrh_adc_snapshot_sequence = rtrh_adc_sequence;
+      rtrh_adc_snapshot_ready = true;
+    }
+    portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
+
+    // Measurement state is independent of HTTP now.
+    reset_rtrh_adc_capture();
+
   }
 
-  // Finalize RT/RH capture either on timeout or on buffer overflow.
-  // Crucially, disable the four GPIO interrupts while the frozen capture waits
-  // for download. Otherwise these very active lines can generate ~40k ISR/s.
-  if (rtrh_capture_ready && !rtrh_irqs_suspended && !rtrh_adc_active) {
-    suspend_rtrh_irqs();
+  // A completed digital trace stays frozen for HTTP, but the GPIO IRQs stay
+  // enabled because the autonomous RT/RH timing/ADC engine uses the same edges.
+  if (rtrh_capture_ready && !rtrh_adc_active) {
+    static uint32_t last_reported_rtrh_sequence = UINT32_MAX;
 
-    ESP_LOGI(
-        TAG,
-        "RT/RH edge capture ready: %u events, sequence %lu%s",
-        rtrh_sample_count,
-        static_cast<unsigned long>(rtrh_sequence),
-        rtrh_overflow ? " OVERFLOW" : "");
+    if (last_reported_rtrh_sequence != rtrh_sequence) {
+      last_reported_rtrh_sequence = rtrh_sequence;
+
+      ESP_LOGI(
+          TAG,
+          "RT/RH edge capture ready: %u events, sequence %lu%s",
+          rtrh_sample_count,
+          static_cast<unsigned long>(rtrh_sequence),
+          rtrh_overflow ? " OVERFLOW" : "");
+    }
   }
 
   if (rtrh_capturing && !rtrh_capture_ready) {
@@ -2122,7 +2158,6 @@ void BusSniffer::loop()
       rtrh_capturing = false;
       rtrh_capture_ready = true;
       rtrh_sequence++;
-      suspend_rtrh_irqs();
 
       ESP_LOGI(
           TAG,
