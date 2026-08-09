@@ -921,7 +921,7 @@ static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_11;
 static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
-static constexpr uint32_t RTRH_CAPTURE_US = 500000;
+static constexpr uint32_t RTRH_CAPTURE_US = 75000;
 static constexpr uint16_t RTRH_MAX_SAMPLES = 4096;
 
 struct __attribute__((packed)) RtRhSample {
@@ -937,6 +937,7 @@ static volatile bool rtrh_capturing = false;
 static volatile bool rtrh_capture_ready = false;
 static volatile bool rtrh_overflow = false;
 static volatile uint32_t rtrh_sequence = 0;
+static volatile bool rtrh_irqs_suspended = false;
 
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
@@ -946,6 +947,30 @@ static inline uint8_t IRAM_ATTR read_rtrh_state()
   if (gpio_get_level(PIN_RTRH2)) value |= 0x04;
   if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
   return value;
+}
+
+static void suspend_rtrh_irqs()
+{
+  if (rtrh_irqs_suspended)
+    return;
+
+  gpio_intr_disable(PIN_RTRH0);
+  gpio_intr_disable(PIN_RTRH1);
+  gpio_intr_disable(PIN_RTRH2);
+  gpio_intr_disable(PIN_RTRH3);
+  rtrh_irqs_suspended = true;
+}
+
+static void resume_rtrh_irqs()
+{
+  rtrh_last_value = read_rtrh_state();
+
+  gpio_intr_enable(PIN_RTRH0);
+  gpio_intr_enable(PIN_RTRH1);
+  gpio_intr_enable(PIN_RTRH2);
+  gpio_intr_enable(PIN_RTRH3);
+
+  rtrh_irqs_suspended = false;
 }
 
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
@@ -1011,14 +1036,22 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
         "sequence,t_us,gpio10,gpio11,gpio12,gpio13,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
-    char line[128];
     const uint16_t count = rtrh_sample_count;
     const uint32_t sequence = rtrh_sequence;
     const bool overflow = rtrh_overflow;
 
+    // Batch many CSV rows into each TCP chunk. Sending one HTTP chunk per
+    // edge (~3000-4000 chunks) needlessly stresses lwIP on the ESP32-S2.
+    // Keep these buffers out of the small ESP-IDF HTTP server task stack.
+    // The previous 2 KiB automatic buffer caused vApplicationStackOverflowHook.
+    static char chunk[512];
+    static char line[96];
+    size_t used = 0;
+
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
       const uint32_t t = rtrh_samples[i].t_us;
       const uint8_t v = rtrh_samples[i].value;
+
       const int n = snprintf(
           line, sizeof(line),
           "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
@@ -1030,9 +1063,25 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
           (v & 0x08) ? 1U : 0U,
           v,
           overflow ? 1U : 0U);
-      if (n > 0)
-        err = httpd_resp_send_chunk(req, line, static_cast<size_t>(n));
+
+      if (n <= 0)
+        continue;
+
+      const size_t line_len = static_cast<size_t>(n);
+
+      if (used + line_len > sizeof(chunk)) {
+        err = httpd_resp_send_chunk(req, chunk, used);
+        used = 0;
+      }
+
+      if (err == ESP_OK && line_len <= sizeof(chunk)) {
+        memcpy(chunk + used, line, line_len);
+        used += line_len;
+      }
     }
+
+    if (err == ESP_OK && used != 0)
+      err = httpd_resp_send_chunk(req, chunk, used);
 
     if (err == ESP_OK)
       httpd_resp_send_chunk(req, nullptr, 0);
@@ -1042,7 +1091,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     rtrh_overflow = false;
     rtrh_capture_ready = false;
     rtrh_capturing = false;
-    rtrh_last_value = read_rtrh_state();
+    resume_rtrh_irqs();
 
     if (err != ESP_OK)
       ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
@@ -1273,12 +1322,29 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
+  // Finalize RT/RH capture either on timeout or on buffer overflow.
+  // Crucially, disable the four GPIO interrupts while the frozen capture waits
+  // for download. Otherwise these very active lines can generate ~40k ISR/s.
+  if (rtrh_capture_ready && !rtrh_irqs_suspended) {
+    suspend_rtrh_irqs();
+
+    ESP_LOGI(
+        TAG,
+        "RT/RH edge capture ready: %u events, sequence %lu%s",
+        rtrh_sample_count,
+        static_cast<unsigned long>(rtrh_sequence),
+        rtrh_overflow ? " OVERFLOW" : "");
+  }
+
   if (rtrh_capturing && !rtrh_capture_ready) {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+
     if (static_cast<uint32_t>(now - rtrh_start_us) >= RTRH_CAPTURE_US) {
       rtrh_capturing = false;
       rtrh_capture_ready = true;
       rtrh_sequence++;
+      suspend_rtrh_irqs();
+
       ESP_LOGI(
           TAG,
           "RT/RH edge capture ready: %u events, sequence %lu%s",
