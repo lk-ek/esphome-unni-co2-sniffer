@@ -924,7 +924,7 @@ static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
 static constexpr uint32_t RTRH_CAPTURE_US = 75000;
-static constexpr uint16_t RTRH_MAX_SAMPLES = 4096;
+static constexpr uint16_t RTRH_MAX_SAMPLES = 3584;
 
 struct __attribute__((packed)) RtRhSample {
   uint32_t t_us;
@@ -985,8 +985,8 @@ static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
 };
 
 struct RtRhAdcAggregate {
-  uint32_t sum{0};
-  uint32_t period_sum{0};
+  uint16_t sum{0};
+  uint16_t period_sum{0};
   uint16_t min{0xFFFF};
   uint16_t max{0};
   uint16_t count{0};
@@ -1588,8 +1588,8 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     // edge (~3000-4000 chunks) needlessly stresses lwIP on the ESP32-S2.
     // Keep these buffers out of the small ESP-IDF HTTP server task stack.
     // The previous 2 KiB automatic buffer caused vApplicationStackOverflowHook.
-    static char chunk[256];
-    static char line[96];
+    static char chunk[128];
+    static char line[80];
     size_t used = 0;
 
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
@@ -1678,8 +1678,8 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
-    static char chunk[256];
-    static char line[192];
+    static char chunk[128];
+    static char line[128];
     size_t used = 0;
 
     const uint32_t sequence = rtrh_adc_sequence;
