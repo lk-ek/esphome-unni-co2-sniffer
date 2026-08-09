@@ -996,6 +996,63 @@ static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
     12, 16, 20, 24
 };
+
+/*
+ * Passive timing probe.
+ *
+ * Before any GPIO is switched to ADC mode, observe a handful of completely
+ * untouched RT/RH cycles:
+ *
+ *   - GPIO10 falling-to-falling period -> SHORT/LONG classification
+ *   - GPIO10 rising -> GPIO13 rising delay -> passive RH threshold timing
+ *
+ * After enough SHORT and LONG cycles have been observed, one ADC sequence is
+ * allowed for the burst.  This prevents ADC pad reconfiguration from biasing
+ * the timing values used for RT/RH decoding.
+ */
+static constexpr uint32_t RTRH_PASSIVE_QUIET_US = 100000;
+static constexpr uint16_t RTRH_PASSIVE_MIN_SHORT = 8;
+static constexpr uint16_t RTRH_PASSIVE_MIN_LONG = 8;
+static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 32;
+
+struct RtRhPassiveSnapshot {
+  uint32_t long_period_sum{0};
+  uint16_t long_period_count{0};
+  uint32_t short_period_sum{0};
+  uint16_t short_period_count{0};
+
+  uint32_t short_g13_delay_sum{0};
+  uint16_t short_g13_delay_count{0};
+  uint16_t short_g13_delay_min{0xFFFF};
+  uint16_t short_g13_delay_max{0};
+  uint8_t short_g13_delay_hist[RTRH_PASSIVE_DELAY_BINS]{};
+
+  uint32_t sequence{0};
+};
+
+static volatile uint32_t rtrh_passive_last_any_us = 0;
+static volatile uint32_t rtrh_passive_last_g10_fall_us = 0;
+static volatile uint32_t rtrh_passive_g10_rise_us = 0;
+static volatile bool rtrh_passive_g13_delay_valid = false;
+static volatile uint16_t rtrh_passive_g13_delay_us = 0;
+static volatile bool rtrh_passive_collecting = false;
+static volatile bool rtrh_passive_current_finalized = false;
+static volatile bool rtrh_passive_adc_started = false;
+
+static volatile uint32_t rtrh_passive_long_period_sum = 0;
+static volatile uint16_t rtrh_passive_long_period_count = 0;
+static volatile uint32_t rtrh_passive_short_period_sum = 0;
+static volatile uint16_t rtrh_passive_short_period_count = 0;
+static volatile uint32_t rtrh_passive_short_g13_delay_sum = 0;
+static volatile uint16_t rtrh_passive_short_g13_delay_count = 0;
+static volatile uint16_t rtrh_passive_short_g13_delay_min = 0xFFFF;
+static volatile uint16_t rtrh_passive_short_g13_delay_max = 0;
+static volatile uint8_t
+    rtrh_passive_short_g13_delay_hist[RTRH_PASSIVE_DELAY_BINS] = {};
+
+static RtRhPassiveSnapshot rtrh_passive_snapshot;
+static volatile bool rtrh_passive_snapshot_ready = false;
+static volatile bool rtrh_passive_snapshot_consumed = true;
 static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
     10, 11, 12, 13
 };
@@ -1501,6 +1558,65 @@ static void resume_rtrh_irqs()
   rtrh_irqs_suspended = false;
 }
 
+
+static inline void IRAM_ATTR reset_rtrh_passive_working(uint32_t now)
+{
+  rtrh_passive_collecting = true;
+  rtrh_passive_current_finalized = false;
+  rtrh_passive_adc_started = false;
+  rtrh_passive_last_g10_fall_us = 0;
+  rtrh_passive_g10_rise_us = 0;
+  rtrh_passive_g13_delay_valid = false;
+  rtrh_passive_g13_delay_us = 0;
+
+  rtrh_passive_long_period_sum = 0;
+  rtrh_passive_long_period_count = 0;
+  rtrh_passive_short_period_sum = 0;
+  rtrh_passive_short_period_count = 0;
+
+  rtrh_passive_short_g13_delay_sum = 0;
+  rtrh_passive_short_g13_delay_count = 0;
+  rtrh_passive_short_g13_delay_min = 0xFFFF;
+  rtrh_passive_short_g13_delay_max = 0;
+
+  for (uint8_t i = 0; i < RTRH_PASSIVE_DELAY_BINS; i++)
+    rtrh_passive_short_g13_delay_hist[i] = 0;
+
+  rtrh_passive_last_any_us = now;
+}
+
+static inline void IRAM_ATTR finalize_rtrh_passive_snapshot()
+{
+  rtrh_passive_snapshot.long_period_sum =
+      rtrh_passive_long_period_sum;
+  rtrh_passive_snapshot.long_period_count =
+      rtrh_passive_long_period_count;
+  rtrh_passive_snapshot.short_period_sum =
+      rtrh_passive_short_period_sum;
+  rtrh_passive_snapshot.short_period_count =
+      rtrh_passive_short_period_count;
+
+  rtrh_passive_snapshot.short_g13_delay_sum =
+      rtrh_passive_short_g13_delay_sum;
+  rtrh_passive_snapshot.short_g13_delay_count =
+      rtrh_passive_short_g13_delay_count;
+  rtrh_passive_snapshot.short_g13_delay_min =
+      rtrh_passive_short_g13_delay_min;
+  rtrh_passive_snapshot.short_g13_delay_max =
+      rtrh_passive_short_g13_delay_max;
+
+  for (uint8_t i = 0; i < RTRH_PASSIVE_DELAY_BINS; i++) {
+    rtrh_passive_snapshot.short_g13_delay_hist[i] =
+        rtrh_passive_short_g13_delay_hist[i];
+  }
+
+  rtrh_passive_snapshot.sequence++;
+  rtrh_passive_snapshot_ready = true;
+  rtrh_passive_snapshot_consumed = false;
+  rtrh_passive_collecting = false;
+  rtrh_passive_current_finalized = true;
+}
+
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 {
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
@@ -1528,25 +1644,106 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       static_cast<uint32_t>(esp_timer_get_time());
 
   /*
-   * Start one ADC sequence from the first observed GPIO10 falling edge.
+   * A long quiet gap marks the start of a new physical RT/RH measurement
+   * burst.  Collect passive timing before ADC touches any pad.
+   */
+  const uint32_t previous_any = rtrh_passive_last_any_us;
+  if (previous_any == 0 ||
+      static_cast<uint32_t>(now - previous_any) > RTRH_PASSIVE_QUIET_US) {
+    reset_rtrh_passive_working(now);
+  } else {
+    rtrh_passive_last_any_us = now;
+  }
+
+  // GPIO10 rising starts the G10->G13 threshold-delay measurement.
+  if (pin_index == 0 && !previous && level) {
+    rtrh_passive_g10_rise_us = now;
+    rtrh_passive_g13_delay_valid = false;
+  }
+
+  // GPIO13 rising completes it.
+  if (pin_index == 3 && !previous && level &&
+      rtrh_passive_g10_rise_us != 0) {
+    const uint32_t d =
+        static_cast<uint32_t>(now - rtrh_passive_g10_rise_us);
+    if (d < 65535U) {
+      rtrh_passive_g13_delay_us = static_cast<uint16_t>(d);
+      rtrh_passive_g13_delay_valid = true;
+    }
+  }
+
+  /*
+   * Start one ADC sequence only AFTER enough untouched SHORT and LONG cycles
+   * have been observed in this burst.
    * The task then pre-arms each target channel BEFORE waiting for its own
    * timing reference edge.
    */
-  if (!rtrh_adc_ready && !rtrh_adc_active &&
-      pin_index == 0 && previous && !level) {
-    clear_rtrh_adc_aggregates();
-    rtrh_adc_active = true;
-    rtrh_adc_cycle = 0;
-    rtrh_adc_missed_edges = 0;
-    rtrh_adc_sequence_start = true;
+  if (pin_index == 0 && previous && !level) {
+    const uint32_t previous_fall =
+        rtrh_passive_last_g10_fall_us;
 
-    if (rtrh_adc_task_handle != nullptr) {
-      BaseType_t higher_priority_woken = pdFALSE;
-      vTaskNotifyGiveFromISR(
-          rtrh_adc_task_handle,
-          &higher_priority_woken);
-      if (higher_priority_woken)
-        portYIELD_FROM_ISR();
+    if (previous_fall != 0 && rtrh_passive_collecting) {
+      const uint32_t period =
+          static_cast<uint32_t>(now - previous_fall);
+
+      uint8_t passive_mode = 0xFF;
+      if (period >= RTRH_SHORT_MIN_US && period <= RTRH_SHORT_MAX_US)
+        passive_mode = RTRH_MODE_SHORT;
+      else if (period >= RTRH_LONG_MIN_US && period <= RTRH_LONG_MAX_US)
+        passive_mode = RTRH_MODE_LONG;
+
+      if (passive_mode == RTRH_MODE_SHORT) {
+        rtrh_passive_short_period_sum += period;
+        rtrh_passive_short_period_count++;
+
+        if (rtrh_passive_g13_delay_valid) {
+          const uint16_t d = rtrh_passive_g13_delay_us;
+          rtrh_passive_short_g13_delay_sum += d;
+          rtrh_passive_short_g13_delay_count++;
+
+          if (d < rtrh_passive_short_g13_delay_min)
+            rtrh_passive_short_g13_delay_min = d;
+          if (d > rtrh_passive_short_g13_delay_max)
+            rtrh_passive_short_g13_delay_max = d;
+
+          const uint8_t bin =
+              d < RTRH_PASSIVE_DELAY_BINS
+                  ? static_cast<uint8_t>(d)
+                  : static_cast<uint8_t>(RTRH_PASSIVE_DELAY_BINS - 1);
+          rtrh_passive_short_g13_delay_hist[bin]++;
+        }
+      } else if (passive_mode == RTRH_MODE_LONG) {
+        rtrh_passive_long_period_sum += period;
+        rtrh_passive_long_period_count++;
+      }
+
+      if (rtrh_passive_short_period_count >= RTRH_PASSIVE_MIN_SHORT &&
+          rtrh_passive_long_period_count >= RTRH_PASSIVE_MIN_LONG) {
+        finalize_rtrh_passive_snapshot();
+      }
+    }
+
+    rtrh_passive_last_g10_fall_us = now;
+
+    if (rtrh_passive_current_finalized &&
+        !rtrh_passive_adc_started &&
+        !rtrh_adc_ready && !rtrh_adc_active) {
+      rtrh_passive_adc_started = true;
+
+      clear_rtrh_adc_aggregates();
+      rtrh_adc_active = true;
+      rtrh_adc_cycle = 0;
+      rtrh_adc_missed_edges = 0;
+      rtrh_adc_sequence_start = true;
+
+      if (rtrh_adc_task_handle != nullptr) {
+        BaseType_t higher_priority_woken = pdFALSE;
+        vTaskNotifyGiveFromISR(
+            rtrh_adc_task_handle,
+            &higher_priority_woken);
+        if (higher_priority_woken)
+          portYIELD_FROM_ISR();
+      }
     }
   }
 
@@ -1771,6 +1968,109 @@ static uint16_t median_u16_ignore_missing(
       (static_cast<uint32_t>(tmp[n / 2 - 1]) +
        static_cast<uint32_t>(tmp[n / 2])) / 2U);
 }
+
+
+class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
+ public:
+  bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
+  {
+    if (request->method() != HTTP_GET)
+      return false;
+    char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
+    return request->url_to(url) == "/rt_rh_timing.csv";
+  }
+
+  void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
+  {
+    if (!rtrh_passive_snapshot_ready || rtrh_passive_snapshot_consumed) {
+      request->send(204, "text/plain", nullptr);
+      return;
+    }
+
+    const RtRhPassiveSnapshot s = rtrh_passive_snapshot;
+
+    httpd_req_t *req = *request;
+    httpd_resp_set_status(req, "200 OK");
+    httpd_resp_set_type(req, "text/csv");
+    httpd_resp_set_hdr(
+        req,
+        "Content-Disposition",
+        "attachment; filename=\"rt_rh_timing.csv\"");
+
+    static constexpr char HEADER[] =
+        "sequence,long_count,long_mean_us,short_count,short_mean_us,"
+        "short_g13_delay_count,short_g13_delay_mean_us,"
+        "short_g13_delay_min_us,short_g13_delay_max_us,"
+        "d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11,d12,d13,d14,d15,"
+        "d16,d17,d18,d19,d20,d21,d22,d23,d24,d25,d26,d27,d28,d29,d30,d31plus\n";
+
+    esp_err_t err =
+        httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
+
+    static char line[256];
+
+    const float long_mean =
+        s.long_period_count
+            ? static_cast<float>(s.long_period_sum) /
+                  static_cast<float>(s.long_period_count)
+            : 0.0f;
+
+    const float short_mean =
+        s.short_period_count
+            ? static_cast<float>(s.short_period_sum) /
+                  static_cast<float>(s.short_period_count)
+            : 0.0f;
+
+    const float delay_mean =
+        s.short_g13_delay_count
+            ? static_cast<float>(s.short_g13_delay_sum) /
+                  static_cast<float>(s.short_g13_delay_count)
+            : 0.0f;
+
+    int n = snprintf(
+        line,
+        sizeof(line),
+        "%lu,%u,%.3f,%u,%.3f,%u,%.3f,%u,%u",
+        static_cast<unsigned long>(s.sequence),
+        static_cast<unsigned>(s.long_period_count),
+        long_mean,
+        static_cast<unsigned>(s.short_period_count),
+        short_mean,
+        static_cast<unsigned>(s.short_g13_delay_count),
+        delay_mean,
+        s.short_g13_delay_count
+            ? static_cast<unsigned>(s.short_g13_delay_min)
+            : 0U,
+        static_cast<unsigned>(s.short_g13_delay_max));
+
+    for (uint8_t i = 0; i < RTRH_PASSIVE_DELAY_BINS &&
+                        n > 0 && static_cast<size_t>(n) < sizeof(line); i++) {
+      const int m = snprintf(
+          line + n,
+          sizeof(line) - static_cast<size_t>(n),
+          ",%u",
+          static_cast<unsigned>(s.short_g13_delay_hist[i]));
+      if (m <= 0)
+        break;
+      n += m;
+    }
+
+    if (n > 0 && static_cast<size_t>(n + 1) < sizeof(line)) {
+      line[n++] = '\n';
+      line[n] = '\0';
+      if (err == ESP_OK)
+        err = httpd_resp_send_chunk(req, line, n);
+    }
+
+    if (err == ESP_OK)
+      err = httpd_resp_send_chunk(req, nullptr, 0);
+
+    if (err == ESP_OK)
+      rtrh_passive_snapshot_consumed = true;
+  }
+};
+
+static RtRhTimingHandler rtrh_timing_handler;
 
 class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
  public:
@@ -2140,6 +2440,9 @@ void BusSniffer::setup()
         &rtrh_capture_handler);
 
     web_server_base::global_web_server_base->add_handler(
+        &rtrh_timing_handler);
+
+    web_server_base::global_web_server_base->add_handler(
         &rtrh_adc_handler);
 
   } else {
@@ -2185,6 +2488,49 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
+  static uint32_t last_passive_sequence = 0;
+
+  if (rtrh_passive_snapshot_ready &&
+      rtrh_passive_snapshot.sequence != last_passive_sequence) {
+    const RtRhPassiveSnapshot s = rtrh_passive_snapshot;
+    last_passive_sequence = s.sequence;
+
+    if (s.long_period_count != 0) {
+      const float long_period_us =
+          static_cast<float>(s.long_period_sum) /
+          static_cast<float>(s.long_period_count);
+
+      const float temperature_c =
+          RTRH_TEMP_A * long_period_us * long_period_us +
+          RTRH_TEMP_B * long_period_us +
+          RTRH_TEMP_C;
+
+      ESP_LOGI(
+          TAG,
+          "RT temperature PASSIVE: %.2f C from LONG period %.3f us (%u observations)",
+          temperature_c,
+          long_period_us,
+          static_cast<unsigned>(s.long_period_count));
+
+      if (this->rt_temperature_sensor_ != nullptr)
+        this->rt_temperature_sensor_->publish_state(temperature_c);
+    }
+
+    if (s.short_g13_delay_count != 0) {
+      const float delay_mean =
+          static_cast<float>(s.short_g13_delay_sum) /
+          static_cast<float>(s.short_g13_delay_count);
+
+      ESP_LOGI(
+          TAG,
+          "RH passive SHORT G13 rise delay: mean %.2f us, min %u, max %u (%u observations)",
+          delay_mean,
+          static_cast<unsigned>(s.short_g13_delay_min),
+          static_cast<unsigned>(s.short_g13_delay_max),
+          static_cast<unsigned>(s.short_g13_delay_count));
+    }
+  }
+
   static uint32_t last_logged_adc_sequence = 0;
 
   if (rtrh_adc_ready &&
@@ -2222,15 +2568,12 @@ void BusSniffer::loop()
           RTRH_TEMP_B * long_period_us +
           RTRH_TEMP_C;
 
-      ESP_LOGI(
+      ESP_LOGD(
           TAG,
-          "RT temperature: %.2f C from LONG period %.2f us (%lu observations)",
-          temperature_c,
+          "ADC LONG period diagnostic: %.2f us -> %.2f C (%lu observations)",
           long_period_us,
+          temperature_c,
           static_cast<unsigned long>(long_period_count));
-
-      if (this->rt_temperature_sensor_ != nullptr)
-        this->rt_temperature_sensor_->publish_state(temperature_c);
     } else {
       ESP_LOGW(TAG, "RT temperature unavailable: no valid LONG period");
     }
