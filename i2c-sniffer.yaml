@@ -28,7 +28,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "I2CSniffer Fallback Hotspot"
-    password: "1TtKb0m072q3"
+    password: !secret i2csniffer__ap_password
 
 captive_portal:
 
