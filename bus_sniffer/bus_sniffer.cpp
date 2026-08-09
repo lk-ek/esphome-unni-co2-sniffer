@@ -963,6 +963,7 @@ static constexpr uint8_t RTRH_ADC_CHANNELS = 4;
 static constexpr uint8_t RTRH_ADC_REPEATS = 8;
 static constexpr uint16_t RTRH_ADC_SAMPLES =
     RTRH_ADC_PHASES * RTRH_ADC_CHANNELS * RTRH_ADC_REPEATS;
+static constexpr uint16_t RTRH_ADC_STORED_SAMPLES = 32;
 static constexpr uint8_t RTRH_ADC_SKIP_EDGES = 3;
 static constexpr uint16_t RTRH_ADC_OFFSETS_US[RTRH_ADC_PHASES] = {
     8, 25, 45, 62
@@ -991,7 +992,7 @@ static RtRhAdcChannel rtrh_adc_channels[RTRH_ADC_CHANNELS];
 static adc_oneshot_unit_handle_t rtrh_adc1_handle = nullptr;
 static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
 
-static RtRhAdcRow rtrh_adc_rows[RTRH_ADC_SAMPLES];
+static RtRhAdcRow rtrh_adc_rows[RTRH_ADC_STORED_SAMPLES];
 
 static volatile bool rtrh_adc_active = false;
 static volatile bool rtrh_adc_ready = false;
@@ -1200,7 +1201,7 @@ static void rtrh_adc_task(void *arg)
     gpio_intr_disable(PIN_RTRH3);
     rtrh_irqs_suspended = true;
 
-    RtRhAdcRow &row = rtrh_adc_rows[sample_index];
+    RtRhAdcRow &row = rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
     row.repeat = repeat;
     row.phase = phase;
     row.channel = channel;
@@ -1497,7 +1498,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
 
     const uint32_t sequence = rtrh_adc_sequence;
 
-    for (uint16_t i = 0; i < RTRH_ADC_SAMPLES && err == ESP_OK; i++) {
+    for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES && err == ESP_OK; i++) {
       const RtRhAdcRow &row = rtrh_adc_rows[i];
 
       const int n = snprintf(
@@ -1804,7 +1805,7 @@ void BusSniffer::loop()
       uint16_t n[RTRH_ADC_CHANNELS] = {};
       int32_t max_late = 0;
 
-      for (uint16_t i = 0; i < RTRH_ADC_SAMPLES; i++) {
+      for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES; i++) {
         const RtRhAdcRow &row = rtrh_adc_rows[i];
 
         if (row.phase != phase)
