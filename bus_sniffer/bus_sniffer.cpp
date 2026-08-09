@@ -1292,7 +1292,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     // edge (~3000-4000 chunks) needlessly stresses lwIP on the ESP32-S2.
     // Keep these buffers out of the small ESP-IDF HTTP server task stack.
     // The previous 2 KiB automatic buffer caused vApplicationStackOverflowHook.
-    static char chunk[512];
+    static char chunk[256];
     static char line[96];
     size_t used = 0;
 
@@ -1381,7 +1381,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
-    static char chunk[512];
+    static char chunk[256];
     static char line[128];
     size_t used = 0;
 
