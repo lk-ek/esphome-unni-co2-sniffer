@@ -958,75 +958,101 @@ static uint32_t next_probe_publish_us = 0;
  */
 
 static constexpr uint32_t ANALOG_SAMPLE_PERIOD_US = 1000;
-static constexpr uint16_t ANALOG_RING_SAMPLES = 4096;
-static constexpr uint16_t ANALOG_PRETRIGGER_SAMPLES = 500;
-static constexpr uint16_t ANALOG_POSTTRIGGER_SAMPLES = 3000;
+static constexpr uint16_t ANALOG_PRETRIGGER_SAMPLES = 250;
+static constexpr uint16_t ANALOG_POSTTRIGGER_SAMPLES = 1250;
+static constexpr uint16_t ANALOG_CAPTURE_SAMPLES =
+    ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES;
 static constexpr int ANALOG_TRIGGER_RAW = 100;
 static constexpr uint16_t ANALOG_REARM_QUIET_SAMPLES = 250;
 
+// Fixed sample period means a timestamp per sample is unnecessary.
+// This keeps each entry compact: 4 x uint16 raw + validity mask.
 struct AnalogSample {
-  uint32_t t;
   uint16_t raw[PROBE_COUNT];
   uint8_t valid_mask;
 };
 
-static AnalogSample analog_ring[ANALOG_RING_SAMPLES];
-static AnalogSample analog_capture[ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES];
+// Only the pre-trigger history needs a ring buffer. Once triggered we write
+// directly into the final capture buffer. This avoids duplicating several
+// seconds of samples in DRAM.
+static AnalogSample analog_pretrigger[ANALOG_PRETRIGGER_SAMPLES];
+static AnalogSample analog_capture[ANALOG_CAPTURE_SAMPLES];
 
-static volatile uint16_t analog_write_index = 0;
-static volatile uint32_t analog_total_samples = 0;
+static volatile uint16_t analog_pretrigger_write = 0;
+static volatile uint16_t analog_pretrigger_count = 0;
 static volatile bool analog_triggered = false;
-static volatile uint16_t analog_trigger_index = 0;
 static volatile uint16_t analog_post_remaining = 0;
 static volatile bool analog_armed = true;
 static volatile uint16_t analog_quiet_samples = 0;
 
 static uint16_t analog_capture_count = 0;
+static uint16_t analog_capture_trigger_pos = 0;
 static uint32_t analog_capture_sequence = 0;
 static SemaphoreHandle_t analog_capture_mutex = nullptr;
 static TaskHandle_t analog_capture_task_handle = nullptr;
 static esp_timer_handle_t analog_sample_timer = nullptr;
 
+
 static adc_oneshot_unit_handle_t probe_handle_for_unit(adc_unit_t unit);
 
 
-static void analog_snapshot_capture()
+static void analog_begin_capture(const AnalogSample &trigger_sample)
 {
-  const uint16_t wanted =
-      ANALOG_PRETRIGGER_SAMPLES + 1 + ANALOG_POSTTRIGGER_SAMPLES;
-
-  uint16_t available = ANALOG_RING_SAMPLES;
-  if (analog_total_samples < ANALOG_RING_SAMPLES)
-    available = static_cast<uint16_t>(analog_total_samples);
-
-  uint16_t count = wanted;
-  if (count > available)
-    count = available;
-
-  // The newest sample is the one immediately before analog_write_index.
-  uint16_t start = static_cast<uint16_t>(
-      (analog_write_index + ANALOG_RING_SAMPLES - count) % ANALOG_RING_SAMPLES);
-
-  if (analog_capture_mutex != nullptr &&
-      xSemaphoreTake(analog_capture_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-    for (uint16_t i = 0; i < count; i++) {
-      analog_capture[i] = analog_ring[(start + i) % ANALOG_RING_SAMPLES];
-    }
-    analog_capture_count = count;
-    analog_capture_sequence++;
-    xSemaphoreGive(analog_capture_mutex);
+  if (analog_capture_mutex == nullptr ||
+      xSemaphoreTake(analog_capture_mutex, 0) != pdTRUE) {
+    return;
   }
+
+  // Copy the available pre-trigger history in chronological order.
+  const uint16_t pre_count = analog_pretrigger_count;
+  const uint16_t oldest = static_cast<uint16_t>(
+      (analog_pretrigger_write + ANALOG_PRETRIGGER_SAMPLES - pre_count) %
+      ANALOG_PRETRIGGER_SAMPLES);
+
+  for (uint16_t i = 0; i < pre_count; i++) {
+    analog_capture[i] =
+        analog_pretrigger[(oldest + i) % ANALOG_PRETRIGGER_SAMPLES];
+  }
+
+  analog_capture_trigger_pos = pre_count;
+  analog_capture[pre_count] = trigger_sample;
+  analog_capture_count = pre_count + 1;
+  analog_post_remaining = ANALOG_POSTTRIGGER_SAMPLES;
+  analog_triggered = true;
+  analog_armed = false;
+  analog_quiet_samples = 0;
+
+  ESP_LOGI(
+      TAG,
+      "Analog trigger detected (pre=%u samples)",
+      pre_count);
+}
+
+
+static void analog_finish_capture()
+{
+  analog_triggered = false;
+  analog_capture_sequence++;
+
+  ESP_LOGI(
+      TAG,
+      "Analog capture ready: %u samples, sequence %lu",
+      analog_capture_count,
+      static_cast<unsigned long>(analog_capture_sequence));
+
+  // analog_begin_capture() acquired this mutex. Keep it for the complete
+  // acquisition so /analog_capture.csv can never read a half-written frame.
+  if (analog_capture_mutex != nullptr)
+    xSemaphoreGive(analog_capture_mutex);
 }
 
 
 static void analog_capture_task(void *arg)
 {
   while (true) {
-    // Woken by an esp_timer at 1 kHz, independent of the FreeRTOS tick rate.
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-    AnalogSample sample{};
-    sample.t = static_cast<uint32_t>(esp_timer_get_time());
 
+    AnalogSample sample{};
     bool above_trigger = false;
 
     for (uint8_t i = 0; i < PROBE_COUNT; i++) {
@@ -1054,32 +1080,23 @@ static void analog_capture_task(void *arg)
         above_trigger = true;
     }
 
-    const uint16_t this_index = analog_write_index;
-    analog_ring[this_index] = sample;
-    analog_write_index = static_cast<uint16_t>((this_index + 1) % ANALOG_RING_SAMPLES);
-    analog_total_samples++;
+    if (analog_triggered) {
+      if (analog_capture_count < ANALOG_CAPTURE_SAMPLES) {
+        analog_capture[analog_capture_count++] = sample;
+      }
 
-    if (analog_armed && !analog_triggered && above_trigger) {
-      analog_triggered = true;
-      analog_trigger_index = this_index;
-      analog_post_remaining = ANALOG_POSTTRIGGER_SAMPLES;
-      analog_armed = false;
-      analog_quiet_samples = 0;
-      ESP_LOGI(TAG, "Analog trigger detected");
-    } else if (analog_triggered) {
       if (analog_post_remaining > 0)
         analog_post_remaining--;
 
-      if (analog_post_remaining == 0) {
-        analog_triggered = false;
-        analog_snapshot_capture();
-        ESP_LOGI(
-            TAG,
-            "Analog capture ready: %u samples, sequence %lu",
-            analog_capture_count,
-            static_cast<unsigned long>(analog_capture_sequence));
+      if (analog_post_remaining == 0 ||
+          analog_capture_count >= ANALOG_CAPTURE_SAMPLES) {
+        analog_finish_capture();
       }
-    } else if (!analog_armed) {
+
+      continue;
+    }
+
+    if (!analog_armed) {
       if (above_trigger) {
         analog_quiet_samples = 0;
       } else if (++analog_quiet_samples >= ANALOG_REARM_QUIET_SAMPLES) {
@@ -1087,8 +1104,26 @@ static void analog_capture_task(void *arg)
         analog_quiet_samples = 0;
         ESP_LOGD(TAG, "Analog trigger rearmed");
       }
+
+      // Keep refreshing pre-trigger history while waiting for rearm.
+      analog_pretrigger[analog_pretrigger_write] = sample;
+      analog_pretrigger_write = static_cast<uint16_t>(
+          (analog_pretrigger_write + 1) % ANALOG_PRETRIGGER_SAMPLES);
+      if (analog_pretrigger_count < ANALOG_PRETRIGGER_SAMPLES)
+        analog_pretrigger_count++;
+      continue;
     }
 
+    if (above_trigger) {
+      analog_begin_capture(sample);
+      continue;
+    }
+
+    analog_pretrigger[analog_pretrigger_write] = sample;
+    analog_pretrigger_write = static_cast<uint16_t>(
+        (analog_pretrigger_write + 1) % ANALOG_PRETRIGGER_SAMPLES);
+    if (analog_pretrigger_count < ANALOG_PRETRIGGER_SAMPLES)
+      analog_pretrigger_count++;
   }
 }
 
@@ -1347,26 +1382,26 @@ class AnalogCaptureHandler : public web_server_idf::AsyncWebHandler {
 
     std::string output;
     output.reserve(static_cast<size_t>(count) * 42 + 128);
-    output += "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask\n";
+    output += "sequence,t_us,gpio10,gpio11,gpio12,gpio13,valid_mask,trigger\n";
 
-    const uint32_t base = analog_capture[0].t;
     char line[128];
 
     for (uint16_t i = 0; i < count; i++) {
       const AnalogSample &sample = analog_capture[i];
-      const uint32_t rel = static_cast<uint32_t>(sample.t - base);
+      const uint32_t rel = static_cast<uint32_t>(i) * ANALOG_SAMPLE_PERIOD_US;
 
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%lu,%u,%u,%u,%u,0x%02X\n",
+          "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence),
           static_cast<unsigned long>(rel),
           sample.raw[0],
           sample.raw[1],
           sample.raw[2],
           sample.raw[3],
-          sample.valid_mask);
+          sample.valid_mask,
+          i == analog_capture_trigger_pos ? 1U : 0U);
 
       if (n > 0)
         output.append(line, static_cast<size_t>(n));
@@ -1432,7 +1467,9 @@ void BusSniffer::setup()
         } else {
           ESP_LOGI(
               TAG,
-              "Analog trigger capture: GPIO10..13 @ 1 kHz, trigger raw>%d",
+              "Analog trigger capture: GPIO10..13 @ 1 kHz, %u ms pre + %u ms post, trigger raw>%d",
+              ANALOG_PRETRIGGER_SAMPLES,
+              ANALOG_POSTTRIGGER_SAMPLES,
               ANALOG_TRIGGER_RAW);
         }
       }
