@@ -984,16 +984,16 @@ static constexpr int RTRH_ADC_GPIOS[RTRH_ADC_CHANNELS] = {
     10, 11, 12, 13
 };
 
-struct RtRhAdcRow {
-  uint8_t repeat;
-  uint8_t mode;
-  uint8_t phase;
-  uint8_t channel;
-  uint16_t offset_us;
-  uint16_t trigger_period_us;
-  int16_t lateness_us;
-  uint16_t raw;
-  uint8_t valid;
+struct RtRhAdcAggregate {
+  uint32_t sum{0};
+  uint32_t period_sum{0};
+  uint16_t min{0xFFFF};
+  uint16_t max{0};
+  uint16_t count{0};
+  uint16_t period_count{0};
+  uint16_t max_lateness_us{0};
+  uint16_t rejected_late{0};
+  uint16_t read_errors{0};
 };
 
 struct RtRhAdcChannel {
@@ -1006,7 +1006,8 @@ static RtRhAdcChannel rtrh_adc_channels[RTRH_ADC_CHANNELS];
 static adc_oneshot_unit_handle_t rtrh_adc1_handle = nullptr;
 static adc_oneshot_unit_handle_t rtrh_adc2_handle = nullptr;
 
-static RtRhAdcRow rtrh_adc_rows[RTRH_ADC_STORED_SAMPLES];
+static RtRhAdcAggregate
+    rtrh_adc_agg[RTRH_ADC_MODES][RTRH_ADC_PHASES][RTRH_ADC_CHANNELS];
 
 static volatile bool rtrh_adc_active = false;
 static volatile bool rtrh_adc_ready = false;
@@ -1063,6 +1064,18 @@ static void reset_rtrh_adc_capture()
   rtrh_last_fall_us[2] = 0;
   rtrh_last_fall_us[3] = 0;
 }
+
+static void clear_rtrh_adc_aggregates()
+{
+  for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
+    for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
+      for (uint8_t channel = 0; channel < RTRH_ADC_CHANNELS; channel++) {
+        rtrh_adc_agg[mode][phase][channel] = RtRhAdcAggregate{};
+      }
+    }
+  }
+}
+
 
 static void setup_rtrh_adc()
 {
@@ -1279,18 +1292,7 @@ static void rtrh_adc_task(void *arg)
           static_cast<int8_t>(channel == 0 ? 1 : 0);
 
       if (!configure_rtrh_pin_for_adc(channel)) {
-        RtRhAdcRow &row =
-            rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
-        row.repeat = repeat;
-        row.mode = mode;
-        row.phase = phase;
-        row.channel = channel;
-        row.offset_us = offset;
-        row.trigger_period_us = 0;
-        row.lateness_us = INT16_MAX;
-        row.raw = 0;
-        row.valid = 0;
-
+        rtrh_adc_agg[mode][phase][channel].read_errors++;
         rtrh_adc_cycle =
             static_cast<uint16_t>(sample_index + 1);
         continue;
@@ -1325,42 +1327,47 @@ static void rtrh_adc_task(void *arg)
         // intentional short spin
       }
 
-      RtRhAdcRow &row =
-          rtrh_adc_rows[sample_index % RTRH_ADC_STORED_SAMPLES];
-
-      row.repeat = repeat;
-      row.mode = mode;
-      row.phase = phase;
-      row.channel = channel;
-      row.offset_us = offset;
-      row.trigger_period_us = rtrh_adc_trigger_period_us;
-      row.raw = 0;
-      row.valid = 0;
-
       const uint32_t actual =
           static_cast<uint32_t>(esp_timer_get_time());
 
       int32_t late = static_cast<int32_t>(actual - target);
-      if (late > INT16_MAX)
-        late = INT16_MAX;
-      if (late < INT16_MIN)
-        late = INT16_MIN;
+      if (late < 0)
+        late = -late;
 
-      row.lateness_us = static_cast<int16_t>(late);
+      RtRhAdcAggregate &agg =
+          rtrh_adc_agg[mode][phase][channel];
+
+      if (late > agg.max_lateness_us && late <= 65535)
+        agg.max_lateness_us = static_cast<uint16_t>(late);
 
       const RtRhAdcChannel &ch = rtrh_adc_channels[channel];
       adc_oneshot_unit_handle_t handle = rtrh_adc_handle(ch.unit);
 
-      if (handle != nullptr) {
-        int raw = 0;
-        if (adc_oneshot_read(handle, ch.channel, &raw) == ESP_OK) {
-          if (raw < 0)
-            raw = 0;
-          if (raw > 65535)
-            raw = 65535;
+      int raw = 0;
+      if (handle == nullptr ||
+          adc_oneshot_read(handle, ch.channel, &raw) != ESP_OK) {
+        agg.read_errors++;
+      } else if (late > 10) {
+        agg.rejected_late++;
+      } else {
+        if (raw < 0)
+          raw = 0;
+        if (raw > 65535)
+          raw = 65535;
 
-          row.raw = static_cast<uint16_t>(raw);
-          row.valid = 1;
+        const uint16_t value = static_cast<uint16_t>(raw);
+
+        agg.sum += value;
+        agg.count++;
+
+        if (value < agg.min)
+          agg.min = value;
+        if (value > agg.max)
+          agg.max = value;
+
+        if (rtrh_adc_trigger_period_us != 0) {
+          agg.period_sum += rtrh_adc_trigger_period_us;
+          agg.period_count++;
         }
       }
 
@@ -1435,6 +1442,7 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
    */
   if (!rtrh_adc_ready && !rtrh_adc_active &&
       pin_index == 0 && previous && !level) {
+    clear_rtrh_adc_aggregates();
     rtrh_adc_active = true;
     rtrh_adc_cycle = 0;
     rtrh_adc_missed_edges = 0;
@@ -1663,52 +1671,73 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
         "attachment; filename=\"rt_rh_adc.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,sample,repeat,mode,mode_name,phase,channel,gpio,"
-        "offset_us,trigger_period_us,lateness_us,raw,valid\n";
+        "sequence,mode,mode_name,phase,gpio,offset_us,"
+        "count,mean,min,max,period_mean_us,max_lateness_us,"
+        "rejected_late,read_errors\n";
 
     esp_err_t err =
         httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
     static char chunk[256];
-    static char line[160];
+    static char line[192];
     size_t used = 0;
 
     const uint32_t sequence = rtrh_adc_sequence;
 
-    for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES && err == ESP_OK; i++) {
-      const RtRhAdcRow &row = rtrh_adc_rows[i];
+    for (uint8_t mode = 0; mode < RTRH_ADC_MODES && err == ESP_OK; mode++) {
+      for (uint8_t phase = 0; phase < RTRH_ADC_PHASES && err == ESP_OK; phase++) {
+        for (uint8_t channel = 0;
+             channel < RTRH_ADC_CHANNELS && err == ESP_OK;
+             channel++) {
 
-      const int n = snprintf(
-          line,
-          sizeof(line),
-          "%lu,%u,%u,%u,%s,%u,%u,%d,%u,%u,%d,%u,%u\n",
-          static_cast<unsigned long>(sequence),
-          static_cast<unsigned>(i),
-          static_cast<unsigned>(row.repeat),
-          static_cast<unsigned>(row.mode),
-          row.mode == RTRH_MODE_SHORT ? "short" : "long",
-          static_cast<unsigned>(row.phase),
-          static_cast<unsigned>(row.channel),
-          RTRH_ADC_GPIOS[row.channel],
-          static_cast<unsigned>(row.offset_us),
-          static_cast<unsigned>(row.trigger_period_us),
-          static_cast<int>(row.lateness_us),
-          static_cast<unsigned>(row.raw),
-          static_cast<unsigned>(row.valid));
+          const RtRhAdcAggregate &agg =
+              rtrh_adc_agg[mode][phase][channel];
 
-      if (n <= 0)
-        continue;
+          const uint32_t mean =
+              agg.count ? agg.sum / agg.count : 0;
 
-      const size_t len = static_cast<size_t>(n);
+          const uint32_t period_mean =
+              agg.period_count
+                  ? agg.period_sum / agg.period_count
+                  : 0;
 
-      if (used + len > sizeof(chunk)) {
-        err = httpd_resp_send_chunk(req, chunk, used);
-        used = 0;
-      }
+          const uint16_t min_value =
+              agg.count ? agg.min : 0;
 
-      if (err == ESP_OK && len <= sizeof(chunk)) {
-        memcpy(chunk + used, line, len);
-        used += len;
+          const int n = snprintf(
+              line,
+              sizeof(line),
+              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u\n",
+              static_cast<unsigned long>(sequence),
+              static_cast<unsigned>(mode),
+              mode == RTRH_MODE_SHORT ? "short" : "long",
+              static_cast<unsigned>(phase),
+              RTRH_ADC_GPIOS[channel],
+              static_cast<unsigned>(RTRH_ADC_OFFSETS_US[phase]),
+              static_cast<unsigned>(agg.count),
+              static_cast<unsigned long>(mean),
+              static_cast<unsigned>(min_value),
+              static_cast<unsigned>(agg.max),
+              static_cast<unsigned long>(period_mean),
+              static_cast<unsigned>(agg.max_lateness_us),
+              static_cast<unsigned>(agg.rejected_late),
+              static_cast<unsigned>(agg.read_errors));
+
+          if (n <= 0)
+            continue;
+
+          const size_t len = static_cast<size_t>(n);
+
+          if (used + len > sizeof(chunk)) {
+            err = httpd_resp_send_chunk(req, chunk, used);
+            used = 0;
+          }
+
+          if (err == ESP_OK && len <= sizeof(chunk)) {
+            memcpy(chunk + used, line, len);
+            used += len;
+          }
+        }
       }
     }
 
@@ -1990,48 +2019,41 @@ void BusSniffer::loop()
 
     for (uint8_t mode = 0; mode < RTRH_ADC_MODES; mode++) {
       for (uint8_t phase = 0; phase < RTRH_ADC_PHASES; phase++) {
-        uint64_t sum[RTRH_ADC_CHANNELS] = {};
-        uint16_t n[RTRH_ADC_CHANNELS] = {};
-        uint32_t period_sum = 0;
-        uint16_t period_n = 0;
-        int32_t max_late = 0;
+        const RtRhAdcAggregate &a0 = rtrh_adc_agg[mode][phase][0];
+        const RtRhAdcAggregate &a1 = rtrh_adc_agg[mode][phase][1];
+        const RtRhAdcAggregate &a2 = rtrh_adc_agg[mode][phase][2];
+        const RtRhAdcAggregate &a3 = rtrh_adc_agg[mode][phase][3];
 
-        for (uint16_t i = 0; i < RTRH_ADC_STORED_SAMPLES; i++) {
-          const RtRhAdcRow &row = rtrh_adc_rows[i];
+        const uint32_t period_sum =
+            a0.period_sum + a1.period_sum + a2.period_sum + a3.period_sum;
+        const uint32_t period_count =
+            a0.period_count + a1.period_count +
+            a2.period_count + a3.period_count;
 
-          if (row.mode != mode || row.phase != phase)
-            continue;
-
-          const int32_t abs_late =
-              row.lateness_us < 0 ? -row.lateness_us : row.lateness_us;
-          if (abs_late > max_late)
-            max_late = abs_late;
-
-          if (!row.valid || abs_late > 10)
-            continue;
-
-          sum[row.channel] += row.raw;
-          n[row.channel]++;
-
-          if (row.trigger_period_us != 0) {
-            period_sum += row.trigger_period_us;
-            period_n++;
-          }
-        }
+        uint16_t max_late = a0.max_lateness_us;
+        if (a1.max_lateness_us > max_late) max_late = a1.max_lateness_us;
+        if (a2.max_lateness_us > max_late) max_late = a2.max_lateness_us;
+        if (a3.max_lateness_us > max_late) max_late = a3.max_lateness_us;
 
         ESP_LOGI(
             TAG,
             "RT/RH %s phase %u (+%u us, period~%lu): "
-            "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%ld us",
+            "G10=%lu(%u) G11=%lu(%u) G12=%lu(%u) G13=%lu(%u), max_late=%u us",
             mode == RTRH_MODE_SHORT ? "SHORT" : "LONG",
             phase,
             RTRH_ADC_OFFSETS_US[phase],
-            period_n ? static_cast<unsigned long>(period_sum / period_n) : 0UL,
-            n[0] ? static_cast<unsigned long>(sum[0] / n[0]) : 0UL, n[0],
-            n[1] ? static_cast<unsigned long>(sum[1] / n[1]) : 0UL, n[1],
-            n[2] ? static_cast<unsigned long>(sum[2] / n[2]) : 0UL, n[2],
-            n[3] ? static_cast<unsigned long>(sum[3] / n[3]) : 0UL, n[3],
-            static_cast<long>(max_late));
+            period_count
+                ? static_cast<unsigned long>(period_sum / period_count)
+                : 0UL,
+            a0.count ? static_cast<unsigned long>(a0.sum / a0.count) : 0UL,
+            a0.count,
+            a1.count ? static_cast<unsigned long>(a1.sum / a1.count) : 0UL,
+            a1.count,
+            a2.count ? static_cast<unsigned long>(a2.sum / a2.count) : 0UL,
+            a2.count,
+            a3.count ? static_cast<unsigned long>(a3.sum / a3.count) : 0UL,
+            a3.count,
+            max_late);
       }
     }
   }
