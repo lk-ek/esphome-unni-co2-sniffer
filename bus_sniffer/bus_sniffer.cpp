@@ -1736,6 +1736,42 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
 
 static RtRhCaptureHandler rtrh_capture_handler;
 
+static uint16_t median_u16_ignore_missing(
+    const uint16_t *values,
+    uint8_t count)
+{
+  uint16_t tmp[RTRH_ADC_REPEATS];
+  uint8_t n = 0;
+
+  for (uint8_t i = 0; i < count && i < RTRH_ADC_REPEATS; i++) {
+    if (values[i] != 0xFFFF)
+      tmp[n++] = values[i];
+  }
+
+  if (n == 0)
+    return 0;
+
+  // Tiny insertion sort; n <= 8.
+  for (uint8_t i = 1; i < n; i++) {
+    const uint16_t v = tmp[i];
+    int j = static_cast<int>(i) - 1;
+
+    while (j >= 0 && tmp[j] > v) {
+      tmp[j + 1] = tmp[j];
+      j--;
+    }
+
+    tmp[j + 1] = v;
+  }
+
+  if (n & 1)
+    return tmp[n / 2];
+
+  return static_cast<uint16_t>(
+      (static_cast<uint32_t>(tmp[n / 2 - 1]) +
+       static_cast<uint32_t>(tmp[n / 2])) / 2U);
+}
+
 class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
@@ -1774,7 +1810,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
     static constexpr char HEADER[] =
         "sequence,mode,mode_name,phase,gpio,offset_us,"
         "count,mean,min,max,period_mean_us,max_lateness_us,"
-        "rejected_late,read_errors,"
+        "rejected_late,read_errors,median,"
         "raw0,raw1,raw2,raw3,raw4,raw5,raw6,raw7\n";
 
     esp_err_t err =
@@ -1806,6 +1842,15 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
           const uint16_t min_value =
               agg.count ? agg.min : 0;
 
+          uint16_t median_value = 0;
+
+          if (mode == RTRH_MODE_SHORT && channel == 3) {
+            median_value =
+                median_u16_ignore_missing(
+                    rtrh_short_g13_raw_snapshot[phase],
+                    RTRH_ADC_REPEATS);
+          }
+
           char raw_fields[64] = ",,,,,,,,";
           if (mode == RTRH_MODE_SHORT && channel == 3) {
             char *rp = raw_fields;
@@ -1832,7 +1877,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
           const int n = snprintf(
               line,
               sizeof(line),
-              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u%s\n",
+              "%lu,%u,%s,%u,%d,%u,%u,%lu,%u,%u,%lu,%u,%u,%u,%u%s\n",
               static_cast<unsigned long>(sequence),
               static_cast<unsigned>(mode),
               mode == RTRH_MODE_SHORT ? "short" : "long",
@@ -1847,6 +1892,7 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
               static_cast<unsigned>(agg.max_lateness_us),
               static_cast<unsigned>(agg.rejected_late),
               static_cast<unsigned>(agg.read_errors),
+              static_cast<unsigned>(median_value),
               raw_fields);
 
           if (n <= 0)
@@ -1875,6 +1921,13 @@ class RtRhAdcHandler : public web_server_idf::AsyncWebHandler {
 
     portENTER_CRITICAL(&rtrh_adc_snapshot_mux);
     rtrh_adc_snapshot_in_use = false;
+
+    // A successfully downloaded snapshot is consumed.  Until the next
+    // completed ADC sequence arrives, repeated GETs return 204 instead of
+    // silently serving stale data under a new display label.
+    if (err == ESP_OK)
+      rtrh_adc_snapshot_ready = false;
+
     portEXIT_CRITICAL(&rtrh_adc_snapshot_mux);
 
     if (err != ESP_OK)
