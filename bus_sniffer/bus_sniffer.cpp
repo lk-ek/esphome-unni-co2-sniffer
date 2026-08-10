@@ -1110,129 +1110,113 @@ static volatile bool rtrh_passive_snapshot_consumed = true;
 
 static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
 
-// Experimental state-recurrence decoder.
+// Robust RH period decoder.
 //
-// Periods are measured between repeated arrivals at the characteristic complete
-// 4-bit states, not from individual GPIO10 edges:
-//   REF: 0x0F -> 0x0F
-//   RT : 0x07 -> 0x07
-//   RH : 0x08 -> 0x08
+// REF and RT remain on the proven v7c GPIO10-period path.  RH alone is measured
+// from repeated arrivals at the characteristic complete 4-bit state 0x08.
+// This avoids the RH-specific ambiguity caused by closely spaced GPIO edges.
 //
-// We keep a small rolling interval reservoir and use its median outside the
-// ISR.  This rejects occasional missed characteristic states (2*T, 3*T, ...)
-// as well as short ordering glitches without making the ISR choose a period.
-static constexpr uint8_t RTRH_STATE_PERIOD_SAMPLES = 96;
+// A small rolling interval reservoir is reduced to its median outside the ISR.
+// Missed 0x08 states therefore appear as 2*T, 3*T, ... and do not dominate the
+// result as long as enough direct recurrences are observed.
+static constexpr uint8_t RTRH_RH_STATE_PERIOD_SAMPLES = 96;
 
-struct RtRhStatePeriodStats {
+struct RtRhRhStatePeriodStats {
   uint32_t last_us{0};
-  uint16_t samples[RTRH_STATE_PERIOD_SAMPLES]{};
+  uint16_t samples[RTRH_RH_STATE_PERIOD_SAMPLES]{};
   uint8_t write_pos{0};
   uint8_t sample_count{0};
   uint32_t seen{0};
 };
 
-struct RtRhStatePeriodSnapshot {
-  RtRhStatePeriodStats ref;
-  RtRhStatePeriodStats rt;
-  RtRhStatePeriodStats rh;
+struct RtRhRhStateSnapshot {
+  RtRhRhStatePeriodStats rh;
   uint32_t sequence{0};
 };
 
-static RtRhStatePeriodStats rtrh_state_ref;
-static RtRhStatePeriodStats rtrh_state_rt;
-static RtRhStatePeriodStats rtrh_state_rh;
-static uint8_t rtrh_state_phase = RTRH_PHASE_WAIT_REF;
-static RtRhStatePeriodSnapshot rtrh_state_snapshot;
+static RtRhRhStatePeriodStats rtrh_rh_state;
+static RtRhRhStateSnapshot rtrh_rh_state_snapshot;
+static uint8_t rtrh_rh_state_phase = RTRH_PHASE_WAIT_REF;
 
-static inline void IRAM_ATTR clear_rtrh_state_period(
-    RtRhStatePeriodStats &s)
+static inline void IRAM_ATTR clear_rtrh_rh_state_period()
 {
-  s.last_us = 0;
-  s.write_pos = 0;
-  s.sample_count = 0;
-  s.seen = 0;
-  for (uint8_t i = 0; i < RTRH_STATE_PERIOD_SAMPLES; i++)
-    s.samples[i] = 0;
+  rtrh_rh_state.last_us = 0;
+  rtrh_rh_state.write_pos = 0;
+  rtrh_rh_state.sample_count = 0;
+  rtrh_rh_state.seen = 0;
+
+  for (uint8_t i = 0; i < RTRH_RH_STATE_PERIOD_SAMPLES; i++)
+    rtrh_rh_state.samples[i] = 0;
 }
 
-static inline void IRAM_ATTR reset_rtrh_state_periods()
+static inline void IRAM_ATTR reset_rtrh_rh_state_period()
 {
-  clear_rtrh_state_period(rtrh_state_ref);
-  clear_rtrh_state_period(rtrh_state_rt);
-  clear_rtrh_state_period(rtrh_state_rh);
-  rtrh_state_phase = RTRH_PHASE_WAIT_REF;
+  clear_rtrh_rh_state_period();
+  rtrh_rh_state_phase = RTRH_PHASE_WAIT_REF;
 }
 
-static inline void IRAM_ATTR add_rtrh_state_interval(
-    RtRhStatePeriodStats &s,
-    uint32_t now)
-{
-  if (s.last_us != 0) {
-    const uint32_t dt = static_cast<uint32_t>(now - s.last_us);
-
-    // All known physical periods fit comfortably below 2 ms.  The generous
-    // upper bound still lets the median expose missed states as multiples,
-    // while discarding phase gaps and unrelated long pauses.
-    if (dt >= 40 && dt <= 2000) {
-      s.samples[s.write_pos] = static_cast<uint16_t>(dt);
-      s.write_pos =
-          static_cast<uint8_t>((s.write_pos + 1) %
-                               RTRH_STATE_PERIOD_SAMPLES);
-      if (s.sample_count < RTRH_STATE_PERIOD_SAMPLES)
-        s.sample_count++;
-    }
-  }
-
-  s.last_us = now;
-  s.seen++;
-}
-
-static inline void IRAM_ATTR observe_rtrh_characteristic_state(
+static inline void IRAM_ATTR observe_rtrh_rh_state(
     uint32_t now,
     uint8_t state)
 {
   const uint8_t phase = rtrh_passive_phase;
 
-  if (phase != rtrh_state_phase) {
-    rtrh_state_phase = phase;
+  if (phase != rtrh_rh_state_phase) {
+    rtrh_rh_state_phase = phase;
 
-    // Do not bridge a phase boundary with a recurrence interval.
-    if (phase == RTRH_PHASE_REF)
-      rtrh_state_ref.last_us = 0;
-    else if (phase == RTRH_PHASE_RT)
-      rtrh_state_rt.last_us = 0;
-    else if (phase == RTRH_PHASE_RH)
-      rtrh_state_rh.last_us = 0;
+    // Never bridge a phase transition with an RH recurrence interval.
+    if (phase == RTRH_PHASE_RH)
+      rtrh_rh_state.last_us = 0;
   }
 
-  if (phase == RTRH_PHASE_REF && state == 0x0F)
-    add_rtrh_state_interval(rtrh_state_ref, now);
-  else if (phase == RTRH_PHASE_RT && state == 0x07)
-    add_rtrh_state_interval(rtrh_state_rt, now);
-  else if (phase == RTRH_PHASE_RH && state == 0x08)
-    add_rtrh_state_interval(rtrh_state_rh, now);
+  if (phase != RTRH_PHASE_RH || state != 0x08)
+    return;
+
+  if (rtrh_rh_state.last_us != 0) {
+    const uint32_t dt =
+        static_cast<uint32_t>(now - rtrh_rh_state.last_us);
+
+    // Known RH periods are well below 2 ms.  The broad upper limit retains
+    // missed-state multiples for the median while discarding phase gaps.
+    if (dt >= 40 && dt <= 2000) {
+      rtrh_rh_state.samples[rtrh_rh_state.write_pos] =
+          static_cast<uint16_t>(dt);
+
+      rtrh_rh_state.write_pos =
+          static_cast<uint8_t>(
+              (rtrh_rh_state.write_pos + 1) %
+              RTRH_RH_STATE_PERIOD_SAMPLES);
+
+      if (rtrh_rh_state.sample_count < RTRH_RH_STATE_PERIOD_SAMPLES)
+        rtrh_rh_state.sample_count++;
+    }
+  }
+
+  rtrh_rh_state.last_us = now;
+  rtrh_rh_state.seen++;
 }
 
-static float rtrh_state_period_median(
-    const RtRhStatePeriodStats &s)
+static float rtrh_rh_state_period_median(
+    const RtRhRhStatePeriodStats &s)
 {
   const uint8_t n = s.sample_count;
   if (n == 0)
     return 0.0f;
 
-  uint16_t tmp[RTRH_STATE_PERIOD_SAMPLES];
+  uint16_t tmp[RTRH_RH_STATE_PERIOD_SAMPLES];
+
   for (uint8_t i = 0; i < n; i++)
     tmp[i] = s.samples[i];
 
-  // n <= 96, once per 30 s: simple insertion sort is smaller than dragging in
-  // a generic sort helper and deterministic enough here.
   for (uint8_t i = 1; i < n; i++) {
     const uint16_t v = tmp[i];
     uint8_t j = i;
+
     while (j > 0 && tmp[j - 1] > v) {
       tmp[j] = tmp[j - 1];
       j--;
     }
+
     tmp[j] = v;
   }
 
@@ -1306,7 +1290,7 @@ static inline void IRAM_ATTR reset_rtrh_passive_measurement(
   rtrh_passive_phase_candidate_run = 0;
   rtrh_passive_rt_temp_period_sum = 0;
   rtrh_passive_rt_temp_count = 0;
-  reset_rtrh_state_periods();
+  reset_rtrh_rh_state_period();
   clear_passive_train(rtrh_passive_current_train);
 
   for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++)
@@ -1472,10 +1456,8 @@ static void finalize_rtrh_passive_measurement()
 
   rtrh_passive_snapshot = next;
 
-  rtrh_state_snapshot.ref = rtrh_state_ref;
-  rtrh_state_snapshot.rt = rtrh_state_rt;
-  rtrh_state_snapshot.rh = rtrh_state_rh;
-  rtrh_state_snapshot.sequence = next.sequence;
+  rtrh_rh_state_snapshot.rh = rtrh_rh_state;
+  rtrh_rh_state_snapshot.sequence = next.sequence;
 
   rtrh_passive_snapshot_ready = true;
   rtrh_passive_snapshot_consumed = false;
@@ -1650,9 +1632,9 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       rtrh_passive_have_g13_rise = false;
     }
 
-    // State-recurrence measurement.  This intentionally runs after the
-    // original v7c phase FSM so the current REF/RT/RH phase is already known.
-    observe_rtrh_characteristic_state(now, state);
+    // RH state-recurrence measurement.  This intentionally runs after the
+    // original v7c phase FSM so the current phase is already known.
+    observe_rtrh_rh_state(now, state);
 
     rtrh_passive_last_state = state;
   }
@@ -2423,76 +2405,59 @@ void BusSniffer::loop()
           rt_period_us,
           static_cast<unsigned>(s.rt_count));
 
-      // Experimental v9 result: period from complete-state recurrence.
-      const RtRhStatePeriodSnapshot ss = rtrh_state_snapshot;
-      const float state_ref_us = rtrh_state_period_median(ss.ref);
-      const float state_rt_us = rtrh_state_period_median(ss.rt);
-      const float state_rh_us = rtrh_state_period_median(ss.rh);
+      // Hybrid result:
+      //   REF + RT: proven v7c period averages
+      //   RH      : median 0x08 -> 0x08 recurrence
+      const RtRhRhStateSnapshot rss = rtrh_rh_state_snapshot;
+      const float state_rh_us =
+          rtrh_rh_state_period_median(rss.rh);
 
-      const bool state_periods_valid =
-          ss.sequence == s.sequence &&
-          ss.ref.sample_count >= 16 &&
-          ss.rt.sample_count >= 16 &&
-          ss.rh.sample_count >= 8 &&
-          state_ref_us >= RTRH_REF_VALID_MIN_US &&
-          state_ref_us <= RTRH_REF_VALID_MAX_US &&
-          state_rt_us >= 105.0f &&
-          state_rt_us <= 190.0f &&
+      const bool state_rh_valid =
+          rss.sequence == s.sequence &&
+          rss.rh.sample_count >= 8 &&
           state_rh_us >= 70.0f &&
           state_rh_us <= 1200.0f;
 
-      if (state_periods_valid) {
-        const float state_rt_ratio = state_rt_us / state_ref_us;
-        const float state_temperature_c =
-            RTRH_TEMP_RATIO_M * state_rt_ratio + RTRH_TEMP_RATIO_C;
-
-        const float state_rh_ratio = state_rh_us / state_ref_us;
+      if (state_rh_valid) {
+        const float state_rh_ratio =
+            state_rh_us / ref_period_us;
         const float state_x = logf(state_rh_ratio);
+
         float state_rh_percent =
             RTRH_RH_RATIO_A * state_x * state_x +
             RTRH_RH_RATIO_B * state_x +
             RTRH_RH_RATIO_C;
-        if (state_rh_percent < 0.0f) state_rh_percent = 0.0f;
-        if (state_rh_percent > 100.0f) state_rh_percent = 100.0f;
+
+        if (state_rh_percent < 0.0f)
+          state_rh_percent = 0.0f;
+        if (state_rh_percent > 100.0f)
+          state_rh_percent = 100.0f;
 
         ESP_LOGI(
             TAG,
-            "STATE periods: REF %.3f us (%u/%lu), RT %.3f us (%u/%lu), "
-            "RH %.3f us (%u/%lu)",
-            state_ref_us,
-            static_cast<unsigned>(ss.ref.sample_count),
-            static_cast<unsigned long>(ss.ref.seen),
-            state_rt_us,
-            static_cast<unsigned>(ss.rt.sample_count),
-            static_cast<unsigned long>(ss.rt.seen),
+            "HYBRID: REF %.3f us, RT %.3f us -> %.2f C ; "
+            "RH STATE %.3f us (%u/%lu) ratio=%.6f -> %.1f %%",
+            ref_period_us,
+            rt_period_us,
+            temperature_c,
             state_rh_us,
-            static_cast<unsigned>(ss.rh.sample_count),
-            static_cast<unsigned long>(ss.rh.seen));
-
-        ESP_LOGI(
-            TAG,
-            "STATE normalized: RT ratio=%.6f -> %.2f C ; "
-            "RH ratio=%.6f -> %.1f %%",
-            state_rt_ratio,
-            state_temperature_c,
+            static_cast<unsigned>(rss.rh.sample_count),
+            static_cast<unsigned long>(rss.rh.seen),
             state_rh_ratio,
             state_rh_percent);
 
-        // v9 deliberately publishes the state-recurrence result.  The complete
-        // v7c calculation above remains in the log as the golden comparison.
         if (this->rh_humidity_sensor_ != nullptr)
           this->rh_humidity_sensor_->publish_state(state_rh_percent);
 
         if (this->rt_temperature_sensor_ != nullptr)
-          this->rt_temperature_sensor_->publish_state(state_temperature_c);
+          this->rt_temperature_sensor_->publish_state(temperature_c);
       } else {
         ESP_LOGW(
             TAG,
-            "STATE periods invalid: REF %.3f us (%u), RT %.3f us (%u), "
-            "RH %.3f us (%u); keeping v7c result",
-            state_ref_us, static_cast<unsigned>(ss.ref.sample_count),
-            state_rt_us, static_cast<unsigned>(ss.rt.sample_count),
-            state_rh_us, static_cast<unsigned>(ss.rh.sample_count));
+            "HYBRID RH state invalid: %.3f us (%u samples); "
+            "falling back to v7c RH",
+            state_rh_us,
+            static_cast<unsigned>(rss.rh.sample_count));
 
         if (this->rh_humidity_sensor_ != nullptr)
           this->rh_humidity_sensor_->publish_state(rh_percent);
