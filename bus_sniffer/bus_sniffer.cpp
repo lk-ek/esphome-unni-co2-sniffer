@@ -968,7 +968,7 @@ static constexpr float RTRH_TEMP_RATIO_C = 80.051f;
 // RH = A*ln(ratio)^2 + B*ln(ratio) + C
 static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
 static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
-static constexpr float RTRH_RH_RATIO_C = 65.8005f;
+static constexpr float RTRH_RH_RATIO_C = 67.9005f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
