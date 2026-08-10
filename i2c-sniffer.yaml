@@ -52,6 +52,7 @@ esp32_ble_server:
   # Define 0x180A explicitly so it contains exactly the MyCO2-supported
   # Device Information characteristics from the Sensirion table.
   services:
+    # Device Information Service used by the current ESPHome compatibility layer.
     - uuid: 0x180A
       advertise: false
       characteristics:
@@ -86,6 +87,76 @@ esp32_ble_server:
                 return std::vector<uint8_t>({0, 0, 0, 0, 0, 0});
               }
               return std::vector<uint8_t>(mac, mac + 6);
+
+    # Sensirion Gadget BLE history/download service.  This mirrors the
+    # official arduino-ble-gadget service topology exactly.
+    - uuid: "00008000-B38D-4985-720E-0F993A68EE41"
+      advertise: false
+      characteristics:
+        # Number of samples in history: READ, uint32 LE.
+        - id: sensirion_history_count_char
+          uuid: "00008002-B38D-4985-720E-0F993A68EE41"
+          read: true
+          value:
+            data: [0x00, 0x00, 0x00, 0x00]
+
+        # Requested number of samples: WRITE, uint32 LE.
+        - id: sensirion_requested_samples_char
+          uuid: "00008003-B38D-4985-720E-0F993A68EE41"
+          write: true
+          on_write:
+            - lambda: |-
+                ESP_LOGI("sensirion_gatt",
+                         "8003 requested-samples WRITE: %u byte(s)",
+                         static_cast<unsigned>(x.size()));
+                if (x.size() >= 4) {
+                  const uint32_t n =
+                      static_cast<uint32_t>(x[0]) |
+                      (static_cast<uint32_t>(x[1]) << 8) |
+                      (static_cast<uint32_t>(x[2]) << 16) |
+                      (static_cast<uint32_t>(x[3]) << 24);
+                  ESP_LOGI("sensirion_gatt",
+                           "8003 requested samples = %u",
+                           static_cast<unsigned>(n));
+                }
+
+        # Sample-history interval: READ | WRITE, uint32 LE milliseconds.
+        # Official DataProvider default is 600000 ms = 10 minutes.
+        - id: sensirion_history_interval_char
+          uuid: "00008001-B38D-4985-720E-0F993A68EE41"
+          read: true
+          write: true
+          value:
+            data: [0xC0, 0x27, 0x09, 0x00]
+          on_write:
+            - lambda: |-
+                ESP_LOGI("sensirion_gatt",
+                         "8001 history-interval WRITE: %u byte(s)",
+                         static_cast<unsigned>(x.size()));
+                if (x.size() >= 4) {
+                  const uint32_t ms =
+                      static_cast<uint32_t>(x[0]) |
+                      (static_cast<uint32_t>(x[1]) << 8) |
+                      (static_cast<uint32_t>(x[2]) << 16) |
+                      (static_cast<uint32_t>(x[3]) << 24);
+                  ESP_LOGI("sensirion_gatt",
+                           "8001 history interval = %u ms",
+                           static_cast<unsigned>(ms));
+                }
+
+        # Download stream: NOTIFY only. ESPHome adds CCCD 0x2902.
+        - id: sensirion_download_packet_char
+          uuid: "00008004-B38D-4985-720E-0F993A68EE41"
+          notify: true
+          value:
+            data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                   0x00, 0x00, 0x00, 0x00]
+
+    # Official DataProvider creates this service even when no optional
+    # settings characteristics (Wi-Fi / alternate name) are enabled.
+    - uuid: "00008100-B38D-4985-720E-0F993A68EE41"
+      advertise: false
 
   on_connect:
     - lambda: |-
