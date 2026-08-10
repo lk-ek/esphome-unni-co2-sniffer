@@ -55,6 +55,10 @@ static const char *TAG = "bus_sniffer";
  * v22 additionally forces the configured local name "Unni-CO2" into the
  * primary advertising packet.  Manufacturer data + flags + this 8-byte name
  * fit within the 31-byte legacy BLE advertising payload.
+ *
+ * v23 keeps that over-the-air payload unchanged and enables ESPHome's native
+ * GATT server from YAML.  This deliberately avoids mixing NimBLE-Arduino with
+ * ESPHome's ESP-IDF BLE stack.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;

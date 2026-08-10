@@ -39,6 +39,24 @@ esp32_ble:
   name: "Unni-CO2"
   advertising: true
 
+# Sensirion Gadgets are connectable GATT servers in addition to broadcasting
+# live measurements in manufacturer data.  Use ESPHome's native ESP-IDF BLE
+# server rather than loading a second NimBLE-Arduino stack.
+#
+# ESPHome automatically exposes its Device Information service here.
+esp32_ble_server:
+  manufacturer: "Sensirion"
+  model: "MyCO2 Gadget"
+  max_clients: 1
+  on_connect:
+    - lambda: |-
+        ESP_LOGI("sensirion_gatt", "BLE GATT client connected: id=%u",
+                 static_cast<unsigned>(id));
+  on_disconnect:
+    - lambda: |-
+        ESP_LOGI("sensirion_gatt", "BLE GATT client disconnected: id=%u",
+                 static_cast<unsigned>(id));
+
 web_server:
   port: 80
 
