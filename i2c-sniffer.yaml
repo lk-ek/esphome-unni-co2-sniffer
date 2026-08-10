@@ -19,6 +19,8 @@ api:
 ota:
   - platform: esphome
     password: !secret i2csniffer__ota
+    # Needed only when installing/changing the partition table over OTA.
+    allow_partition_access: true
 
 wifi:
   ssid: !secret wifi_ssid
@@ -34,6 +36,13 @@ esp32:
   board: seeed_xiao_esp32c3
   framework:
     type: esp-idf
+  # Dedicated 64 KiB append-only history log. ESPHome shrinks the auto-generated
+  # OTA app partitions to make room for this data partition.
+  partitions:
+    - name: senshist
+      type: data
+      subtype: spiffs
+      size: 0x10000
 
 # BLE host used by the custom Sensirion MyCO2 manufacturer advertisement.
 # No GATT server is required for live broadcasts.
@@ -104,46 +113,14 @@ esp32_ble_server:
         - id: sensirion_requested_samples_char
           uuid: "00008003-B38D-4985-720E-0F993A68EE41"
           write: true
-          on_write:
-            - lambda: |-
-                ESP_LOGI("sensirion_gatt",
-                         "8003 requested-samples WRITE: %u byte(s)",
-                         static_cast<unsigned>(x.size()));
-                if (x.size() >= 4) {
-                  const uint32_t n =
-                      static_cast<uint32_t>(x[0]) |
-                      (static_cast<uint32_t>(x[1]) << 8) |
-                      (static_cast<uint32_t>(x[2]) << 16) |
-                      (static_cast<uint32_t>(x[3]) << 24);
-                  ESP_LOGI("sensirion_gatt",
-                           "8003 requested samples = %u",
-                           static_cast<unsigned>(n));
-                }
-
         # Sample-history interval: READ | WRITE, uint32 LE milliseconds.
-        # Official DataProvider default is 600000 ms = 10 minutes.
+        # Default remains 600000 ms = 10 minutes; writes are handled by bus_sniffer history code.
         - id: sensirion_history_interval_char
           uuid: "00008001-B38D-4985-720E-0F993A68EE41"
           read: true
           write: true
           value:
             data: [0xC0, 0x27, 0x09, 0x00]
-          on_write:
-            - lambda: |-
-                ESP_LOGI("sensirion_gatt",
-                         "8001 history-interval WRITE: %u byte(s)",
-                         static_cast<unsigned>(x.size()));
-                if (x.size() >= 4) {
-                  const uint32_t ms =
-                      static_cast<uint32_t>(x[0]) |
-                      (static_cast<uint32_t>(x[1]) << 8) |
-                      (static_cast<uint32_t>(x[2]) << 16) |
-                      (static_cast<uint32_t>(x[3]) << 24);
-                  ESP_LOGI("sensirion_gatt",
-                           "8001 history interval = %u ms",
-                           static_cast<unsigned>(ms));
-                }
-
         # Download stream: NOTIFY only. ESPHome adds CCCD 0x2902.
         - id: sensirion_download_packet_char
           uuid: "00008004-B38D-4985-720E-0F993A68EE41"
