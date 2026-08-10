@@ -918,7 +918,7 @@ static CaptureHandler capture_handler;
  *   - capture 450 ms, long enough for REF -> RT -> RH (~380 ms)
  *   - store the first edge
  *   - store every 16th subsequent edge as a time anchor
- *   - additionally store every edge whose 4-bit state is neither 0x00 nor 0x0F
+ *   - additionally store every 8th edge whose 4-bit state is neither 0x00 nor 0x0F
  *
  * edge_no is the 16-bit number of the original (non-decimated)
  * state-changing edge, so skipped edges remain visible in the CSV.
@@ -935,6 +935,7 @@ static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 static constexpr uint32_t RTRH_CAPTURE_US = 450000;
 static constexpr uint16_t RTRH_MAX_SAMPLES = 1536;
 static constexpr uint32_t RTRH_CAPTURE_DECIMATION = 16;
+static constexpr uint32_t RTRH_CAPTURE_UNUSUAL_DECIMATION = 8;
 
 struct __attribute__((packed)) RtRhSample {
   uint32_t t_us;
@@ -945,6 +946,7 @@ struct __attribute__((packed)) RtRhSample {
 static volatile RtRhSample rtrh_samples[RTRH_MAX_SAMPLES];
 static volatile uint16_t rtrh_sample_count = 0;
 static volatile uint16_t rtrh_capture_edge_no = 0;
+static volatile uint16_t rtrh_capture_unusual_no = 0;
 static volatile uint8_t rtrh_last_value = 0xff;
 static volatile uint32_t rtrh_start_us = 0;
 static volatile bool rtrh_capturing = false;
@@ -1523,18 +1525,29 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
     rtrh_start_us = now;
     rtrh_sample_count = 0;
     rtrh_capture_edge_no = 0;
+    rtrh_capture_unusual_no = 0;
     rtrh_overflow = false;
   }
 
   const uint16_t edge_no = rtrh_capture_edge_no++;
 
-  // Preserve every unusual intermediate state while heavily decimating
-  // the normal all-low/all-high oscillator edges.
+  // Keep regular global anchors, but also sample recurring "unusual" states.
+  // RT contains ~900 repetitions of 0x07, so storing every unusual edge would
+  // still overflow the buffer.  Every 8th unusual state is sufficient to show
+  // the phase pattern while preserving plenty of transition detail.
   const bool unusual_state = value != 0x00 && value != 0x0F;
   const bool time_anchor =
       edge_no == 0 || (edge_no % RTRH_CAPTURE_DECIMATION) == 0;
 
-  if (!unusual_state && !time_anchor)
+  bool unusual_anchor = false;
+  if (unusual_state) {
+    const uint16_t unusual_no = rtrh_capture_unusual_no++;
+    unusual_anchor =
+        unusual_no == 0 ||
+        (unusual_no % RTRH_CAPTURE_UNUSUAL_DECIMATION) == 0;
+  }
+
+  if (!time_anchor && !unusual_anchor)
     return;
 
   const uint16_t index = rtrh_sample_count;
@@ -1637,6 +1650,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     // Rearm only after the frozen capture has been downloaded.
     rtrh_sample_count = 0;
     rtrh_capture_edge_no = 0;
+    rtrh_capture_unusual_no = 0;
     rtrh_overflow = false;
     rtrh_capture_ready = false;
     rtrh_capturing = false;
