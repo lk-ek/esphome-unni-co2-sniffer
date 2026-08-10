@@ -932,11 +932,6 @@ static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_11;
 static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
-// 1: keep reverse-engineering CSV capture/timing endpoints.
-// 0: same four-GPIO decoder/ISR/FSM, but no raw capture buffer or RT/RH CSV handlers.
-#define RTRH_DEBUG_CAPTURE 1
-
-#if RTRH_DEBUG_CAPTURE
 static constexpr uint32_t RTRH_CAPTURE_US = 450000;
 static constexpr uint16_t RTRH_MAX_SAMPLES = 1536;
 static constexpr uint32_t RTRH_CAPTURE_DECIMATION = 16;
@@ -958,16 +953,25 @@ static volatile bool rtrh_capturing = false;
 static volatile bool rtrh_capture_ready = false;
 static volatile bool rtrh_overflow = false;
 static volatile uint32_t rtrh_sequence = 0;
-#endif
 
 /*
  * ============================================================================
- * RT/RH phase decoder
+ * Phase-synchronous RT/RH ADC probe
  * ============================================================================
  *
- * IMPORTANT: the four-GPIO state/timestamp handling below is timing-sensitive.
- * Keep its ISR ordering intact.  The test points are not a 1:1 map of MCU pins;
- * the combined 4-bit state is required for reliable RH edge pairing.
+ * GPIO10 falling is our phase reference. The measured digital period is about
+ * 76-77 us. RH testing showed that GPIO13 in SHORT mode changes most strongly
+ * across the early/middle part of the cycle.  The 31..66 % RH sweep showed
+ * that GPIO13 is already saturated by +24 us at high humidity, so move the
+ * four phases earlier:
+ *
+ *   phase 0: +12 us
+ *   phase 1: +16 us
+ *   phase 2: +20 us
+ *   phase 3: +24 us
+ *
+ * Eight repeats are retained.  Their individual SHORT/GPIO13 raw values are
+ * also exported so cycle-to-cycle structure is not hidden by the mean.
  */
 
 static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
@@ -1106,6 +1110,141 @@ static volatile bool rtrh_passive_snapshot_consumed = true;
 
 static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
 
+// Experimental state-recurrence decoder.
+//
+// Periods are measured between repeated arrivals at the characteristic complete
+// 4-bit states, not from individual GPIO10 edges:
+//   REF: 0x0F -> 0x0F
+//   RT : 0x07 -> 0x07
+//   RH : 0x08 -> 0x08
+//
+// We keep a small rolling interval reservoir and use its median outside the
+// ISR.  This rejects occasional missed characteristic states (2*T, 3*T, ...)
+// as well as short ordering glitches without making the ISR choose a period.
+static constexpr uint8_t RTRH_STATE_PERIOD_SAMPLES = 96;
+
+struct RtRhStatePeriodStats {
+  uint32_t last_us{0};
+  uint16_t samples[RTRH_STATE_PERIOD_SAMPLES]{};
+  uint8_t write_pos{0};
+  uint8_t sample_count{0};
+  uint32_t seen{0};
+};
+
+struct RtRhStatePeriodSnapshot {
+  RtRhStatePeriodStats ref;
+  RtRhStatePeriodStats rt;
+  RtRhStatePeriodStats rh;
+  uint32_t sequence{0};
+};
+
+static RtRhStatePeriodStats rtrh_state_ref;
+static RtRhStatePeriodStats rtrh_state_rt;
+static RtRhStatePeriodStats rtrh_state_rh;
+static uint8_t rtrh_state_phase = RTRH_PHASE_WAIT_REF;
+static RtRhStatePeriodSnapshot rtrh_state_snapshot;
+
+static inline void IRAM_ATTR clear_rtrh_state_period(
+    RtRhStatePeriodStats &s)
+{
+  s.last_us = 0;
+  s.write_pos = 0;
+  s.sample_count = 0;
+  s.seen = 0;
+  for (uint8_t i = 0; i < RTRH_STATE_PERIOD_SAMPLES; i++)
+    s.samples[i] = 0;
+}
+
+static inline void IRAM_ATTR reset_rtrh_state_periods()
+{
+  clear_rtrh_state_period(rtrh_state_ref);
+  clear_rtrh_state_period(rtrh_state_rt);
+  clear_rtrh_state_period(rtrh_state_rh);
+  rtrh_state_phase = RTRH_PHASE_WAIT_REF;
+}
+
+static inline void IRAM_ATTR add_rtrh_state_interval(
+    RtRhStatePeriodStats &s,
+    uint32_t now)
+{
+  if (s.last_us != 0) {
+    const uint32_t dt = static_cast<uint32_t>(now - s.last_us);
+
+    // All known physical periods fit comfortably below 2 ms.  The generous
+    // upper bound still lets the median expose missed states as multiples,
+    // while discarding phase gaps and unrelated long pauses.
+    if (dt >= 40 && dt <= 2000) {
+      s.samples[s.write_pos] = static_cast<uint16_t>(dt);
+      s.write_pos =
+          static_cast<uint8_t>((s.write_pos + 1) %
+                               RTRH_STATE_PERIOD_SAMPLES);
+      if (s.sample_count < RTRH_STATE_PERIOD_SAMPLES)
+        s.sample_count++;
+    }
+  }
+
+  s.last_us = now;
+  s.seen++;
+}
+
+static inline void IRAM_ATTR observe_rtrh_characteristic_state(
+    uint32_t now,
+    uint8_t state)
+{
+  const uint8_t phase = rtrh_passive_phase;
+
+  if (phase != rtrh_state_phase) {
+    rtrh_state_phase = phase;
+
+    // Do not bridge a phase boundary with a recurrence interval.
+    if (phase == RTRH_PHASE_REF)
+      rtrh_state_ref.last_us = 0;
+    else if (phase == RTRH_PHASE_RT)
+      rtrh_state_rt.last_us = 0;
+    else if (phase == RTRH_PHASE_RH)
+      rtrh_state_rh.last_us = 0;
+  }
+
+  if (phase == RTRH_PHASE_REF && state == 0x0F)
+    add_rtrh_state_interval(rtrh_state_ref, now);
+  else if (phase == RTRH_PHASE_RT && state == 0x07)
+    add_rtrh_state_interval(rtrh_state_rt, now);
+  else if (phase == RTRH_PHASE_RH && state == 0x08)
+    add_rtrh_state_interval(rtrh_state_rh, now);
+}
+
+static float rtrh_state_period_median(
+    const RtRhStatePeriodStats &s)
+{
+  const uint8_t n = s.sample_count;
+  if (n == 0)
+    return 0.0f;
+
+  uint16_t tmp[RTRH_STATE_PERIOD_SAMPLES];
+  for (uint8_t i = 0; i < n; i++)
+    tmp[i] = s.samples[i];
+
+  // n <= 96, once per 30 s: simple insertion sort is smaller than dragging in
+  // a generic sort helper and deterministic enough here.
+  for (uint8_t i = 1; i < n; i++) {
+    const uint16_t v = tmp[i];
+    uint8_t j = i;
+    while (j > 0 && tmp[j - 1] > v) {
+      tmp[j] = tmp[j - 1];
+      j--;
+    }
+    tmp[j] = v;
+  }
+
+  if (n & 1)
+    return static_cast<float>(tmp[n / 2]);
+
+  return 0.5f *
+      (static_cast<float>(tmp[n / 2 - 1]) +
+       static_cast<float>(tmp[n / 2]));
+}
+
+
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
   uint8_t value = 0;
@@ -1167,6 +1306,7 @@ static inline void IRAM_ATTR reset_rtrh_passive_measurement(
   rtrh_passive_phase_candidate_run = 0;
   rtrh_passive_rt_temp_period_sum = 0;
   rtrh_passive_rt_temp_count = 0;
+  reset_rtrh_state_periods();
   clear_passive_train(rtrh_passive_current_train);
 
   for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++)
@@ -1331,6 +1471,12 @@ static void finalize_rtrh_passive_measurement()
   classify_rtrh_passive_snapshot(next);
 
   rtrh_passive_snapshot = next;
+
+  rtrh_state_snapshot.ref = rtrh_state_ref;
+  rtrh_state_snapshot.rt = rtrh_state_rt;
+  rtrh_state_snapshot.rh = rtrh_state_rh;
+  rtrh_state_snapshot.sequence = next.sequence;
+
   rtrh_passive_snapshot_ready = true;
   rtrh_passive_snapshot_consumed = false;
   rtrh_passive_collecting = false;
@@ -1503,10 +1649,14 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
       rtrh_passive_have_g10_rise = false;
       rtrh_passive_have_g13_rise = false;
     }
+
+    // State-recurrence measurement.  This intentionally runs after the
+    // original v7c phase FSM so the current REF/RT/RH phase is already known.
+    observe_rtrh_characteristic_state(now, state);
+
     rtrh_passive_last_state = state;
   }
 
-#if RTRH_DEBUG_CAPTURE
   if (rtrh_capture_ready)
     return;
 
@@ -1561,11 +1711,8 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   rtrh_samples[index].edge_no = edge_no;
   rtrh_samples[index].value = value;
   rtrh_sample_count = index + 1;
-#endif
-
 }
 
-#if RTRH_DEBUG_CAPTURE
 class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
@@ -1787,7 +1934,6 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
 };
 
 static RtRhTimingHandler rtrh_timing_handler;
-#endif
 
 /*
  * ============================================================================
@@ -1874,9 +2020,7 @@ void BusSniffer::setup()
   capture_initial_value =
       last_value;
 
-#if RTRH_DEBUG_CAPTURE
   rtrh_last_value = read_rtrh_state();
-#endif
   rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
   rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
   rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
@@ -1977,13 +2121,11 @@ void BusSniffer::setup()
             &capture_handler
         );
 
-#if RTRH_DEBUG_CAPTURE
     web_server_base::global_web_server_base->add_handler(
         &rtrh_capture_handler);
 
     web_server_base::global_web_server_base->add_handler(
         &rtrh_timing_handler);
-#endif
 
   } else {
 
@@ -2013,17 +2155,10 @@ void BusSniffer::setup()
   );
 
 
-#if RTRH_DEBUG_CAPTURE
   ESP_LOGD(
       TAG,
       "Raw captures at /capture; RT/RH edges /rt_rh_capture.csv; trains /rt_rh_timing.csv"
   );
-#else
-  ESP_LOGD(
-      TAG,
-      "Raw capture at /capture; RT/RH decoder running without RT/RH debug buffers"
-  );
-#endif
 }
 
 
@@ -2288,15 +2423,86 @@ void BusSniffer::loop()
           rt_period_us,
           static_cast<unsigned>(s.rt_count));
 
-      if (this->rh_humidity_sensor_ != nullptr)
-        this->rh_humidity_sensor_->publish_state(rh_percent);
+      // Experimental v9 result: period from complete-state recurrence.
+      const RtRhStatePeriodSnapshot ss = rtrh_state_snapshot;
+      const float state_ref_us = rtrh_state_period_median(ss.ref);
+      const float state_rt_us = rtrh_state_period_median(ss.rt);
+      const float state_rh_us = rtrh_state_period_median(ss.rh);
 
-      if (this->rt_temperature_sensor_ != nullptr)
-        this->rt_temperature_sensor_->publish_state(temperature_c);
+      const bool state_periods_valid =
+          ss.sequence == s.sequence &&
+          ss.ref.sample_count >= 16 &&
+          ss.rt.sample_count >= 16 &&
+          ss.rh.sample_count >= 8 &&
+          state_ref_us >= RTRH_REF_VALID_MIN_US &&
+          state_ref_us <= RTRH_REF_VALID_MAX_US &&
+          state_rt_us >= 105.0f &&
+          state_rt_us <= 190.0f &&
+          state_rh_us >= 70.0f &&
+          state_rh_us <= 1200.0f;
+
+      if (state_periods_valid) {
+        const float state_rt_ratio = state_rt_us / state_ref_us;
+        const float state_temperature_c =
+            RTRH_TEMP_RATIO_M * state_rt_ratio + RTRH_TEMP_RATIO_C;
+
+        const float state_rh_ratio = state_rh_us / state_ref_us;
+        const float state_x = logf(state_rh_ratio);
+        float state_rh_percent =
+            RTRH_RH_RATIO_A * state_x * state_x +
+            RTRH_RH_RATIO_B * state_x +
+            RTRH_RH_RATIO_C;
+        if (state_rh_percent < 0.0f) state_rh_percent = 0.0f;
+        if (state_rh_percent > 100.0f) state_rh_percent = 100.0f;
+
+        ESP_LOGI(
+            TAG,
+            "STATE periods: REF %.3f us (%u/%lu), RT %.3f us (%u/%lu), "
+            "RH %.3f us (%u/%lu)",
+            state_ref_us,
+            static_cast<unsigned>(ss.ref.sample_count),
+            static_cast<unsigned long>(ss.ref.seen),
+            state_rt_us,
+            static_cast<unsigned>(ss.rt.sample_count),
+            static_cast<unsigned long>(ss.rt.seen),
+            state_rh_us,
+            static_cast<unsigned>(ss.rh.sample_count),
+            static_cast<unsigned long>(ss.rh.seen));
+
+        ESP_LOGI(
+            TAG,
+            "STATE normalized: RT ratio=%.6f -> %.2f C ; "
+            "RH ratio=%.6f -> %.1f %%",
+            state_rt_ratio,
+            state_temperature_c,
+            state_rh_ratio,
+            state_rh_percent);
+
+        // v9 deliberately publishes the state-recurrence result.  The complete
+        // v7c calculation above remains in the log as the golden comparison.
+        if (this->rh_humidity_sensor_ != nullptr)
+          this->rh_humidity_sensor_->publish_state(state_rh_percent);
+
+        if (this->rt_temperature_sensor_ != nullptr)
+          this->rt_temperature_sensor_->publish_state(state_temperature_c);
+      } else {
+        ESP_LOGW(
+            TAG,
+            "STATE periods invalid: REF %.3f us (%u), RT %.3f us (%u), "
+            "RH %.3f us (%u); keeping v7c result",
+            state_ref_us, static_cast<unsigned>(ss.ref.sample_count),
+            state_rt_us, static_cast<unsigned>(ss.rt.sample_count),
+            state_rh_us, static_cast<unsigned>(ss.rh.sample_count));
+
+        if (this->rh_humidity_sensor_ != nullptr)
+          this->rh_humidity_sensor_->publish_state(rh_percent);
+
+        if (this->rt_temperature_sensor_ != nullptr)
+          this->rt_temperature_sensor_->publish_state(temperature_c);
+      }
     }
   }
 
-#if RTRH_DEBUG_CAPTURE
   // A completed digital trace stays frozen for HTTP; train decoding continues.
   if (rtrh_capture_ready) {
     static uint32_t last_reported_rtrh_sequence = UINT32_MAX;
@@ -2329,7 +2535,6 @@ void BusSniffer::loop()
           rtrh_overflow ? " OVERFLOW" : "");
     }
   }
-#endif
 
   /*
    * Capture noch aktiv?
