@@ -60,6 +60,8 @@ static const char *TAG = "bus_sniffer";
  * v23 enabled ESPHome's native GATT server.
  * v24 corrects the Sensirion manufacturer-data header back to the byte order
  * used by the current official UPT BLE_example: D5 06.
+ * v25 uses T_RH_CO2_ALT integer signal encoding: T*200 (signed),
+ * RH*100, CO2 direct ppm; sample uint16 fields remain little-endian.
  * The rest of the over-the-air payload remains unchanged and enables ESPHome's native
  * GATT server from YAML.  This deliberately avoids mixing NimBLE-Arduino with
  * ESPHome's ESP-IDF BLE stack.
@@ -85,47 +87,37 @@ static uint16_t sensirion_ble_device_id = 0;
 
 static uint16_t sensirion_ble_encode_temperature(float value)
 {
-  // Sensirion SCD4x/SHT-style 16-bit temperature representation:
-  // T = -45 + 175 * raw / 65535.
-  if (value < -45.0f)
-    value = -45.0f;
-  else if (value > 130.0f)
-    value = 130.0f;
+  /*
+   * Sensirion UPT T_RH_CO2_ALT temperature:
+   * signed temperature in degrees C, scaling factor 200.
+   */
+  float scaled = value * 200.0f;
 
-  const float raw =
-      (value + 45.0f) * 65535.0f / 175.0f;
+  if (scaled > 32767.0f)
+    scaled = 32767.0f;
+  else if (scaled < -32768.0f)
+    scaled = -32768.0f;
 
-  long rounded = lroundf(raw);
+  const int16_t encoded =
+      static_cast<int16_t>(lroundf(scaled));
 
-  if (rounded < 0)
-    rounded = 0;
-  else if (rounded > 65535)
-    rounded = 65535;
-
-  return static_cast<uint16_t>(rounded);
+  return static_cast<uint16_t>(encoded);
 }
 
 
 static uint16_t sensirion_ble_encode_humidity(float value)
 {
-  // Sensirion SCD4x-style 16-bit RH representation:
-  // RH = 100 * raw / 65535.
+  /*
+   * Sensirion UPT T_RH_CO2_ALT relative humidity:
+   * percent RH, scaling factor 100.
+   */
   if (value < 0.0f)
     value = 0.0f;
   else if (value > 100.0f)
     value = 100.0f;
 
-  const float raw =
-      value * 65535.0f / 100.0f;
-
-  long rounded = lroundf(raw);
-
-  if (rounded < 0)
-    rounded = 0;
-  else if (rounded > 65535)
-    rounded = 65535;
-
-  return static_cast<uint16_t>(rounded);
+  return static_cast<uint16_t>(
+      lroundf(value * 100.0f));
 }
 
 
@@ -230,7 +222,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2 [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2/UPT [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
