@@ -31,6 +31,47 @@ static const char *TAG = "bus_sniffer";
 
 /*
  * ============================================================================
+ * BLE identity test
+ * ============================================================================
+ *
+ * Give this firmware a deliberately different Bluetooth identity so that
+ * MyAmbience/CoreBluetooth cannot identify it through the original ESP32-C3
+ * BT MAC / GATT System ID.
+ *
+ * Original observed BT identity / 0x2A23:
+ *   80:F1:B2:61:67:3A
+ *
+ * Test identity:
+ *   82:F1:B2:61:68:3A
+ *
+ * 0x82 has the locally-administered bit set and the multicast bit clear, so it
+ * is a valid private test MAC.  esp_iface_mac_addr_set(ESP_MAC_BT) is executed
+ * from a C++ constructor, i.e. before ESPHome initializes Wi-Fi/BLE in
+ * app_main().  Consequently:
+ *
+ *   - the BLE controller uses the new identity address,
+ *   - esp_read_mac(..., ESP_MAC_BT) returns the new address,
+ *   - GATT characteristic 0x2A23 from the YAML returns ... 68 3A,
+ *   - sensirion_ble_get_device_id() derives gadget ID 0x683A.
+ *
+ * This intentionally changes no sensor/BLE payload logic apart from identity.
+ */
+static constexpr uint8_t SENSIRION_TEST_BT_MAC[6] = {
+    0x82, 0xF1, 0xB2, 0x61, 0x68, 0x3A};
+
+static esp_err_t sensirion_test_bt_mac_set_result = ESP_FAIL;
+
+__attribute__((constructor))
+static void sensirion_set_test_bt_identity_early()
+{
+  sensirion_test_bt_mac_set_result = esp_iface_mac_addr_set(
+      SENSIRION_TEST_BT_MAC,
+      ESP_MAC_BT);
+}
+
+
+/*
+ * ============================================================================
  * Sensirion MyCO2-compatible BLE live advertisement
  * ============================================================================
  *
@@ -187,7 +228,8 @@ static void update_sensirion_ble_advertisement()
   const uint16_t device_id =
       sensirion_ble_get_device_id();
 
-  std::vector<uint8_t> data(14);
+  //std::vector<uint8_t> data(14);
+  std::vector<uint8_t> data(18, 0);
 
   // Sensirion Bluetooth SIG Company Identifier is 0x06D5.
   // BLE Manufacturer Specific Data carries the 16-bit company ID
@@ -1919,6 +1961,28 @@ static RtRhTimingHandler rtrh_timing_handler;
 
 void BusSniffer::setup()
 {
+  uint8_t bt_mac[6] = {0};
+  const esp_err_t bt_read_err = esp_read_mac(bt_mac, ESP_MAC_BT);
+
+  if (sensirion_test_bt_mac_set_result == ESP_OK && bt_read_err == ESP_OK) {
+    ESP_LOGI(
+        TAG,
+        "BLE identity test active: BT MAC/System ID "
+        "%02X:%02X:%02X:%02X:%02X:%02X, Sensirion ID 0x%02X%02X",
+        bt_mac[0], bt_mac[1], bt_mac[2],
+        bt_mac[3], bt_mac[4], bt_mac[5],
+        bt_mac[4], bt_mac[5]);
+  } else {
+    ESP_LOGE(
+        TAG,
+        "BLE identity test FAILED: set=%d read=%d; actual BT MAC "
+        "%02X:%02X:%02X:%02X:%02X:%02X",
+        static_cast<int>(sensirion_test_bt_mac_set_result),
+        static_cast<int>(bt_read_err),
+        bt_mac[0], bt_mac[1], bt_mac[2],
+        bt_mac[3], bt_mac[4], bt_mac[5]);
+  }
+
   last_capture_mutex =
       xSemaphoreCreateMutex();
 
