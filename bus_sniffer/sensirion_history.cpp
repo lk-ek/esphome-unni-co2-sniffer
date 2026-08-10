@@ -750,6 +750,14 @@ static void sens_history_configure_gatt(esp32_ble_server::BLEServer *server)
 void sensirion_history_setup()
 {
   sens_history_flash_init();
+
+  // GATT characteristics may already have been created with the compile-time
+  // defaults before flash restoration runs. Publish the restored interval and
+  // sample count immediately so MyAmbience sees the persistent state on its
+  // first read after boot, rather than 600000 ms / 0 samples until the next
+  // history sample is recorded.
+  sens_history_sync_gatt_values();
+
   sens_history_last_flush_ms = sens_history_now_ms();
 }
 
