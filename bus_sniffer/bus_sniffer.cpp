@@ -6,6 +6,7 @@
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include "esphome/components/esp32_ble_server/ble_service.h"
 #include "esphome/components/esp32_ble_server/ble_characteristic.h"
+#include "esphome/components/esp32_ble_server/ble_2902.h"
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
@@ -401,6 +402,13 @@ static esp32_ble_server::BLECharacteristic *sens_history_count_char = nullptr;
 static esp32_ble_server::BLECharacteristic *sens_history_interval_char = nullptr;
 static esp32_ble_server::BLECharacteristic *sens_history_requested_char = nullptr;
 static esp32_ble_server::BLECharacteristic *sens_history_download_char = nullptr;
+
+class SensirionHistoryCCCD : public esp32_ble_server::BLE2902 {
+ public:
+  uint16_t get_handle() const { return this->handle_; }
+};
+
+static SensirionHistoryCCCD *sens_history_download_cccd = nullptr;
 static bool sens_history_gatt_bound = false;
 
 static uint32_t sens_history_requested_samples = 0;
@@ -929,37 +937,77 @@ static void sens_history_download_tick()
   }
 }
 
-static void sens_history_bind_gatt()
+static void sens_history_configure_gatt(esp32_ble_server::BLEServer *server)
 {
-  if (sens_history_gatt_bound ||
-      esp32_ble_server::global_ble_server == nullptr ||
-      !esp32_ble_server::global_ble_server->is_running())
+  if (sens_history_gatt_bound || server == nullptr)
     return;
 
-  auto *service = esp32_ble_server::global_ble_server->get_service(
-      esp32_ble::ESPBTUUID::from_raw(
-          "00008000-B38D-4985-720E-0F993A68EE41"));
-  if (service == nullptr)
+  using esp32_ble::ESPBTUUID;
+  using esp32_ble_server::BLECharacteristic;
+
+  // Device Information (0x180A) stays owned by ESPHome.  It is generic
+  // metadata, not part of the Sensirion history protocol.  Keeping it out of
+  // this component also avoids coupling to ESPHome's DIS handle allocation.
+
+  auto download_uuid = ESPBTUUID::from_raw(
+      "00008000-B38D-4985-720E-0F993A68EE41");
+  auto *service = server->get_service(download_uuid);
+  if (service == nullptr) {
+    // Service declaration + 4 characteristics + one CCCD = 10 handles.
+    service = server->create_service(download_uuid, false, 10);
+  }
+  if (service == nullptr) {
+    ESP_LOGE("sensirion_history", "failed to create 0x8000 history service");
     return;
+  }
 
   sens_history_count_char = service->get_characteristic(
-      esp32_ble::ESPBTUUID::from_raw(
-          "00008002-B38D-4985-720E-0F993A68EE41"));
+      ESPBTUUID::from_raw("00008002-B38D-4985-720E-0F993A68EE41"));
+  if (sens_history_count_char == nullptr) {
+    sens_history_count_char = service->create_characteristic(
+        ESPBTUUID::from_raw("00008002-B38D-4985-720E-0F993A68EE41"),
+        BLECharacteristic::PROPERTY_READ);
+  }
+
   sens_history_requested_char = service->get_characteristic(
-      esp32_ble::ESPBTUUID::from_raw(
-          "00008003-B38D-4985-720E-0F993A68EE41"));
+      ESPBTUUID::from_raw("00008003-B38D-4985-720E-0F993A68EE41"));
+  if (sens_history_requested_char == nullptr) {
+    sens_history_requested_char = service->create_characteristic(
+        ESPBTUUID::from_raw("00008003-B38D-4985-720E-0F993A68EE41"),
+        BLECharacteristic::PROPERTY_WRITE);
+  }
+
   sens_history_interval_char = service->get_characteristic(
-      esp32_ble::ESPBTUUID::from_raw(
-          "00008001-B38D-4985-720E-0F993A68EE41"));
+      ESPBTUUID::from_raw("00008001-B38D-4985-720E-0F993A68EE41"));
+  if (sens_history_interval_char == nullptr) {
+    sens_history_interval_char = service->create_characteristic(
+        ESPBTUUID::from_raw("00008001-B38D-4985-720E-0F993A68EE41"),
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  }
+
   sens_history_download_char = service->get_characteristic(
-      esp32_ble::ESPBTUUID::from_raw(
-          "00008004-B38D-4985-720E-0F993A68EE41"));
+      ESPBTUUID::from_raw("00008004-B38D-4985-720E-0F993A68EE41"));
+  if (sens_history_download_char == nullptr) {
+    sens_history_download_char = service->create_characteristic(
+        ESPBTUUID::from_raw("00008004-B38D-4985-720E-0F993A68EE41"),
+        BLECharacteristic::PROPERTY_NOTIFY);
+    sens_history_download_cccd = new SensirionHistoryCCCD();
+    sens_history_download_cccd->set_value({0x00, 0x00});
+    sens_history_download_char->add_descriptor(sens_history_download_cccd);
+  }
 
   if (sens_history_count_char == nullptr ||
       sens_history_requested_char == nullptr ||
       sens_history_interval_char == nullptr ||
-      sens_history_download_char == nullptr)
+      sens_history_download_char == nullptr ||
+      sens_history_download_cccd == nullptr) {
+    ESP_LOGE("sensirion_history", "failed to create complete Sensirion GATT topology");
     return;
+  }
+
+  sens_history_count_char->set_value({0, 0, 0, 0});
+  sens_history_requested_char->set_value({0, 0, 0, 0});
+  sens_history_download_char->set_value(std::vector<uint8_t>(20, 0));
 
   sens_history_requested_char->on_write(
       [](std::span<const uint8_t> x, uint16_t conn_id) {
@@ -985,10 +1033,21 @@ static void sens_history_bind_gatt()
       });
 
   sens_history_sync_gatt_values();
-  sens_history_gatt_bound = true;
 
+  // Non-DIS services must be explicitly queued for start.
+  server->enqueue_start_service(service);
+
+  auto settings_uuid = ESPBTUUID::from_raw(
+      "00008100-B38D-4985-720E-0F993A68EE41");
+  auto *settings = server->get_service(settings_uuid);
+  if (settings == nullptr)
+    settings = server->create_service(settings_uuid, false, 1);
+  if (settings != nullptr)
+    server->enqueue_start_service(settings);
+
+  sens_history_gatt_bound = true;
   ESP_LOGI("sensirion_history",
-           "Sensirion history GATT bound: %u sample(s), interval=%u ms",
+           "Sensirion GATT configured in component: %u sample(s), interval=%u ms",
            static_cast<unsigned>(sens_history_count),
            static_cast<unsigned>(sens_history_interval_ms));
 }
@@ -2635,6 +2694,12 @@ class RtRhTimingHandler
 static RtRhTimingHandler rtrh_timing_handler;
 #endif
 
+void BusSniffer::configure_gatt_server(esp32_ble_server::BLEServer *server)
+{
+  sens_history_configure_gatt(server);
+}
+
+
 void BusSniffer::gatts_event_handler(
     esp_gatts_cb_event_t event,
     esp_gatt_if_t,
@@ -2649,17 +2714,26 @@ void BusSniffer::gatts_event_handler(
     return;
   }
 
-  if (event != ESP_GATTS_WRITE_EVT ||
-      param->write.is_prep ||
+  if (event != ESP_GATTS_WRITE_EVT || param->write.is_prep)
+    return;
+
+  ESP_LOGD("sensirion_history",
+           "GATT WRITE handle=0x%04X len=%u conn=%u",
+           static_cast<unsigned>(param->write.handle),
+           static_cast<unsigned>(param->write.len),
+           static_cast<unsigned>(param->write.conn_id));
+
+  if (sens_history_download_cccd == nullptr ||
+      param->write.handle != sens_history_download_cccd->get_handle() ||
       param->write.len != 2)
     return;
 
-  // This firmware exposes exactly one CCCD: 0x2902 on characteristic 0x8004.
-  // ESPHome itself consumes the descriptor write to maintain the subscriber
-  // list; this second registered GATT handler observes the same event and
-  // starts/stops the Sensirion download state machine.
   const uint8_t lo = param->write.value[0];
   const uint8_t hi = param->write.value[1];
+  ESP_LOGI("sensirion_history",
+           "8004 CCCD WRITE = %02X %02X (conn=%u, handle=0x%04X)",
+           lo, hi, static_cast<unsigned>(param->write.conn_id),
+           static_cast<unsigned>(param->write.handle));
 
   if (lo == 0x01 && hi == 0x00) {
     sens_history_start_download();
@@ -2938,7 +3012,6 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
-  sens_history_bind_gatt();
   sens_history_sampling_tick();
   sens_history_download_tick();
 

@@ -19,13 +19,11 @@ api:
 ota:
   - platform: esphome
     password: !secret i2csniffer__ota
-    # Needed only when installing/changing the partition table over OTA.
     allow_partition_access: true
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
   ap:
     ssid: "I2CSniffer Fallback Hotspot"
     password: !secret i2csniffer__ap_password
@@ -36,126 +34,25 @@ esp32:
   board: seeed_xiao_esp32c3
   framework:
     type: esp-idf
-  # Dedicated 64 KiB append-only history log. ESPHome shrinks the auto-generated
-  # OTA app partitions to make room for this data partition.
+  # Persistent Sensirion history store. This is storage configuration rather
+  # than GATT protocol configuration; the bus_sniffer component owns the format.
   partitions:
     - name: senshist
       type: data
       subtype: spiffs
       size: 0x10000
 
-# BLE host used by the custom Sensirion MyCO2 manufacturer advertisement.
-# No GATT server is required for live broadcasts.
+# User-facing BLE configuration only.  Sensirion services/characteristics,
+# callbacks, System ID and history protocol are created by bus_sniffer itself.
 esp32_ble:
   name: "S"
   advertising: true
 
-# Sensirion Gadgets are connectable GATT servers in addition to broadcasting
-# live measurements in manufacturer data.  Use ESPHome's native ESP-IDF BLE
-# server rather than loading a second NimBLE-Arduino stack.
-#
-# ESPHome automatically exposes its Device Information service here.
 esp32_ble_server:
   max_clients: 1
-
-  # Define 0x180A explicitly so it contains exactly the MyCO2-supported
-  # Device Information characteristics from the Sensirion table.
-  services:
-    # Device Information Service used by the current ESPHome compatibility layer.
-    - uuid: 0x180A
-      advertise: false
-      characteristics:
-        - uuid: 0x2A29
-          read: true
-          value:
-            data: "Sensirion"
-            type: string
-
-        - uuid: 0x2A24
-          read: true
-          value:
-            data: "MyCO2 Gadget"
-            type: string
-
-        - uuid: 0x2A26
-          read: true
-          value:
-            data: "1.0.0"
-            type: string
-
-        - uuid: 0x2A23
-          read: true
-          value:
-            data: !lambda |-
-              uint8_t mac[6] = {0};
-              esp_err_t err = esp_read_mac(mac, ESP_MAC_BT);
-              if (err != ESP_OK) {
-                ESP_LOGE("sensirion_gatt",
-                         "esp_read_mac(ESP_MAC_BT) failed: %d",
-                         static_cast<int>(err));
-                return std::vector<uint8_t>({0, 0, 0, 0, 0, 0});
-              }
-              return std::vector<uint8_t>(mac, mac + 6);
-
-    # Sensirion Gadget BLE history/download service.  This mirrors the
-    # official arduino-ble-gadget service topology exactly.
-    - uuid: "00008000-B38D-4985-720E-0F993A68EE41"
-      advertise: false
-      characteristics:
-        # Number of samples in history: READ, uint32 LE.
-        - id: sensirion_history_count_char
-          uuid: "00008002-B38D-4985-720E-0F993A68EE41"
-          read: true
-          value:
-            data: [0x00, 0x00, 0x00, 0x00]
-
-        # Requested number of samples: WRITE, uint32 LE.
-        - id: sensirion_requested_samples_char
-          uuid: "00008003-B38D-4985-720E-0F993A68EE41"
-          write: true
-        # Sample-history interval: READ | WRITE, uint32 LE milliseconds.
-        # Default remains 600000 ms = 10 minutes; writes are handled by bus_sniffer history code.
-        - id: sensirion_history_interval_char
-          uuid: "00008001-B38D-4985-720E-0F993A68EE41"
-          read: true
-          write: true
-          value:
-            data: [0xC0, 0x27, 0x09, 0x00]
-        # Download stream: NOTIFY only. ESPHome adds CCCD 0x2902.
-        - id: sensirion_download_packet_char
-          uuid: "00008004-B38D-4985-720E-0F993A68EE41"
-          notify: true
-          value:
-            data: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                   0x00, 0x00, 0x00, 0x00]
-
-    # Official DataProvider creates this service even when no optional
-    # settings characteristics (Wi-Fi / alternate name) are enabled.
-    - uuid: "00008100-B38D-4985-720E-0F993A68EE41"
-      advertise: false
-
-  on_connect:
-    - lambda: |-
-        uint8_t mac[6] = {0};
-        esp_err_t err = esp_read_mac(mac, ESP_MAC_BT);
-        if (err == ESP_OK) {
-          ESP_LOGI("sensirion_gatt",
-                   "BLE GATT client connected: id=%u, System ID/MAC "
-                   "%02X:%02X:%02X:%02X:%02X:%02X",
-                   static_cast<unsigned>(id),
-                   mac[0], mac[1], mac[2],
-                   mac[3], mac[4], mac[5]);
-        } else {
-          ESP_LOGI("sensirion_gatt",
-                   "BLE GATT client connected: id=%u",
-                   static_cast<unsigned>(id));
-        }
-
-  on_disconnect:
-    - lambda: |-
-        ESP_LOGI("sensirion_gatt", "BLE GATT client disconnected: id=%u",
-                 static_cast<unsigned>(id));
+  manufacturer: "Sensirion"
+  model: "MyCO2 Gadget"
+  firmware_version: "1.0.0"
 
 web_server:
   port: 80
