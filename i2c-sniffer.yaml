@@ -45,13 +45,63 @@ esp32_ble:
 #
 # ESPHome automatically exposes its Device Information service here.
 esp32_ble_server:
-  manufacturer: "Sensirion"
-  model: "MyCO2 Gadget"
   max_clients: 1
+
+  # Define 0x180A explicitly so it contains exactly the MyCO2-supported
+  # Device Information characteristics from the Sensirion table.
+  services:
+    - uuid: 0x180A
+      advertise: false
+      characteristics:
+        - uuid: 0x2A29
+          read: true
+          value:
+            data: "Sensirion"
+            type: string
+
+        - uuid: 0x2A24
+          read: true
+          value:
+            data: "MyCO2 Gadget"
+            type: string
+
+        - uuid: 0x2A26
+          read: true
+          value:
+            data: "1.0.0"
+            type: string
+
+        - uuid: 0x2A23
+          read: true
+          value:
+            data: !lambda |-
+              uint8_t mac[6] = {0};
+              esp_err_t err = esp_read_mac(mac, ESP_MAC_BT);
+              if (err != ESP_OK) {
+                ESP_LOGE("sensirion_gatt",
+                         "esp_read_mac(ESP_MAC_BT) failed: %d",
+                         static_cast<int>(err));
+                return std::vector<uint8_t>({0, 0, 0, 0, 0, 0});
+              }
+              return std::vector<uint8_t>(mac, mac + 6);
+
   on_connect:
     - lambda: |-
-        ESP_LOGI("sensirion_gatt", "BLE GATT client connected: id=%u",
-                 static_cast<unsigned>(id));
+        uint8_t mac[6] = {0};
+        esp_err_t err = esp_read_mac(mac, ESP_MAC_BT);
+        if (err == ESP_OK) {
+          ESP_LOGI("sensirion_gatt",
+                   "BLE GATT client connected: id=%u, System ID/MAC "
+                   "%02X:%02X:%02X:%02X:%02X:%02X",
+                   static_cast<unsigned>(id),
+                   mac[0], mac[1], mac[2],
+                   mac[3], mac[4], mac[5]);
+        } else {
+          ESP_LOGI("sensirion_gatt",
+                   "BLE GATT client connected: id=%u",
+                   static_cast<unsigned>(id));
+        }
+
   on_disconnect:
     - lambda: |-
         ESP_LOGI("sensirion_gatt", "BLE GATT client disconnected: id=%u",

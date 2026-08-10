@@ -71,6 +71,8 @@ static const char *TAG = "bus_sniffer";
  * complete local name begins with 'S' (S-Unni-CO2) and the assigned
  * Company Identifier 0x06D5 is serialized little-endian as D5 06.
  * Sensor decoding, calibration, UPT sample scaling and GATT server stay unchanged.
+ * v28 completes the Device Information Service in YAML: firmware 1.0.0
+ * and System ID 0x2A23 containing the six BLE-MAC bytes.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
@@ -230,7 +232,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2/UPT v27 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2/UPT v28 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
