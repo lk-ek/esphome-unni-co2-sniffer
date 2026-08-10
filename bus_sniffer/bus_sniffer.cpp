@@ -962,19 +962,44 @@ static volatile uint32_t rtrh_sequence = 0;
 
 static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 
-// Preliminary calibration for completely passive RT timing.
-// T[°C] = M * RT_period_us + C
-static constexpr float RTRH_TEMP_M = -0.4163213f;
-static constexpr float RTRH_TEMP_C = 84.38101f;
+// REF-normalized passive calibration.
+//
+// The REF phase is treated as the internal timing reference.  Using ratios
+// suppresses common drift from C12, GPIO threshold and supply.
+//
+// Historical calibration was obtained around REF ~= 76.72 us.  The old
+// absolute fits have therefore been algebraically transformed to ratios;
+// at REF=76.72 us they are numerically identical to v5.
+//
+// Temperature:
+//   ratio = RT_period / REF_period
+//   T[degC] = M * ratio + C
+static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
+static constexpr float RTRH_TEMP_RATIO_C = 84.38101f;
 
-// Preliminary RH calibration from the passive RH oscillator.
-// x = ln(period_us)
-// RH[%] = A*x^2 + B*x + C
-// Refit with the stable anchor 457 us -> 39 % RH and boundary anchors
-// 775 us -> 34 % RH, 94 us -> 61 % RH. Still provisional.
-static constexpr float RTRH_RH_A = 2.1072311f;
-static constexpr float RTRH_RH_B = -36.391719f;
-static constexpr float RTRH_RH_C = 182.84184f;
+// Humidity:
+//   ratio = RH_period / REF_period
+//   x = ln(ratio)
+//   RH[%] = A*x^2 + B*x + C
+// Anchors remain approximately 775 us -> 34 %, 457 us -> 39 %, 94 us -> 61 %
+// when REF is 76.72 us.
+static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
+static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
+static constexpr float RTRH_RH_RATIO_C = 64.58980155f;
+
+// Measurement quality limits.  Invalid snapshots are logged but not published.
+static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
+static constexpr float RTRH_REF_VALID_MAX_US = 82.0f;
+static constexpr float RTRH_REF_DURATION_MIN_MS = 115.0f;
+static constexpr float RTRH_REF_DURATION_MAX_MS = 135.0f;
+static constexpr float RTRH_RT_DURATION_MIN_MS = 120.0f;
+static constexpr float RTRH_RT_DURATION_MAX_MS = 135.0f;
+static constexpr float RTRH_RH_DURATION_MIN_MS = 120.0f;
+static constexpr float RTRH_RH_DURATION_MAX_MS = 135.0f;
+static constexpr uint16_t RTRH_REF_COUNT_MIN = 1450;
+static constexpr uint16_t RTRH_REF_COUNT_MAX = 1750;
+static constexpr uint16_t RTRH_RT_PHASE_COUNT_MIN = 850;
+static constexpr uint16_t RTRH_RT_PHASE_COUNT_MAX = 930;
 
 // Phase-based passive RT/RH decoder.
 // Sequence: REF (~76.7 us) -> RT (~138 us) -> RH (variable).
@@ -2017,25 +2042,29 @@ void BusSniffer::loop()
         s.overflow ? " OVERFLOW" : "",
         s.rt_mixed ? " RT/RH-MIXED" : "");
 
+    const RtRhPassiveTrain *ref_train = nullptr;
+    const RtRhPassiveTrain *rt_train = nullptr;
+    const RtRhPassiveTrain *rh_train = nullptr;
+
     for (uint8_t i = 0; i < s.train_count; i++) {
-      const RtRhPassiveTrain &t = s.trains[i];
+      const RtRhPassiveTrain &train = s.trains[i];
 
       const float period_mean =
-          t.count
-              ? static_cast<float>(t.period_sum) /
-                    static_cast<float>(t.count)
+          train.count
+              ? static_cast<float>(train.period_sum) /
+                    static_cast<float>(train.count)
               : 0.0f;
 
       const float low_mean =
-          t.count
-              ? static_cast<float>(t.low_sum) /
-                    static_cast<float>(t.count)
+          train.count
+              ? static_cast<float>(train.low_sum) /
+                    static_cast<float>(train.count)
               : 0.0f;
 
       const float delay_mean =
-          t.g13_delay_count
-              ? static_cast<float>(t.g13_delay_sum) /
-                    static_cast<float>(t.g13_delay_count)
+          train.g13_delay_count
+              ? static_cast<float>(train.g13_delay_sum) /
+                    static_cast<float>(train.g13_delay_count)
               : 0.0f;
 
       ESP_LOGI(
@@ -2043,83 +2072,173 @@ void BusSniffer::loop()
           "  train %u %-7s: n=%u gap=%lu us period=%.3f us "
           "low=%.3f us G13delay=%.3f us (%u)",
           static_cast<unsigned>(i),
-          rtrh_train_role_name(t.role),
-          static_cast<unsigned>(t.count),
-          static_cast<unsigned long>(t.gap_before_us),
+          rtrh_train_role_name(train.role),
+          static_cast<unsigned>(train.count),
+          static_cast<unsigned long>(train.gap_before_us),
           period_mean,
           low_mean,
           delay_mean,
-          static_cast<unsigned>(t.g13_delay_count));
+          static_cast<unsigned>(train.g13_delay_count));
 
-      if (t.role == RTRH_ROLE_RH && t.count != 0) {
-        const float rh_duration_ms =
-            static_cast<float>(t.period_sum) / 1000.0f;
-
-        const float rh_frequency_hz =
-            period_mean > 0.0f
-                ? 1000000.0f / period_mean
-                : 0.0f;
-
-        ESP_LOGI(
-            TAG,
-            "RH timing PASSIVE: period=%.3f us, cycles=%u, "
-            "duration=%.3f ms, freq=%.2f Hz",
-            period_mean,
-            static_cast<unsigned>(t.count),
-            rh_duration_ms,
-            rh_frequency_hz);
-
-        if (period_mean > 0.0f) {
-          const float x = logf(period_mean);
-
-          float rh_percent =
-              RTRH_RH_A * x * x +
-              RTRH_RH_B * x +
-              RTRH_RH_C;
-
-          if (rh_percent < 0.0f)
-            rh_percent = 0.0f;
-          else if (rh_percent > 100.0f)
-            rh_percent = 100.0f;
-
-          ESP_LOGI(
-              TAG,
-              "RH humidity PASSIVE: %.1f %% from RH period %.3f us",
-              rh_percent,
-              period_mean);
-
-          if (this->rh_humidity_sensor_ != nullptr)
-            this->rh_humidity_sensor_->
-                publish_state(rh_percent);
-        }
-      }
+      if (train.role == RTRH_ROLE_REF && ref_train == nullptr)
+        ref_train = &s.trains[i];
+      else if (train.role == RTRH_ROLE_RT && rt_train == nullptr)
+        rt_train = &s.trains[i];
+      else if (train.role == RTRH_ROLE_RH && rh_train == nullptr)
+        rh_train = &s.trains[i];
     }
 
-    if (s.rt_valid && s.rt_count != 0) {
+    bool measurement_valid =
+        !s.overflow &&
+        !s.rt_mixed &&
+        ref_train != nullptr &&
+        rt_train != nullptr &&
+        rh_train != nullptr &&
+        ref_train->count != 0 &&
+        rt_train->count != 0 &&
+        rh_train->count != 0;
+
+    float ref_period_us = 0.0f;
+    float rt_phase_period_us = 0.0f;
+    float rh_period_us = 0.0f;
+    float ref_duration_ms = 0.0f;
+    float rt_duration_ms = 0.0f;
+    float rh_duration_ms = 0.0f;
+
+    if (measurement_valid) {
+      ref_period_us =
+          static_cast<float>(ref_train->period_sum) /
+          static_cast<float>(ref_train->count);
+
+      rt_phase_period_us =
+          static_cast<float>(rt_train->period_sum) /
+          static_cast<float>(rt_train->count);
+
+      rh_period_us =
+          static_cast<float>(rh_train->period_sum) /
+          static_cast<float>(rh_train->count);
+
+      ref_duration_ms =
+          static_cast<float>(ref_train->period_sum) / 1000.0f;
+      rt_duration_ms =
+          static_cast<float>(rt_train->period_sum) / 1000.0f;
+      rh_duration_ms =
+          static_cast<float>(rh_train->period_sum) / 1000.0f;
+
+      const bool ref_ok =
+          ref_period_us >= RTRH_REF_VALID_MIN_US &&
+          ref_period_us <= RTRH_REF_VALID_MAX_US &&
+          ref_duration_ms >= RTRH_REF_DURATION_MIN_MS &&
+          ref_duration_ms <= RTRH_REF_DURATION_MAX_MS &&
+          ref_train->count >= RTRH_REF_COUNT_MIN &&
+          ref_train->count <= RTRH_REF_COUNT_MAX;
+
+      const bool rt_ok =
+          rt_duration_ms >= RTRH_RT_DURATION_MIN_MS &&
+          rt_duration_ms <= RTRH_RT_DURATION_MAX_MS &&
+          rt_train->count >= RTRH_RT_PHASE_COUNT_MIN &&
+          rt_train->count <= RTRH_RT_PHASE_COUNT_MAX &&
+          s.rt_valid &&
+          s.rt_count >= 800;
+
+      const bool rh_ok =
+          rh_duration_ms >= RTRH_RH_DURATION_MIN_MS &&
+          rh_duration_ms <= RTRH_RH_DURATION_MAX_MS;
+
+      measurement_valid = ref_ok && rt_ok && rh_ok;
+
+      ESP_LOGI(
+          TAG,
+          "RT/RH quality: REF %.3f us / %.3f ms / %u, "
+          "RT %.3f ms / %u, RH %.3f ms / %u -> %s",
+          ref_period_us,
+          ref_duration_ms,
+          static_cast<unsigned>(ref_train->count),
+          rt_duration_ms,
+          static_cast<unsigned>(rt_train->count),
+          rh_duration_ms,
+          static_cast<unsigned>(rh_train->count),
+          measurement_valid ? "VALID" : "REJECT");
+    }
+
+    if (!measurement_valid) {
+      ESP_LOGW(
+          TAG,
+          "RT/RH values not published: measurement failed "
+          "phase/quality checks");
+    } else {
+      // Temperature uses the protected first 880 RT cycles, normalized by REF.
       const float rt_period_us =
           static_cast<float>(s.rt_period_sum) /
           static_cast<float>(s.rt_count);
 
+      const float rt_ratio =
+          rt_period_us / ref_period_us;
+
       const float temperature_c =
-          RTRH_TEMP_M * rt_period_us +
-          RTRH_TEMP_C;
+          RTRH_TEMP_RATIO_M * rt_ratio +
+          RTRH_TEMP_RATIO_C;
+
+      // RH is normalized to the same REF period.  The RH phase itself is a
+      // fixed ~127 ms counting window, so count and period carry the same
+      // information; period/count consistency is inherently checked by the
+      // duration gate above.
+      const float rh_ratio =
+          rh_period_us / ref_period_us;
+
+      const float x = logf(rh_ratio);
+
+      float rh_percent =
+          RTRH_RH_RATIO_A * x * x +
+          RTRH_RH_RATIO_B * x +
+          RTRH_RH_RATIO_C;
+
+      if (rh_percent < 0.0f)
+        rh_percent = 0.0f;
+      else if (rh_percent > 100.0f)
+        rh_percent = 100.0f;
+
+      const float rh_frequency_hz =
+          1000000.0f / rh_period_us;
 
       ESP_LOGI(
           TAG,
-          "RT temperature PASSIVE: %.2f C from RT %.3f us "
-          "(%u cycles)",
+          "RT normalized: ratio=%.6f (RT %.3f / REF %.3f us)",
+          rt_ratio,
+          rt_period_us,
+          ref_period_us);
+
+      ESP_LOGI(
+          TAG,
+          "RH normalized: ratio=%.6f (RH %.3f / REF %.3f us), "
+          "cycles=%u, duration=%.3f ms, freq=%.2f Hz",
+          rh_ratio,
+          rh_period_us,
+          ref_period_us,
+          static_cast<unsigned>(rh_train->count),
+          rh_duration_ms,
+          rh_frequency_hz);
+
+      ESP_LOGI(
+          TAG,
+          "RH humidity PASSIVE: %.1f %% from normalized RH ratio %.6f",
+          rh_percent,
+          rh_ratio);
+
+      ESP_LOGI(
+          TAG,
+          "RT temperature PASSIVE: %.2f C from normalized RT ratio %.6f "
+          "(%.3f us, %u cycles)",
           temperature_c,
+          rt_ratio,
           rt_period_us,
           static_cast<unsigned>(s.rt_count));
 
+      if (this->rh_humidity_sensor_ != nullptr)
+        this->rh_humidity_sensor_->publish_state(rh_percent);
+
       if (this->rt_temperature_sensor_ != nullptr)
-        this->rt_temperature_sensor_->
-            publish_state(temperature_c);
-    } else if (s.rt_mixed) {
-      ESP_LOGW(
-          TAG,
-          "RT temperature not published: RT/RH trains could "
-          "not be separated");
+        this->rt_temperature_sensor_->publish_state(temperature_c);
     }
   }
 
