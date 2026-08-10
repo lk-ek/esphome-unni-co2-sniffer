@@ -908,12 +908,12 @@ static CaptureHandler capture_handler;
 
 /*
  * ============================================================================
- * RT/RH minimal hybrid decoder
+ * RT/RH production decoder: 2 GPIO hybrid
  * ============================================================================
  *
  * Two GPIO interrupts remain active: GPIO10 and GPIO13.
- * GPIO12 is the same sensor net as GPIO10; GPIO11 is intentionally omitted
- * here to test whether it carries any information required for decoding.
+ * GPIO12 is the same sensor net as GPIO10. GPIO11 was experimentally shown
+ * to be unnecessary for REF, RT and RH decoding and is therefore omitted.
  * Every interrupt re-reads the complete observed two-line state.
  *
  * Measurement:
@@ -924,13 +924,13 @@ static CaptureHandler capture_handler;
  * The old GPIO10-derived RH period is retained ONLY as a phase-duration /
  * quality accumulator.  It is never converted to humidity.
  *
- * Set RTRH_DEBUG_CAPTURE=0 for the lean production build.  This removes the
+ * RTRH_DEBUG_CAPTURE defaults to 0 for the lean production build. This removes the
  * raw RT/RH capture buffer and both RT/RH CSV handlers without changing the
  * two-GPIO decoder.
  */
 
 #ifndef RTRH_DEBUG_CAPTURE
-#define RTRH_DEBUG_CAPTURE 1
+#define RTRH_DEBUG_CAPTURE 0
 #endif
 
 static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_10;
@@ -1034,9 +1034,19 @@ static volatile uint8_t rtrh_pin_level[2] = {0, 0};
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
   uint8_t value = 0;
-  if (gpio_get_level(PIN_RTRH0)) value |= 0x01;
-  if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
+  if (gpio_get_level(PIN_RTRH0)) value |= 0x01;  // G10
+  if (gpio_get_level(PIN_RTRH3)) value |= 0x08;  // G13
   return value;
+}
+
+static inline bool IRAM_ATTR rtrh_state_g10_high(uint8_t state)
+{
+  return (state & 0x01) != 0;
+}
+
+static inline bool IRAM_ATTR rtrh_state_g13_high(uint8_t state)
+{
+  return (state & 0x08) != 0;
 }
 
 static inline void IRAM_ATTR clear_rtrh_accum(RtRhAccum &a)
@@ -1094,12 +1104,13 @@ static inline void IRAM_ATTR observe_rtrh_rh_state(
     uint32_t now,
     uint8_t state)
 {
-  // Candidate RH marker on the two observed lines:
-  // GPIO10=0, GPIO13=1.
-  const bool rh_state =
-      (state & 0x09) == 0x08;
+  // RH marker on the two observed lines: GPIO10 LOW, GPIO13 HIGH.
+  const bool g10_low = !rtrh_state_g10_high(state);
+  const bool g13_high = rtrh_state_g13_high(state);
 
-  if (rtrh_phase != RTRH_PHASE_RH || !rh_state)
+  if (rtrh_phase != RTRH_PHASE_RH ||
+      !g10_low ||
+      !g13_high)
     return;
 
   if (rtrh_rh_state.last_us != 0) {
@@ -1243,8 +1254,8 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   const uint8_t old_state = rtrh_last_state;
 
   if (state != old_state) {
-    const bool old_g10 = (old_state & 0x01) != 0;
-    const bool new_g10 = (state & 0x01) != 0;
+    const bool old_g10 = rtrh_state_g10_high(old_state);
+    const bool new_g10 = rtrh_state_g10_high(state);
 
     if (!old_g10 && new_g10)
       rtrh_have_g10_rise = true;
@@ -1871,7 +1882,7 @@ void BusSniffer::setup()
 #else
   ESP_LOGD(
       TAG,
-      "RT/RH minimal hybrid decoder (GPIO10/13); debug capture disabled"
+      "RT/RH production decoder (GPIO10/13); debug capture disabled"
   );
 #endif
 }
