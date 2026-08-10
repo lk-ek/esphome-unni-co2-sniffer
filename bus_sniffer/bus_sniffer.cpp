@@ -36,8 +36,10 @@ static const char *TAG = "bus_sniffer";
  * D5 / GPIO7 = CO2 SCL  (yellow; old ESP32-S2 GPIO40)
  * D4 / GPIO6 = CO2 SDA  (blue;   old ESP32-S2 GPIO39)
  * D1 / GPIO3 = RT/RH G10 (green;  old ESP32-S2 GPIO10)
+ * D3 / GPIO5 = RT/RH G11 (blue;   old ESP32-S2 GPIO11)
  * D2 / GPIO4 = RT/RH G13 (yellow; old ESP32-S2 GPIO13)
  *
+ * The former RT/RH G12 net is omitted because it duplicates G10.
  * The old extra CO2 logic-analyzer channel (ESP32-S2 GPIO38) is omitted.
  */
 
@@ -908,23 +910,24 @@ static CaptureHandler capture_handler;
  * RT/RH minimal hybrid decoder
  * ============================================================================
  *
- * Two RT/RH GPIO interrupts remain active on the XIAO:
+ * Three RT/RH GPIO interrupts remain active on the XIAO:
  * GPIO3 / D1 observes the former ESP32-S2 GPIO10 sensor net.
+ * GPIO5 / D3 observes the former ESP32-S2 GPIO11 sensor net.
  * GPIO4 / D2 observes the former ESP32-S2 GPIO13 sensor net.
- * The former GPIO11 sensor net is not required; former GPIO12 duplicates G10.
- * Every interrupt re-reads the complete observed two-line state.
+ * Former GPIO12 duplicates G10 and remains omitted.
+ * Every interrupt re-reads the complete observed three-line state.
  *
  * Measurement:
  *   REF: G10-net (XIAO GPIO3/D1) falling-edge period sum/count
  *   RT : G10-net (XIAO GPIO3/D1) falling-edge period sum/count; first 880 cycles
- *   RH : humidity from repeated arrivals at G10=0, G13=1
+ *   RH : humidity from repeated arrivals at G10=0, G11=0, G13=1
  *
  * The G10-net-derived RH period is retained ONLY as a phase-duration /
  * quality accumulator.  It is never converted to humidity.
  *
  * Set RTRH_DEBUG_CAPTURE=0 for the lean production build.  This removes the
  * raw RT/RH capture buffer and both RT/RH CSV handlers without changing the
- * two-GPIO decoder.
+ * three-GPIO decoder.
  */
 
 #ifndef RTRH_DEBUG_CAPTURE
@@ -932,9 +935,10 @@ static CaptureHandler capture_handler;
 #endif
 
 static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_3;
+static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_5;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 
-static constexpr int RTRH_GPIOS[2] = {3, 4};
+static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 
 // REF-normalized calibration.
 static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
@@ -1027,12 +1031,13 @@ static RtRhRhStateStats rtrh_rh_state;
 static RtRhSnapshot rtrh_snapshot;
 static volatile bool rtrh_snapshot_ready = false;
 
-static volatile uint8_t rtrh_pin_level[2] = {0, 0};
+static volatile uint8_t rtrh_pin_level[3] = {0, 0, 0};
 
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
   uint8_t value = 0;
   if (gpio_get_level(PIN_RTRH0)) value |= 0x01;
+  if (gpio_get_level(PIN_RTRH1)) value |= 0x02;
   if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
   return value;
 }
@@ -1092,10 +1097,10 @@ static inline void IRAM_ATTR observe_rtrh_rh_state(
     uint32_t now,
     uint8_t state)
 {
-  // Candidate RH marker on the two observed lines:
-  // G10-net (GPIO3)=0, G13-net (GPIO4)=1.
+  // Characteristic RH state on the three observed lines:
+  // G10-net (GPIO3)=0, G11-net (GPIO5)=0, G13-net (GPIO4)=1.
   const bool rh_state =
-      (state & 0x09) == 0x08;
+      (state & 0x0B) == 0x08;
 
   if (rtrh_phase != RTRH_PHASE_RH || !rh_state)
     return;
@@ -1211,7 +1216,7 @@ static volatile uint32_t rtrh_sequence = 0;
 static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 {
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
-  if (encoded < 1 || encoded > 2)
+  if (encoded < 1 || encoded > 3)
     return;
 
   const uint8_t pin_index =
@@ -1454,7 +1459,7 @@ class RtRhCaptureHandler
         "attachment; filename=\"rt_rh_capture.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,t_us,edge_no,gpio10,"
+        "sequence,t_us,edge_no,gpio10,gpio11,"
         "gpio13,state,overflow\n";
 
     esp_err_t err =
@@ -1482,11 +1487,12 @@ class RtRhCaptureHandler
       const int n = snprintf(
           line,
           sizeof(line),
-          "%lu,%lu,%u,%u,%u,0x%02X,%u\n",
+          "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence),
           static_cast<unsigned long>(stamp),
           static_cast<unsigned>(edge_no),
           (v & 0x01) ? 1U : 0U,
+          (v & 0x02) ? 1U : 0U,
           (v & 0x08) ? 1U : 0U,
           v,
           overflow ? 1U : 0U);
@@ -1674,6 +1680,7 @@ void BusSniffer::setup()
       (1ULL << PIN_SCL) |
       (1ULL << PIN_SDA) |
       (1ULL << PIN_RTRH0) |
+      (1ULL << PIN_RTRH1) |
       (1ULL << PIN_RTRH3);
 
 
@@ -1712,6 +1719,7 @@ void BusSniffer::setup()
 
 
   gpio_set_intr_type(PIN_RTRH0, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(PIN_RTRH1, GPIO_INTR_ANYEDGE);
   gpio_set_intr_type(PIN_RTRH3, GPIO_INTR_ANYEDGE);
 
 
@@ -1727,9 +1735,10 @@ void BusSniffer::setup()
 #endif
   rtrh_last_state = read_rtrh_state();
   rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
-  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH3);
+  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
+  rtrh_pin_level[2] = gpio_get_level(PIN_RTRH3);
 
-  // All four XIAO signal pins stay ordinary high-impedance digital inputs.
+  // All five XIAO signal pins stay ordinary high-impedance digital inputs.
 
 
   last_edge =
@@ -1798,9 +1807,9 @@ void BusSniffer::setup()
 
 
   static constexpr gpio_num_t RTRH_PINS[] = {
-      PIN_RTRH0, PIN_RTRH3};
+      PIN_RTRH0, PIN_RTRH1, PIN_RTRH3};
 
-  for (uint8_t i = 0; i < 2; i++) {
+  for (uint8_t i = 0; i < 3; i++) {
     const gpio_num_t pin = RTRH_PINS[i];
     err = gpio_isr_handler_add(
         pin,
@@ -1868,7 +1877,7 @@ void BusSniffer::setup()
 #else
   ESP_LOGD(
       TAG,
-      "RT/RH minimal hybrid decoder (GPIO3/D1 + GPIO4/D2); debug capture disabled"
+      "RT/RH minimal hybrid decoder (GPIO3/D1 + GPIO5/D3 + GPIO4/D2); debug capture disabled"
   );
 #endif
 }
@@ -1893,6 +1902,7 @@ void BusSniffer::loop()
         static_cast<uint32_t>(now - last_any) >
             RTRH_MEASUREMENT_QUIET_US) {
       gpio_intr_disable(PIN_RTRH0);
+      gpio_intr_disable(PIN_RTRH1);
       gpio_intr_disable(PIN_RTRH3);
 
       const uint32_t now2 =
@@ -1911,7 +1921,13 @@ void BusSniffer::loop()
 
       rtrh_pin_level[0] =
           gpio_get_level(PIN_RTRH0);
+      rtrh_pin_level[1] =
+          gpio_get_level(PIN_RTRH1);
+      rtrh_pin_level[2] =
+          gpio_get_level(PIN_RTRH3);
+
       gpio_intr_enable(PIN_RTRH0);
+      gpio_intr_enable(PIN_RTRH1);
       gpio_intr_enable(PIN_RTRH3);
     }
   }
