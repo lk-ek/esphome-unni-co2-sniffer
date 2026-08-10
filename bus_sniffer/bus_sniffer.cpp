@@ -908,100 +908,49 @@ static CaptureHandler capture_handler;
 
 /*
  * ============================================================================
- * RT/RH digital edge capture
+ * RT/RH decoder
  * ============================================================================
  *
- * GPIO10..13 are connected to the four RT/RH test points. They are treated
- * strictly as passive digital inputs.
+ * Production path:
+ *   GPIO10 falling edges -> REF -> RT -> RH FSM -> REF-normalized values.
  *
- * Reverse-engineering capture:
- *   - capture 450 ms, long enough for REF -> RT -> RH (~380 ms)
- *   - store the first edge
- *   - store every 16th subsequent edge as a time anchor
- *   - additionally store every 8th edge whose 4-bit state is neither 0x00 nor 0x0F
- *
- * edge_no is the 16-bit number of the original (non-decimated)
- * state-changing edge, so skipped edges remain visible in the CSV.
- *
- * When complete, the frozen capture is available as CSV at
- * /rt_rh_capture.csv. Downloading it rearms the capture for the next cycle.
+ * Debug path:
+ *   GPIO11..13 interrupts are added only for raw 4-bit state capture and
+ *   G13 timing diagnostics.  Set RTRH_DEBUG_CAPTURE to 0 for the lean
+ *   one-interrupt production decoder.
  */
+
+#define RTRH_DEBUG_CAPTURE 1
 
 static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_10;
 static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_11;
 static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
-static constexpr uint32_t RTRH_CAPTURE_US = 450000;
-static constexpr uint16_t RTRH_MAX_SAMPLES = 1536;
-static constexpr uint32_t RTRH_CAPTURE_DECIMATION = 16;
-static constexpr uint32_t RTRH_CAPTURE_UNUSUAL_DECIMATION = 8;
+static constexpr gpio_num_t RTRH_PINS[4] = {
+    PIN_RTRH0, PIN_RTRH1, PIN_RTRH2, PIN_RTRH3};
 
-struct __attribute__((packed)) RtRhSample {
-  uint32_t t_us;
-  uint16_t edge_no;
-  uint8_t value;
-};
-
-static volatile RtRhSample rtrh_samples[RTRH_MAX_SAMPLES];
-static volatile uint16_t rtrh_sample_count = 0;
-static volatile uint16_t rtrh_capture_edge_no = 0;
-static volatile uint16_t rtrh_capture_unusual_no = 0;
-static volatile uint8_t rtrh_last_value = 0xff;
-static volatile uint32_t rtrh_start_us = 0;
-static volatile bool rtrh_capturing = false;
-static volatile bool rtrh_capture_ready = false;
-static volatile bool rtrh_overflow = false;
-static volatile uint32_t rtrh_sequence = 0;
-
-/*
- * ============================================================================
- * Phase-synchronous RT/RH ADC probe
- * ============================================================================
- *
- * GPIO10 falling is our phase reference. The measured digital period is about
- * 76-77 us. RH testing showed that GPIO13 in SHORT mode changes most strongly
- * across the early/middle part of the cycle.  The 31..66 % RH sweep showed
- * that GPIO13 is already saturated by +24 us at high humidity, so move the
- * four phases earlier:
- *
- *   phase 0: +12 us
- *   phase 1: +16 us
- *   phase 2: +20 us
- *   phase 3: +24 us
- *
- * Eight repeats are retained.  Their individual SHORT/GPIO13 raw values are
- * also exported so cycle-to-cycle structure is not hidden by the mean.
- */
-
-static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
-
-// REF-normalized passive calibration.
-//
-// The REF phase is treated as the internal timing reference.  Using ratios
-// suppresses common drift from C12, GPIO threshold and supply.
-//
-// Historical calibration was obtained around REF ~= 76.72 us.  The old
-// absolute fits have therefore been algebraically transformed to ratios;
-// at REF=76.72 us they are numerically identical to v5.
-//
-// Temperature:
-//   ratio = RT_period / REF_period
-//   T[degC] = M * ratio + C
+// REF-normalized calibration.
 static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
 static constexpr float RTRH_TEMP_RATIO_C = 84.38101f;
 
-// Humidity:
-//   ratio = RH_period / REF_period
-//   x = ln(ratio)
-//   RH[%] = A*x^2 + B*x + C
-// Anchors remain approximately 775 us -> 34 %, 457 us -> 39 %, 94 us -> 61 %
-// when REF is 76.72 us.
 static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
 static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
 static constexpr float RTRH_RH_RATIO_C = 64.58980155f;
 
-// Measurement quality limits.  Invalid snapshots are logged but not published.
+// Measurement/FSM limits.
+static constexpr uint32_t RTRH_MEASUREMENT_QUIET_US = 15000000;
+static constexpr uint32_t RTRH_CYCLE_GAP_US = 2000;
+static constexpr uint32_t RTRH_REF_MIN_US = 60;
+static constexpr uint32_t RTRH_REF_MAX_US = 105;
+static constexpr uint32_t RTRH_RT_MIN_US = 105;
+static constexpr uint32_t RTRH_RT_MAX_US = 190;
+static constexpr uint16_t RTRH_RT_TEMP_CYCLES = 880;
+static constexpr uint16_t RTRH_RT_MIN_BEFORE_RH = 800;
+static constexpr uint16_t RTRH_RT_FORCE_END_CYCLES = 920;
+static constexpr uint8_t RTRH_PHASE_LOCK_CYCLES = 8;
+
+// Publication quality gates.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
 static constexpr float RTRH_REF_VALID_MAX_US = 82.0f;
 static constexpr float RTRH_REF_DURATION_MIN_MS = 115.0f;
@@ -1015,101 +964,106 @@ static constexpr uint16_t RTRH_REF_COUNT_MAX = 1750;
 static constexpr uint16_t RTRH_RT_PHASE_COUNT_MIN = 850;
 static constexpr uint16_t RTRH_RT_PHASE_COUNT_MAX = 930;
 
-// Phase-based passive RT/RH decoder.
-// Sequence: REF (~76.7 us) -> RT (~138 us) -> RH (variable).
-static constexpr uint32_t RTRH_MEASUREMENT_QUIET_US = 15000000;
-static constexpr uint32_t RTRH_CYCLE_GAP_US = 2000;
-static constexpr uint8_t RTRH_PASSIVE_MAX_TRAINS = 16;
-static constexpr uint8_t RTRH_PASSIVE_DELAY_BINS = 8;
-static constexpr uint32_t RTRH_REF_MIN_US = 60;
-static constexpr uint32_t RTRH_REF_MAX_US = 105;
-static constexpr uint32_t RTRH_RT_MIN_US = 105;
-static constexpr uint32_t RTRH_RT_MAX_US = 190;
-static constexpr uint16_t RTRH_RT_TEMP_CYCLES = 880;
-static constexpr uint16_t RTRH_RT_MIN_BEFORE_RH = 800;
-static constexpr uint16_t RTRH_RT_FORCE_END_CYCLES = 920;
-static constexpr uint8_t RTRH_PHASE_LOCK_CYCLES = 8;
-
-enum RtRhPhase : uint8_t {
-  RTRH_PHASE_WAIT_REF = 0,
-  RTRH_PHASE_REF = 1,
-  RTRH_PHASE_RT = 2,
-  RTRH_PHASE_RH = 3,
+enum class RtRhPhase : uint8_t {
+  WAIT_REF = 0,
+  REF,
+  RT,
+  RH,
 };
 
-enum RtRhTrainRole : uint8_t {
-  RTRH_ROLE_UNKNOWN = 0,
-  RTRH_ROLE_REF = 1,
-  RTRH_ROLE_RT = 2,
-  RTRH_ROLE_RH = 3,
-  RTRH_ROLE_MIXED = 4,
-};
-
-struct RtRhPassiveTrain {
-  uint8_t role{RTRH_ROLE_UNKNOWN};
+struct RtRhPhaseStats {
+  uint32_t period_sum{0};
   uint16_t count{0};
 
-  uint32_t period_sum{0};
+#if RTRH_DEBUG_CAPTURE
   uint32_t low_sum{0};
   uint32_t g13_delay_sum{0};
   uint16_t g13_delay_count{0};
-
   uint16_t period_min{0xFFFF};
   uint16_t period_max{0};
   uint16_t low_min{0xFFFF};
   uint16_t low_max{0};
   uint16_t g13_delay_min{0xFFFF};
   uint16_t g13_delay_max{0};
-
-  uint16_t g13_delay_hist[RTRH_PASSIVE_DELAY_BINS]{};
-
-  uint32_t start_us{0};
-  uint32_t end_us{0};
-  uint32_t gap_before_us{0};
+  uint16_t g13_delay_hist[8]{};
+#endif
 };
 
-struct RtRhPassiveSnapshot {
-  RtRhPassiveTrain trains[RTRH_PASSIVE_MAX_TRAINS];
-  uint8_t train_count{0};
-  bool overflow{false};
+struct RtRhSnapshot {
+  RtRhPhaseStats ref;
+  RtRhPhaseStats rt;
+  RtRhPhaseStats rh;
+  uint32_t rt_temp_period_sum{0};
+  uint16_t rt_temp_count{0};
   uint32_t sequence{0};
-
-  bool rt_valid{false};
-  bool rt_mixed{false};
-  uint32_t rt_period_sum{0};
-  uint16_t rt_count{0};
 };
 
-static volatile bool rtrh_passive_collecting = false;
-static volatile bool rtrh_passive_overflow = false;
-static volatile uint8_t rtrh_passive_train_count = 0;
+static volatile bool rtrh_collecting = false;
+static volatile uint32_t rtrh_last_any_us = 0;
+static volatile uint32_t rtrh_last_g10_fall_us = 0;
+static volatile uint32_t rtrh_g10_rise_us = 0;
+static volatile bool rtrh_have_g10_rise = false;
+static volatile RtRhPhase rtrh_phase = RtRhPhase::WAIT_REF;
+static volatile uint8_t rtrh_phase_candidate_run = 0;
+static volatile uint32_t rtrh_rt_temp_period_sum = 0;
+static volatile uint16_t rtrh_rt_temp_count = 0;
+static volatile uint8_t rtrh_last_g10 = 0;
 
-static volatile uint32_t rtrh_passive_last_any_us = 0;
-static volatile uint8_t rtrh_passive_last_state = 0;
+static RtRhPhaseStats rtrh_ref;
+static RtRhPhaseStats rtrh_rt;
+static RtRhPhaseStats rtrh_rh;
+static RtRhSnapshot rtrh_snapshot;
+static volatile bool rtrh_snapshot_ready = false;
 
-static volatile uint32_t rtrh_passive_last_g10_fall_us = 0;
-static volatile uint32_t rtrh_passive_g10_rise_us = 0;
-static volatile uint32_t rtrh_passive_g13_rise_us = 0;
-static volatile bool rtrh_passive_have_g10_rise = false;
-static volatile bool rtrh_passive_have_g13_rise = false;
-
-static volatile bool rtrh_passive_train_active = false;
-static volatile uint32_t rtrh_passive_last_train_end_us = 0;
-static volatile uint8_t rtrh_passive_phase = RTRH_PHASE_WAIT_REF;
-static volatile uint8_t rtrh_passive_phase_candidate_run = 0;
-static volatile uint32_t rtrh_passive_rt_temp_period_sum = 0;
-static volatile uint16_t rtrh_passive_rt_temp_count = 0;
-
-static RtRhPassiveTrain rtrh_passive_current_train;
-static RtRhPassiveTrain
-    rtrh_passive_trains[RTRH_PASSIVE_MAX_TRAINS];
-
-static RtRhPassiveSnapshot rtrh_passive_snapshot;
-static volatile bool rtrh_passive_snapshot_ready = false;
-static volatile bool rtrh_passive_snapshot_consumed = true;
-
+#if RTRH_DEBUG_CAPTURE
 static volatile uint8_t rtrh_pin_level[4] = {0, 0, 0, 0};
+static volatile uint8_t rtrh_last_state = 0;
+static volatile uint32_t rtrh_g13_rise_us = 0;
+static volatile bool rtrh_have_g13_rise = false;
 
+static constexpr uint32_t RTRH_CAPTURE_US = 450000;
+static constexpr uint16_t RTRH_MAX_SAMPLES = 1536;
+static constexpr uint16_t RTRH_CAPTURE_DECIMATION = 16;
+static constexpr uint16_t RTRH_CAPTURE_UNUSUAL_DECIMATION = 8;
+
+struct __attribute__((packed)) RtRhSample {
+  uint32_t t_us;
+  uint16_t edge_no;
+  uint8_t value;
+};
+
+static volatile RtRhSample rtrh_samples[RTRH_MAX_SAMPLES];
+static volatile uint16_t rtrh_sample_count = 0;
+static volatile uint16_t rtrh_capture_edge_no = 0;
+static volatile uint16_t rtrh_capture_unusual_no = 0;
+static volatile uint8_t rtrh_capture_last_value = 0xff;
+static volatile uint32_t rtrh_capture_start_us = 0;
+static volatile bool rtrh_capturing = false;
+static volatile bool rtrh_capture_ready = false;
+static volatile bool rtrh_capture_overflow = false;
+static volatile uint32_t rtrh_capture_sequence = 0;
+#endif
+
+static inline void IRAM_ATTR clear_rtrh_stats(RtRhPhaseStats &s)
+{
+  s.period_sum = 0;
+  s.count = 0;
+#if RTRH_DEBUG_CAPTURE
+  s.low_sum = 0;
+  s.g13_delay_sum = 0;
+  s.g13_delay_count = 0;
+  s.period_min = 0xFFFF;
+  s.period_max = 0;
+  s.low_min = 0xFFFF;
+  s.low_max = 0;
+  s.g13_delay_min = 0xFFFF;
+  s.g13_delay_max = 0;
+  for (uint8_t i = 0; i < 8; i++)
+    s.g13_delay_hist[i] = 0;
+#endif
+}
+
+#if RTRH_DEBUG_CAPTURE
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
   uint8_t value = 0;
@@ -1119,453 +1073,343 @@ static inline uint8_t IRAM_ATTR read_rtrh_state()
   if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
   return value;
 }
+#endif
 
-
-static inline void IRAM_ATTR clear_passive_train(
-    RtRhPassiveTrain &t)
+static inline void IRAM_ATTR reset_rtrh_measurement(uint32_t now)
 {
-  t.role = RTRH_ROLE_UNKNOWN;
-  t.count = 0;
-
-  t.period_sum = 0;
-  t.low_sum = 0;
-  t.g13_delay_sum = 0;
-  t.g13_delay_count = 0;
-
-  t.period_min = 0xFFFF;
-  t.period_max = 0;
-  t.low_min = 0xFFFF;
-  t.low_max = 0;
-  t.g13_delay_min = 0xFFFF;
-  t.g13_delay_max = 0;
-
-  for (uint8_t i = 0; i < RTRH_PASSIVE_DELAY_BINS; i++)
-    t.g13_delay_hist[i] = 0;
-
-  t.start_us = 0;
-  t.end_us = 0;
-  t.gap_before_us = 0;
+  rtrh_collecting = true;
+  rtrh_last_any_us = now;
+  rtrh_last_g10_fall_us = 0;
+  rtrh_g10_rise_us = 0;
+  rtrh_have_g10_rise = false;
+  rtrh_phase = RtRhPhase::WAIT_REF;
+  rtrh_phase_candidate_run = 0;
+  rtrh_rt_temp_period_sum = 0;
+  rtrh_rt_temp_count = 0;
+  clear_rtrh_stats(rtrh_ref);
+  clear_rtrh_stats(rtrh_rt);
+  clear_rtrh_stats(rtrh_rh);
+#if RTRH_DEBUG_CAPTURE
+  rtrh_g13_rise_us = 0;
+  rtrh_have_g13_rise = false;
+#endif
 }
 
-
-static inline void IRAM_ATTR reset_rtrh_passive_measurement(
-    uint32_t now,
-    uint8_t state)
-{
-  rtrh_passive_collecting = true;
-  rtrh_passive_overflow = false;
-  rtrh_passive_train_count = 0;
-
-  rtrh_passive_last_any_us = now;
-  rtrh_passive_last_state = state;
-
-  rtrh_passive_last_g10_fall_us = 0;
-  rtrh_passive_g10_rise_us = 0;
-  rtrh_passive_g13_rise_us = 0;
-  rtrh_passive_have_g10_rise = false;
-  rtrh_passive_have_g13_rise = false;
-
-  rtrh_passive_train_active = false;
-  rtrh_passive_last_train_end_us = 0;
-  rtrh_passive_phase = RTRH_PHASE_WAIT_REF;
-  rtrh_passive_phase_candidate_run = 0;
-  rtrh_passive_rt_temp_period_sum = 0;
-  rtrh_passive_rt_temp_count = 0;
-  clear_passive_train(rtrh_passive_current_train);
-
-  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++)
-    clear_passive_train(rtrh_passive_trains[i]);
-}
-
-
-static inline void IRAM_ATTR start_rtrh_passive_train(
-    uint32_t now, uint8_t role)
-{
-  clear_passive_train(rtrh_passive_current_train);
-  rtrh_passive_current_train.role = role;
-  rtrh_passive_current_train.start_us = now;
-  if (rtrh_passive_last_train_end_us != 0)
-    rtrh_passive_current_train.gap_before_us =
-        static_cast<uint32_t>(now - rtrh_passive_last_train_end_us);
-  rtrh_passive_train_active = true;
-  rtrh_passive_last_g10_fall_us = now;
-  rtrh_passive_have_g10_rise = false;
-  rtrh_passive_have_g13_rise = false;
-}
-
-
-static inline void IRAM_ATTR append_current_rtrh_passive_train()
-{
-  if (!rtrh_passive_train_active)
-    return;
-
-  RtRhPassiveTrain &cur = rtrh_passive_current_train;
-
-  if (cur.count != 0) {
-    cur.end_us = rtrh_passive_last_g10_fall_us;
-
-    if (rtrh_passive_train_count < RTRH_PASSIVE_MAX_TRAINS) {
-      rtrh_passive_trains[rtrh_passive_train_count++] = cur;
-    } else {
-      rtrh_passive_overflow = true;
-    }
-
-    rtrh_passive_last_train_end_us = cur.end_us;
-  }
-
-  clear_passive_train(rtrh_passive_current_train);
-  rtrh_passive_train_active = false;
-  rtrh_passive_last_g10_fall_us = 0;
-  rtrh_passive_have_g10_rise = false;
-  rtrh_passive_have_g13_rise = false;
-}
-
-
-static inline void IRAM_ATTR add_rtrh_passive_cycle(
+static inline void IRAM_ATTR add_rtrh_cycle(
+    RtRhPhaseStats &s,
     uint32_t period,
-    uint32_t low,
-    bool have_delay,
-    uint32_t delay)
+    uint32_t low
+#if RTRH_DEBUG_CAPTURE
+    , bool have_delay,
+    uint32_t delay
+#endif
+)
 {
-  if (!rtrh_passive_train_active)
-    return;
+  if (s.count != 0xFFFF)
+    s.count++;
+  s.period_sum += period;
 
-  RtRhPassiveTrain &t = rtrh_passive_current_train;
-
+#if RTRH_DEBUG_CAPTURE
   const uint16_t p =
       period > 65535U ? 65535U : static_cast<uint16_t>(period);
   const uint16_t l =
       low > 65535U ? 65535U : static_cast<uint16_t>(low);
 
-  if (t.count != 0xFFFF)
-    t.count++;
-
-  t.period_sum += p;
-  t.low_sum += l;
-
-  if (p < t.period_min)
-    t.period_min = p;
-  if (p > t.period_max)
-    t.period_max = p;
-
-  if (l < t.low_min)
-    t.low_min = l;
-  if (l > t.low_max)
-    t.low_max = l;
+  s.low_sum += l;
+  if (p < s.period_min) s.period_min = p;
+  if (p > s.period_max) s.period_max = p;
+  if (l < s.low_min) s.low_min = l;
+  if (l > s.low_max) s.low_max = l;
 
   if (have_delay && delay <= 65535U) {
     const uint16_t d = static_cast<uint16_t>(delay);
-
-    t.g13_delay_sum += d;
-    if (t.g13_delay_count != 0xFFFF)
-      t.g13_delay_count++;
-
-    if (d < t.g13_delay_min)
-      t.g13_delay_min = d;
-    if (d > t.g13_delay_max)
-      t.g13_delay_max = d;
-
-    const uint8_t bin =
-        d < (RTRH_PASSIVE_DELAY_BINS - 1)
-            ? static_cast<uint8_t>(d)
-            : static_cast<uint8_t>(RTRH_PASSIVE_DELAY_BINS - 1);
-
-    if (t.g13_delay_hist[bin] != 0xFFFF)
-      t.g13_delay_hist[bin]++;
+    s.g13_delay_sum += d;
+    if (s.g13_delay_count != 0xFFFF)
+      s.g13_delay_count++;
+    if (d < s.g13_delay_min) s.g13_delay_min = d;
+    if (d > s.g13_delay_max) s.g13_delay_max = d;
+    const uint8_t bin = d < 7 ? static_cast<uint8_t>(d) : 7;
+    if (s.g13_delay_hist[bin] != 0xFFFF)
+      s.g13_delay_hist[bin]++;
   }
+#endif
 }
 
-
-static inline float rtrh_train_period_mean(
-    const RtRhPassiveTrain &t)
+static void finalize_rtrh_measurement()
 {
-  return t.count
-      ? static_cast<float>(t.period_sum) /
-            static_cast<float>(t.count)
-      : 0.0f;
-}
-
-
-static inline bool rtrh_train_is_reference(
-    const RtRhPassiveTrain &t)
-{
-  if (t.count < 8)
-    return false;
-
-  const float p = rtrh_train_period_mean(t);
-  return p >= RTRH_REF_MIN_US && p <= RTRH_REF_MAX_US;
-}
-
-
-static void classify_rtrh_passive_snapshot(
-    RtRhPassiveSnapshot &s)
-{
-  s.rt_valid = s.rt_count >= 800 && s.rt_count <= RTRH_RT_TEMP_CYCLES;
-  s.rt_mixed = false;
-}
-
-
-static void finalize_rtrh_passive_measurement()
-{
-  if (!rtrh_passive_collecting)
+  if (!rtrh_collecting)
     return;
 
-  append_current_rtrh_passive_train();
-
-  if (rtrh_passive_train_count == 0) {
-    rtrh_passive_collecting = false;
+  if (rtrh_ref.count == 0 || rtrh_rt.count == 0 || rtrh_rh.count == 0) {
+    rtrh_collecting = false;
     return;
   }
 
-  RtRhPassiveSnapshot next{};
+  RtRhSnapshot next{};
+  next.ref = rtrh_ref;
+  next.rt = rtrh_rt;
+  next.rh = rtrh_rh;
+  next.rt_temp_period_sum = rtrh_rt_temp_period_sum;
+  next.rt_temp_count = rtrh_rt_temp_count;
+  next.sequence = rtrh_snapshot.sequence + 1;
 
-  next.train_count = rtrh_passive_train_count;
-  next.overflow = rtrh_passive_overflow;
-  next.sequence = rtrh_passive_snapshot.sequence + 1;
-
-  for (uint8_t i = 0; i < RTRH_PASSIVE_MAX_TRAINS; i++) {
-    if (i < next.train_count)
-      next.trains[i] = rtrh_passive_trains[i];
-    else
-      clear_passive_train(next.trains[i]);
-  }
-
-  next.rt_period_sum = rtrh_passive_rt_temp_period_sum;
-  next.rt_count = rtrh_passive_rt_temp_count;
-  classify_rtrh_passive_snapshot(next);
-
-  rtrh_passive_snapshot = next;
-  rtrh_passive_snapshot_ready = true;
-  rtrh_passive_snapshot_consumed = false;
-  rtrh_passive_collecting = false;
+  rtrh_snapshot = next;
+  rtrh_snapshot_ready = true;
+  rtrh_collecting = false;
 }
 
-
-static const char *rtrh_train_role_name(uint8_t role)
+static inline void IRAM_ATTR process_rtrh_g10_edge(
+    uint32_t now,
+    uint8_t new_g10
+#if RTRH_DEBUG_CAPTURE
+    , uint8_t old_state,
+    uint8_t new_state
+#endif
+)
 {
-  switch (role) {
-    case RTRH_ROLE_REF:
-      return "ref";
-    case RTRH_ROLE_RT:
-      return "rt";
-    case RTRH_ROLE_RH:
-      return "rh";
-    case RTRH_ROLE_MIXED:
-      return "mixed";
-    default:
-      return "unknown";
+  if (!rtrh_collecting)
+    reset_rtrh_measurement(now);
+  else
+    rtrh_last_any_us = now;
+
+  const uint8_t old_g10 = rtrh_last_g10;
+  rtrh_last_g10 = new_g10;
+
+  if (!old_g10 && new_g10) {
+    rtrh_g10_rise_us = now;
+    rtrh_have_g10_rise = true;
+#if RTRH_DEBUG_CAPTURE
+    const bool new_g13 = (new_state & 0x08) != 0;
+    rtrh_have_g13_rise = new_g13;
+    if (new_g13)
+      rtrh_g13_rise_us = now;
+#endif
+    return;
   }
-}
 
+  if (!(old_g10 && !new_g10))
+    return;
 
-static void IRAM_ATTR rtrh_gpio_isr(void *arg)
-{
-  const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
-  if (encoded < 1 || encoded > 4) return;
-  const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
-  const gpio_num_t pin = static_cast<gpio_num_t>(RTRH_GPIOS[pin_index]);
-  const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
-  const uint8_t previous = rtrh_pin_level[pin_index];
-  if (level == previous) return;
-  rtrh_pin_level[pin_index] = level;
+  const uint32_t previous_fall = rtrh_last_g10_fall_us;
+  rtrh_last_g10_fall_us = now;
 
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-  const uint8_t state = read_rtrh_state();
+  if (previous_fall == 0 || !rtrh_have_g10_rise)
+    goto done;
 
-  if (!rtrh_passive_collecting) reset_rtrh_passive_measurement(now, state);
-  else rtrh_passive_last_any_us = now;
+  {
+    const uint32_t period = static_cast<uint32_t>(now - previous_fall);
+    if (period >= RTRH_CYCLE_GAP_US)
+      goto done;
 
-  const uint8_t old_state = rtrh_passive_last_state;
-  if (state != old_state) {
-    const bool old_g10 = (old_state & 0x01) != 0;
-    const bool new_g10 = (state & 0x01) != 0;
-    const bool old_g13 = (old_state & 0x08) != 0;
-    const bool new_g13 = (state & 0x08) != 0;
+    const uint32_t low =
+        static_cast<uint32_t>(rtrh_g10_rise_us - previous_fall);
+    const bool is_ref =
+        period >= RTRH_REF_MIN_US && period <= RTRH_REF_MAX_US;
+    const bool is_rt =
+        period >= RTRH_RT_MIN_US && period <= RTRH_RT_MAX_US;
 
-    if (!old_g10 && new_g10) {
-      rtrh_passive_g10_rise_us = now;
-      rtrh_passive_have_g10_rise = true;
-      rtrh_passive_have_g13_rise = new_g13;
-      if (new_g13) rtrh_passive_g13_rise_us = now;
-    }
-    if (!old_g13 && new_g13 && rtrh_passive_have_g10_rise) {
-      rtrh_passive_g13_rise_us = now;
-      rtrh_passive_have_g13_rise = true;
-    }
+#if RTRH_DEBUG_CAPTURE
+    const bool have_delay =
+        rtrh_have_g13_rise &&
+        static_cast<int32_t>(rtrh_g13_rise_us - rtrh_g10_rise_us) >= 0;
+    const uint32_t delay =
+        have_delay
+            ? static_cast<uint32_t>(rtrh_g13_rise_us - rtrh_g10_rise_us)
+            : 0;
+#define RTRH_ADD(stats) add_rtrh_cycle((stats), period, low, have_delay, delay)
+#else
+#define RTRH_ADD(stats) add_rtrh_cycle((stats), period, low)
+#endif
 
-    if (old_g10 && !new_g10) {
-      const uint32_t pf = rtrh_passive_last_g10_fall_us;
-      if (pf == 0) {
-        rtrh_passive_last_g10_fall_us = now;
-      } else {
-        const uint32_t period = static_cast<uint32_t>(now - pf);
-        rtrh_passive_last_g10_fall_us = now;
+    switch (rtrh_phase) {
+      case RtRhPhase::WAIT_REF:
+        if (is_ref) {
+          rtrh_phase = RtRhPhase::REF;
+          RTRH_ADD(rtrh_ref);
+        }
+        break;
 
-        if (period < RTRH_CYCLE_GAP_US && rtrh_passive_have_g10_rise) {
-          const uint32_t low =
-              static_cast<uint32_t>(rtrh_passive_g10_rise_us - pf);
-          const bool have_delay =
-              rtrh_passive_have_g13_rise &&
-              static_cast<int32_t>(rtrh_passive_g13_rise_us -
-                                   rtrh_passive_g10_rise_us) >= 0;
-          const uint32_t delay = have_delay
-              ? static_cast<uint32_t>(rtrh_passive_g13_rise_us -
-                                      rtrh_passive_g10_rise_us)
-              : 0;
-          const bool is_ref = period >= RTRH_REF_MIN_US && period <= RTRH_REF_MAX_US;
-          const bool is_rt  = period >= RTRH_RT_MIN_US  && period <= RTRH_RT_MAX_US;
+      case RtRhPhase::REF:
+        if (is_ref) {
+          rtrh_phase_candidate_run = 0;
+          RTRH_ADD(rtrh_ref);
+        } else if (is_rt) {
+          if (rtrh_phase_candidate_run < 255)
+            rtrh_phase_candidate_run++;
 
-          switch (rtrh_passive_phase) {
-            case RTRH_PHASE_WAIT_REF:
-              if (is_ref) {
-                start_rtrh_passive_train(now, RTRH_ROLE_REF);
-                rtrh_passive_phase = RTRH_PHASE_REF;
-                add_rtrh_passive_cycle(period, low, have_delay, delay);
-              }
-              break;
+          if (rtrh_phase_candidate_run >= RTRH_PHASE_LOCK_CYCLES) {
+            rtrh_phase = RtRhPhase::RT;
+            rtrh_phase_candidate_run = 0;
+            RTRH_ADD(rtrh_rt);
 
-            case RTRH_PHASE_REF:
-              if (is_ref) {
-                // A genuine REF cycle cancels any tentative REF->RT transition.
-                rtrh_passive_phase_candidate_run = 0;
-                add_rtrh_passive_cycle(period, low, have_delay, delay);
-              } else if (is_rt) {
-                // REF contains occasional isolated 140..160 us glitches.
-                // Do not leave REF until RT-like timing is stable for 8 cycles.
-                if (rtrh_passive_phase_candidate_run < 255)
-                  rtrh_passive_phase_candidate_run++;
+            if (rtrh_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
+              rtrh_rt_temp_period_sum += period;
+              rtrh_rt_temp_count++;
+            }
+          }
+        } else {
+          rtrh_phase_candidate_run = 0;
+        }
+        break;
 
-                if (rtrh_passive_phase_candidate_run >=
-                    RTRH_PHASE_LOCK_CYCLES) {
-                  append_current_rtrh_passive_train();
-                  start_rtrh_passive_train(now, RTRH_ROLE_RT);
-                  rtrh_passive_phase = RTRH_PHASE_RT;
-                  rtrh_passive_phase_candidate_run = 0;
+      case RtRhPhase::RT:
+        if (rtrh_rt.count >= RTRH_RT_FORCE_END_CYCLES) {
+          rtrh_phase = RtRhPhase::RH;
+          rtrh_phase_candidate_run = 0;
+          RTRH_ADD(rtrh_rh);
+        } else if (is_rt) {
+          rtrh_phase_candidate_run = 0;
+          RTRH_ADD(rtrh_rt);
 
-                  // The first 7 candidate cycles are intentionally discarded;
-                  // one cycle is enough to seed the confirmed RT phase.
-                  add_rtrh_passive_cycle(period, low, have_delay, delay);
+          if (rtrh_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
+            rtrh_rt_temp_period_sum += period;
+            rtrh_rt_temp_count++;
+          }
+        } else if (rtrh_rt.count < RTRH_RT_MIN_BEFORE_RH) {
+          rtrh_phase_candidate_run = 0;
+        } else {
+          if (rtrh_phase_candidate_run < 255)
+            rtrh_phase_candidate_run++;
 
-                  if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
-                    rtrh_passive_rt_temp_period_sum += period;
-                    rtrh_passive_rt_temp_count++;
-                  }
-                }
-              } else {
-                // Neither REF nor RT: transition/glitch, do not accumulate lock.
-                rtrh_passive_phase_candidate_run = 0;
-              }
-              break;
-
-            case RTRH_PHASE_RT:
-              if (rtrh_passive_current_train.count >=
-                  RTRH_RT_FORCE_END_CYCLES) {
-                // Ambiguous RT/RH overlap: physical RT length is known.
-                append_current_rtrh_passive_train();
-                start_rtrh_passive_train(now, RTRH_ROLE_RH);
-                rtrh_passive_phase = RTRH_PHASE_RH;
-                rtrh_passive_phase_candidate_run = 0;
-                add_rtrh_passive_cycle(period, low, have_delay, delay);
-              } else if (is_rt) {
-                rtrh_passive_phase_candidate_run = 0;
-                add_rtrh_passive_cycle(period, low, have_delay, delay);
-
-                if (rtrh_passive_rt_temp_count < RTRH_RT_TEMP_CYCLES) {
-                  rtrh_passive_rt_temp_period_sum += period;
-                  rtrh_passive_rt_temp_count++;
-                }
-              } else {
-                // Do not permit an RT->RH transition until a physically
-                // plausible RT section has actually been collected.  This
-                // prevents transition glitches immediately after REF from
-                // turning almost the whole measurement into RH.
-                if (rtrh_passive_current_train.count <
-                    RTRH_RT_MIN_BEFORE_RH) {
-                  rtrh_passive_phase_candidate_run = 0;
-                } else {
-                  if (rtrh_passive_phase_candidate_run < 255)
-                    rtrh_passive_phase_candidate_run++;
-
-                  if (rtrh_passive_phase_candidate_run >=
-                      RTRH_PHASE_LOCK_CYCLES) {
-                    append_current_rtrh_passive_train();
-                    start_rtrh_passive_train(now, RTRH_ROLE_RH);
-                    rtrh_passive_phase = RTRH_PHASE_RH;
-                    rtrh_passive_phase_candidate_run = 0;
-                    add_rtrh_passive_cycle(period, low, have_delay, delay);
-                  }
-                }
-              }
-              break;
-
-            case RTRH_PHASE_RH:
-              add_rtrh_passive_cycle(period, low, have_delay, delay);
-              break;
+          if (rtrh_phase_candidate_run >= RTRH_PHASE_LOCK_CYCLES) {
+            rtrh_phase = RtRhPhase::RH;
+            rtrh_phase_candidate_run = 0;
+            RTRH_ADD(rtrh_rh);
           }
         }
-      }
-      rtrh_passive_have_g10_rise = false;
-      rtrh_passive_have_g13_rise = false;
+        break;
+
+      case RtRhPhase::RH:
+        RTRH_ADD(rtrh_rh);
+        break;
     }
-    rtrh_passive_last_state = state;
+
+#undef RTRH_ADD
   }
 
-  if (rtrh_capture_ready)
+done:
+  rtrh_have_g10_rise = false;
+#if RTRH_DEBUG_CAPTURE
+  rtrh_have_g13_rise = false;
+#endif
+}
+
+#if RTRH_DEBUG_CAPTURE
+static inline void IRAM_ATTR capture_rtrh_state(uint32_t now, uint8_t value)
+{
+  if (rtrh_capture_ready || value == rtrh_capture_last_value)
     return;
 
-  const uint8_t value = read_rtrh_state();
-
-  if (value == rtrh_last_value)
-    return;
-
-  rtrh_last_value = value;
+  rtrh_capture_last_value = value;
 
   if (!rtrh_capturing) {
     rtrh_capturing = true;
-    rtrh_start_us = now;
+    rtrh_capture_start_us = now;
     rtrh_sample_count = 0;
     rtrh_capture_edge_no = 0;
     rtrh_capture_unusual_no = 0;
-    rtrh_overflow = false;
+    rtrh_capture_overflow = false;
   }
 
   const uint16_t edge_no = rtrh_capture_edge_no++;
-
-  // Keep regular global anchors, but also sample recurring "unusual" states.
-  // RT contains ~900 repetitions of 0x07, so storing every unusual edge would
-  // still overflow the buffer.  Every 8th unusual state is sufficient to show
-  // the phase pattern while preserving plenty of transition detail.
-  const bool unusual_state = value != 0x00 && value != 0x0F;
-  const bool time_anchor =
+  const bool unusual = value != 0x00 && value != 0x0F;
+  const bool regular_anchor =
       edge_no == 0 || (edge_no % RTRH_CAPTURE_DECIMATION) == 0;
 
   bool unusual_anchor = false;
-  if (unusual_state) {
+  if (unusual) {
     const uint16_t unusual_no = rtrh_capture_unusual_no++;
     unusual_anchor =
         unusual_no == 0 ||
         (unusual_no % RTRH_CAPTURE_UNUSUAL_DECIMATION) == 0;
   }
 
-  if (!time_anchor && !unusual_anchor)
+  if (!regular_anchor && !unusual_anchor)
     return;
 
   const uint16_t index = rtrh_sample_count;
   if (index >= RTRH_MAX_SAMPLES) {
-    rtrh_overflow = true;
+    rtrh_capture_overflow = true;
     rtrh_capturing = false;
     rtrh_capture_ready = true;
-    rtrh_sequence++;
+    rtrh_capture_sequence++;
     return;
   }
 
   rtrh_samples[index].t_us =
-      static_cast<uint32_t>(now - rtrh_start_us);
+      static_cast<uint32_t>(now - rtrh_capture_start_us);
   rtrh_samples[index].edge_no = edge_no;
   rtrh_samples[index].value = value;
   rtrh_sample_count = index + 1;
 }
+#endif
 
+static void IRAM_ATTR rtrh_gpio_isr(void *arg)
+{
+  const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
+  const uint8_t pin_index =
+      encoded >= 1 && encoded <= 4
+          ? static_cast<uint8_t>(encoded - 1)
+          : 0;
+
+#if RTRH_DEBUG_CAPTURE
+  const gpio_num_t pin = RTRH_PINS[pin_index];
+  const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
+  if (level == rtrh_pin_level[pin_index])
+    return;
+  rtrh_pin_level[pin_index] = level;
+
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  const uint8_t old_state = rtrh_last_state;
+  const uint8_t state = read_rtrh_state();
+  if (state == old_state)
+    return;
+  rtrh_last_state = state;
+
+  const bool old_g13 = (old_state & 0x08) != 0;
+  const bool new_g13 = (state & 0x08) != 0;
+  if (!old_g13 && new_g13 && rtrh_have_g10_rise) {
+    rtrh_g13_rise_us = now;
+    rtrh_have_g13_rise = true;
+  }
+
+  const uint8_t old_g10 = (old_state & 0x01) ? 1 : 0;
+  const uint8_t new_g10 = (state & 0x01) ? 1 : 0;
+  if (old_g10 != new_g10)
+    process_rtrh_g10_edge(now, new_g10, old_state, state);
+
+  capture_rtrh_state(now, state);
+#else
+  (void) pin_index;
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  const uint8_t level = static_cast<uint8_t>(gpio_get_level(PIN_RTRH0));
+  if (level == rtrh_last_g10)
+    return;
+  process_rtrh_g10_edge(now, level);
+#endif
+}
+
+static inline void rtrh_disable_irqs()
+{
+  gpio_intr_disable(PIN_RTRH0);
+#if RTRH_DEBUG_CAPTURE
+  gpio_intr_disable(PIN_RTRH1);
+  gpio_intr_disable(PIN_RTRH2);
+  gpio_intr_disable(PIN_RTRH3);
+#endif
+}
+
+static inline void rtrh_enable_irqs()
+{
+  gpio_intr_enable(PIN_RTRH0);
+#if RTRH_DEBUG_CAPTURE
+  gpio_intr_enable(PIN_RTRH1);
+  gpio_intr_enable(PIN_RTRH2);
+  gpio_intr_enable(PIN_RTRH3);
+#endif
+}
+
+#if RTRH_DEBUG_CAPTURE
 class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override
@@ -1587,8 +1431,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(
-        req,
-        "Content-Disposition",
+        req, "Content-Disposition",
         "attachment; filename=\"rt_rh_capture.csv\"");
 
     static constexpr char HEADER[] =
@@ -1596,19 +1439,14 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
     const uint16_t count = rtrh_sample_count;
-    const uint32_t sequence = rtrh_sequence;
-    const bool overflow = rtrh_overflow;
-
-    // Batch many CSV rows into each TCP chunk. Sending one HTTP chunk per
-    // edge (~3000-4000 chunks) needlessly stresses lwIP on the ESP32-S2.
-    // Keep these buffers out of the small ESP-IDF HTTP server task stack.
-    // The previous 2 KiB automatic buffer caused vApplicationStackOverflowHook.
+    const uint32_t sequence = rtrh_capture_sequence;
+    const bool overflow = rtrh_capture_overflow;
     static char chunk[128];
     static char line[80];
     size_t used = 0;
 
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
-      const uint32_t t = rtrh_samples[i].t_us;
+      const uint32_t stamp = rtrh_samples[i].t_us;
       const uint16_t edge_no = rtrh_samples[i].edge_no;
       const uint8_t v = rtrh_samples[i].value;
 
@@ -1616,7 +1454,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
           line, sizeof(line),
           "%lu,%lu,%u,%u,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence),
-          static_cast<unsigned long>(t),
+          static_cast<unsigned long>(stamp),
           static_cast<unsigned>(edge_no),
           (v & 0x01) ? 1U : 0U,
           (v & 0x02) ? 1U : 0U,
@@ -1629,12 +1467,10 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
         continue;
 
       const size_t line_len = static_cast<size_t>(n);
-
       if (used + line_len > sizeof(chunk)) {
         err = httpd_resp_send_chunk(req, chunk, used);
         used = 0;
       }
-
       if (err == ESP_OK && line_len <= sizeof(chunk)) {
         memcpy(chunk + used, line, line_len);
         used += line_len;
@@ -1643,20 +1479,15 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
 
     if (err == ESP_OK && used != 0)
       err = httpd_resp_send_chunk(req, chunk, used);
-
     if (err == ESP_OK)
       httpd_resp_send_chunk(req, nullptr, 0);
 
-    // Rearm only after the frozen capture has been downloaded.
     rtrh_sample_count = 0;
     rtrh_capture_edge_no = 0;
     rtrh_capture_unusual_no = 0;
-    rtrh_overflow = false;
+    rtrh_capture_overflow = false;
     rtrh_capture_ready = false;
     rtrh_capturing = false;
-
-    if (err != ESP_OK)
-      ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
   }
 };
 
@@ -1668,125 +1499,90 @@ class RtRhTimingHandler : public web_server_idf::AsyncWebHandler {
   {
     if (request->method() != HTTP_GET)
       return false;
-
     char url[web_server_idf::AsyncWebServerRequest::URL_BUF_SIZE];
     return request->url_to(url) == "/rt_rh_timing.csv";
   }
 
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override
   {
-    if (!rtrh_passive_snapshot_ready ||
-        rtrh_passive_snapshot_consumed) {
+    if (!rtrh_snapshot_ready) {
       request->send(204, "text/plain", nullptr);
       return;
     }
 
-    const RtRhPassiveSnapshot s = rtrh_passive_snapshot;
+    const RtRhSnapshot s = rtrh_snapshot;
 
     httpd_req_t *req = *request;
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(
-        req,
-        "Content-Disposition",
+        req, "Content-Disposition",
         "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "measurement,train,role,count,gap_before_us,"
-        "period_mean_us,period_min_us,period_max_us,"
-        "duration_ms,frequency_hz,"
-        "low_mean_us,low_min_us,low_max_us,"
-        "g13_delay_count,g13_delay_mean_us,g13_delay_min_us,g13_delay_max_us,"
+        "measurement,train,role,count,gap_before_us,period_mean_us,"
+        "period_min_us,period_max_us,duration_ms,frequency_hz,"
+        "low_mean_us,low_min_us,low_max_us,g13_delay_count,"
+        "g13_delay_mean_us,g13_delay_min_us,g13_delay_max_us,"
         "d0,d1,d2,d3,d4,d5,d6,d7plus,overflow\n";
 
-    esp_err_t err =
-        httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
+    esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
+    const RtRhPhaseStats *phases[3] = {&s.ref, &s.rt, &s.rh};
+    static constexpr const char *names[3] = {"ref", "rt", "rh"};
     static char line[320];
 
-    for (uint8_t i = 0;
-         i < s.train_count && err == ESP_OK;
-         i++) {
-      const RtRhPassiveTrain &t = s.trains[i];
-
-      const float period_mean =
-          t.count
-              ? static_cast<float>(t.period_sum) /
-                    static_cast<float>(t.count)
-              : 0.0f;
-
-      const float low_mean =
-          t.count
-              ? static_cast<float>(t.low_sum) /
-                    static_cast<float>(t.count)
-              : 0.0f;
-
-      const float delay_mean =
-          t.g13_delay_count
-              ? static_cast<float>(t.g13_delay_sum) /
-                    static_cast<float>(t.g13_delay_count)
-              : 0.0f;
-
-      const float duration_ms =
-          static_cast<float>(t.period_sum) / 1000.0f;
-
-      const float frequency_hz =
-          period_mean > 0.0f
-              ? 1000000.0f / period_mean
-              : 0.0f;
+    for (uint8_t i = 0; i < 3 && err == ESP_OK; i++) {
+      const RtRhPhaseStats &p = *phases[i];
+      const float mean = p.count
+          ? static_cast<float>(p.period_sum) / static_cast<float>(p.count)
+          : 0.0f;
+      const float low_mean = p.count
+          ? static_cast<float>(p.low_sum) / static_cast<float>(p.count)
+          : 0.0f;
+      const float delay_mean = p.g13_delay_count
+          ? static_cast<float>(p.g13_delay_sum) /
+                static_cast<float>(p.g13_delay_count)
+          : 0.0f;
+      const float duration_ms = static_cast<float>(p.period_sum) / 1000.0f;
+      const float frequency_hz = mean > 0.0f ? 1000000.0f / mean : 0.0f;
 
       const int n = snprintf(
-          line,
-          sizeof(line),
-          "%lu,%u,%s,%u,%lu,%.3f,%u,%u,%.3f,%.2f,%.3f,%u,%u,"
-          "%u,%.3f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+          line, sizeof(line),
+          "%lu,%u,%s,%u,0,%.3f,%u,%u,%.3f,%.2f,%.3f,%u,%u,"
+          "%u,%.3f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,0\n",
           static_cast<unsigned long>(s.sequence),
           static_cast<unsigned>(i),
-          rtrh_train_role_name(t.role),
-          static_cast<unsigned>(t.count),
-          static_cast<unsigned long>(t.gap_before_us),
-          period_mean,
-          t.count ? static_cast<unsigned>(t.period_min) : 0U,
-          static_cast<unsigned>(t.period_max),
+          names[i],
+          static_cast<unsigned>(p.count),
+          mean,
+          p.period_min == 0xFFFF ? 0 : p.period_min,
+          p.period_max,
           duration_ms,
           frequency_hz,
           low_mean,
-          t.count ? static_cast<unsigned>(t.low_min) : 0U,
-          static_cast<unsigned>(t.low_max),
-          static_cast<unsigned>(t.g13_delay_count),
+          p.low_min == 0xFFFF ? 0 : p.low_min,
+          p.low_max,
+          static_cast<unsigned>(p.g13_delay_count),
           delay_mean,
-          t.g13_delay_count
-              ? static_cast<unsigned>(t.g13_delay_min)
-              : 0U,
-          static_cast<unsigned>(t.g13_delay_max),
-          static_cast<unsigned>(t.g13_delay_hist[0]),
-          static_cast<unsigned>(t.g13_delay_hist[1]),
-          static_cast<unsigned>(t.g13_delay_hist[2]),
-          static_cast<unsigned>(t.g13_delay_hist[3]),
-          static_cast<unsigned>(t.g13_delay_hist[4]),
-          static_cast<unsigned>(t.g13_delay_hist[5]),
-          static_cast<unsigned>(t.g13_delay_hist[6]),
-          static_cast<unsigned>(t.g13_delay_hist[7]),
-          s.overflow ? 1U : 0U);
+          p.g13_delay_min == 0xFFFF ? 0 : p.g13_delay_min,
+          p.g13_delay_max,
+          p.g13_delay_hist[0], p.g13_delay_hist[1],
+          p.g13_delay_hist[2], p.g13_delay_hist[3],
+          p.g13_delay_hist[4], p.g13_delay_hist[5],
+          p.g13_delay_hist[6], p.g13_delay_hist[7]);
 
-      if (n <= 0 ||
-          static_cast<size_t>(n) >= sizeof(line)) {
-        err = ESP_FAIL;
-        break;
-      }
-
-      err = httpd_resp_send_chunk(req, line, n);
+      if (n > 0)
+        err = httpd_resp_send_chunk(req, line, static_cast<size_t>(n));
     }
 
     if (err == ESP_OK)
-      err = httpd_resp_send_chunk(req, nullptr, 0);
-
-    if (err == ESP_OK)
-      rtrh_passive_snapshot_consumed = true;
+      httpd_resp_send_chunk(req, nullptr, 0);
   }
 };
 
 static RtRhTimingHandler rtrh_timing_handler;
+#endif
 
 /*
  * ============================================================================
@@ -1861,9 +1657,11 @@ void BusSniffer::setup()
 
 
   gpio_set_intr_type(PIN_RTRH0, GPIO_INTR_ANYEDGE);
+#if RTRH_DEBUG_CAPTURE
   gpio_set_intr_type(PIN_RTRH1, GPIO_INTR_ANYEDGE);
   gpio_set_intr_type(PIN_RTRH2, GPIO_INTR_ANYEDGE);
   gpio_set_intr_type(PIN_RTRH3, GPIO_INTR_ANYEDGE);
+#endif
 
 
   last_value =
@@ -1873,13 +1671,15 @@ void BusSniffer::setup()
   capture_initial_value =
       last_value;
 
-  rtrh_last_value = read_rtrh_state();
-  rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
-  rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
-  rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
-  rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
+  rtrh_last_g10 = static_cast<uint8_t>(gpio_get_level(PIN_RTRH0));
+#if RTRH_DEBUG_CAPTURE
+  rtrh_last_state = read_rtrh_state();
+  rtrh_capture_last_value = rtrh_last_state;
+  for (uint8_t i = 0; i < 4; i++)
+    rtrh_pin_level[i] = static_cast<uint8_t>(gpio_get_level(RTRH_PINS[i]));
+#endif
 
-  // GPIO10..13 stay ordinary high-impedance digital inputs for the entire run.
+  // GPIO10..13 remain high-impedance digital inputs for the entire run.
 
 
   last_edge =
@@ -1947,9 +1747,7 @@ void BusSniffer::setup()
   }
 
 
-  static constexpr gpio_num_t RTRH_PINS[] = {
-      PIN_RTRH0, PIN_RTRH1, PIN_RTRH2, PIN_RTRH3};
-
+#if RTRH_DEBUG_CAPTURE
   for (uint8_t i = 0; i < 4; i++) {
     const gpio_num_t pin = RTRH_PINS[i];
     err = gpio_isr_handler_add(
@@ -1961,6 +1759,16 @@ void BusSniffer::setup()
       return;
     }
   }
+#else
+  err = gpio_isr_handler_add(
+      PIN_RTRH0,
+      rtrh_gpio_isr,
+      reinterpret_cast<void *>(static_cast<intptr_t>(1)));
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "RT/RH ISR GPIO10 failed: %d", err);
+    return;
+  }
+#endif
 
 
   if (
@@ -1974,11 +1782,13 @@ void BusSniffer::setup()
             &capture_handler
         );
 
+#if RTRH_DEBUG_CAPTURE
     web_server_base::global_web_server_base->add_handler(
         &rtrh_capture_handler);
 
     web_server_base::global_web_server_base->add_handler(
         &rtrh_timing_handler);
+#endif
 
   } else {
 
@@ -2008,10 +1818,17 @@ void BusSniffer::setup()
   );
 
 
+#if RTRH_DEBUG_CAPTURE
   ESP_LOGD(
       TAG,
-      "Raw captures at /capture; RT/RH edges /rt_rh_capture.csv; trains /rt_rh_timing.csv"
+      "RT/RH decoder ready (debug: 4 GPIO IRQs, /rt_rh_capture.csv, /rt_rh_timing.csv)"
   );
+#else
+  ESP_LOGD(
+      TAG,
+      "RT/RH decoder ready (production: GPIO10 IRQ only)"
+  );
+#endif
 }
 
 
@@ -2023,299 +1840,197 @@ void BusSniffer::setup()
 
 void BusSniffer::loop()
 {
-  /*
-   * A whole sensor measurement may contain long internal pauses.  Only 15 s
-   * without ANY RT/RH edge freezes and classifies the measurement.
-   */
-  if (rtrh_passive_collecting) {
-    const uint32_t now =
-        static_cast<uint32_t>(esp_timer_get_time());
-    const uint32_t last_any =
-        rtrh_passive_last_any_us;
+  // A whole RT/RH measurement is finalized after 15 s without any GPIO10 edge.
+  if (rtrh_collecting) {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+    const uint32_t last_any = rtrh_last_any_us;
 
     if (last_any != 0 &&
-        static_cast<uint32_t>(now - last_any) >
-            RTRH_MEASUREMENT_QUIET_US) {
-      gpio_intr_disable(PIN_RTRH0);
-      gpio_intr_disable(PIN_RTRH1);
-      gpio_intr_disable(PIN_RTRH2);
-      gpio_intr_disable(PIN_RTRH3);
+        static_cast<uint32_t>(now - last_any) > RTRH_MEASUREMENT_QUIET_US) {
+      rtrh_disable_irqs();
 
-      const uint32_t now2 =
-          static_cast<uint32_t>(esp_timer_get_time());
-      const uint32_t last_any2 =
-          rtrh_passive_last_any_us;
-
-      if (rtrh_passive_collecting &&
+      const uint32_t now2 = static_cast<uint32_t>(esp_timer_get_time());
+      const uint32_t last_any2 = rtrh_last_any_us;
+      if (rtrh_collecting &&
           last_any2 != 0 &&
           static_cast<uint32_t>(now2 - last_any2) >
               RTRH_MEASUREMENT_QUIET_US) {
-        finalize_rtrh_passive_measurement();
+        finalize_rtrh_measurement();
       }
 
-      rtrh_passive_last_state = read_rtrh_state();
-      rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
-      rtrh_pin_level[1] = gpio_get_level(PIN_RTRH1);
-      rtrh_pin_level[2] = gpio_get_level(PIN_RTRH2);
-      rtrh_pin_level[3] = gpio_get_level(PIN_RTRH3);
-
-      gpio_intr_enable(PIN_RTRH0);
-      gpio_intr_enable(PIN_RTRH1);
-      gpio_intr_enable(PIN_RTRH2);
-      gpio_intr_enable(PIN_RTRH3);
+      rtrh_last_g10 = static_cast<uint8_t>(gpio_get_level(PIN_RTRH0));
+#if RTRH_DEBUG_CAPTURE
+      rtrh_last_state = read_rtrh_state();
+      for (uint8_t i = 0; i < 4; i++)
+        rtrh_pin_level[i] =
+            static_cast<uint8_t>(gpio_get_level(RTRH_PINS[i]));
+#endif
+      rtrh_enable_irqs();
     }
   }
 
-  static uint32_t last_passive_sequence = 0;
+  static uint32_t last_rtrh_sequence = 0;
+  if (rtrh_snapshot_ready &&
+      rtrh_snapshot.sequence != last_rtrh_sequence) {
+    const RtRhSnapshot s = rtrh_snapshot;
+    last_rtrh_sequence = s.sequence;
 
-  if (rtrh_passive_snapshot_ready &&
-      rtrh_passive_snapshot.sequence !=
-          last_passive_sequence) {
-    const RtRhPassiveSnapshot s =
-        rtrh_passive_snapshot;
+    const float ref_period_us =
+        s.ref.count
+            ? static_cast<float>(s.ref.period_sum) /
+                  static_cast<float>(s.ref.count)
+            : 0.0f;
+    const float rt_phase_period_us =
+        s.rt.count
+            ? static_cast<float>(s.rt.period_sum) /
+                  static_cast<float>(s.rt.count)
+            : 0.0f;
+    const float rh_period_us =
+        s.rh.count
+            ? static_cast<float>(s.rh.period_sum) /
+                  static_cast<float>(s.rh.count)
+            : 0.0f;
 
-    last_passive_sequence = s.sequence;
+    const float ref_duration_ms =
+        static_cast<float>(s.ref.period_sum) / 1000.0f;
+    const float rt_duration_ms =
+        static_cast<float>(s.rt.period_sum) / 1000.0f;
+    const float rh_duration_ms =
+        static_cast<float>(s.rh.period_sum) / 1000.0f;
+
+    const bool ref_ok =
+        ref_period_us >= RTRH_REF_VALID_MIN_US &&
+        ref_period_us <= RTRH_REF_VALID_MAX_US &&
+        ref_duration_ms >= RTRH_REF_DURATION_MIN_MS &&
+        ref_duration_ms <= RTRH_REF_DURATION_MAX_MS &&
+        s.ref.count >= RTRH_REF_COUNT_MIN &&
+        s.ref.count <= RTRH_REF_COUNT_MAX;
+
+    const bool rt_ok =
+        rt_duration_ms >= RTRH_RT_DURATION_MIN_MS &&
+        rt_duration_ms <= RTRH_RT_DURATION_MAX_MS &&
+        s.rt.count >= RTRH_RT_PHASE_COUNT_MIN &&
+        s.rt.count <= RTRH_RT_PHASE_COUNT_MAX &&
+        s.rt_temp_count >= 800;
+
+    const bool rh_ok =
+        rh_duration_ms >= RTRH_RH_DURATION_MIN_MS &&
+        rh_duration_ms <= RTRH_RH_DURATION_MAX_MS &&
+        s.rh.count != 0;
+
+    const bool valid = ref_ok && rt_ok && rh_ok;
+
+#if RTRH_DEBUG_CAPTURE
+    const RtRhPhaseStats *phases[3] = {&s.ref, &s.rt, &s.rh};
+    static constexpr const char *names[3] = {"ref", "rt", "rh"};
+
+    ESP_LOGI(
+        TAG, "RT/RH measurement %lu: 3 phases",
+        static_cast<unsigned long>(s.sequence));
+
+    for (uint8_t i = 0; i < 3; i++) {
+      const RtRhPhaseStats &p = *phases[i];
+      const float mean = p.count
+          ? static_cast<float>(p.period_sum) / static_cast<float>(p.count)
+          : 0.0f;
+      const float low_mean = p.count
+          ? static_cast<float>(p.low_sum) / static_cast<float>(p.count)
+          : 0.0f;
+      const float delay_mean = p.g13_delay_count
+          ? static_cast<float>(p.g13_delay_sum) /
+                static_cast<float>(p.g13_delay_count)
+          : 0.0f;
+
+      ESP_LOGI(
+          TAG,
+          "  %-3s: n=%u period=%.3f us low=%.3f us G13delay=%.3f us (%u)",
+          names[i],
+          static_cast<unsigned>(p.count),
+          mean,
+          low_mean,
+          delay_mean,
+          static_cast<unsigned>(p.g13_delay_count));
+    }
+#endif
 
     ESP_LOGI(
         TAG,
-        "RT/RH passive measurement %lu: %u phases%s%s",
-        static_cast<unsigned long>(s.sequence),
-        static_cast<unsigned>(s.train_count),
-        s.overflow ? " OVERFLOW" : "",
-        s.rt_mixed ? " RT/RH-MIXED" : "");
+        "RT/RH quality: REF %.3f us / %.3f ms / %u, "
+        "RT %.3f ms / %u, RH %.3f ms / %u -> %s",
+        ref_period_us,
+        ref_duration_ms,
+        static_cast<unsigned>(s.ref.count),
+        rt_duration_ms,
+        static_cast<unsigned>(s.rt.count),
+        rh_duration_ms,
+        static_cast<unsigned>(s.rh.count),
+        valid ? "VALID" : "REJECT");
 
-    const RtRhPassiveTrain *ref_train = nullptr;
-    const RtRhPassiveTrain *rt_train = nullptr;
-    const RtRhPassiveTrain *rh_train = nullptr;
-
-    for (uint8_t i = 0; i < s.train_count; i++) {
-      const RtRhPassiveTrain &train = s.trains[i];
-
-      const float period_mean =
-          train.count
-              ? static_cast<float>(train.period_sum) /
-                    static_cast<float>(train.count)
-              : 0.0f;
-
-      const float low_mean =
-          train.count
-              ? static_cast<float>(train.low_sum) /
-                    static_cast<float>(train.count)
-              : 0.0f;
-
-      const float delay_mean =
-          train.g13_delay_count
-              ? static_cast<float>(train.g13_delay_sum) /
-                    static_cast<float>(train.g13_delay_count)
-              : 0.0f;
-
-      ESP_LOGI(
-          TAG,
-          "  train %u %-7s: n=%u gap=%lu us period=%.3f us "
-          "low=%.3f us G13delay=%.3f us (%u)",
-          static_cast<unsigned>(i),
-          rtrh_train_role_name(train.role),
-          static_cast<unsigned>(train.count),
-          static_cast<unsigned long>(train.gap_before_us),
-          period_mean,
-          low_mean,
-          delay_mean,
-          static_cast<unsigned>(train.g13_delay_count));
-
-      if (train.role == RTRH_ROLE_REF && ref_train == nullptr)
-        ref_train = &s.trains[i];
-      else if (train.role == RTRH_ROLE_RT && rt_train == nullptr)
-        rt_train = &s.trains[i];
-      else if (train.role == RTRH_ROLE_RH && rh_train == nullptr)
-        rh_train = &s.trains[i];
-    }
-
-    bool measurement_valid =
-        !s.overflow &&
-        !s.rt_mixed &&
-        ref_train != nullptr &&
-        rt_train != nullptr &&
-        rh_train != nullptr &&
-        ref_train->count != 0 &&
-        rt_train->count != 0 &&
-        rh_train->count != 0;
-
-    float ref_period_us = 0.0f;
-    float rt_phase_period_us = 0.0f;
-    float rh_period_us = 0.0f;
-    float ref_duration_ms = 0.0f;
-    float rt_duration_ms = 0.0f;
-    float rh_duration_ms = 0.0f;
-
-    if (measurement_valid) {
-      ref_period_us =
-          static_cast<float>(ref_train->period_sum) /
-          static_cast<float>(ref_train->count);
-
-      rt_phase_period_us =
-          static_cast<float>(rt_train->period_sum) /
-          static_cast<float>(rt_train->count);
-
-      rh_period_us =
-          static_cast<float>(rh_train->period_sum) /
-          static_cast<float>(rh_train->count);
-
-      ref_duration_ms =
-          static_cast<float>(ref_train->period_sum) / 1000.0f;
-      rt_duration_ms =
-          static_cast<float>(rt_train->period_sum) / 1000.0f;
-      rh_duration_ms =
-          static_cast<float>(rh_train->period_sum) / 1000.0f;
-
-      const bool ref_ok =
-          ref_period_us >= RTRH_REF_VALID_MIN_US &&
-          ref_period_us <= RTRH_REF_VALID_MAX_US &&
-          ref_duration_ms >= RTRH_REF_DURATION_MIN_MS &&
-          ref_duration_ms <= RTRH_REF_DURATION_MAX_MS &&
-          ref_train->count >= RTRH_REF_COUNT_MIN &&
-          ref_train->count <= RTRH_REF_COUNT_MAX;
-
-      const bool rt_ok =
-          rt_duration_ms >= RTRH_RT_DURATION_MIN_MS &&
-          rt_duration_ms <= RTRH_RT_DURATION_MAX_MS &&
-          rt_train->count >= RTRH_RT_PHASE_COUNT_MIN &&
-          rt_train->count <= RTRH_RT_PHASE_COUNT_MAX &&
-          s.rt_valid &&
-          s.rt_count >= 800;
-
-      const bool rh_ok =
-          rh_duration_ms >= RTRH_RH_DURATION_MIN_MS &&
-          rh_duration_ms <= RTRH_RH_DURATION_MAX_MS;
-
-      measurement_valid = ref_ok && rt_ok && rh_ok;
-
-      ESP_LOGI(
-          TAG,
-          "RT/RH quality: REF %.3f us / %.3f ms / %u, "
-          "RT %.3f ms / %u, RH %.3f ms / %u -> %s",
-          ref_period_us,
-          ref_duration_ms,
-          static_cast<unsigned>(ref_train->count),
-          rt_duration_ms,
-          static_cast<unsigned>(rt_train->count),
-          rh_duration_ms,
-          static_cast<unsigned>(rh_train->count),
-          measurement_valid ? "VALID" : "REJECT");
-    }
-
-    if (!measurement_valid) {
+    if (!valid) {
       ESP_LOGW(
           TAG,
-          "RT/RH values not published: measurement failed "
-          "phase/quality checks");
+          "RT/RH values not published: measurement failed quality checks");
     } else {
-      // Temperature uses the protected first 880 RT cycles, normalized by REF.
       const float rt_period_us =
-          static_cast<float>(s.rt_period_sum) /
-          static_cast<float>(s.rt_count);
-
-      const float rt_ratio =
-          rt_period_us / ref_period_us;
-
+          static_cast<float>(s.rt_temp_period_sum) /
+          static_cast<float>(s.rt_temp_count);
+      const float rt_ratio = rt_period_us / ref_period_us;
       const float temperature_c =
-          RTRH_TEMP_RATIO_M * rt_ratio +
-          RTRH_TEMP_RATIO_C;
+          RTRH_TEMP_RATIO_M * rt_ratio + RTRH_TEMP_RATIO_C;
 
-      // RH is normalized to the same REF period.  The RH phase itself is a
-      // fixed ~127 ms counting window, so count and period carry the same
-      // information; period/count consistency is inherently checked by the
-      // duration gate above.
-      const float rh_ratio =
-          rh_period_us / ref_period_us;
-
+      const float rh_ratio = rh_period_us / ref_period_us;
       const float x = logf(rh_ratio);
-
       float rh_percent =
           RTRH_RH_RATIO_A * x * x +
           RTRH_RH_RATIO_B * x +
           RTRH_RH_RATIO_C;
-
-      if (rh_percent < 0.0f)
-        rh_percent = 0.0f;
-      else if (rh_percent > 100.0f)
-        rh_percent = 100.0f;
-
-      const float rh_frequency_hz =
-          1000000.0f / rh_period_us;
+      if (rh_percent < 0.0f) rh_percent = 0.0f;
+      if (rh_percent > 100.0f) rh_percent = 100.0f;
 
       ESP_LOGI(
           TAG,
           "RT normalized: ratio=%.6f (RT %.3f / REF %.3f us)",
-          rt_ratio,
-          rt_period_us,
-          ref_period_us);
-
+          rt_ratio, rt_period_us, ref_period_us);
       ESP_LOGI(
           TAG,
-          "RH normalized: ratio=%.6f (RH %.3f / REF %.3f us), "
-          "cycles=%u, duration=%.3f ms, freq=%.2f Hz",
-          rh_ratio,
-          rh_period_us,
-          ref_period_us,
-          static_cast<unsigned>(rh_train->count),
-          rh_duration_ms,
-          rh_frequency_hz);
-
+          "RH normalized: ratio=%.6f (RH %.3f / REF %.3f us)",
+          rh_ratio, rh_period_us, ref_period_us);
       ESP_LOGI(
           TAG,
-          "RH humidity PASSIVE: %.1f %% from normalized RH ratio %.6f",
-          rh_percent,
-          rh_ratio);
-
-      ESP_LOGI(
-          TAG,
-          "RT temperature PASSIVE: %.2f C from normalized RT ratio %.6f "
-          "(%.3f us, %u cycles)",
-          temperature_c,
-          rt_ratio,
-          rt_period_us,
-          static_cast<unsigned>(s.rt_count));
+          "RH humidity: %.1f %% ; RT temperature: %.2f C",
+          rh_percent, temperature_c);
 
       if (this->rh_humidity_sensor_ != nullptr)
         this->rh_humidity_sensor_->publish_state(rh_percent);
-
       if (this->rt_temperature_sensor_ != nullptr)
         this->rt_temperature_sensor_->publish_state(temperature_c);
     }
   }
 
-  // A completed digital trace stays frozen for HTTP; train decoding continues.
+#if RTRH_DEBUG_CAPTURE
   if (rtrh_capture_ready) {
-    static uint32_t last_reported_rtrh_sequence = UINT32_MAX;
-
-    if (last_reported_rtrh_sequence != rtrh_sequence) {
-      last_reported_rtrh_sequence = rtrh_sequence;
-
+    static uint32_t last_reported_capture_sequence = UINT32_MAX;
+    if (last_reported_capture_sequence != rtrh_capture_sequence) {
+      last_reported_capture_sequence = rtrh_capture_sequence;
       ESP_LOGI(
           TAG,
           "RT/RH edge capture ready: %u events, sequence %lu%s",
           rtrh_sample_count,
-          static_cast<unsigned long>(rtrh_sequence),
-          rtrh_overflow ? " OVERFLOW" : "");
+          static_cast<unsigned long>(rtrh_capture_sequence),
+          rtrh_capture_overflow ? " OVERFLOW" : "");
     }
   }
 
   if (rtrh_capturing && !rtrh_capture_ready) {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-
-    if (static_cast<uint32_t>(now - rtrh_start_us) >= RTRH_CAPTURE_US) {
+    if (static_cast<uint32_t>(now - rtrh_capture_start_us) >=
+        RTRH_CAPTURE_US) {
       rtrh_capturing = false;
       rtrh_capture_ready = true;
-      rtrh_sequence++;
-
-      ESP_LOGI(
-          TAG,
-          "RT/RH edge capture ready: %u events, sequence %lu%s",
-          rtrh_sample_count,
-          static_cast<unsigned long>(rtrh_sequence),
-          rtrh_overflow ? " OVERFLOW" : "");
+      rtrh_capture_sequence++;
     }
   }
+#endif
 
   /*
    * Capture noch aktiv?
