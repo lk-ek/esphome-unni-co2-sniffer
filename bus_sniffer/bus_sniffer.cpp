@@ -953,14 +953,22 @@ static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 
 // REF-normalized calibration.
-// ESP32-C3 calibration fitted from synchronized original-display points.
+// ESP32-C3 temperature calibration.
+// Slope from the multi-temperature C3 fit; intercept refined by -0.48 C from
+// the later stable ambient v18 measurements.
 // T [degC] = M * (RT_period / REF_period) + C
 static constexpr float RTRH_TEMP_RATIO_M = -29.508f;
-static constexpr float RTRH_TEMP_RATIO_C = 80.531f;
+static constexpr float RTRH_TEMP_RATIO_C = 80.051f;
 
+// ESP32-C3 RH calibration.
+// Keep the established log-quadratic shape for now and apply the robust median
+// ambient C3 correction (+1.2107 %-points).  The heated/drying transient data
+// are intentionally not used to refit A/B because their display/timing pairing
+// is time-lagged and non-monotonic.
+// RH = A*ln(ratio)^2 + B*ln(ratio) + C
 static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
 static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
-static constexpr float RTRH_RH_RATIO_C = 64.58980155f;
+static constexpr float RTRH_RH_RATIO_C = 65.8005f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
