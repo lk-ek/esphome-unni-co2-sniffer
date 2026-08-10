@@ -953,8 +953,10 @@ static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 
 // REF-normalized calibration.
-static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
-static constexpr float RTRH_TEMP_RATIO_C = 84.38101f;
+// ESP32-C3 calibration fitted from synchronized original-display points.
+// T [degC] = M * (RT_period / REF_period) + C
+static constexpr float RTRH_TEMP_RATIO_M = -29.508f;
+static constexpr float RTRH_TEMP_RATIO_C = 80.531f;
 
 static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
 static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
@@ -2010,9 +2012,11 @@ void BusSniffer::loop()
 
     ESP_LOGI(
         TAG,
-        "RT/RH quality: REF %.3f us / %.3f ms / %u, "
+        "RT/RH measurement %lu quality: "
+        "REF %.3f us / %.3f ms / %u, "
         "RT %.3f us / %.3f ms / %u, "
         "RH %.3f ms / state %.3f us (%u/%lu) -> %s",
+        static_cast<unsigned long>(s.sequence),
         ref_period_us,
         ref_duration_ms,
         static_cast<unsigned>(s.ref.count),
@@ -2030,7 +2034,9 @@ void BusSniffer::loop()
     if (!measurement_valid) {
       ESP_LOGW(
           TAG,
-          "RT/RH values not published: quality check failed");
+          "RT/RH measurement %lu values not published: "
+          "quality check failed",
+          static_cast<unsigned long>(s.sequence));
     } else {
       // Temperature: first up to 880 RT cycles, normalized by REF.
       const float rt_period_us =
@@ -2064,7 +2070,9 @@ void BusSniffer::loop()
 
       ESP_LOGI(
           TAG,
-          "RT: %.3f / REF %.3f us = %.6f -> %.2f C",
+          "RT/RH measurement %lu RT: "
+          "%.3f / REF %.3f us = %.6f -> %.2f C",
+          static_cast<unsigned long>(s.sequence),
           rt_period_us,
           ref_period_us,
           rt_ratio,
@@ -2072,7 +2080,9 @@ void BusSniffer::loop()
 
       ESP_LOGI(
           TAG,
-          "RH: state %.3f / REF %.3f us = %.6f -> %.1f %%",
+          "RT/RH measurement %lu RH: "
+          "state %.3f / REF %.3f us = %.6f -> %.1f %%",
+          static_cast<unsigned long>(s.sequence),
           rh_state_us,
           ref_period_us,
           rh_ratio,
