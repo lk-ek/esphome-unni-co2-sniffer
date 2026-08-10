@@ -73,12 +73,15 @@ static const char *TAG = "bus_sniffer";
  * Sensor decoding, calibration, UPT sample scaling and GATT server stay unchanged.
  * v28 completes the Device Information Service in YAML: firmware 1.0.0
  * and System ID 0x2A23 containing the six BLE-MAC bytes.
+ * v30 changes only the live-advertisement SampleType from 8 to 10,
+ * matching Sensirion's current Zephyr/MyAmbience DIY-gadget example.
+ * Name, company bytes, value encoding, GATT, decoder and calibration are unchanged.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0xD5;
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0x06;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
-static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
+static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x0A;
 
 static bool sensirion_ble_have_temperature = false;
 static bool sensirion_ble_have_humidity = false;
@@ -232,7 +235,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2/UPT v29 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE DIY/ST10 v30 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
