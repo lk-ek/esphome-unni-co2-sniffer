@@ -916,13 +916,22 @@ static CaptureHandler capture_handler;
  * GPIO4 / D2 observes the former ESP32-S2 GPIO13 sensor net.
  * Former GPIO12 duplicates G10 and remains omitted.
  * Every interrupt re-reads the complete observed three-line state.
- * REF/RT edge timing, however, is accepted only from the actual GPIO3/D1 IRQ;
- * it is never reconstructed from another pin's post-edge state.
+ * REF/RT edge timing is accepted only from the actual GPIO3/D1 IRQ.
+ *
+ * Phase identity is based solely on elapsed time from the first edge after the
+ * long inter-measurement quiet interval:
+ *   REF:   0 .. 125 ms
+ *   RT : 125 .. 252 ms
+ *   RH : 252 ms .. end of activity
+ *
+ * The measured period and the number of cycles do NOT select the phase.  This
+ * keeps extreme temperatures decodable even when RT becomes shorter than REF
+ * or far longer than the old 105..190 us range.
  *
  * Measurement:
  *   REF: physical G10-net (XIAO GPIO3/D1) falling-edge IRQ period sum/count
  *   RT : physical G10-net (XIAO GPIO3/D1) falling-edge IRQ period sum/count;
- *        first 880 cycles for temperature
+ *        first up to 880 cycles for temperature
  *   RH : humidity from repeated arrivals at G10=0, G11=0, G13=1
  *
  * The G10-net-derived RH period is retained ONLY as a phase-duration /
@@ -956,26 +965,33 @@ static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
 static constexpr float RTRH_REF_VALID_MAX_US = 82.0f;
 static constexpr float RTRH_REF_DURATION_MIN_MS = 115.0f;
 static constexpr float RTRH_REF_DURATION_MAX_MS = 135.0f;
-static constexpr float RTRH_RT_DURATION_MIN_MS = 120.0f;
+static constexpr float RTRH_RT_DURATION_MIN_MS = 110.0f;
 static constexpr float RTRH_RT_DURATION_MAX_MS = 135.0f;
-static constexpr float RTRH_RH_DURATION_MIN_MS = 120.0f;
-static constexpr float RTRH_RH_DURATION_MAX_MS = 135.0f;
+static constexpr float RTRH_RH_DURATION_MIN_MS = 110.0f;
+static constexpr float RTRH_RH_DURATION_MAX_MS = 145.0f;
 static constexpr uint16_t RTRH_REF_COUNT_MIN = 1450;
 static constexpr uint16_t RTRH_REF_COUNT_MAX = 1750;
-static constexpr uint16_t RTRH_RT_PHASE_COUNT_MIN = 850;
-static constexpr uint16_t RTRH_RT_PHASE_COUNT_MAX = 930;
+static constexpr uint16_t RTRH_RT_TEMP_COUNT_MIN = 64;
 
-// FSM limits.
+// Time-based phase decoder.
+//
+// The original controller spends about 125 ms in REF, then about 127 ms in RT.
+// Those phase lengths stay nearly constant while the actual RC period changes
+// strongly with temperature/humidity.  Therefore period/count must never decide
+// which phase we are in.
 static constexpr uint32_t RTRH_MEASUREMENT_QUIET_US = 15000000;
-static constexpr uint32_t RTRH_CYCLE_GAP_US = 2000;
-static constexpr uint32_t RTRH_REF_MIN_US = 60;
-static constexpr uint32_t RTRH_REF_MAX_US = 105;
-static constexpr uint32_t RTRH_RT_MIN_US = 105;
-static constexpr uint32_t RTRH_RT_MAX_US = 190;
+static constexpr uint32_t RTRH_REF_PHASE_END_US = 125000;
+static constexpr uint32_t RTRH_RT_PHASE_END_US = 252000;
+
+// Reject only implausibly long "cycles" inside a phase.  This is deliberately
+// much wider than the old 2 ms / 60..190 us classifier so hot/cold extremes
+// remain decodable.
+static constexpr uint32_t RTRH_CYCLE_MAX_US = 20000;
+
+// Preserve the historical "first 880 RT cycles" averaging when available.
+// At low cycle counts all available cycles are used; quality no longer depends
+// on reaching a temperature-specific number of cycles.
 static constexpr uint16_t RTRH_RT_TEMP_CYCLES = 880;
-static constexpr uint16_t RTRH_RT_MIN_BEFORE_RH = 800;
-static constexpr uint16_t RTRH_RT_FORCE_END_CYCLES = 920;
-static constexpr uint8_t RTRH_PHASE_LOCK_CYCLES = 8;
 
 enum RtRhPhase : uint8_t {
   RTRH_PHASE_WAIT_REF = 0,
@@ -1013,6 +1029,7 @@ struct RtRhSnapshot {
 };
 
 static volatile bool rtrh_collecting = false;
+static volatile uint32_t rtrh_measurement_start_us = 0;
 static volatile uint32_t rtrh_last_any_us = 0;
 static volatile uint8_t rtrh_last_state = 0;
 
@@ -1020,7 +1037,6 @@ static volatile uint32_t rtrh_last_g10_fall_us = 0;
 static volatile bool rtrh_have_g10_rise = false;
 
 static volatile uint8_t rtrh_phase = RTRH_PHASE_WAIT_REF;
-static volatile uint8_t rtrh_phase_candidate_run = 0;
 
 static RtRhAccum rtrh_ref;
 static RtRhAccum rtrh_rt;
@@ -1067,14 +1083,15 @@ static inline void IRAM_ATTR reset_rtrh_measurement(
     uint8_t state)
 {
   rtrh_collecting = true;
+  rtrh_measurement_start_us = now;
   rtrh_last_any_us = now;
   rtrh_last_state = state;
 
   rtrh_last_g10_fall_us = 0;
   rtrh_have_g10_rise = false;
 
-  rtrh_phase = RTRH_PHASE_WAIT_REF;
-  rtrh_phase_candidate_run = 0;
+  // The first edge after the long quiet interval is phase zero: REF.
+  rtrh_phase = RTRH_PHASE_REF;
 
   clear_rtrh_accum(rtrh_ref);
   clear_rtrh_accum(rtrh_rt);
@@ -1096,6 +1113,37 @@ static inline void IRAM_ATTR add_rtrh_period(
   a.period_sum += period;
 }
 
+static inline void IRAM_ATTR update_rtrh_phase_by_time(
+    uint32_t now)
+{
+  const uint32_t elapsed =
+      static_cast<uint32_t>(
+          now - rtrh_measurement_start_us);
+
+  uint8_t next_phase;
+
+  if (elapsed < RTRH_REF_PHASE_END_US)
+    next_phase = RTRH_PHASE_REF;
+  else if (elapsed < RTRH_RT_PHASE_END_US)
+    next_phase = RTRH_PHASE_RT;
+  else
+    next_phase = RTRH_PHASE_RH;
+
+  if (next_phase == rtrh_phase)
+    return;
+
+  rtrh_phase = next_phase;
+
+  // Never let a period straddle a fixed phase boundary.
+  rtrh_last_g10_fall_us = 0;
+  rtrh_have_g10_rise = false;
+
+  // RH recurrence timing starts fresh at the RH boundary.
+  if (next_phase == RTRH_PHASE_RH)
+    rtrh_rh_state.last_us = 0;
+}
+
+
 static inline void IRAM_ATTR observe_rtrh_rh_state(
     uint32_t now,
     uint8_t state)
@@ -1112,7 +1160,7 @@ static inline void IRAM_ATTR observe_rtrh_rh_state(
     const uint32_t dt =
         static_cast<uint32_t>(now - rtrh_rh_state.last_us);
 
-    if (dt >= 40 && dt <= 2000) {
+    if (dt >= 40 && dt <= 60000) {
       rtrh_rh_state.samples[rtrh_rh_state.write_pos] =
           static_cast<uint16_t>(dt);
 
@@ -1246,6 +1294,9 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   else
     rtrh_last_any_us = now;
 
+  // Phase identity comes only from elapsed time in the measurement cycle.
+  update_rtrh_phase_by_time(now);
+
   /*
    * REF/RT timing must be tied to the interrupt from the physical G10 net
    * itself (XIAO GPIO3 / D1).  Reconstructing a G10 edge from a later
@@ -1263,101 +1314,48 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 
     rtrh_last_g10_fall_us = now;
 
-    if (previous_fall != 0) {
+    if (previous_fall != 0 &&
+        rtrh_have_g10_rise) {
       const uint32_t period =
-          static_cast<uint32_t>(now - previous_fall);
+          static_cast<uint32_t>(
+              now - previous_fall);
 
-      if (period < RTRH_CYCLE_GAP_US &&
-          rtrh_have_g10_rise) {
-        const bool is_ref =
-            period >= RTRH_REF_MIN_US &&
-            period <= RTRH_REF_MAX_US;
-
-        const bool is_rt =
-            period >= RTRH_RT_MIN_US &&
-            period <= RTRH_RT_MAX_US;
-
+      if (period <= RTRH_CYCLE_MAX_US) {
         switch (rtrh_phase) {
-          case RTRH_PHASE_WAIT_REF:
-            if (is_ref) {
-              rtrh_phase = RTRH_PHASE_REF;
-              add_rtrh_period(rtrh_ref, period);
-            }
-            break;
-
           case RTRH_PHASE_REF:
-            if (is_ref) {
-              rtrh_phase_candidate_run = 0;
-              add_rtrh_period(rtrh_ref, period);
-            } else if (is_rt) {
-              if (rtrh_phase_candidate_run < 255)
-                rtrh_phase_candidate_run++;
-
-              if (rtrh_phase_candidate_run >=
-                  RTRH_PHASE_LOCK_CYCLES) {
-                rtrh_phase = RTRH_PHASE_RT;
-                rtrh_phase_candidate_run = 0;
-
-                // As in v7c, the first seven candidate cycles are discarded.
-                add_rtrh_period(rtrh_rt, period);
-
-                if (rtrh_rt_temp_count <
-                    RTRH_RT_TEMP_CYCLES) {
-                  rtrh_rt_temp_period_sum += period;
-                  rtrh_rt_temp_count++;
-                }
-              }
-            } else {
-              rtrh_phase_candidate_run = 0;
-            }
+            add_rtrh_period(
+                rtrh_ref,
+                period);
             break;
 
           case RTRH_PHASE_RT:
-            if (rtrh_rt.count >=
-                RTRH_RT_FORCE_END_CYCLES) {
-              rtrh_phase = RTRH_PHASE_RH;
-              rtrh_phase_candidate_run = 0;
+            add_rtrh_period(
+                rtrh_rt,
+                period);
 
-              // G10-net timing is retained only to validate RH phase length.
-              add_rtrh_period(rtrh_rh_timing, period);
-              rtrh_rh_state.last_us = 0;
-            } else if (is_rt) {
-              rtrh_phase_candidate_run = 0;
-              add_rtrh_period(rtrh_rt, period);
-
-              if (rtrh_rt_temp_count <
-                  RTRH_RT_TEMP_CYCLES) {
-                rtrh_rt_temp_period_sum += period;
-                rtrh_rt_temp_count++;
-              }
-            } else if (rtrh_rt.count <
-                       RTRH_RT_MIN_BEFORE_RH) {
-              rtrh_phase_candidate_run = 0;
-            } else {
-              if (rtrh_phase_candidate_run < 255)
-                rtrh_phase_candidate_run++;
-
-              if (rtrh_phase_candidate_run >=
-                  RTRH_PHASE_LOCK_CYCLES) {
-                rtrh_phase = RTRH_PHASE_RH;
-                rtrh_phase_candidate_run = 0;
-
-                add_rtrh_period(rtrh_rh_timing, period);
-                rtrh_rh_state.last_us = 0;
-              }
+            if (rtrh_rt_temp_count <
+                RTRH_RT_TEMP_CYCLES) {
+              rtrh_rt_temp_period_sum +=
+                  period;
+              rtrh_rt_temp_count++;
             }
             break;
 
           case RTRH_PHASE_RH:
-            // Only phase duration/quality; not used for humidity.
-            add_rtrh_period(rtrh_rh_timing, period);
+            // G10 timing is only a phase-duration/quality accumulator here.
+            add_rtrh_period(
+                rtrh_rh_timing,
+                period);
+            break;
+
+          case RTRH_PHASE_WAIT_REF:
+          default:
             break;
         }
       }
     }
 
     rtrh_have_g10_rise = false;
-    
   }
 
   /*
@@ -1888,7 +1886,7 @@ void BusSniffer::setup()
 #else
   ESP_LOGD(
       TAG,
-      "RT/RH minimal hybrid decoder (GPIO3/D1 + GPIO5/D3 + GPIO4/D2); debug capture disabled"
+      "RT/RH time-phase decoder (GPIO3/D1 + GPIO5/D3 + GPIO4/D2); debug capture disabled"
   );
 #endif
 }
@@ -1995,11 +1993,8 @@ void BusSniffer::loop()
             RTRH_RT_DURATION_MIN_MS &&
         rt_duration_ms <=
             RTRH_RT_DURATION_MAX_MS &&
-        s.rt.count >=
-            RTRH_RT_PHASE_COUNT_MIN &&
-        s.rt.count <=
-            RTRH_RT_PHASE_COUNT_MAX &&
-        s.rt_temp_count >= 800;
+        s.rt_temp_count >=
+            RTRH_RT_TEMP_COUNT_MIN;
 
     const bool rh_ok =
         rh_duration_ms >=
@@ -2007,8 +2002,8 @@ void BusSniffer::loop()
         rh_duration_ms <=
             RTRH_RH_DURATION_MAX_MS &&
         s.rh_state.sample_count >= 8 &&
-        rh_state_us >= 70.0f &&
-        rh_state_us <= 1200.0f;
+        rh_state_us >= 40.0f &&
+        rh_state_us <= 60000.0f;
 
     const bool measurement_valid =
         ref_ok && rt_ok && rh_ok;
@@ -2037,7 +2032,7 @@ void BusSniffer::loop()
           TAG,
           "RT/RH values not published: quality check failed");
     } else {
-      // Temperature: first 880 RT cycles, normalized by REF.
+      // Temperature: first up to 880 RT cycles, normalized by REF.
       const float rt_period_us =
           static_cast<float>(
               s.rt_temp_period_sum) /
