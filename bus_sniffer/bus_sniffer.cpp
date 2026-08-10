@@ -80,12 +80,16 @@ static const char *TAG = "bus_sniffer";
  *   T = encodeTemperatureV1, RH = encodeHumidityV1, CO2 = encodeSimple
  *   all 16-bit sample fields little-endian.
  * Decoder/FSM and sensor calibration remain unchanged.
+ * v32 follows uploaded Sensirion Example2 SCD30 exactly for advertisement data:
+ *   T_RH_CO2_ALT => SampleType 8, 8-byte sample; trailing 00 00 reserved.
+ *   T/RH use V1 encoders, CO2 simple uint16, all sample words little-endian.
+ *   Local Name remains exactly "S".
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
 static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
-static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x0A;
+static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
 
 static bool sensirion_ble_have_temperature = false;
 static bool sensirion_ble_have_humidity = false;
@@ -183,7 +187,7 @@ static void update_sensirion_ble_advertisement()
   const uint16_t device_id =
       sensirion_ble_get_device_id();
 
-  std::vector<uint8_t> data(12);
+  std::vector<uint8_t> data(14);
 
   // Sensirion Bluetooth SIG Company Identifier is 0x06D5.
   // BLE Manufacturer Specific Data carries the 16-bit company ID
@@ -207,6 +211,10 @@ static void update_sensirion_ble_advertisement()
   sensirion_ble_put_u16_le(
       data, 10, sensirion_ble_co2_ppm);
 
+  // T_RH_CO2_ALT has two required reserved bytes after CO2.
+  data[12] = 0x00;
+  data[13] = 0x00;
+
   esp32_ble::global_ble->
       advertising_set_manufacturer_data(data);
 
@@ -225,10 +233,10 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE REF/T_RH_CO2 v31 [S]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE REF/T_RH_CO2_ALT v32 [S]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
-      "%02X %02X %02X %02X %02X %02X",
+      "%02X %02X %02X %02X %02X %02X %02X %02X",
       sensirion_ble_temperature_c,
       sensirion_ble_humidity_percent,
       static_cast<unsigned>(
@@ -236,7 +244,8 @@ static void update_sensirion_ble_advertisement()
       static_cast<unsigned>(device_id),
       data[0], data[1], data[2], data[3],
       data[4], data[5], data[6], data[7],
-      data[8], data[9], data[10], data[11]);
+      data[8], data[9], data[10], data[11],
+      data[12], data[13]);
 }
 
 
