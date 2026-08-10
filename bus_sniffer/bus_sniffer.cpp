@@ -75,8 +75,8 @@ static const char *TAG = "bus_sniffer";
  * and System ID 0x2A23 containing the six BLE-MAC bytes.
  */
 
-static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
-static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0xD5;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0x06;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
 
@@ -232,7 +232,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2/UPT v28 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2/UPT v29 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
