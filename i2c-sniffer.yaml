@@ -33,6 +33,11 @@ esp32:
   framework:
     type: esp-idf
 
+# BLE host used by the custom Sensirion MyCO2 manufacturer advertisement.
+# No GATT server is required for live broadcasts.
+esp32_ble:
+  advertising: true
+
 web_server:
   port: 80
 

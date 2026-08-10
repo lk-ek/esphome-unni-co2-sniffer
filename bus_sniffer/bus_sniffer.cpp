@@ -2,10 +2,12 @@
 
 #include "esphome/core/log.h"
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "esphome/components/esp32_ble/ble.h"
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
+#include "esp_mac.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -18,12 +20,236 @@
 #include <cstring>
 #include <string>
 #include <utility>
+#include <vector>
 
 
 namespace esphome {
 namespace bus_sniffer {
 
 static const char *TAG = "bus_sniffer";
+
+
+/*
+ * ============================================================================
+ * Sensirion MyCO2-compatible BLE live advertisement
+ * ============================================================================
+ *
+ * Manufacturer data layout used by Sensirion UPT:
+ *
+ *   [0]  0xD5   Sensirion company ID, high byte (0xD506)
+ *   [1]  0x06   Sensirion company ID, low byte
+ *   [2]  0x00   live/sample advertisement type
+ *   [3]  0x08   SampleType 8 = T_RH_CO2_ALT / MyCO2
+ *   [4]  dev_id high
+ *   [5]  dev_id low
+ *   [6..7]   temperature raw uint16
+ *   [8..9]   relative humidity raw uint16
+ *   [10..11] CO2 ppm uint16
+ *
+ * The three sample values use Sensirion's 16-bit representation and are placed
+ * little-endian in the sample payload.  The fixed header/device-ID byte order
+ * follows Sensirion's UPT BLE_example.
+ *
+ * This is deliberately advertising-only.  No GATT server/history buffer is
+ * needed for live readings in scanner applications.
+ */
+
+static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
+static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
+static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
+
+static bool sensirion_ble_have_temperature = false;
+static bool sensirion_ble_have_humidity = false;
+static bool sensirion_ble_have_co2 = false;
+
+static float sensirion_ble_temperature_c = 0.0f;
+static float sensirion_ble_humidity_percent = 0.0f;
+static uint16_t sensirion_ble_co2_ppm = 0;
+
+static bool sensirion_ble_device_id_ready = false;
+static uint16_t sensirion_ble_device_id = 0;
+
+static bool sensirion_ble_logged_first_packet = false;
+
+
+static uint16_t sensirion_ble_encode_temperature(float value)
+{
+  // Sensirion SCD4x/SHT-style 16-bit temperature representation:
+  // T = -45 + 175 * raw / 65535.
+  if (value < -45.0f)
+    value = -45.0f;
+  else if (value > 130.0f)
+    value = 130.0f;
+
+  const float raw =
+      (value + 45.0f) * 65535.0f / 175.0f;
+
+  long rounded = lroundf(raw);
+
+  if (rounded < 0)
+    rounded = 0;
+  else if (rounded > 65535)
+    rounded = 65535;
+
+  return static_cast<uint16_t>(rounded);
+}
+
+
+static uint16_t sensirion_ble_encode_humidity(float value)
+{
+  // Sensirion SCD4x-style 16-bit RH representation:
+  // RH = 100 * raw / 65535.
+  if (value < 0.0f)
+    value = 0.0f;
+  else if (value > 100.0f)
+    value = 100.0f;
+
+  const float raw =
+      value * 65535.0f / 100.0f;
+
+  long rounded = lroundf(raw);
+
+  if (rounded < 0)
+    rounded = 0;
+  else if (rounded > 65535)
+    rounded = 65535;
+
+  return static_cast<uint16_t>(rounded);
+}
+
+
+static inline void sensirion_ble_put_u16_le(
+    std::vector<uint8_t> &data,
+    size_t offset,
+    uint16_t value)
+{
+  data[offset] =
+      static_cast<uint8_t>(value & 0xFF);
+  data[offset + 1] =
+      static_cast<uint8_t>(value >> 8);
+}
+
+
+static uint16_t sensirion_ble_get_device_id()
+{
+  if (sensirion_ble_device_id_ready)
+    return sensirion_ble_device_id;
+
+  uint8_t mac[6] = {0};
+
+  if (esp_read_mac(mac, ESP_MAC_BT) != ESP_OK) {
+    // Stable fallback; should normally never be needed on ESP32-C3.
+    sensirion_ble_device_id = 0xC301;
+  } else {
+    // Sensirion's manufacturer payload carries a 16-bit gadget ID.
+    // Derive it deterministically from the board's Bluetooth MAC.
+    sensirion_ble_device_id =
+        (static_cast<uint16_t>(mac[4]) << 8) |
+        static_cast<uint16_t>(mac[5]);
+
+    if (sensirion_ble_device_id == 0)
+      sensirion_ble_device_id = 0xC301;
+  }
+
+  sensirion_ble_device_id_ready = true;
+
+  return sensirion_ble_device_id;
+}
+
+
+static void update_sensirion_ble_advertisement()
+{
+  if (!sensirion_ble_have_temperature ||
+      !sensirion_ble_have_humidity ||
+      !sensirion_ble_have_co2)
+    return;
+
+  if (esp32_ble::global_ble == nullptr ||
+      !esp32_ble::global_ble->is_active())
+    return;
+
+  const uint16_t raw_temperature =
+      sensirion_ble_encode_temperature(
+          sensirion_ble_temperature_c);
+
+  const uint16_t raw_humidity =
+      sensirion_ble_encode_humidity(
+          sensirion_ble_humidity_percent);
+
+  const uint16_t device_id =
+      sensirion_ble_get_device_id();
+
+  std::vector<uint8_t> data(12);
+
+  data[0] = SENSIRION_BLE_COMPANY_HI;
+  data[1] = SENSIRION_BLE_COMPANY_LO;
+  data[2] = SENSIRION_BLE_SAMPLE_ADV_TYPE;
+  data[3] = SENSIRION_BLE_SAMPLE_TYPE_MYCO2;
+
+  // UPT BLE_example serializes the 16-bit device ID MSB first.
+  data[4] =
+      static_cast<uint8_t>(device_id >> 8);
+  data[5] =
+      static_cast<uint8_t>(device_id & 0xFF);
+
+  // Measurement sample data.
+  sensirion_ble_put_u16_le(
+      data, 6, raw_temperature);
+  sensirion_ble_put_u16_le(
+      data, 8, raw_humidity);
+  sensirion_ble_put_u16_le(
+      data, 10, sensirion_ble_co2_ppm);
+
+  esp32_ble::global_ble->
+      advertising_set_manufacturer_data(data);
+
+  if (!sensirion_ble_logged_first_packet) {
+    sensirion_ble_logged_first_packet = true;
+
+    ESP_LOGI(
+        TAG,
+        "Sensirion BLE MyCO2 advertising active: "
+        "device 0x%04X, payload "
+        "%02X %02X %02X %02X %02X %02X "
+        "%02X %02X %02X %02X %02X %02X",
+        static_cast<unsigned>(device_id),
+        data[0], data[1], data[2], data[3],
+        data[4], data[5], data[6], data[7],
+        data[8], data[9], data[10], data[11]);
+  }
+
+  ESP_LOGV(
+      TAG,
+      "BLE MyCO2: %.2f C / %.1f %% / %u ppm",
+      sensirion_ble_temperature_c,
+      sensirion_ble_humidity_percent,
+      static_cast<unsigned>(
+          sensirion_ble_co2_ppm));
+}
+
+
+static void sensirion_ble_set_temperature_humidity(
+    float temperature_c,
+    float humidity_percent)
+{
+  sensirion_ble_temperature_c = temperature_c;
+  sensirion_ble_humidity_percent = humidity_percent;
+  sensirion_ble_have_temperature = true;
+  sensirion_ble_have_humidity = true;
+
+  update_sensirion_ble_advertisement();
+}
+
+
+static void sensirion_ble_set_co2(uint16_t ppm)
+{
+  sensirion_ble_co2_ppm = ppm;
+  sensirion_ble_have_co2 = true;
+
+  update_sensirion_ble_advertisement();
+}
+
 
 
 /*
@@ -961,10 +1187,8 @@ static constexpr float RTRH_TEMP_RATIO_M = -29.508f;
 static constexpr float RTRH_TEMP_RATIO_C = 80.051f;
 
 // ESP32-C3 RH calibration.
-// Keep the established log-quadratic shape for now and apply the robust median
-// ambient C3 correction (+1.2107 %-points).  The heated/drying transient data
-// are intentionally not used to refit A/B because their display/timing pairing
-// is time-lagged and non-monotonic.
+// A/B retain the established log-quadratic shape; C includes the final local
+// ambient correction verified by the original display around 49 %RH.
 // RH = A*ln(ratio)^2 + B*ln(ratio) + C
 static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
 static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
@@ -2096,6 +2320,10 @@ void BusSniffer::loop()
           rh_ratio,
           rh_percent);
 
+      sensirion_ble_set_temperature_humidity(
+          temperature_c,
+          rh_percent);
+
       if (this->rt_temperature_sensor_ != nullptr)
         this->rt_temperature_sensor_->
             publish_state(temperature_c);
@@ -2320,6 +2548,10 @@ void BusSniffer::loop()
 
         const uint16_t ppm =
             result.co2_ppm;
+
+        // Keep BLE live advertisement fresh even when the ppm value did not
+        // change, while HA publication below remains change-only.
+        sensirion_ble_set_co2(ppm);
 
 
         if (
