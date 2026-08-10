@@ -31,21 +31,21 @@ static const char *TAG = "bus_sniffer";
  * Hardware
  * ============================================================================
  *
- * GPIO40 = SCL
- * GPIO39 = SDA
- * GPIO38 = zusätzlicher Logic-Analyzer-Kanal
+ * XIAO ESP32-C3 pin mapping:
  *
- * GPIO38 wird nur mitgesampelt und erzeugt selbst keine Interrupts.
+ * D5 / GPIO7 = CO2 SCL  (yellow; old ESP32-S2 GPIO40)
+ * D4 / GPIO6 = CO2 SDA  (blue;   old ESP32-S2 GPIO39)
+ * D1 / GPIO3 = RT/RH G10 (green;  old ESP32-S2 GPIO10)
+ * D2 / GPIO4 = RT/RH G13 (yellow; old ESP32-S2 GPIO13)
+ *
+ * The old extra CO2 logic-analyzer channel (ESP32-S2 GPIO38) is omitted.
  */
 
 static constexpr gpio_num_t PIN_SCL =
-    GPIO_NUM_40;
+    GPIO_NUM_7;
 
 static constexpr gpio_num_t PIN_SDA =
-    GPIO_NUM_39;
-
-static constexpr gpio_num_t PIN_OTHER =
-    GPIO_NUM_38;
+    GPIO_NUM_6;
 
 
 /*
@@ -118,9 +118,6 @@ static inline uint8_t IRAM_ATTR read_gpio_state()
 
   if (gpio_get_level(PIN_SDA))
     value |= 0x02;
-
-  if (gpio_get_level(PIN_OTHER))
-    value |= 0x04;
 
   return value;
 }
@@ -908,35 +905,36 @@ static CaptureHandler capture_handler;
 
 /*
  * ============================================================================
- * RT/RH production decoder: 2 GPIO hybrid
+ * RT/RH minimal hybrid decoder
  * ============================================================================
  *
- * Two GPIO interrupts remain active: GPIO10 and GPIO13.
- * GPIO12 is the same sensor net as GPIO10. GPIO11 was experimentally shown
- * to be unnecessary for REF, RT and RH decoding and is therefore omitted.
+ * Two RT/RH GPIO interrupts remain active on the XIAO:
+ * GPIO3 / D1 observes the former ESP32-S2 GPIO10 sensor net.
+ * GPIO4 / D2 observes the former ESP32-S2 GPIO13 sensor net.
+ * The former GPIO11 sensor net is not required; former GPIO12 duplicates G10.
  * Every interrupt re-reads the complete observed two-line state.
  *
  * Measurement:
- *   REF: GPIO10 falling-edge period sum/count
- *   RT : GPIO10 falling-edge period sum/count; first 880 cycles for temperature
+ *   REF: G10-net (XIAO GPIO3/D1) falling-edge period sum/count
+ *   RT : G10-net (XIAO GPIO3/D1) falling-edge period sum/count; first 880 cycles
  *   RH : humidity from repeated arrivals at G10=0, G13=1
  *
- * The old GPIO10-derived RH period is retained ONLY as a phase-duration /
+ * The G10-net-derived RH period is retained ONLY as a phase-duration /
  * quality accumulator.  It is never converted to humidity.
  *
- * RTRH_DEBUG_CAPTURE defaults to 0 for the lean production build. This removes the
+ * Set RTRH_DEBUG_CAPTURE=0 for the lean production build.  This removes the
  * raw RT/RH capture buffer and both RT/RH CSV handlers without changing the
  * two-GPIO decoder.
  */
 
 #ifndef RTRH_DEBUG_CAPTURE
-#define RTRH_DEBUG_CAPTURE 0
+#define RTRH_DEBUG_CAPTURE 1
 #endif
 
-static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_10;
-static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
+static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_3;
+static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 
-static constexpr int RTRH_GPIOS[2] = {10, 13};
+static constexpr int RTRH_GPIOS[2] = {3, 4};
 
 // REF-normalized calibration.
 static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
@@ -1034,19 +1032,9 @@ static volatile uint8_t rtrh_pin_level[2] = {0, 0};
 static inline uint8_t IRAM_ATTR read_rtrh_state()
 {
   uint8_t value = 0;
-  if (gpio_get_level(PIN_RTRH0)) value |= 0x01;  // G10
-  if (gpio_get_level(PIN_RTRH3)) value |= 0x08;  // G13
+  if (gpio_get_level(PIN_RTRH0)) value |= 0x01;
+  if (gpio_get_level(PIN_RTRH3)) value |= 0x08;
   return value;
-}
-
-static inline bool IRAM_ATTR rtrh_state_g10_high(uint8_t state)
-{
-  return (state & 0x01) != 0;
-}
-
-static inline bool IRAM_ATTR rtrh_state_g13_high(uint8_t state)
-{
-  return (state & 0x08) != 0;
 }
 
 static inline void IRAM_ATTR clear_rtrh_accum(RtRhAccum &a)
@@ -1104,13 +1092,12 @@ static inline void IRAM_ATTR observe_rtrh_rh_state(
     uint32_t now,
     uint8_t state)
 {
-  // RH marker on the two observed lines: GPIO10 LOW, GPIO13 HIGH.
-  const bool g10_low = !rtrh_state_g10_high(state);
-  const bool g13_high = rtrh_state_g13_high(state);
+  // Candidate RH marker on the two observed lines:
+  // G10-net (GPIO3)=0, G13-net (GPIO4)=1.
+  const bool rh_state =
+      (state & 0x09) == 0x08;
 
-  if (rtrh_phase != RTRH_PHASE_RH ||
-      !g10_low ||
-      !g13_high)
+  if (rtrh_phase != RTRH_PHASE_RH || !rh_state)
     return;
 
   if (rtrh_rh_state.last_us != 0) {
@@ -1254,8 +1241,8 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   const uint8_t old_state = rtrh_last_state;
 
   if (state != old_state) {
-    const bool old_g10 = rtrh_state_g10_high(old_state);
-    const bool new_g10 = rtrh_state_g10_high(state);
+    const bool old_g10 = (old_state & 0x01) != 0;
+    const bool new_g10 = (state & 0x01) != 0;
 
     if (!old_g10 && new_g10)
       rtrh_have_g10_rise = true;
@@ -1321,7 +1308,7 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
                 rtrh_phase = RTRH_PHASE_RH;
                 rtrh_phase_candidate_run = 0;
 
-                // GPIO10 timing is retained only to validate RH phase length.
+                // G10-net timing is retained only to validate RH phase length.
                 add_rtrh_period(rtrh_rh_timing, period);
                 rtrh_rh_state.last_us = 0;
               } else if (is_rt) {
@@ -1686,7 +1673,6 @@ void BusSniffer::setup()
   io.pin_bit_mask =
       (1ULL << PIN_SCL) |
       (1ULL << PIN_SDA) |
-      (1ULL << PIN_OTHER) |
       (1ULL << PIN_RTRH0) |
       (1ULL << PIN_RTRH3);
 
@@ -1743,7 +1729,7 @@ void BusSniffer::setup()
   rtrh_pin_level[0] = gpio_get_level(PIN_RTRH0);
   rtrh_pin_level[1] = gpio_get_level(PIN_RTRH3);
 
-  // GPIO10..13 stay ordinary high-impedance digital inputs for the entire run.
+  // All four XIAO signal pins stay ordinary high-impedance digital inputs.
 
 
   last_edge =
@@ -1870,7 +1856,7 @@ void BusSniffer::setup()
   ESP_LOGI(
       TAG,
       "Passive CO2 sniffer ready "
-      "(I2C 0x62, SCL GPIO40, SDA GPIO39)"
+      "(I2C 0x62, SCL GPIO7/D5, SDA GPIO6/D4)"
   );
 
 
@@ -1882,7 +1868,7 @@ void BusSniffer::setup()
 #else
   ESP_LOGD(
       TAG,
-      "RT/RH production decoder (GPIO10/13); debug capture disabled"
+      "RT/RH minimal hybrid decoder (GPIO3/D1 + GPIO4/D2); debug capture disabled"
   );
 #endif
 }

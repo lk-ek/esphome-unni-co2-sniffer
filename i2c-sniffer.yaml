@@ -29,7 +29,7 @@ wifi:
 captive_portal:
 
 esp32:
-  board: esp32-s2-saola-1
+  board: seeed_xiao_esp32c3
   framework:
     type: esp-idf
 
