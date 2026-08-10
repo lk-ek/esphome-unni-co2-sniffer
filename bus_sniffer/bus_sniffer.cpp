@@ -970,10 +970,11 @@ static constexpr float RTRH_TEMP_C = 84.38101f;
 // Preliminary RH calibration from the passive RH oscillator.
 // x = ln(period_us)
 // RH[%] = A*x^2 + B*x + C
-// Based on the best usable points from the dynamic sweep; provisional.
-static constexpr float RTRH_RH_A = 5.5477837f;
-static constexpr float RTRH_RH_B = -73.210527f;
-static constexpr float RTRH_RH_C = 276.45988f;
+// Refit with the stable anchor 457 us -> 39 % RH and boundary anchors
+// 775 us -> 34 % RH, 94 us -> 61 % RH. Still provisional.
+static constexpr float RTRH_RH_A = 2.1072311f;
+static constexpr float RTRH_RH_B = -36.391719f;
+static constexpr float RTRH_RH_C = 182.84184f;
 
 // Phase-based passive RT/RH decoder.
 // Sequence: REF (~76.7 us) -> RT (~138 us) -> RH (variable).
