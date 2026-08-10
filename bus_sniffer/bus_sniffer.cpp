@@ -36,8 +36,8 @@ static const char *TAG = "bus_sniffer";
  *
  * Manufacturer data layout used by Sensirion UPT:
  *
- *   [0]  0xD5   Sensirion company ID, high byte (0xD506)
- *   [1]  0x06   Sensirion company ID, low byte
+ *   [0]  0x06   Sensirion company ID, low byte (0xD506)
+ *   [1]  0xD5   Sensirion company ID, high byte
  *   [2]  0x00   live/sample advertisement type
  *   [3]  0x08   SampleType 8 = T_RH_CO2_ALT / MyCO2
  *   [4]  dev_id high
@@ -65,6 +65,8 @@ static const char *TAG = "bus_sniffer";
  * The rest of the over-the-air payload remains unchanged and enables ESPHome's native
  * GATT server from YAML.  This deliberately avoids mixing NimBLE-Arduino with
  * ESPHome's ESP-IDF BLE stack.
+ * v26 restores the official Gadget-library company-ID byte order 06 D5,
+ * while keeping the v25 UPT sample encoding and the native GATT server.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
@@ -184,9 +186,10 @@ static void update_sensirion_ble_advertisement()
 
   std::vector<uint8_t> data(12);
 
-  // Sensirion UPT BLE_example serializes company ID 0xD506 as D5 06.
-  data[0] = SENSIRION_BLE_COMPANY_HI;
-  data[1] = SENSIRION_BLE_COMPANY_LO;
+  // Official Sensirion Gadget library AdvertisementHeader writes company
+  // ID 0xD506 little-endian: 06 D5.
+  data[0] = SENSIRION_BLE_COMPANY_LO;
+  data[1] = SENSIRION_BLE_COMPANY_HI;
   data[2] = SENSIRION_BLE_SAMPLE_ADV_TYPE;
   data[3] = SENSIRION_BLE_SAMPLE_TYPE_MYCO2;
 
@@ -222,7 +225,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2/UPT [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2/UPT v26 [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
