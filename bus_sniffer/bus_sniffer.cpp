@@ -53,7 +53,7 @@ static const char *TAG = "bus_sniffer";
  * This is deliberately advertising-only.  No GATT server/history buffer is
  * needed for live readings in scanner applications.
  *
- * v22 additionally forces the configured local name "S-Unni-CO2" into the
+ * v22 additionally forces the configured local name "S" into the
  * primary advertising packet.  Manufacturer data + flags + this 8-byte name
  * fit within the 31-byte legacy BLE advertising payload.
  *
@@ -68,18 +68,22 @@ static const char *TAG = "bus_sniffer";
  * v26 restores the official Gadget-library company-ID byte order 06 D5,
  * while keeping the v25 UPT sample encoding and the native GATT server.
  * v27 follows Sensirion's documented MyAmbience DIY-discovery rules:
- * complete local name begins with 'S' (S-Unni-CO2) and the assigned
+ * complete local name begins with 'S' (S) and the assigned
  * Company Identifier 0x06D5 is serialized little-endian as D5 06.
  * Sensor decoding, calibration, UPT sample scaling and GATT server stay unchanged.
  * v28 completes the Device Information Service in YAML: firmware 1.0.0
  * and System ID 0x2A23 containing the six BLE-MAC bytes.
- * v30 changes only the live-advertisement SampleType from 8 to 10,
- * matching Sensirion's current Zephyr/MyAmbience DIY-gadget example.
- * Name, company bytes, value encoding, GATT, decoder and calibration are unchanged.
+ * v30 changed SampleType from 8 to 10.
+ * v31 matches the uploaded working Sensirion CO2-Gadget reference:
+ *   Local Name = "S"
+ *   DataType T_RH_CO2 => SampleType 10, 6 sample bytes
+ *   T = encodeTemperatureV1, RH = encodeHumidityV1, CO2 = encodeSimple
+ *   all 16-bit sample fields little-endian.
+ * Decoder/FSM and sensor calibration remain unchanged.
  */
 
-static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0xD5;
-static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0x06;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x0A;
 
@@ -99,36 +103,22 @@ static uint16_t sensirion_ble_device_id = 0;
 static uint16_t sensirion_ble_encode_temperature(float value)
 {
   /*
-   * Sensirion UPT T_RH_CO2_ALT temperature:
-   * signed temperature in degrees C, scaling factor 200.
+   * Exact Sensirion UPT BLEProtocol::encodeTemperatureV1():
+   * uint16_t(((((T + 45) / 175) * 65535) + 0.5)).
    */
-  float scaled = value * 200.0f;
-
-  if (scaled > 32767.0f)
-    scaled = 32767.0f;
-  else if (scaled < -32768.0f)
-    scaled = -32768.0f;
-
-  const int16_t encoded =
-      static_cast<int16_t>(lroundf(scaled));
-
-  return static_cast<uint16_t>(encoded);
+  return static_cast<uint16_t>(
+      ((((value + 45.0f) / 175.0f) * 65535.0f) + 0.5f));
 }
 
 
 static uint16_t sensirion_ble_encode_humidity(float value)
 {
   /*
-   * Sensirion UPT T_RH_CO2_ALT relative humidity:
-   * percent RH, scaling factor 100.
+   * Exact Sensirion UPT BLEProtocol::encodeHumidityV1():
+   * uint16_t((((RH / 100) * 65535) + 0.5)).
    */
-  if (value < 0.0f)
-    value = 0.0f;
-  else if (value > 100.0f)
-    value = 100.0f;
-
   return static_cast<uint16_t>(
-      lroundf(value * 100.0f));
+      (((value / 100.0f) * 65535.0f) + 0.5f));
 }
 
 
@@ -235,7 +225,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE DIY/ST10 v30 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE REF/T_RH_CO2 v31 [S]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
