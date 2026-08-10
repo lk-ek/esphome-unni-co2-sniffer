@@ -911,11 +911,20 @@ static CaptureHandler capture_handler;
  * RT/RH digital edge capture
  * ============================================================================
  *
- * GPIO10..13 are connected to the four RT/RH test points.  They are treated
- * strictly as passive digital inputs.  The first edge starts a 500 ms capture;
- * every subsequent state change stores a microsecond timestamp plus the state
- * of all four lines.  When complete, the frozen capture is available as CSV at
- * /rt_rh_capture.csv.  Downloading it rearms the capture for the next cycle.
+ * GPIO10..13 are connected to the four RT/RH test points. They are treated
+ * strictly as passive digital inputs.
+ *
+ * Reverse-engineering capture:
+ *   - capture 450 ms, long enough for REF -> RT -> RH (~380 ms)
+ *   - store the first edge
+ *   - store every 16th subsequent edge as a time anchor
+ *   - additionally store every edge whose 4-bit state is neither 0x00 nor 0x0F
+ *
+ * edge_no is the number of the original (non-decimated) state-changing edge,
+ * so skipped edges remain visible in the CSV.
+ *
+ * When complete, the frozen capture is available as CSV at
+ * /rt_rh_capture.csv. Downloading it rearms the capture for the next cycle.
  */
 
 static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_10;
@@ -923,16 +932,19 @@ static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_11;
 static constexpr gpio_num_t PIN_RTRH2 = GPIO_NUM_12;
 static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_13;
 
-static constexpr uint32_t RTRH_CAPTURE_US = 75000;
+static constexpr uint32_t RTRH_CAPTURE_US = 450000;
 static constexpr uint16_t RTRH_MAX_SAMPLES = 3584;
+static constexpr uint32_t RTRH_CAPTURE_DECIMATION = 16;
 
 struct __attribute__((packed)) RtRhSample {
   uint32_t t_us;
+  uint32_t edge_no;
   uint8_t value;
 };
 
 static volatile RtRhSample rtrh_samples[RTRH_MAX_SAMPLES];
 static volatile uint16_t rtrh_sample_count = 0;
+static volatile uint32_t rtrh_capture_edge_no = 0;
 static volatile uint8_t rtrh_last_value = 0xff;
 static volatile uint32_t rtrh_start_us = 0;
 static volatile bool rtrh_capturing = false;
@@ -976,7 +988,6 @@ static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 //   T[degC] = M * ratio + C
 static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
 static constexpr float RTRH_TEMP_RATIO_C = 84.38101f;
-
 
 // Humidity:
 //   ratio = RH_period / REF_period
@@ -1511,8 +1522,20 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
     rtrh_capturing = true;
     rtrh_start_us = now;
     rtrh_sample_count = 0;
+    rtrh_capture_edge_no = 0;
     rtrh_overflow = false;
   }
+
+  const uint32_t edge_no = rtrh_capture_edge_no++;
+
+  // Preserve every unusual intermediate state while heavily decimating
+  // the normal all-low/all-high oscillator edges.
+  const bool unusual_state = value != 0x00 && value != 0x0F;
+  const bool time_anchor =
+      edge_no == 0 || (edge_no % RTRH_CAPTURE_DECIMATION) == 0;
+
+  if (!unusual_state && !time_anchor)
+    return;
 
   const uint16_t index = rtrh_sample_count;
   if (index >= RTRH_MAX_SAMPLES) {
@@ -1525,6 +1548,7 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
 
   rtrh_samples[index].t_us =
       static_cast<uint32_t>(now - rtrh_start_us);
+  rtrh_samples[index].edge_no = edge_no;
   rtrh_samples[index].value = value;
   rtrh_sample_count = index + 1;
 }
@@ -1555,7 +1579,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
         "attachment; filename=\"rt_rh_capture.csv\"");
 
     static constexpr char HEADER[] =
-        "sequence,t_us,gpio10,gpio11,gpio12,gpio13,state,overflow\n";
+        "sequence,t_us,edge_no,gpio10,gpio11,gpio12,gpio13,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
 
     const uint16_t count = rtrh_sample_count;
@@ -1572,13 +1596,15 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
 
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
       const uint32_t t = rtrh_samples[i].t_us;
+      const uint32_t edge_no = rtrh_samples[i].edge_no;
       const uint8_t v = rtrh_samples[i].value;
 
       const int n = snprintf(
           line, sizeof(line),
-          "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
+          "%lu,%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence),
           static_cast<unsigned long>(t),
+          static_cast<unsigned long>(edge_no),
           (v & 0x01) ? 1U : 0U,
           (v & 0x02) ? 1U : 0U,
           (v & 0x04) ? 1U : 0U,
@@ -1610,6 +1636,7 @@ class RtRhCaptureHandler : public web_server_idf::AsyncWebHandler {
 
     // Rearm only after the frozen capture has been downloaded.
     rtrh_sample_count = 0;
+    rtrh_capture_edge_no = 0;
     rtrh_overflow = false;
     rtrh_capture_ready = false;
     rtrh_capturing = false;
