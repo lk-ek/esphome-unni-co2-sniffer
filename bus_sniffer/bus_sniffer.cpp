@@ -36,8 +36,8 @@ static const char *TAG = "bus_sniffer";
  *
  * Manufacturer data layout used by Sensirion UPT:
  *
- *   [0]  0x06   Sensirion company ID, low byte (0xD506)
- *   [1]  0xD5   Sensirion company ID, high byte
+ *   [0]  0xD5   Sensirion company ID, high byte (0xD506)
+ *   [1]  0x06   Sensirion company ID, low byte
  *   [2]  0x00   live/sample advertisement type
  *   [3]  0x08   SampleType 8 = T_RH_CO2_ALT / MyCO2
  *   [4]  dev_id high
@@ -46,8 +46,9 @@ static const char *TAG = "bus_sniffer";
  *   [8..9]   relative humidity raw uint16
  *   [10..11] CO2 ppm uint16
  *
- * Multi-byte fields are serialized little-endian where applicable.  In
- * particular, Sensirion company ID 0xD506 appears on-air as 06 D5.
+ * Note: Sensirion's UPT BLE_example treats the manufacturer-data header
+ * specially: company ID 0xD506 is serialized as D5 06. Sample payload
+ * encoding is handled separately by the UPT signal encoders.
  *
  * This is deliberately advertising-only.  No GATT server/history buffer is
  * needed for live readings in scanner applications.
@@ -56,13 +57,16 @@ static const char *TAG = "bus_sniffer";
  * primary advertising packet.  Manufacturer data + flags + this 8-byte name
  * fit within the 31-byte legacy BLE advertising payload.
  *
- * v23 keeps that over-the-air payload unchanged and enables ESPHome's native
+ * v23 enabled ESPHome's native GATT server.
+ * v24 corrects the Sensirion manufacturer-data header back to the byte order
+ * used by the current official UPT BLE_example: D5 06.
+ * The rest of the over-the-air payload remains unchanged and enables ESPHome's native
  * GATT server from YAML.  This deliberately avoids mixing NimBLE-Arduino with
  * ESPHome's ESP-IDF BLE stack.
  */
 
-static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
 
@@ -188,9 +192,9 @@ static void update_sensirion_ble_advertisement()
 
   std::vector<uint8_t> data(12);
 
-  // Sensirion company ID 0xD506 serialized little-endian.
-  data[0] = SENSIRION_BLE_COMPANY_LO;
-  data[1] = SENSIRION_BLE_COMPANY_HI;
+  // Sensirion UPT BLE_example serializes company ID 0xD506 as D5 06.
+  data[0] = SENSIRION_BLE_COMPANY_HI;
+  data[1] = SENSIRION_BLE_COMPANY_LO;
   data[2] = SENSIRION_BLE_SAMPLE_ADV_TYPE;
   data[3] = SENSIRION_BLE_SAMPLE_TYPE_MYCO2;
 
