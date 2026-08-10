@@ -36,8 +36,8 @@ static const char *TAG = "bus_sniffer";
  *
  * Manufacturer data layout used by Sensirion UPT:
  *
- *   [0]  0x06   Sensirion company ID, low byte (0xD506)
- *   [1]  0xD5   Sensirion company ID, high byte
+ *   [0]  0xD5   Sensirion company ID low byte (Company ID 0x06D5)
+ *   [1]  0x06   Sensirion company ID high byte
  *   [2]  0x00   live/sample advertisement type
  *   [3]  0x08   SampleType 8 = T_RH_CO2_ALT / MyCO2
  *   [4]  dev_id high
@@ -53,7 +53,7 @@ static const char *TAG = "bus_sniffer";
  * This is deliberately advertising-only.  No GATT server/history buffer is
  * needed for live readings in scanner applications.
  *
- * v22 additionally forces the configured local name "Unni-CO2" into the
+ * v22 additionally forces the configured local name "S-Unni-CO2" into the
  * primary advertising packet.  Manufacturer data + flags + this 8-byte name
  * fit within the 31-byte legacy BLE advertising payload.
  *
@@ -67,6 +67,10 @@ static const char *TAG = "bus_sniffer";
  * ESPHome's ESP-IDF BLE stack.
  * v26 restores the official Gadget-library company-ID byte order 06 D5,
  * while keeping the v25 UPT sample encoding and the native GATT server.
+ * v27 follows Sensirion's documented MyAmbience DIY-discovery rules:
+ * complete local name begins with 'S' (S-Unni-CO2) and the assigned
+ * Company Identifier 0x06D5 is serialized little-endian as D5 06.
+ * Sensor decoding, calibration, UPT sample scaling and GATT server stay unchanged.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
@@ -186,10 +190,11 @@ static void update_sensirion_ble_advertisement()
 
   std::vector<uint8_t> data(12);
 
-  // Official Sensirion Gadget library AdvertisementHeader writes company
-  // ID 0xD506 little-endian: 06 D5.
-  data[0] = SENSIRION_BLE_COMPANY_LO;
-  data[1] = SENSIRION_BLE_COMPANY_HI;
+  // Sensirion Bluetooth SIG Company Identifier is 0x06D5.
+  // BLE Manufacturer Specific Data carries the 16-bit company ID
+  // little-endian, hence bytes D5 06 on the air.
+  data[0] = SENSIRION_BLE_COMPANY_HI;
+  data[1] = SENSIRION_BLE_COMPANY_LO;
   data[2] = SENSIRION_BLE_SAMPLE_ADV_TYPE;
   data[3] = SENSIRION_BLE_SAMPLE_TYPE_MYCO2;
 
@@ -225,7 +230,7 @@ static void update_sensirion_ble_advertisement()
 
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2/UPT v26 [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2/UPT v27 [S-Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
