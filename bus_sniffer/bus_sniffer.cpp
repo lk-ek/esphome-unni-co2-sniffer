@@ -974,8 +974,8 @@ static constexpr int RTRH_GPIOS[4] = {10, 11, 12, 13};
 // Temperature:
 //   ratio = RT_period / REF_period
 //   T[degC] = M * ratio + C
-static constexpr float RTRH_TEMP_RATIO_M = -31.940170136f;
-static constexpr float RTRH_TEMP_RATIO_C = 84.38101f;
+static constexpr float RTRH_TEMP_RATIO_M = -32.60550f;
+static constexpr float RTRH_TEMP_RATIO_C = 87.64288f;
 
 // Humidity:
 //   ratio = RH_period / REF_period
