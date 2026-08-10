@@ -36,6 +36,7 @@ esp32:
 # BLE host used by the custom Sensirion MyCO2 manufacturer advertisement.
 # No GATT server is required for live broadcasts.
 esp32_ble:
+  name: "Unni-CO2"
   advertising: true
 
 web_server:

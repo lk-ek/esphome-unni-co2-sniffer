@@ -51,6 +51,10 @@ static const char *TAG = "bus_sniffer";
  *
  * This is deliberately advertising-only.  No GATT server/history buffer is
  * needed for live readings in scanner applications.
+ *
+ * v22 additionally forces the configured local name "Unni-CO2" into the
+ * primary advertising packet.  Manufacturer data + flags + this 8-byte name
+ * fit within the 31-byte legacy BLE advertising payload.
  */
 
 static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
@@ -203,9 +207,22 @@ static void update_sensirion_ble_advertisement()
   esp32_ble::global_ble->
       advertising_set_manufacturer_data(data);
 
+  /*
+   * MyAmbience-compatible discovery:
+   * force the configured BLE local name into the PRIMARY advertisement,
+   * rather than relying on an active scanner to fetch the scan response.
+   *
+   * This call leaves manufacturer data intact; it only clears service data
+   * (we do not use any) and enables local-name inclusion.
+   */
+  esp32_ble::global_ble->
+      advertising_set_service_data_and_name(
+          std::span<const uint8_t>{},
+          true);
+
   ESP_LOGI(
       TAG,
-      "Sensirion BLE MyCO2: %.2f C / %.1f %% / %u ppm, "
+      "Sensirion BLE MyCO2 [Unni-CO2]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
       "%02X %02X %02X %02X %02X %02X "
       "%02X %02X %02X %02X %02X %02X",
