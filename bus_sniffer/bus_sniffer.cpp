@@ -916,10 +916,13 @@ static CaptureHandler capture_handler;
  * GPIO4 / D2 observes the former ESP32-S2 GPIO13 sensor net.
  * Former GPIO12 duplicates G10 and remains omitted.
  * Every interrupt re-reads the complete observed three-line state.
+ * REF/RT edge timing, however, is accepted only from the actual GPIO3/D1 IRQ;
+ * it is never reconstructed from another pin's post-edge state.
  *
  * Measurement:
- *   REF: G10-net (XIAO GPIO3/D1) falling-edge period sum/count
- *   RT : G10-net (XIAO GPIO3/D1) falling-edge period sum/count; first 880 cycles
+ *   REF: physical G10-net (XIAO GPIO3/D1) falling-edge IRQ period sum/count
+ *   RT : physical G10-net (XIAO GPIO3/D1) falling-edge IRQ period sum/count;
+ *        first 880 cycles for temperature
  *   RH : humidity from repeated arrivals at G10=0, G11=0, G13=1
  *
  * The G10-net-derived RH period is retained ONLY as a phase-duration /
@@ -1243,81 +1246,59 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
   else
     rtrh_last_any_us = now;
 
-  const uint8_t old_state = rtrh_last_state;
+  /*
+   * REF/RT timing must be tied to the interrupt from the physical G10 net
+   * itself (XIAO GPIO3 / D1).  Reconstructing a G10 edge from a later
+   * three-line state read is ordering-dependent when several sensor nets
+   * switch almost simultaneously, which differs between ESP32-S2 and C3.
+   */
+  const bool is_g10_irq = pin_index == 0;
 
-  if (state != old_state) {
-    const bool old_g10 = (old_state & 0x01) != 0;
-    const bool new_g10 = (state & 0x01) != 0;
+  if (is_g10_irq && previous == 0 && level != 0)
+    rtrh_have_g10_rise = true;
 
-    if (!old_g10 && new_g10)
-      rtrh_have_g10_rise = true;
+  if (is_g10_irq && previous != 0 && level == 0) {
+    const uint32_t previous_fall =
+        rtrh_last_g10_fall_us;
 
-    if (old_g10 && !new_g10) {
-      const uint32_t previous_fall =
-          rtrh_last_g10_fall_us;
+    rtrh_last_g10_fall_us = now;
 
-      rtrh_last_g10_fall_us = now;
+    if (previous_fall != 0) {
+      const uint32_t period =
+          static_cast<uint32_t>(now - previous_fall);
 
-      if (previous_fall != 0) {
-        const uint32_t period =
-            static_cast<uint32_t>(now - previous_fall);
+      if (period < RTRH_CYCLE_GAP_US &&
+          rtrh_have_g10_rise) {
+        const bool is_ref =
+            period >= RTRH_REF_MIN_US &&
+            period <= RTRH_REF_MAX_US;
 
-        if (period < RTRH_CYCLE_GAP_US &&
-            rtrh_have_g10_rise) {
-          const bool is_ref =
-              period >= RTRH_REF_MIN_US &&
-              period <= RTRH_REF_MAX_US;
+        const bool is_rt =
+            period >= RTRH_RT_MIN_US &&
+            period <= RTRH_RT_MAX_US;
 
-          const bool is_rt =
-              period >= RTRH_RT_MIN_US &&
-              period <= RTRH_RT_MAX_US;
+        switch (rtrh_phase) {
+          case RTRH_PHASE_WAIT_REF:
+            if (is_ref) {
+              rtrh_phase = RTRH_PHASE_REF;
+              add_rtrh_period(rtrh_ref, period);
+            }
+            break;
 
-          switch (rtrh_phase) {
-            case RTRH_PHASE_WAIT_REF:
-              if (is_ref) {
-                rtrh_phase = RTRH_PHASE_REF;
-                add_rtrh_period(rtrh_ref, period);
-              }
-              break;
+          case RTRH_PHASE_REF:
+            if (is_ref) {
+              rtrh_phase_candidate_run = 0;
+              add_rtrh_period(rtrh_ref, period);
+            } else if (is_rt) {
+              if (rtrh_phase_candidate_run < 255)
+                rtrh_phase_candidate_run++;
 
-            case RTRH_PHASE_REF:
-              if (is_ref) {
-                rtrh_phase_candidate_run = 0;
-                add_rtrh_period(rtrh_ref, period);
-              } else if (is_rt) {
-                if (rtrh_phase_candidate_run < 255)
-                  rtrh_phase_candidate_run++;
-
-                if (rtrh_phase_candidate_run >=
-                    RTRH_PHASE_LOCK_CYCLES) {
-                  rtrh_phase = RTRH_PHASE_RT;
-                  rtrh_phase_candidate_run = 0;
-
-                  // As in v7c, the first seven candidate cycles are discarded.
-                  add_rtrh_period(rtrh_rt, period);
-
-                  if (rtrh_rt_temp_count <
-                      RTRH_RT_TEMP_CYCLES) {
-                    rtrh_rt_temp_period_sum += period;
-                    rtrh_rt_temp_count++;
-                  }
-                }
-              } else {
-                rtrh_phase_candidate_run = 0;
-              }
-              break;
-
-            case RTRH_PHASE_RT:
-              if (rtrh_rt.count >=
-                  RTRH_RT_FORCE_END_CYCLES) {
-                rtrh_phase = RTRH_PHASE_RH;
+              if (rtrh_phase_candidate_run >=
+                  RTRH_PHASE_LOCK_CYCLES) {
+                rtrh_phase = RTRH_PHASE_RT;
                 rtrh_phase_candidate_run = 0;
 
-                // G10-net timing is retained only to validate RH phase length.
-                add_rtrh_period(rtrh_rh_timing, period);
-                rtrh_rh_state.last_us = 0;
-              } else if (is_rt) {
-                rtrh_phase_candidate_run = 0;
+                // As in v7c, the first seven candidate cycles are discarded.
                 add_rtrh_period(rtrh_rt, period);
 
                 if (rtrh_rt_temp_count <
@@ -1325,38 +1306,68 @@ static void IRAM_ATTR rtrh_gpio_isr(void *arg)
                   rtrh_rt_temp_period_sum += period;
                   rtrh_rt_temp_count++;
                 }
-              } else if (rtrh_rt.count <
-                         RTRH_RT_MIN_BEFORE_RH) {
-                rtrh_phase_candidate_run = 0;
-              } else {
-                if (rtrh_phase_candidate_run < 255)
-                  rtrh_phase_candidate_run++;
-
-                if (rtrh_phase_candidate_run >=
-                    RTRH_PHASE_LOCK_CYCLES) {
-                  rtrh_phase = RTRH_PHASE_RH;
-                  rtrh_phase_candidate_run = 0;
-
-                  add_rtrh_period(rtrh_rh_timing, period);
-                  rtrh_rh_state.last_us = 0;
-                }
               }
-              break;
+            } else {
+              rtrh_phase_candidate_run = 0;
+            }
+            break;
 
-            case RTRH_PHASE_RH:
-              // Only phase duration/quality; not used for humidity.
+          case RTRH_PHASE_RT:
+            if (rtrh_rt.count >=
+                RTRH_RT_FORCE_END_CYCLES) {
+              rtrh_phase = RTRH_PHASE_RH;
+              rtrh_phase_candidate_run = 0;
+
+              // G10-net timing is retained only to validate RH phase length.
               add_rtrh_period(rtrh_rh_timing, period);
-              break;
-          }
+              rtrh_rh_state.last_us = 0;
+            } else if (is_rt) {
+              rtrh_phase_candidate_run = 0;
+              add_rtrh_period(rtrh_rt, period);
+
+              if (rtrh_rt_temp_count <
+                  RTRH_RT_TEMP_CYCLES) {
+                rtrh_rt_temp_period_sum += period;
+                rtrh_rt_temp_count++;
+              }
+            } else if (rtrh_rt.count <
+                       RTRH_RT_MIN_BEFORE_RH) {
+              rtrh_phase_candidate_run = 0;
+            } else {
+              if (rtrh_phase_candidate_run < 255)
+                rtrh_phase_candidate_run++;
+
+              if (rtrh_phase_candidate_run >=
+                  RTRH_PHASE_LOCK_CYCLES) {
+                rtrh_phase = RTRH_PHASE_RH;
+                rtrh_phase_candidate_run = 0;
+
+                add_rtrh_period(rtrh_rh_timing, period);
+                rtrh_rh_state.last_us = 0;
+              }
+            }
+            break;
+
+          case RTRH_PHASE_RH:
+            // Only phase duration/quality; not used for humidity.
+            add_rtrh_period(rtrh_rh_timing, period);
+            break;
         }
       }
-
-      rtrh_have_g10_rise = false;
     }
 
-    // Crucially, RH uses the complete post-edge 4-bit state.
-    observe_rtrh_rh_state(now, state);
+    rtrh_have_g10_rise = false;
+    
+  }
 
+  /*
+   * RH still intentionally uses the complete post-edge three-line state.
+   * This is independent of which of the three GPIOs caused this ISR.
+   */
+  const uint8_t old_state = rtrh_last_state;
+
+  if (state != old_state) {
+    observe_rtrh_rh_state(now, state);
     rtrh_last_state = state;
   }
 
