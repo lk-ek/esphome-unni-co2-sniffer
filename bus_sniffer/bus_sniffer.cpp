@@ -36,8 +36,8 @@ static const char *TAG = "bus_sniffer";
  *
  * Manufacturer data layout used by Sensirion UPT:
  *
- *   [0]  0xD5   Sensirion company ID, high byte (0xD506)
- *   [1]  0x06   Sensirion company ID, low byte
+ *   [0]  0x06   Sensirion company ID, low byte (0xD506)
+ *   [1]  0xD5   Sensirion company ID, high byte
  *   [2]  0x00   live/sample advertisement type
  *   [3]  0x08   SampleType 8 = T_RH_CO2_ALT / MyCO2
  *   [4]  dev_id high
@@ -46,16 +46,15 @@ static const char *TAG = "bus_sniffer";
  *   [8..9]   relative humidity raw uint16
  *   [10..11] CO2 ppm uint16
  *
- * The three sample values use Sensirion's 16-bit representation and are placed
- * little-endian in the sample payload.  The fixed header/device-ID byte order
- * follows Sensirion's UPT BLE_example.
+ * Multi-byte fields are serialized little-endian where applicable.  In
+ * particular, Sensirion company ID 0xD506 appears on-air as 06 D5.
  *
  * This is deliberately advertising-only.  No GATT server/history buffer is
  * needed for live readings in scanner applications.
  */
 
-static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
 static constexpr uint8_t SENSIRION_BLE_COMPANY_LO = 0x06;
+static constexpr uint8_t SENSIRION_BLE_COMPANY_HI = 0xD5;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_ADV_TYPE = 0x00;
 static constexpr uint8_t SENSIRION_BLE_SAMPLE_TYPE_MYCO2 = 0x08;
 
@@ -70,7 +69,6 @@ static uint16_t sensirion_ble_co2_ppm = 0;
 static bool sensirion_ble_device_id_ready = false;
 static uint16_t sensirion_ble_device_id = 0;
 
-static bool sensirion_ble_logged_first_packet = false;
 
 
 static uint16_t sensirion_ble_encode_temperature(float value)
@@ -182,8 +180,9 @@ static void update_sensirion_ble_advertisement()
 
   std::vector<uint8_t> data(12);
 
-  data[0] = SENSIRION_BLE_COMPANY_HI;
-  data[1] = SENSIRION_BLE_COMPANY_LO;
+  // Sensirion company ID 0xD506 serialized little-endian.
+  data[0] = SENSIRION_BLE_COMPANY_LO;
+  data[1] = SENSIRION_BLE_COMPANY_HI;
   data[2] = SENSIRION_BLE_SAMPLE_ADV_TYPE;
   data[3] = SENSIRION_BLE_SAMPLE_TYPE_MYCO2;
 
@@ -204,28 +203,20 @@ static void update_sensirion_ble_advertisement()
   esp32_ble::global_ble->
       advertising_set_manufacturer_data(data);
 
-  if (!sensirion_ble_logged_first_packet) {
-    sensirion_ble_logged_first_packet = true;
-
-    ESP_LOGI(
-        TAG,
-        "Sensirion BLE MyCO2 advertising active: "
-        "device 0x%04X, payload "
-        "%02X %02X %02X %02X %02X %02X "
-        "%02X %02X %02X %02X %02X %02X",
-        static_cast<unsigned>(device_id),
-        data[0], data[1], data[2], data[3],
-        data[4], data[5], data[6], data[7],
-        data[8], data[9], data[10], data[11]);
-  }
-
-  ESP_LOGV(
+  ESP_LOGI(
       TAG,
-      "BLE MyCO2: %.2f C / %.1f %% / %u ppm",
+      "Sensirion BLE MyCO2: %.2f C / %.1f %% / %u ppm, "
+      "device 0x%04X, payload "
+      "%02X %02X %02X %02X %02X %02X "
+      "%02X %02X %02X %02X %02X %02X",
       sensirion_ble_temperature_c,
       sensirion_ble_humidity_percent,
       static_cast<unsigned>(
-          sensirion_ble_co2_ppm));
+          sensirion_ble_co2_ppm),
+      static_cast<unsigned>(device_id),
+      data[0], data[1], data[2], data[3],
+      data[4], data[5], data[6], data[7],
+      data[8], data[9], data[10], data[11]);
 }
 
 
