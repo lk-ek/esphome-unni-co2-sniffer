@@ -1,14 +1,14 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import sensor, esp32_ble, esp32_ble_server
+from esphome.components import sensor, binary_sensor, esp32_ble, esp32_ble_server
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
 from esphome.core import TimePeriod
 
 # BLE is deliberately NOT a hard dependency anymore.  A real `ble: false`
 # build therefore does not need esp32_ble / esp32_ble_server in the YAML at all.
 DEPENDENCIES = ["web_server"]
-AUTO_LOAD = ["sensor"]
+AUTO_LOAD = ["sensor", "binary_sensor"]
 
 CONF_CO2 = "co2"
 CONF_CRC_ERRORS = "crc_errors"
@@ -22,6 +22,18 @@ CONF_BLE_ID = "ble_id"
 CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
+CONF_DEBUG_METRICS = "debug_metrics"
+CONF_THERMAL_TRANSIENT_THRESHOLD = "thermal_transient_threshold"
+
+CONF_REF_PERIOD = "ref_period"
+CONF_RT_PERIOD = "rt_period"
+CONF_RH_STATE_PERIOD = "rh_state_period"
+CONF_RT_RATIO = "rt_ratio"
+CONF_RH_RATIO = "rh_ratio"
+CONF_RH_LOG = "rh_log"
+CONF_MEASUREMENT_QUALITY = "measurement_quality"
+CONF_THERMAL_TRANSIENT = "thermal_transient"
+CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 
 bus_sniffer_ns = cg.esphome_ns.namespace("bus_sniffer")
 BusSniffer = bus_sniffer_ns.class_("BusSniffer", cg.Component)
@@ -69,6 +81,56 @@ CONFIG_SCHEMA = cv.All(
                 ),
             ),
             cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
+            cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
+            cv.Optional(CONF_THERMAL_TRANSIENT_THRESHOLD, default=0.4): cv.float_range(
+                min=0.05, max=10.0
+            ),
+
+            cv.Optional(CONF_REF_PERIOD): sensor.sensor_schema(
+                unit_of_measurement="µs",
+                accuracy_decimals=3,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_RT_PERIOD): sensor.sensor_schema(
+                unit_of_measurement="µs",
+                accuracy_decimals=3,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_RH_STATE_PERIOD): sensor.sensor_schema(
+                unit_of_measurement="µs",
+                accuracy_decimals=1,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_RT_RATIO): sensor.sensor_schema(
+                accuracy_decimals=6,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_RH_RATIO): sensor.sensor_schema(
+                accuracy_decimals=6,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_RH_LOG): sensor.sensor_schema(
+                accuracy_decimals=6,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_MEASUREMENT_QUALITY): sensor.sensor_schema(
+                unit_of_measurement="%",
+                accuracy_decimals=0,
+                state_class="measurement",
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_THERMAL_TRANSIENT): binary_sensor.binary_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_CALIBRATION_EXTRAPOLATION): binary_sensor.binary_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
 
             cv.Required(CONF_CO2): sensor.sensor_schema(
                 unit_of_measurement="ppm",
@@ -126,6 +188,36 @@ async def to_code(config):
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
+    cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
+    cg.add(var.set_thermal_transient_threshold(config[CONF_THERMAL_TRANSIENT_THRESHOLD]))
+
+    if CONF_REF_PERIOD in config:
+        s = await sensor.new_sensor(config[CONF_REF_PERIOD])
+        cg.add(var.set_ref_period_sensor(s))
+    if CONF_RT_PERIOD in config:
+        s = await sensor.new_sensor(config[CONF_RT_PERIOD])
+        cg.add(var.set_rt_period_sensor(s))
+    if CONF_RH_STATE_PERIOD in config:
+        s = await sensor.new_sensor(config[CONF_RH_STATE_PERIOD])
+        cg.add(var.set_rh_state_period_sensor(s))
+    if CONF_RT_RATIO in config:
+        s = await sensor.new_sensor(config[CONF_RT_RATIO])
+        cg.add(var.set_rt_ratio_sensor(s))
+    if CONF_RH_RATIO in config:
+        s = await sensor.new_sensor(config[CONF_RH_RATIO])
+        cg.add(var.set_rh_ratio_sensor(s))
+    if CONF_RH_LOG in config:
+        s = await sensor.new_sensor(config[CONF_RH_LOG])
+        cg.add(var.set_rh_log_sensor(s))
+    if CONF_MEASUREMENT_QUALITY in config:
+        s = await sensor.new_sensor(config[CONF_MEASUREMENT_QUALITY])
+        cg.add(var.set_measurement_quality_sensor(s))
+    if CONF_THERMAL_TRANSIENT in config:
+        s = await binary_sensor.new_binary_sensor(config[CONF_THERMAL_TRANSIENT])
+        cg.add(var.set_thermal_transient_sensor(s))
+    if CONF_CALIBRATION_EXTRAPOLATION in config:
+        s = await binary_sensor.new_binary_sensor(config[CONF_CALIBRATION_EXTRAPOLATION])
+        cg.add(var.set_calibration_extrapolation_sensor(s))
 
     co2 = await sensor.new_sensor(config[CONF_CO2])
     cg.add(var.set_co2_sensor(co2))

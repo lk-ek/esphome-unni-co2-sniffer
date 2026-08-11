@@ -977,6 +977,58 @@ static constexpr float RTRH_RH_LOG_B = -33.93748066f;
 static constexpr float RTRH_RH_TEMP_C = -0.48564674f;
 static constexpr float RTRH_RH_OFFSET = 93.38516444f;
 
+// Stable-calibration envelope used only for diagnostics.  Values outside this
+// range are still calculated; the calibration_extrapolation flag tells HA and
+// the CSV export that we are extrapolating beyond the well-validated region.
+static constexpr float RTRH_CAL_TEMP_MIN_C = 18.0f;
+static constexpr float RTRH_CAL_TEMP_MAX_C = 23.0f;
+static constexpr float RTRH_CAL_RH_RATIO_MIN = 3.20f;
+static constexpr float RTRH_CAL_RH_RATIO_MAX = 8.20f;
+
+// The breath test exposed an alias/failure mode where only 12 RH recurrence
+// samples were seen and a 6.7 ms pseudo-period was nevertheless accepted.
+// Normal captures fill all 96 slots.  Require enough independent recurrences
+// and reject implausibly large state/REF ratios.
+static constexpr uint8_t RTRH_RH_STATE_SAMPLES_MIN = 32;
+static constexpr float RTRH_RH_RATIO_VALID_MAX = 20.0f;
+
+static inline float rtrh_temperature_from_ratio(float rt_ratio)
+{
+  return RTRH_TEMP_RATIO_M * rt_ratio + RTRH_TEMP_RATIO_C;
+}
+
+static inline float rtrh_humidity_from_ratio_temperature(
+    float rh_ratio,
+    float temperature_c)
+{
+  if (!(rh_ratio > 0.0f))
+    return NAN;
+
+  const float x = logf(rh_ratio);
+  float rh =
+      RTRH_RH_LOG2_A * x * x +
+      RTRH_RH_LOG_B * x +
+      RTRH_RH_TEMP_C * temperature_c +
+      RTRH_RH_OFFSET;
+
+  if (rh < 0.0f)
+    rh = 0.0f;
+  else if (rh > 100.0f)
+    rh = 100.0f;
+
+  return rh;
+}
+
+static inline bool rtrh_calibration_extrapolation(
+    float temperature_c,
+    float rh_ratio)
+{
+  return temperature_c < RTRH_CAL_TEMP_MIN_C ||
+         temperature_c > RTRH_CAL_TEMP_MAX_C ||
+         rh_ratio < RTRH_CAL_RH_RATIO_MIN ||
+         rh_ratio > RTRH_CAL_RH_RATIO_MAX;
+}
+
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
 static constexpr float RTRH_REF_VALID_MAX_US = 82.0f;
@@ -1066,6 +1118,20 @@ static RtRhRhStateStats rtrh_rh_state;
 
 static RtRhSnapshot rtrh_snapshot;
 static volatile bool rtrh_snapshot_ready = false;
+
+struct RtRhDerived {
+  uint32_t sequence{0};
+  bool valid{false};
+  float rt_ratio{NAN};
+  float rh_ratio{NAN};
+  float temperature_c{NAN};
+  float humidity_percent{NAN};
+  float quality_percent{0.0f};
+  bool thermal_transient{false};
+  bool calibration_extrapolation{false};
+};
+
+static RtRhDerived rtrh_derived;
 
 static volatile uint8_t rtrh_pin_level[3] = {0, 0, 0};
 
@@ -1622,17 +1688,23 @@ class RtRhTimingHandler
     const float rh_state_us =
         rtrh_rh_state_period_median(s.rh_state);
 
-    char body[512];
+    const RtRhDerived d = rtrh_derived;
+    const bool have_derived = d.sequence == s.sequence;
+
+    char body[1024];
 
     const int n = snprintf(
         body,
         sizeof(body),
         "measurement,phase,count,period_mean_us,"
         "duration_ms,state_rh_median_us,state_rh_samples,"
-        "state_rh_seen\n"
-        "%lu,ref,%u,%.3f,%.3f,,,\n"
-        "%lu,rt,%u,%.3f,%.3f,,,\n"
-        "%lu,rh,%u,%.3f,%.3f,%.3f,%u,%lu\n",
+        "state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,"
+        "humidity_percent,quality_percent,thermal_transient,"
+        "calibration_extrapolation\n"
+        "%lu,ref,%u,%.3f,%.3f,,,,,,,,,,,\n"
+        "%lu,rt,%u,%.3f,%.3f,,,,,,,,,,,\n"
+        "%lu,rh,%u,%.3f,%.3f,%.3f,%u,%lu,%u,%.6f,%.6f,"
+        "%.3f,%.3f,%.1f,%u,%u\n",
         static_cast<unsigned long>(s.sequence),
         static_cast<unsigned>(s.ref.count),
         ref_us,
@@ -1650,7 +1722,15 @@ class RtRhTimingHandler
         static_cast<unsigned>(
             s.rh_state.sample_count),
         static_cast<unsigned long>(
-            s.rh_state.seen));
+            s.rh_state.seen),
+        have_derived && d.valid ? 1U : 0U,
+        have_derived ? d.rt_ratio : NAN,
+        have_derived ? d.rh_ratio : NAN,
+        have_derived ? d.temperature_c : NAN,
+        have_derived ? d.humidity_percent : NAN,
+        have_derived ? d.quality_percent : 0.0f,
+        have_derived && d.thermal_transient ? 1U : 0U,
+        have_derived && d.calibration_extrapolation ? 1U : 0U);
 
     if (n <= 0) {
       request->send(500, "text/plain", nullptr);
@@ -2096,17 +2176,48 @@ void BusSniffer::loop()
         s.rt_temp_count >=
             RTRH_RT_TEMP_COUNT_MIN;
 
+    const float rt_period_us =
+        s.rt_temp_count
+            ? static_cast<float>(s.rt_temp_period_sum) /
+                  static_cast<float>(s.rt_temp_count)
+            : 0.0f;
+
+    const float rt_ratio =
+        ref_period_us > 0.0f
+            ? rt_period_us / ref_period_us
+            : NAN;
+
+    const float rh_ratio =
+        ref_period_us > 0.0f && rh_state_us > 0.0f
+            ? rh_state_us / ref_period_us
+            : NAN;
+
     const bool rh_ok =
         rh_duration_ms >=
             RTRH_RH_DURATION_MIN_MS &&
         rh_duration_ms <=
             RTRH_RH_DURATION_MAX_MS &&
-        s.rh_state.sample_count >= 8 &&
+        s.rh_state.sample_count >= RTRH_RH_STATE_SAMPLES_MIN &&
         rh_state_us >= 40.0f &&
-        rh_state_us <= 60000.0f;
+        rh_state_us <= 60000.0f &&
+        isfinite(rh_ratio) &&
+        rh_ratio <= RTRH_RH_RATIO_VALID_MAX;
 
     const bool measurement_valid =
         ref_ok && rt_ok && rh_ok;
+
+    const float ref_score =
+        fmaxf(0.0f, 1.0f - fabsf(ref_period_us - 76.80f) / 2.0f);
+    const float rt_score =
+        fminf(1.0f,
+              static_cast<float>(s.rt_temp_count) /
+              static_cast<float>(RTRH_RT_TEMP_CYCLES));
+    const float rh_score =
+        fminf(1.0f,
+              static_cast<float>(s.rh_state.sample_count) /
+              static_cast<float>(RTRH_RH_STATE_PERIOD_SAMPLES));
+    const float quality_percent =
+        100.0f * (0.30f * ref_score + 0.35f * rt_score + 0.35f * rh_score);
 
     ESP_LOGI(
         TAG,
@@ -2130,42 +2241,74 @@ void BusSniffer::loop()
         measurement_valid ? "VALID" : "REJECT");
 
     if (!measurement_valid) {
+      rtrh_derived.sequence = s.sequence;
+      rtrh_derived.valid = false;
+      rtrh_derived.rt_ratio = rt_ratio;
+      rtrh_derived.rh_ratio = rh_ratio;
+      rtrh_derived.temperature_c =
+          isfinite(rt_ratio)
+              ? rtrh_temperature_from_ratio(rt_ratio)
+              : NAN;
+      rtrh_derived.humidity_percent = NAN;
+      rtrh_derived.quality_percent = quality_percent;
+      rtrh_derived.thermal_transient = false;
+      rtrh_derived.calibration_extrapolation = true;
+
+      if (this->measurement_quality_sensor_ != nullptr)
+        this->measurement_quality_sensor_->publish_state(quality_percent);
+      if (this->ref_period_sensor_ != nullptr)
+        this->ref_period_sensor_->publish_state(ref_period_us);
+      if (this->rt_period_sensor_ != nullptr && rt_period_us > 0.0f)
+        this->rt_period_sensor_->publish_state(rt_period_us);
+      if (this->rh_state_period_sensor_ != nullptr && rh_state_us > 0.0f)
+        this->rh_state_period_sensor_->publish_state(rh_state_us);
+      if (this->rt_ratio_sensor_ != nullptr && isfinite(rt_ratio))
+        this->rt_ratio_sensor_->publish_state(rt_ratio);
+      if (this->rh_ratio_sensor_ != nullptr && isfinite(rh_ratio))
+        this->rh_ratio_sensor_->publish_state(rh_ratio);
+      if (this->calibration_extrapolation_sensor_ != nullptr)
+        this->calibration_extrapolation_sensor_->publish_state(true);
+
       ESP_LOGW(
           TAG,
           "RT/RH measurement %lu values not published: "
-          "quality check failed",
-          static_cast<unsigned long>(s.sequence));
+          "quality check failed (quality %.0f%%)",
+          static_cast<unsigned long>(s.sequence),
+          quality_percent);
     } else {
-      // Temperature: first up to 880 RT cycles, normalized by REF.
-      const float rt_period_us =
-          static_cast<float>(
-              s.rt_temp_period_sum) /
-          static_cast<float>(
-              s.rt_temp_count);
-
-      const float rt_ratio =
-          rt_period_us / ref_period_us;
-
+      // Temperature and humidity calibration are deliberately isolated from
+      // the edge decoder so future fits can be changed without touching capture.
       const float temperature_c =
-          RTRH_TEMP_RATIO_M * rt_ratio +
-          RTRH_TEMP_RATIO_C;
-
-      // Humidity: median recurrence of complete RH state 0x08.
-      const float rh_ratio =
-          rh_state_us / ref_period_us;
-
+          rtrh_temperature_from_ratio(rt_ratio);
       const float rh_log = logf(rh_ratio);
+      const float rh_percent =
+          rtrh_humidity_from_ratio_temperature(
+              rh_ratio,
+              temperature_c);
 
-      float rh_percent =
-          RTRH_RH_LOG2_A * rh_log * rh_log +
-          RTRH_RH_LOG_B * rh_log +
-          RTRH_RH_TEMP_C * temperature_c +
-          RTRH_RH_OFFSET;
+      const bool thermal_transient =
+          this->have_last_valid_temperature_ &&
+          fabsf(temperature_c - this->last_valid_temperature_c_) >=
+              this->thermal_transient_threshold_c_;
 
-      if (rh_percent < 0.0f)
-        rh_percent = 0.0f;
-      else if (rh_percent > 100.0f)
-        rh_percent = 100.0f;
+      const bool calibration_extrapolation =
+          rtrh_calibration_extrapolation(
+              temperature_c,
+              rh_ratio);
+
+      this->last_valid_temperature_c_ = temperature_c;
+      this->have_last_valid_temperature_ = true;
+
+      rtrh_derived.sequence = s.sequence;
+      rtrh_derived.valid = true;
+      rtrh_derived.rt_ratio = rt_ratio;
+      rtrh_derived.rh_ratio = rh_ratio;
+      rtrh_derived.temperature_c = temperature_c;
+      rtrh_derived.humidity_percent = rh_percent;
+      rtrh_derived.quality_percent = quality_percent;
+      rtrh_derived.thermal_transient = thermal_transient;
+      rtrh_derived.calibration_extrapolation =
+          calibration_extrapolation;
 
       ESP_LOGI(
           TAG,
@@ -2186,6 +2329,38 @@ void BusSniffer::loop()
           ref_period_us,
           rh_ratio,
           rh_percent);
+
+      if (this->debug_metrics_) {
+        ESP_LOGI(
+            TAG,
+            "RT/RH diagnostics %lu: quality %.0f%%, ln(RH/REF)=%.6f, "
+            "thermal_transient=%s, calibration_extrapolation=%s",
+            static_cast<unsigned long>(s.sequence),
+            quality_percent,
+            rh_log,
+            thermal_transient ? "YES" : "no",
+            calibration_extrapolation ? "YES" : "no");
+      }
+
+      if (this->ref_period_sensor_ != nullptr)
+        this->ref_period_sensor_->publish_state(ref_period_us);
+      if (this->rt_period_sensor_ != nullptr)
+        this->rt_period_sensor_->publish_state(rt_period_us);
+      if (this->rh_state_period_sensor_ != nullptr)
+        this->rh_state_period_sensor_->publish_state(rh_state_us);
+      if (this->rt_ratio_sensor_ != nullptr)
+        this->rt_ratio_sensor_->publish_state(rt_ratio);
+      if (this->rh_ratio_sensor_ != nullptr)
+        this->rh_ratio_sensor_->publish_state(rh_ratio);
+      if (this->rh_log_sensor_ != nullptr)
+        this->rh_log_sensor_->publish_state(rh_log);
+      if (this->measurement_quality_sensor_ != nullptr)
+        this->measurement_quality_sensor_->publish_state(quality_percent);
+      if (this->thermal_transient_sensor_ != nullptr)
+        this->thermal_transient_sensor_->publish_state(thermal_transient);
+      if (this->calibration_extrapolation_sensor_ != nullptr)
+        this->calibration_extrapolation_sensor_->publish_state(
+            calibration_extrapolation);
 
 #if UNNI_BLE_LIVE_ENABLED
       sensirion_ble_set_temperature_humidity(

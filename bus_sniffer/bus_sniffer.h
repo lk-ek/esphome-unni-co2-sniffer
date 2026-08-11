@@ -3,6 +3,7 @@
 #include "ble_options.h"
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/binary_sensor/binary_sensor.h"
 #if UNNI_BLE_ENABLED
 #include <esp_gatts_api.h>
 #include <esp_gap_ble_api.h>
@@ -49,12 +50,42 @@ class BusSniffer : public Component {
     this->rh_humidity_sensor_ = sensor;
   }
 
+  void set_debug_metrics(bool enabled) { this->debug_metrics_ = enabled; }
+  void set_thermal_transient_threshold(float value) {
+    this->thermal_transient_threshold_c_ = value;
+  }
+
+  void set_ref_period_sensor(sensor::Sensor *sensor) { this->ref_period_sensor_ = sensor; }
+  void set_rt_period_sensor(sensor::Sensor *sensor) { this->rt_period_sensor_ = sensor; }
+  void set_rh_state_period_sensor(sensor::Sensor *sensor) { this->rh_state_period_sensor_ = sensor; }
+  void set_rt_ratio_sensor(sensor::Sensor *sensor) { this->rt_ratio_sensor_ = sensor; }
+  void set_rh_ratio_sensor(sensor::Sensor *sensor) { this->rh_ratio_sensor_ = sensor; }
+  void set_rh_log_sensor(sensor::Sensor *sensor) { this->rh_log_sensor_ = sensor; }
+  void set_measurement_quality_sensor(sensor::Sensor *sensor) { this->measurement_quality_sensor_ = sensor; }
+
+  void set_thermal_transient_sensor(binary_sensor::BinarySensor *sensor) {
+    this->thermal_transient_sensor_ = sensor;
+  }
+  void set_calibration_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
+    this->calibration_extrapolation_sensor_ = sensor;
+  }
+
  protected:
   sensor::Sensor *co2_sensor_{nullptr};
   sensor::Sensor *crc_errors_sensor_{nullptr};
   sensor::Sensor *frame_errors_sensor_{nullptr};
   sensor::Sensor *rt_temperature_sensor_{nullptr};
   sensor::Sensor *rh_humidity_sensor_{nullptr};
+
+  sensor::Sensor *ref_period_sensor_{nullptr};
+  sensor::Sensor *rt_period_sensor_{nullptr};
+  sensor::Sensor *rh_state_period_sensor_{nullptr};
+  sensor::Sensor *rt_ratio_sensor_{nullptr};
+  sensor::Sensor *rh_ratio_sensor_{nullptr};
+  sensor::Sensor *rh_log_sensor_{nullptr};
+  sensor::Sensor *measurement_quality_sensor_{nullptr};
+  binary_sensor::BinarySensor *thermal_transient_sensor_{nullptr};
+  binary_sensor::BinarySensor *calibration_extrapolation_sensor_{nullptr};
 
   void maybe_publish_ha_();
 
@@ -69,6 +100,11 @@ class BusSniffer : public Component {
   float ha_co2_{0.0f};
   float ha_temperature_{0.0f};
   float ha_humidity_{0.0f};
+
+  bool debug_metrics_{false};
+  float thermal_transient_threshold_c_{0.4f};
+  bool have_last_valid_temperature_{false};
+  float last_valid_temperature_c_{0.0f};
 
   bool have_last_ppm_{false};
   uint16_t last_ppm_{0};
