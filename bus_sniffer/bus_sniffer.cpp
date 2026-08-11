@@ -958,21 +958,24 @@ static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 
 static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 
-// REF-normalized calibration.
-// ESP32-C3 temperature calibration.
-// Slope from the multi-temperature C3 fit; intercept refined by -0.48 C from
-// the later stable ambient v18 measurements.
+// REF-normalized calibration, refitted 2026-08-11 from the synchronized
+// display/timing captures 40-1..40-16 that had a timing CSV available.
+// Display quantization is 0.1 C and 1 %RH, so a low-order fit is preferred.
+//
+// Validated calibration range of this fit:
+//   temperature: 18.1 .. 19.1 C
+//   humidity:    50 .. 53 %RH
+//
 // T [degC] = M * (RT_period / REF_period) + C
-static constexpr float RTRH_TEMP_RATIO_M = -29.508f;
-static constexpr float RTRH_TEMP_RATIO_C = 80.051f;
+static constexpr float RTRH_TEMP_RATIO_M = -21.433346f;
+static constexpr float RTRH_TEMP_RATIO_C = 64.034661f;
 
-// ESP32-C3 RH calibration.
-// A/B retain the established log-quadratic shape; C includes the final local
-// ambient correction verified by the original display around 49 %RH.
-// RH = A*ln(ratio)^2 + B*ln(ratio) + C
-static constexpr float RTRH_RH_RATIO_A = 2.1072311f;
-static constexpr float RTRH_RH_RATIO_B = -18.10026849f;
-static constexpr float RTRH_RH_RATIO_C = 67.9005f;
+// RH [%] = M * (RH_state_period / REF_period) + C
+// A simple linear fit is deliberately used here: quadratic/log-quadratic fits
+// improved RMSE by less than 0.01 %-points on the available narrow data range
+// and would therefore mostly fit display quantization/noise.
+static constexpr float RTRH_RH_RATIO_M = -7.027693f;
+static constexpr float RTRH_RH_RATIO_C = 76.126783f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
@@ -2151,11 +2154,8 @@ void BusSniffer::loop()
       const float rh_ratio =
           rh_state_us / ref_period_us;
 
-      const float x = logf(rh_ratio);
-
       float rh_percent =
-          RTRH_RH_RATIO_A * x * x +
-          RTRH_RH_RATIO_B * x +
+          RTRH_RH_RATIO_M * rh_ratio +
           RTRH_RH_RATIO_C;
 
       if (rh_percent < 0.0f)

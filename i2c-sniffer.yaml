@@ -67,8 +67,8 @@ bus_sniffer:
   # For a genuine ble:false build, also remove/comment the top-level
   # esp32_ble: and esp32_ble_server: blocks above.
   ble: true
-  ble_live: false
-  ble_history: false
+  ble_live: true
+  ble_history: true
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
