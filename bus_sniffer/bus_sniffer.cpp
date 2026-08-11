@@ -1,6 +1,7 @@
 #include "bus_sniffer.h"
 #include "calibration.h"
 #include "measurement_quality.h"
+#include "esp_pm.h"
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
@@ -1758,6 +1759,35 @@ void BusSniffer::setup()
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_setup();
 #endif
+
+  if (this->experimental_light_sleep_) {
+    esp_pm_config_t pm_config{};
+    // Keep CPU/APB frequency fixed at the configured 80 MHz. The experiment
+    // here is automatic Light Sleep, not DFS, because the sniffer timing is
+    // intentionally left on a stable clock.
+    pm_config.max_freq_mhz = 80;
+    pm_config.min_freq_mhz = 80;
+    pm_config.light_sleep_enable = true;
+
+    const esp_err_t pm_err = esp_pm_configure(&pm_config);
+    if (pm_err == ESP_OK) {
+      ESP_LOGW(
+          TAG,
+          "Experimental automatic Light Sleep enabled "
+          "(80 MHz fixed; actual entry depends on PM locks)");
+    } else {
+      ESP_LOGE(
+          TAG,
+          "esp_pm_configure failed: %s (%d)",
+          esp_err_to_name(pm_err),
+          static_cast<int>(pm_err));
+    }
+
+    // One-time PM lock dump is intentional in this experimental build.
+    // With BLE enabled ESP-IDF is expected to show a NO_LIGHT_SLEEP lock;
+    // the no-BLE profile should allow automatic Light Sleep when idle.
+    esp_pm_dump_locks(stdout);
+  }
 
   last_capture_mutex =
       xSemaphoreCreateMutex();

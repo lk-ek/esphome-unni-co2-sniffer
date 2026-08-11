@@ -30,6 +30,10 @@ class BusSniffer : public Component {
 #endif
   void set_ha_publish_interval(uint32_t interval_ms) { this->ha_publish_interval_ms_ = interval_ms; }
 
+  void set_experimental_light_sleep(bool enabled) {
+    this->experimental_light_sleep_ = enabled;
+  }
+
   void set_co2_sensor(sensor::Sensor *sensor) {
     this->co2_sensor_ = sensor;
   }
@@ -112,6 +116,7 @@ class BusSniffer : public Component {
   float ha_temperature_{0.0f};
   float ha_humidity_{0.0f};
 
+  bool experimental_light_sleep_{false};
   bool debug_metrics_{false};
   float thermal_transient_on_rate_c_per_min_{0.8f};
   float thermal_transient_off_rate_c_per_min_{0.3f};

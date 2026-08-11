@@ -133,7 +133,7 @@ static uint16_t sensirion_ble_device_id = 0;
 // standard connectable advertiser defaults to ~20..40 ms.  The payload is
 // still the same Sensirion legacy advertisement, but the default interval is
 // deliberately much slower to reduce RF duty cycle.
-static uint32_t sensirion_ble_advertising_interval_ms = 5000;
+static uint32_t sensirion_ble_advertising_interval_ms = 10000;
 static std::vector<uint8_t> sensirion_ble_raw_advertisement;
 static uint32_t sensirion_ble_payload_version = 0;
 static uint32_t sensirion_ble_configured_version = 0;
