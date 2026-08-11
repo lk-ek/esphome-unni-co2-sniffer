@@ -967,13 +967,15 @@ static constexpr float RTRH_TEMP_RATIO_M = -23.024269f;
 static constexpr float RTRH_TEMP_RATIO_C = 67.398734f;
 
 // ESP32-C3 RH calibration.
-// Cubic direct fit in ratio = RH_state_period / REF_period.
-// Monotonic over the currently observed calibration range (~42-53 %RH).
-// RH = A*r^3 + B*r^2 + C*r + D
-static constexpr float RTRH_RH_RATIO_A = -0.69753285f;
-static constexpr float RTRH_RH_RATIO_B = 10.13034344f;
-static constexpr float RTRH_RH_RATIO_C = -52.32304359f;
-static constexpr float RTRH_RH_RATIO_D = 140.35957354f;
+// Temperature-compensated log-quadratic fit.
+// r = RH_state_period / REF_period
+// RH = A*ln(r)^2 + B*ln(r) + C*T + D
+// Initial coefficients fitted from the current 30 calibration captures;
+// expected to be refined as the resistor network and sensor type are identified.
+static constexpr float RTRH_RH_LOG2_A = 6.11947870f;
+static constexpr float RTRH_RH_LOG_B = -33.93748066f;
+static constexpr float RTRH_RH_TEMP_C = -0.48564674f;
+static constexpr float RTRH_RH_OFFSET = 93.38516444f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
@@ -2152,11 +2154,13 @@ void BusSniffer::loop()
       const float rh_ratio =
           rh_state_us / ref_period_us;
 
+      const float rh_log = logf(rh_ratio);
+
       float rh_percent =
-          RTRH_RH_RATIO_A * rh_ratio * rh_ratio * rh_ratio +
-          RTRH_RH_RATIO_B * rh_ratio * rh_ratio +
-          RTRH_RH_RATIO_C * rh_ratio +
-          RTRH_RH_RATIO_D;
+          RTRH_RH_LOG2_A * rh_log * rh_log +
+          RTRH_RH_LOG_B * rh_log +
+          RTRH_RH_TEMP_C * temperature_c +
+          RTRH_RH_OFFSET;
 
       if (rh_percent < 0.0f)
         rh_percent = 0.0f;
