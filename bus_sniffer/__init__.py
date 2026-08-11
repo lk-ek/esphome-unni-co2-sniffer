@@ -22,7 +22,6 @@ CONF_BLE_ID = "ble_id"
 CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
-CONF_EXPERIMENTAL_LIGHT_SLEEP = "experimental_light_sleep"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
@@ -85,7 +84,6 @@ CONFIG_SCHEMA = cv.All(
                 ),
             ),
             cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
-            cv.Optional(CONF_EXPERIMENTAL_LIGHT_SLEEP, default=False): cv.boolean,
             cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
             cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(
                 min=0.05, max=20.0
@@ -202,7 +200,6 @@ async def to_code(config):
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
-    cg.add(var.set_experimental_light_sleep(config[CONF_EXPERIMENTAL_LIGHT_SLEEP]))
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))

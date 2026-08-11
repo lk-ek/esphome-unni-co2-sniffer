@@ -43,9 +43,6 @@ esp32:
   cpu_frequency: 80MHz
   framework:
     type: esp-idf
-    sdkconfig_options:
-      CONFIG_PM_ENABLE: "y"
-      CONFIG_FREERTOS_USE_TICKLESS_IDLE: "y"
   # Persistent Sensirion history store. This is storage configuration rather
   # than GATT protocol configuration; the bus_sniffer component owns the format.
   partitions:
@@ -83,7 +80,6 @@ bus_sniffer:
 
   ble_advertising_interval: 10s
   ha_publish_interval: 30s
-  experimental_light_sleep: true
 
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.
