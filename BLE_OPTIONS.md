@@ -81,3 +81,16 @@ and BLE server types in `bus_sniffer.h` are compiled out.
 
 A -> B -> C -> D, with 3-5 RT/RH measurements per build and unchanged calibration.
 Compare the raw `RT/REF` and `RH-state/REF` ratios in addition to the converted values.
+
+## 2026-08-11 no-BLE compile fix
+
+`ble_options.h` now includes ESPHome's generated `esphome/core/defines.h`
+*before* applying fallback defaults. This is required because every `.cpp`
+file is still handed to the compiler by ESPHome/CMake; the preprocessor guard
+must therefore see `UNNI_BLE_ENABLED=0` before `sensirion_ble.h` or any ESP-IDF
+Bluetooth header is included.
+
+This fixes both symptoms of the previous build:
+
+- `esp_gap_ble_api.h: No such file or directory` in a genuine no-BLE build;
+- `UNNI_BLE_* redefined` warnings.

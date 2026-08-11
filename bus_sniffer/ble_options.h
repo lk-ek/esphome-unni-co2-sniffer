@@ -2,10 +2,14 @@
 
 // Compile-time feature switches for the Unni CO2 sniffer.
 //
-// They are normally emitted by the ESPHome component from the YAML options
-// `ble`, `ble_live`, and `ble_history`.  Defaults keep the historical behaviour
-// when the sources are built outside ESPHome codegen.
+// ESPHome's cg.add_define() writes these feature flags to
+// esphome/core/defines.h.  Include that file BEFORE applying standalone
+// defaults; otherwise a translation unit such as sensirion_ble.cpp sees the
+// defaults first and incorrectly compiles BLE code even for ble:false.
+#include "esphome/core/defines.h"
 
+// Fallbacks are only for building the component sources outside ESPHome
+// codegen.  ESPHome-generated builds already have the three defines above.
 #ifndef UNNI_BLE_ENABLED
 #define UNNI_BLE_ENABLED 1
 #endif
