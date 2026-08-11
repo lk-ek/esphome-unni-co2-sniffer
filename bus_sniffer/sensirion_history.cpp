@@ -1,3 +1,5 @@
+#include "ble_options.h"
+#if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
 #include "sensirion_ble.h"
 
@@ -817,3 +819,5 @@ void sensirion_history_gatts_event_handler(
 
 }  // namespace bus_sniffer
 }  // namespace esphome
+
+#endif  // UNNI_BLE_HISTORY_ENABLED

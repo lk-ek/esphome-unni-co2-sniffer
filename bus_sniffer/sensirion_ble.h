@@ -1,4 +1,6 @@
 #pragma once
+#include "ble_options.h"
+#if UNNI_BLE_ENABLED
 
 #include <cstdint>
 #include <esp_gap_ble_api.h>
@@ -25,3 +27,5 @@ uint16_t sensirion_ble_co2();
 
 }  // namespace bus_sniffer
 }  // namespace esphome
+
+#endif  // UNNI_BLE_ENABLED

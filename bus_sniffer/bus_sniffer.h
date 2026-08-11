@@ -1,10 +1,13 @@
 #pragma once
 
+#include "ble_options.h"
 #include "esphome/core/component.h"
 #include "esphome/components/sensor/sensor.h"
+#if UNNI_BLE_ENABLED
 #include <esp_gatts_api.h>
 #include <esp_gap_ble_api.h>
 #include "esphome/components/esp32_ble_server/ble_server.h"
+#endif
 
 namespace esphome {
 namespace bus_sniffer {
@@ -13,6 +16,7 @@ class BusSniffer : public Component {
  public:
   void setup() override;
   void loop() override;
+#if UNNI_BLE_ENABLED
   void configure_gatt_server(esp32_ble_server::BLEServer *server);
 
   void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
@@ -22,6 +26,7 @@ class BusSniffer : public Component {
                            esp_ble_gatts_cb_param_t *param);
 
   void set_ble_advertising_interval(uint32_t interval_ms);
+#endif
   void set_ha_publish_interval(uint32_t interval_ms) { this->ha_publish_interval_ms_ = interval_ms; }
 
   void set_co2_sensor(sensor::Sensor *sensor) {

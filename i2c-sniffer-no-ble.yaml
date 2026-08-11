@@ -45,20 +45,7 @@ esp32:
       subtype: spiffs
       size: 0x10000
 
-# User-facing BLE configuration only.  Sensirion services/characteristics,
-# callbacks, System ID and history protocol are created by bus_sniffer itself.
-esp32_ble:
-  id: unni_ble
-  name: "S"
-  advertising: true
-
-esp32_ble_server:
-  id: unni_ble_server
-  max_clients: 1
-  manufacturer: "Sensirion"
-  model: "MyCO2 Gadget"
-  firmware_version: "1.0.0"
-
+# BLE deliberately omitted for timing A/B test.
 web_server:
   port: 80
 
@@ -66,12 +53,11 @@ bus_sniffer:
   # Compile-time BLE feature selection.
   # For a genuine ble:false build, also remove/comment the top-level
   # esp32_ble: and esp32_ble_server: blocks above.
-  ble: true
+  ble: false
   ble_live: false
   ble_history: false
-  ble_id: unni_ble
-  ble_server_id: unni_ble_server
 
+  # Ignored in a no-BLE build, but harmless to leave present.
   ble_advertising_interval: 2s
   ha_publish_interval: 30s
 

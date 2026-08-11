@@ -1,6 +1,11 @@
 #include "bus_sniffer.h"
+#include "ble_options.h"
+#if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
+#endif
+#if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
+#endif
 
 #include "esphome/core/log.h"
 #include "esphome/components/web_server_base/web_server_base.h"
@@ -1667,9 +1672,14 @@ class RtRhTimingHandler
 static RtRhTimingHandler rtrh_timing_handler;
 #endif
 
+#if UNNI_BLE_ENABLED
 void BusSniffer::configure_gatt_server(esp32_ble_server::BLEServer *server)
 {
+#if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_configure_gatt(server);
+#else
+  (void) server;
+#endif
 }
 
 
@@ -1691,8 +1701,15 @@ void BusSniffer::gatts_event_handler(
     esp_gatt_if_t gatts_if,
     esp_ble_gatts_cb_param_t *param)
 {
+#if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_gatts_event_handler(event, gatts_if, param);
+#else
+  (void) event;
+  (void) gatts_if;
+  (void) param;
+#endif
 }
+#endif
 
 
 
@@ -1704,8 +1721,12 @@ void BusSniffer::gatts_event_handler(
 
 void BusSniffer::setup()
 {
+#if UNNI_BLE_ENABLED
   sensirion_ble_setup();
+#endif
+#if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_setup();
+#endif
 
   last_capture_mutex =
       xSemaphoreCreateMutex();
@@ -1971,7 +1992,9 @@ void BusSniffer::maybe_publish_ha_()
 
 void BusSniffer::loop()
 {
+#if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
+#endif
   this->maybe_publish_ha_();
 
   // Freeze a complete RT/RH measurement after 15 s without any RT/RH edge.
@@ -2160,9 +2183,11 @@ void BusSniffer::loop()
           rh_ratio,
           rh_percent);
 
+#if UNNI_BLE_LIVE_ENABLED
       sensirion_ble_set_temperature_humidity(
           temperature_c,
           rh_percent);
+#endif
 
       this->ha_temperature_ = temperature_c;
       this->ha_humidity_ = rh_percent;
@@ -2403,7 +2428,9 @@ void BusSniffer::loop()
 
         // Keep BLE live advertisement fresh even when the ppm value did not
         // change, while HA publication below remains change-only.
+#if UNNI_BLE_LIVE_ENABLED
         sensirion_ble_set_co2(ppm);
+#endif
         this->ha_co2_ = static_cast<float>(ppm);
         this->ha_have_co2_ = true;
 

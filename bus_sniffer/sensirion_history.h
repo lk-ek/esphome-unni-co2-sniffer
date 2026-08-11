@@ -1,4 +1,6 @@
 #pragma once
+#include "ble_options.h"
+#if UNNI_BLE_HISTORY_ENABLED
 
 #include <esp_gatts_api.h>
 #include "esphome/components/esp32_ble_server/ble_server.h"
@@ -15,3 +17,5 @@ void sensirion_history_gatts_event_handler(esp_gatts_cb_event_t event,
 
 }  // namespace bus_sniffer
 }  // namespace esphome
+
+#endif  // UNNI_BLE_HISTORY_ENABLED

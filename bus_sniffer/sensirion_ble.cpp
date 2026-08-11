@@ -1,3 +1,5 @@
+#include "ble_options.h"
+#if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
 
 #include "esphome/core/log.h"
@@ -480,3 +482,5 @@ uint16_t sensirion_ble_co2() { return sensirion_ble_co2_ppm; }
 
 }  // namespace bus_sniffer
 }  // namespace esphome
+
+#endif  // UNNI_BLE_ENABLED
