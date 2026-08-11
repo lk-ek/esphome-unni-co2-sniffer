@@ -1,4 +1,5 @@
 #include "bus_sniffer.h"
+#include "calibration.h"
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
@@ -21,7 +22,6 @@
 #include <climits>
 #include <cmath>
 #include <cstdio>
-#include <climits>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -958,32 +958,8 @@ static constexpr gpio_num_t PIN_RTRH3 = GPIO_NUM_4;
 
 static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 
-// REF-normalized calibration.
-// ESP32-C3 temperature calibration.
-// Slope from the multi-temperature C3 fit; intercept refined by -0.48 C from
-// the later stable ambient v18 measurements.
-// T [degC] = M * (RT_period / REF_period) + C
-static constexpr float RTRH_TEMP_RATIO_M = -23.024269f;
-static constexpr float RTRH_TEMP_RATIO_C = 67.398734f;
-
-// ESP32-C3 RH calibration.
-// Temperature-compensated log-quadratic fit.
-// r = RH_state_period / REF_period
-// RH = A*ln(r)^2 + B*ln(r) + C*T + D
-// Initial coefficients fitted from the current 30 calibration captures;
-// expected to be refined as the resistor network and sensor type are identified.
-static constexpr float RTRH_RH_LOG2_A = 6.11947870f;
-static constexpr float RTRH_RH_LOG_B = -33.93748066f;
-static constexpr float RTRH_RH_TEMP_C = -0.48564674f;
-static constexpr float RTRH_RH_OFFSET = 93.38516444f;
-
-// Stable-calibration envelope used only for diagnostics.  Values outside this
-// range are still calculated; the calibration_extrapolation flag tells HA and
-// the CSV export that we are extrapolating beyond the well-validated region.
-static constexpr float RTRH_CAL_TEMP_MIN_C = 18.0f;
-static constexpr float RTRH_CAL_TEMP_MAX_C = 23.0f;
-static constexpr float RTRH_CAL_RH_RATIO_MIN = 3.20f;
-static constexpr float RTRH_CAL_RH_RATIO_MAX = 8.20f;
+// Calibration lives in calibration.h.  The decoder only produces normalized
+// RT/REF and RH-state/REF ratios and passes them to that module.
 
 // The breath test exposed an alias/failure mode where only 12 RH recurrence
 // samples were seen and a 6.7 ms pseudo-period was nevertheless accepted.
@@ -991,43 +967,6 @@ static constexpr float RTRH_CAL_RH_RATIO_MAX = 8.20f;
 // and reject implausibly large state/REF ratios.
 static constexpr uint8_t RTRH_RH_STATE_SAMPLES_MIN = 32;
 static constexpr float RTRH_RH_RATIO_VALID_MAX = 20.0f;
-
-static inline float rtrh_temperature_from_ratio(float rt_ratio)
-{
-  return RTRH_TEMP_RATIO_M * rt_ratio + RTRH_TEMP_RATIO_C;
-}
-
-static inline float rtrh_humidity_from_ratio_temperature(
-    float rh_ratio,
-    float temperature_c)
-{
-  if (!(rh_ratio > 0.0f))
-    return NAN;
-
-  const float x = logf(rh_ratio);
-  float rh =
-      RTRH_RH_LOG2_A * x * x +
-      RTRH_RH_LOG_B * x +
-      RTRH_RH_TEMP_C * temperature_c +
-      RTRH_RH_OFFSET;
-
-  if (rh < 0.0f)
-    rh = 0.0f;
-  else if (rh > 100.0f)
-    rh = 100.0f;
-
-  return rh;
-}
-
-static inline bool rtrh_calibration_extrapolation(
-    float temperature_c,
-    float rh_ratio)
-{
-  return temperature_c < RTRH_CAL_TEMP_MIN_C ||
-         temperature_c > RTRH_CAL_TEMP_MAX_C ||
-         rh_ratio < RTRH_CAL_RH_RATIO_MIN ||
-         rh_ratio > RTRH_CAL_RH_RATIO_MAX;
-}
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
@@ -2247,7 +2186,7 @@ void BusSniffer::loop()
       rtrh_derived.rh_ratio = rh_ratio;
       rtrh_derived.temperature_c =
           std::isfinite(rt_ratio)
-              ? rtrh_temperature_from_ratio(rt_ratio)
+              ? calibration::temperature_from_ratio(rt_ratio)
               : NAN;
       rtrh_derived.humidity_percent = NAN;
       rtrh_derived.quality_percent = quality_percent;
@@ -2279,10 +2218,10 @@ void BusSniffer::loop()
       // Temperature and humidity calibration are deliberately isolated from
       // the edge decoder so future fits can be changed without touching capture.
       const float temperature_c =
-          rtrh_temperature_from_ratio(rt_ratio);
-      const float rh_log = logf(rh_ratio);
+          calibration::temperature_from_ratio(rt_ratio);
+      const float rh_log = calibration::log_rh_ratio(rh_ratio);
       const float rh_percent =
-          rtrh_humidity_from_ratio_temperature(
+          calibration::humidity_from_ratio_temperature(
               rh_ratio,
               temperature_c);
 
@@ -2292,7 +2231,7 @@ void BusSniffer::loop()
               this->thermal_transient_threshold_c_;
 
       const bool calibration_extrapolation =
-          rtrh_calibration_extrapolation(
+          calibration::is_extrapolation(
               temperature_c,
               rh_ratio);
 
