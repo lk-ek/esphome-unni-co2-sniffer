@@ -1750,18 +1750,10 @@ void BusSniffer::gatts_event_handler(
  * ============================================================================
  */
 
-void BusSniffer::setup()
+bool BusSniffer::initialize_sniffer_io_()
 {
-#if UNNI_BLE_ENABLED
-  sensirion_ble_setup();
-#endif
-#if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_setup();
-#endif
-
-  last_capture_mutex =
-      xSemaphoreCreateMutex();
-
+  if (this->sniffer_io_initialized_)
+    return true;
 
   gpio_config_t io = {};
 
@@ -1801,7 +1793,7 @@ void BusSniffer::setup()
         err
     );
 
-    return;
+    return false;
   }
 
 
@@ -1865,7 +1857,7 @@ void BusSniffer::setup()
         err
     );
 
-    return;
+    return false;
   }
 
 
@@ -1885,7 +1877,7 @@ void BusSniffer::setup()
         err
     );
 
-    return;
+    return false;
   }
 
 
@@ -1905,7 +1897,7 @@ void BusSniffer::setup()
         err
     );
 
-    return;
+    return false;
   }
 
 
@@ -1920,8 +1912,37 @@ void BusSniffer::setup()
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "RT/RH ISR GPIO%d failed: %d", static_cast<int>(pin), err);
-      return;
+      return false;
     }
+  }
+
+
+  this->sniffer_io_initialized_ = true;
+  ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
+           static_cast<unsigned long>(millis() - this->sniffer_boot_ms_));
+  return true;
+}
+
+void BusSniffer::setup()
+{
+#if UNNI_BLE_ENABLED
+  sensirion_ble_setup();
+#endif
+#if UNNI_BLE_HISTORY_ENABLED
+  sensirion_history_setup();
+#endif
+
+  last_capture_mutex =
+      xSemaphoreCreateMutex();
+
+
+  this->sniffer_boot_ms_ = millis();
+  if (this->sniffer_start_delay_ms_ == 0) {
+    this->initialize_sniffer_io_();
+  } else {
+    ESP_LOGI(TAG,
+             "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
+             static_cast<unsigned long>(this->sniffer_start_delay_ms_));
   }
 
 
@@ -2023,6 +2044,12 @@ void BusSniffer::maybe_publish_ha_()
 
 void BusSniffer::loop()
 {
+  if (!this->sniffer_io_initialized_ &&
+      static_cast<uint32_t>(millis() - this->sniffer_boot_ms_) >=
+          this->sniffer_start_delay_ms_) {
+    this->initialize_sniffer_io_();
+  }
+
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
 #endif

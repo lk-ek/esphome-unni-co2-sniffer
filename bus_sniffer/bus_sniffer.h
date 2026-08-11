@@ -29,6 +29,7 @@ class BusSniffer : public Component {
   void set_ble_advertising_interval(uint32_t interval_ms);
 #endif
   void set_ha_publish_interval(uint32_t interval_ms) { this->ha_publish_interval_ms_ = interval_ms; }
+  void set_sniffer_start_delay(uint32_t delay_ms) { this->sniffer_start_delay_ms_ = delay_ms; }
 
   void set_co2_sensor(sensor::Sensor *sensor) {
     this->co2_sensor_ = sensor;
@@ -99,6 +100,11 @@ class BusSniffer : public Component {
   binary_sensor::BinarySensor *calibration_extrapolation_sensor_{nullptr};
 
   void maybe_publish_ha_();
+  bool initialize_sniffer_io_();
+
+  uint32_t sniffer_start_delay_ms_{0};
+  uint32_t sniffer_boot_ms_{0};
+  bool sniffer_io_initialized_{false};
 
   uint32_t ha_publish_interval_ms_{30000};
   uint32_t last_ha_publish_ms_{0};

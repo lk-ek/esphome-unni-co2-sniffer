@@ -81,6 +81,12 @@ bus_sniffer:
   ble_advertising_interval: 10s
   ha_publish_interval: 30s
 
+  # Boot-isolation test: leave D1/D2/D3/D5/D6 completely untouched by the
+  # custom component during the first 10 seconds after MCU startup. Wi-Fi/BLE
+  # can initialize normally. After the delay the five lines become plain
+  # high-impedance inputs without pulls and their edge ISRs are attached.
+  sniffer_start_delay: 10s
+
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.
   debug_metrics: true
