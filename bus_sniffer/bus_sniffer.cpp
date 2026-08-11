@@ -1673,6 +1673,19 @@ void BusSniffer::configure_gatt_server(esp32_ble_server::BLEServer *server)
 }
 
 
+void BusSniffer::set_ble_advertising_interval(uint32_t interval_ms)
+{
+  sensirion_ble_set_advertising_interval(interval_ms);
+}
+
+void BusSniffer::gap_event_handler(
+    esp_gap_ble_cb_event_t event,
+    esp_ble_gap_cb_param_t *param)
+{
+  sensirion_ble_gap_event_handler(event, param);
+}
+
+
 void BusSniffer::gatts_event_handler(
     esp_gatts_cb_event_t event,
     esp_gatt_if_t gatts_if,
@@ -1921,6 +1934,35 @@ void BusSniffer::setup()
 }
 
 
+void BusSniffer::maybe_publish_ha_()
+{
+  const uint32_t now = millis();
+  if (this->last_ha_publish_ms_ != 0 &&
+      static_cast<uint32_t>(now - this->last_ha_publish_ms_) < this->ha_publish_interval_ms_)
+    return;
+
+  bool published = false;
+  if (this->ha_have_co2_ && this->co2_sensor_ != nullptr &&
+      this->ha_initial_co2_published_) {
+    this->co2_sensor_->publish_state(this->ha_co2_);
+    published = true;
+  }
+  if (this->ha_have_temperature_ && this->rt_temperature_sensor_ != nullptr &&
+      this->ha_initial_temperature_published_) {
+    this->rt_temperature_sensor_->publish_state(this->ha_temperature_);
+    published = true;
+  }
+  if (this->ha_have_humidity_ && this->rh_humidity_sensor_ != nullptr &&
+      this->ha_initial_humidity_published_) {
+    this->rh_humidity_sensor_->publish_state(this->ha_humidity_);
+    published = true;
+  }
+
+  if (published)
+    this->last_ha_publish_ms_ = now;
+}
+
+
 /*
  * ============================================================================
  * Loop
@@ -1930,6 +1972,7 @@ void BusSniffer::setup()
 void BusSniffer::loop()
 {
   sensirion_history_loop();
+  this->maybe_publish_ha_();
 
   // Freeze a complete RT/RH measurement after 15 s without any RT/RH edge.
   if (rtrh_collecting) {
@@ -2121,13 +2164,25 @@ void BusSniffer::loop()
           temperature_c,
           rh_percent);
 
-      if (this->rt_temperature_sensor_ != nullptr)
-        this->rt_temperature_sensor_->
-            publish_state(temperature_c);
+      this->ha_temperature_ = temperature_c;
+      this->ha_humidity_ = rh_percent;
+      this->ha_have_temperature_ = true;
+      this->ha_have_humidity_ = true;
 
-      if (this->rh_humidity_sensor_ != nullptr)
-        this->rh_humidity_sensor_->
-            publish_state(rh_percent);
+      // First valid values are published immediately; subsequent API traffic
+      // is throttled by ha_publish_interval (30 s default).
+      if (!this->ha_initial_temperature_published_ &&
+          this->rt_temperature_sensor_ != nullptr) {
+        this->rt_temperature_sensor_->publish_state(temperature_c);
+        this->ha_initial_temperature_published_ = true;
+        this->last_ha_publish_ms_ = millis();
+      }
+      if (!this->ha_initial_humidity_published_ &&
+          this->rh_humidity_sensor_ != nullptr) {
+        this->rh_humidity_sensor_->publish_state(rh_percent);
+        this->ha_initial_humidity_published_ = true;
+        this->last_ha_publish_ms_ = millis();
+      }
     }
   }
 
@@ -2349,6 +2404,8 @@ void BusSniffer::loop()
         // Keep BLE live advertisement fresh even when the ppm value did not
         // change, while HA publication below remains change-only.
         sensirion_ble_set_co2(ppm);
+        this->ha_co2_ = static_cast<float>(ppm);
+        this->ha_have_co2_ = true;
 
 
         if (
@@ -2371,17 +2428,14 @@ void BusSniffer::loop()
           );
 
 
-          if (
-              this->co2_sensor_ !=
-              nullptr
-          ) {
+          this->ha_co2_ = static_cast<float>(ppm);
+          this->ha_have_co2_ = true;
 
-            this->co2_sensor_->
-                publish_state(
-                    static_cast<float>(
-                        ppm
-                    )
-                );
+          if (!this->ha_initial_co2_published_ &&
+              this->co2_sensor_ != nullptr) {
+            this->co2_sensor_->publish_state(this->ha_co2_);
+            this->ha_initial_co2_published_ = true;
+            this->last_ha_publish_ms_ = millis();
           }
 
         } else {

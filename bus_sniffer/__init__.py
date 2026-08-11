@@ -3,6 +3,7 @@ import esphome.config_validation as cv
 
 from esphome.components import sensor, esp32_ble, esp32_ble_server
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
+from esphome.core import TimePeriod
 
 DEPENDENCIES = ["web_server", "esp32_ble", "esp32_ble_server"]
 AUTO_LOAD = ["sensor"]
@@ -13,6 +14,8 @@ CONF_FRAME_ERRORS = "frame_errors"
 CONF_RT_TEMPERATURE = "rt_temperature"
 CONF_RH_HUMIDITY = "rh_humidity"
 CONF_BLE_SERVER_ID = "ble_server_id"
+CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
+CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 
 bus_sniffer_ns = cg.esphome_ns.namespace("bus_sniffer")
 BusSniffer = bus_sniffer_ns.class_("BusSniffer", cg.Component)
@@ -22,6 +25,10 @@ CONFIG_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.declare_id(BusSniffer),
         cv.GenerateID(esp32_ble.CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
         cv.GenerateID(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
+        cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="2s"): cv.All(
+            cv.positive_time_period_milliseconds, cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240))
+        ),
+        cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
 
         cv.Required(CONF_CO2): sensor.sensor_schema(
             unit_of_measurement="ppm",
@@ -61,12 +68,15 @@ async def to_code(config):
 
     ble = await cg.get_variable(config[esp32_ble.CONF_BLE_ID])
     esp32_ble.register_gatts_event_handler(ble, var)
+    esp32_ble.register_gap_event_handler(ble, var)
 
     # GATT topology is owned by the component, not by user YAML.  This call is
     # emitted during generated setup, before App.setup(), so the services and
     # characteristics exist before the ESPHome BLE server starts registering.
     server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
     cg.add(var.configure_gatt_server(server))
+    cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
+    cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
 
     co2 = await sensor.new_sensor(config[CONF_CO2])
     cg.add(var.set_co2_sensor(co2))

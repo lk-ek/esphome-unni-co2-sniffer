@@ -3,6 +3,7 @@
 #include "esphome/core/log.h"
 #include "esphome/components/esp32_ble/ble.h"
 #include "esp_mac.h"
+#include <esp_gap_ble_api.h>
 
 #include <span>
 #include <vector>
@@ -126,6 +127,131 @@ static uint16_t sensirion_ble_co2_ppm = 0;
 static bool sensirion_ble_device_id_ready = false;
 static uint16_t sensirion_ble_device_id = 0;
 
+// We own the actual over-the-air advertising parameters because ESPHome's
+// standard connectable advertiser defaults to ~20..40 ms.  The payload is
+// still the same Sensirion legacy advertisement, but the default interval is
+// deliberately much slower to reduce RF duty cycle.
+static uint32_t sensirion_ble_advertising_interval_ms = 2000;
+static std::vector<uint8_t> sensirion_ble_raw_advertisement;
+static uint32_t sensirion_ble_payload_version = 0;
+static uint32_t sensirion_ble_configured_version = 0;
+
+enum class SensirionAdvState : uint8_t {
+  IDLE,
+  CONFIGURING,
+  STARTING,
+  ADVERTISING,
+  STOPPING,
+};
+
+static SensirionAdvState sensirion_ble_adv_state = SensirionAdvState::IDLE;
+
+static esp_ble_adv_params_t sensirion_ble_adv_params = {};
+
+static void sensirion_ble_configure_raw_advertisement();
+
+static void sensirion_ble_request_refresh()
+{
+  if (sensirion_ble_raw_advertisement.empty() ||
+      esp32_ble::global_ble == nullptr ||
+      !esp32_ble::global_ble->is_active())
+    return;
+
+  if (sensirion_ble_adv_state == SensirionAdvState::ADVERTISING) {
+    sensirion_ble_adv_state = SensirionAdvState::STOPPING;
+    const esp_err_t err = esp_ble_gap_stop_advertising();
+    if (err != ESP_OK) {
+      // Advertising may already have been stopped by a GATT connection.
+      sensirion_ble_adv_state = SensirionAdvState::IDLE;
+      sensirion_ble_configure_raw_advertisement();
+    }
+  } else if (sensirion_ble_adv_state == SensirionAdvState::IDLE) {
+    sensirion_ble_configure_raw_advertisement();
+  }
+}
+
+static void sensirion_ble_configure_raw_advertisement()
+{
+  if (sensirion_ble_raw_advertisement.empty())
+    return;
+
+  sensirion_ble_adv_state = SensirionAdvState::CONFIGURING;
+  sensirion_ble_configured_version = sensirion_ble_payload_version;
+  const esp_err_t err = esp_ble_gap_config_adv_data_raw(
+      sensirion_ble_raw_advertisement.data(),
+      sensirion_ble_raw_advertisement.size());
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG, "esp_ble_gap_config_adv_data_raw failed: %s", esp_err_to_name(err));
+    sensirion_ble_adv_state = SensirionAdvState::IDLE;
+  }
+}
+
+void sensirion_ble_set_advertising_interval(uint32_t interval_ms)
+{
+  if (interval_ms < 20)
+    interval_ms = 20;
+  if (interval_ms > 10240)
+    interval_ms = 10240;
+
+  sensirion_ble_advertising_interval_ms = interval_ms;
+  const uint16_t units = static_cast<uint16_t>((interval_ms * 1000ULL + 624) / 625);
+  sensirion_ble_adv_params.adv_int_min = units;
+  sensirion_ble_adv_params.adv_int_max = units;
+}
+
+void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
+{
+  switch (event) {
+    case ESP_GAP_BLE_ADV_DATA_RAW_SET_COMPLETE_EVT:
+      if (sensirion_ble_adv_state == SensirionAdvState::CONFIGURING) {
+        if (param->adv_data_raw_cmpl.status != ESP_BT_STATUS_SUCCESS) {
+          ESP_LOGW(TAG, "raw BLE adv data setup failed: %d", param->adv_data_raw_cmpl.status);
+          sensirion_ble_adv_state = SensirionAdvState::IDLE;
+          break;
+        }
+        sensirion_ble_adv_state = SensirionAdvState::STARTING;
+        const esp_err_t err = esp_ble_gap_start_advertising(&sensirion_ble_adv_params);
+        if (err != ESP_OK) {
+          ESP_LOGW(TAG, "slow BLE advertising start failed: %s", esp_err_to_name(err));
+          sensirion_ble_adv_state = SensirionAdvState::IDLE;
+        }
+      }
+      break;
+
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+      if (sensirion_ble_adv_state == SensirionAdvState::STARTING) {
+        if (param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
+          sensirion_ble_adv_state = SensirionAdvState::ADVERTISING;
+          if (sensirion_ble_configured_version != sensirion_ble_payload_version)
+            sensirion_ble_request_refresh();
+        } else {
+          sensirion_ble_adv_state = SensirionAdvState::IDLE;
+        }
+      } else if (!sensirion_ble_raw_advertisement.empty() &&
+                 param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
+        // ESPHome's BLE server may restart its default 20..40 ms advertiser
+        // after a disconnect. Replace it with our low-duty-cycle advertiser.
+        sensirion_ble_adv_state = SensirionAdvState::STOPPING;
+        const esp_err_t err = esp_ble_gap_stop_advertising();
+        if (err != ESP_OK) {
+          sensirion_ble_adv_state = SensirionAdvState::IDLE;
+          sensirion_ble_configure_raw_advertisement();
+        }
+      }
+      break;
+
+    case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
+      if (sensirion_ble_adv_state == SensirionAdvState::STOPPING) {
+        sensirion_ble_adv_state = SensirionAdvState::IDLE;
+        sensirion_ble_configure_raw_advertisement();
+      }
+      break;
+
+    default:
+      break;
+  }
+}
+
 
 
 uint16_t sensirion_ble_encode_temperature(float value)
@@ -246,23 +372,27 @@ static void update_sensirion_ble_advertisement()
   data[16] = 0x00;
   data[17] = 0x00;
 
-  esp32_ble::global_ble->
-      advertising_set_manufacturer_data(data);
+  // Build one complete 26-byte legacy advertising packet ourselves:
+  // Flags + Manufacturer Specific Data + complete local name "S".
+  // This lets us control the *real* GAP advertising interval; ESPHome's
+  // advertising_cycle_time only controls rotation between advertisement sets.
+  sensirion_ble_raw_advertisement.clear();
+  sensirion_ble_raw_advertisement.reserve(26);
+  sensirion_ble_raw_advertisement.push_back(0x02);
+  sensirion_ble_raw_advertisement.push_back(ESP_BLE_AD_TYPE_FLAG);
+  sensirion_ble_raw_advertisement.push_back(
+      ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
+  sensirion_ble_raw_advertisement.push_back(static_cast<uint8_t>(data.size() + 1));
+  sensirion_ble_raw_advertisement.push_back(ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE);
+  sensirion_ble_raw_advertisement.insert(
+      sensirion_ble_raw_advertisement.end(), data.begin(), data.end());
+  sensirion_ble_raw_advertisement.push_back(0x02);
+  sensirion_ble_raw_advertisement.push_back(ESP_BLE_AD_TYPE_NAME_CMPL);
+  sensirion_ble_raw_advertisement.push_back('S');
+  sensirion_ble_payload_version++;
+  sensirion_ble_request_refresh();
 
-  /*
-   * MyAmbience-compatible discovery:
-   * force the configured BLE local name into the PRIMARY advertisement,
-   * rather than relying on an active scanner to fetch the scan response.
-   *
-   * This call leaves manufacturer data intact; it only clears service data
-   * (we do not use any) and enables local-name inclusion.
-   */
-  esp32_ble::global_ble->
-      advertising_set_service_data_and_name(
-          std::span<const uint8_t>{},
-          true);
-
-  ESP_LOGI(
+  ESP_LOGD(
       TAG,
       "Sensirion BLE HISTORY/T_RH_CO2_ALT [S]: %.2f C / %.1f %% / %u ppm, "
       "device 0x%04X, payload "
@@ -307,6 +437,18 @@ void sensirion_ble_set_co2(uint16_t ppm)
 
 void sensirion_ble_setup()
 {
+  sensirion_ble_adv_params = {
+      .adv_int_min = 0,
+      .adv_int_max = 0,
+      .adv_type = ADV_TYPE_IND,
+      .own_addr_type = BLE_ADDR_TYPE_PUBLIC,
+      .peer_addr = {0, 0, 0, 0, 0, 0},
+      .peer_addr_type = BLE_ADDR_TYPE_PUBLIC,
+      .channel_map = ADV_CHNL_ALL,
+      .adv_filter_policy = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+  };
+  sensirion_ble_set_advertising_interval(sensirion_ble_advertising_interval_ms);
+
   uint8_t bt_mac[6] = {0};
   const esp_err_t bt_read_err = esp_read_mac(bt_mac, ESP_MAC_BT);
 
@@ -324,6 +466,9 @@ void sensirion_ble_setup()
              static_cast<int>(bt_read_err),
              bt_mac[0], bt_mac[1], bt_mac[2], bt_mac[3], bt_mac[4], bt_mac[5]);
   }
+
+  ESP_LOGI(TAG, "Sensirion BLE advertising interval: %u ms",
+           static_cast<unsigned>(sensirion_ble_advertising_interval_ms));
 }
 
 bool sensirion_ble_has_temperature() { return sensirion_ble_have_temperature; }
