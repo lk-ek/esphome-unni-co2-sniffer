@@ -967,12 +967,13 @@ static constexpr float RTRH_TEMP_RATIO_M = -23.024269f;
 static constexpr float RTRH_TEMP_RATIO_C = 67.398734f;
 
 // ESP32-C3 RH calibration.
-// A/B retain the established log-quadratic shape; C includes the final local
-// ambient correction verified by the original display around 49 %RH.
-// RH = A*ln(ratio)^2 + B*ln(ratio) + C
-static constexpr float RTRH_RH_RATIO_A = 1.85955589f;
-static constexpr float RTRH_RH_RATIO_B = -20.15071927f;
-static constexpr float RTRH_RH_RATIO_C = 99.20527595f;
+// Cubic direct fit in ratio = RH_state_period / REF_period.
+// Monotonic over the currently observed calibration range (~42-53 %RH).
+// RH = A*r^3 + B*r^2 + C*r + D
+static constexpr float RTRH_RH_RATIO_A = -0.69753285f;
+static constexpr float RTRH_RH_RATIO_B = 10.13034344f;
+static constexpr float RTRH_RH_RATIO_C = -52.32304359f;
+static constexpr float RTRH_RH_RATIO_D = 140.35957354f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
@@ -2152,9 +2153,10 @@ void BusSniffer::loop()
           rh_state_us / ref_period_us;
 
       float rh_percent =
-          RTRH_RH_RATIO_A * rh_ratio * rh_ratio +
-          RTRH_RH_RATIO_B * rh_ratio +
-          RTRH_RH_RATIO_C;
+          RTRH_RH_RATIO_A * rh_ratio * rh_ratio * rh_ratio +
+          RTRH_RH_RATIO_B * rh_ratio * rh_ratio +
+          RTRH_RH_RATIO_C * rh_ratio +
+          RTRH_RH_RATIO_D;
 
       if (rh_percent < 0.0f)
         rh_percent = 0.0f;
