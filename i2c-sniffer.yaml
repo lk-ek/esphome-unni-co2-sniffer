@@ -63,7 +63,7 @@ esp32_ble_server:
   max_clients: 1
   manufacturer: "Sensirion"
   model: "MyCO2 Gadget"
-  firmware_version: "1.0.0"
+  firmware_version: "1.0.1"
 
 bus_sniffer:
   # Compile-time BLE feature selection.
@@ -91,7 +91,7 @@ bus_sniffer:
 
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.
-  debug_metrics: true
+  debug_metrics: false
   thermal_transient_on_rate: 0.8
   thermal_transient_off_rate: 0.3
 
