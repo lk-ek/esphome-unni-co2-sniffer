@@ -49,8 +49,6 @@ inline const char *reject_reason_to_string(RejectReason reason) {
 struct Inputs {
   float ref_period_us{NAN};
   float ref_duration_ms{NAN};
-  uint16_t ref_count{0};
-
   float rt_period_us{NAN};
   float rt_duration_ms{NAN};
   uint16_t rt_count{0};

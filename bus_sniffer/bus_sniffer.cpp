@@ -2106,10 +2106,25 @@ void BusSniffer::loop()
         rtrh_rh_state_period_median(
             s.rh_state);
 
+    const float rt_period_us =
+        s.rt_temp_count
+            ? static_cast<float>(s.rt_temp_period_sum) /
+                  static_cast<float>(s.rt_temp_count)
+            : 0.0f;
+
+    const float rt_ratio =
+        ref_period_us > 0.0f
+            ? rt_period_us / ref_period_us
+            : NAN;
+
+    const float rh_ratio =
+        ref_period_us > 0.0f && rh_state_us > 0.0f
+            ? rh_state_us / ref_period_us
+            : NAN;
+
     measurement_quality::Inputs quality_inputs;
     quality_inputs.ref_period_us = ref_period_us;
     quality_inputs.ref_duration_ms = ref_duration_ms;
-    quality_inputs.ref_count = s.ref_count;
     quality_inputs.rt_period_us = rt_period_us;
     quality_inputs.rt_duration_ms = rt_duration_ms;
     quality_inputs.rt_count = s.rt_temp_count;
