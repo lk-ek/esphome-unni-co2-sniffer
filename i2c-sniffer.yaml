@@ -81,23 +81,23 @@ bus_sniffer:
   thermal_transient_threshold: 0.4
 
   ref_period:
-    name: "RT/RH REF Period"
+    name: "RT RH REF Period"
   rt_period:
-    name: "RT/RH RT Period"
+    name: "RT RH RT Period"
   rh_state_period:
-    name: "RT/RH RH State Period"
+    name: "RT RH RH State Period"
   rt_ratio:
-    name: "RT/RH RT Ratio"
+    name: "RT RH RT Ratio"
   rh_ratio:
-    name: "RT/RH RH Ratio"
+    name: "RT RH RH Ratio"
   rh_log:
-    name: "RT/RH RH Log Ratio"
+    name: "RT RH RH Log Ratio"
   measurement_quality:
-    name: "RT/RH Measurement Quality"
+    name: "RT RH Measurement Quality"
   thermal_transient:
-    name: "RT/RH Thermal Transient"
+    name: "RT RH Thermal Transient"
   calibration_extrapolation:
-    name: "RT/RH Calibration Extrapolation"
+    name: "RT RH Calibration Extrapolation"
 
   co2:
     name: "CO2"

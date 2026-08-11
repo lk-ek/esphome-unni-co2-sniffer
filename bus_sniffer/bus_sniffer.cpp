@@ -2200,7 +2200,7 @@ void BusSniffer::loop()
         s.rh_state.sample_count >= RTRH_RH_STATE_SAMPLES_MIN &&
         rh_state_us >= 40.0f &&
         rh_state_us <= 60000.0f &&
-        isfinite(rh_ratio) &&
+        std::isfinite(rh_ratio) &&
         rh_ratio <= RTRH_RH_RATIO_VALID_MAX;
 
     const bool measurement_valid =
@@ -2246,7 +2246,7 @@ void BusSniffer::loop()
       rtrh_derived.rt_ratio = rt_ratio;
       rtrh_derived.rh_ratio = rh_ratio;
       rtrh_derived.temperature_c =
-          isfinite(rt_ratio)
+          std::isfinite(rt_ratio)
               ? rtrh_temperature_from_ratio(rt_ratio)
               : NAN;
       rtrh_derived.humidity_percent = NAN;
@@ -2262,9 +2262,9 @@ void BusSniffer::loop()
         this->rt_period_sensor_->publish_state(rt_period_us);
       if (this->rh_state_period_sensor_ != nullptr && rh_state_us > 0.0f)
         this->rh_state_period_sensor_->publish_state(rh_state_us);
-      if (this->rt_ratio_sensor_ != nullptr && isfinite(rt_ratio))
+      if (this->rt_ratio_sensor_ != nullptr && std::isfinite(rt_ratio))
         this->rt_ratio_sensor_->publish_state(rt_ratio);
-      if (this->rh_ratio_sensor_ != nullptr && isfinite(rh_ratio))
+      if (this->rh_ratio_sensor_ != nullptr && std::isfinite(rh_ratio))
         this->rh_ratio_sensor_->publish_state(rh_ratio);
       if (this->calibration_extrapolation_sensor_ != nullptr)
         this->calibration_extrapolation_sensor_->publish_state(true);

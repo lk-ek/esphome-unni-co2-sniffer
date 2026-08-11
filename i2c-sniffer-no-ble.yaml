@@ -61,6 +61,30 @@ bus_sniffer:
   ble_advertising_interval: 2s
   ha_publish_interval: 30s
 
+  # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
+  # individually without affecting decoding.
+  debug_metrics: true
+  thermal_transient_threshold: 0.4
+
+  ref_period:
+    name: "RT RH REF Period"
+  rt_period:
+    name: "RT RH RT Period"
+  rh_state_period:
+    name: "RT RH RH State Period"
+  rt_ratio:
+    name: "RT RH RT Ratio"
+  rh_ratio:
+    name: "RT RH RH Ratio"
+  rh_log:
+    name: "RT RH RH Log Ratio"
+  measurement_quality:
+    name: "RT RH Measurement Quality"
+  thermal_transient:
+    name: "RT RH Thermal Transient"
+  calibration_extrapolation:
+    name: "RT RH Calibration Extrapolation"
+
   co2:
     name: "CO2"
     id: cd40_co2
