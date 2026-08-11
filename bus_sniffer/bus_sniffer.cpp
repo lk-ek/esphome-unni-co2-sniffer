@@ -2332,6 +2332,7 @@ void BusSniffer::loop()
       sensirion_ble_set_temperature_humidity(
           temperature_c,
           rh_percent);
+      sensirion_ble_commit_live_advertisement();
 #endif
 
       this->ha_temperature_ = temperature_c;
@@ -2571,8 +2572,9 @@ void BusSniffer::loop()
         const uint16_t ppm =
             result.co2_ppm;
 
-        // Keep BLE live advertisement fresh even when the ppm value did not
-        // change, while HA publication below remains change-only.
+        // Keep the latest CO2 value in BLE state. The actual advertising
+        // payload is committed once per RT/RH cycle (~30 s), avoiding a
+        // stop/configure/start sequence for every ~6 s CO2 frame.
 #if UNNI_BLE_LIVE_ENABLED
         sensirion_ble_set_co2(ppm);
 #endif

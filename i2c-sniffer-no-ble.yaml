@@ -27,6 +27,9 @@ wifi:
   # ESP32 already defaults to LIGHT modem sleep. HIGH saves more RF power;
   # if your AP proves unreliable, change this back to LIGHT.
   power_save_mode: HIGH
+  # Skip the normal active channel scan on reconnect/boot. ESPHome falls back
+  # to scanning automatically if the remembered AP cannot be reached.
+  fast_connect: true
   ap:
     ssid: "I2CSniffer Fallback Hotspot"
     password: !secret i2csniffer__ap_password
@@ -35,6 +38,9 @@ captive_portal:
 
 esp32:
   board: seeed_xiao_esp32c3
+  # ESP32-C3 supports 80/160 MHz. 80 MHz lowers active CPU power substantially;
+  # measurement-quality diagnostics make timing regressions immediately visible.
+  cpu_frequency: 80MHz
   framework:
     type: esp-idf
   # Persistent Sensirion history store. This is storage configuration rather

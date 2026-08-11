@@ -133,7 +133,7 @@ static uint16_t sensirion_ble_device_id = 0;
 // standard connectable advertiser defaults to ~20..40 ms.  The payload is
 // still the same Sensirion legacy advertisement, but the default interval is
 // deliberately much slower to reduce RF duty cycle.
-static uint32_t sensirion_ble_advertising_interval_ms = 2000;
+static uint32_t sensirion_ble_advertising_interval_ms = 5000;
 static std::vector<uint8_t> sensirion_ble_raw_advertisement;
 static uint32_t sensirion_ble_payload_version = 0;
 static uint32_t sensirion_ble_configured_version = 0;
@@ -422,8 +422,6 @@ void sensirion_ble_set_temperature_humidity(
   sensirion_ble_humidity_percent = humidity_percent;
   sensirion_ble_have_temperature = true;
   sensirion_ble_have_humidity = true;
-
-  update_sensirion_ble_advertisement();
 }
 
 
@@ -431,6 +429,20 @@ void sensirion_ble_set_co2(uint16_t ppm)
 {
   sensirion_ble_co2_ppm = ppm;
   sensirion_ble_have_co2 = true;
+}
+
+
+void sensirion_ble_commit_live_advertisement()
+{
+  // Reconfiguring a legacy advertiser requires stop/configure/start. Doing
+  // that for every ~6 s CO2 frame wastes RF/CPU time and can collide with
+  // ESPHome's BLE server. Commit once per RT/RH cycle instead; the packet then
+  // carries the most recent CO2 sample while being repeated at the configured
+  // low-duty advertising interval.
+  if (!sensirion_ble_have_temperature ||
+      !sensirion_ble_have_humidity ||
+      !sensirion_ble_have_co2)
+    return;
 
   update_sensirion_ble_advertisement();
 }
