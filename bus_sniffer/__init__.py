@@ -23,7 +23,8 @@ CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_DEBUG_METRICS = "debug_metrics"
-CONF_THERMAL_TRANSIENT_THRESHOLD = "thermal_transient_threshold"
+CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
+CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
 CONF_REF_PERIOD = "ref_period"
 CONF_RT_PERIOD = "rt_period"
@@ -33,6 +34,8 @@ CONF_RH_RATIO = "rh_ratio"
 CONF_RH_LOG = "rh_log"
 CONF_MEASUREMENT_QUALITY = "measurement_quality"
 CONF_THERMAL_TRANSIENT = "thermal_transient"
+CONF_TEMPERATURE_EXTRAPOLATION = "temperature_extrapolation"
+CONF_HUMIDITY_EXTRAPOLATION = "humidity_extrapolation"
 CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 
 bus_sniffer_ns = cg.esphome_ns.namespace("bus_sniffer")
@@ -82,8 +85,11 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
-            cv.Optional(CONF_THERMAL_TRANSIENT_THRESHOLD, default=0.4): cv.float_range(
-                min=0.05, max=10.0
+            cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(
+                min=0.05, max=20.0
+            ),
+            cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(
+                min=0.01, max=20.0
             ),
 
             cv.Optional(CONF_REF_PERIOD): sensor.sensor_schema(
@@ -126,6 +132,12 @@ CONFIG_SCHEMA = cv.All(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
             ),
             cv.Optional(CONF_THERMAL_TRANSIENT): binary_sensor.binary_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_TEMPERATURE_EXTRAPOLATION): binary_sensor.binary_sensor_schema(
+                entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+            ),
+            cv.Optional(CONF_HUMIDITY_EXTRAPOLATION): binary_sensor.binary_sensor_schema(
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
             ),
             cv.Optional(CONF_CALIBRATION_EXTRAPOLATION): binary_sensor.binary_sensor_schema(
@@ -189,7 +201,8 @@ async def to_code(config):
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
-    cg.add(var.set_thermal_transient_threshold(config[CONF_THERMAL_TRANSIENT_THRESHOLD]))
+    cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
+    cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 
     if CONF_REF_PERIOD in config:
         s = await sensor.new_sensor(config[CONF_REF_PERIOD])
@@ -215,6 +228,12 @@ async def to_code(config):
     if CONF_THERMAL_TRANSIENT in config:
         s = await binary_sensor.new_binary_sensor(config[CONF_THERMAL_TRANSIENT])
         cg.add(var.set_thermal_transient_sensor(s))
+    if CONF_TEMPERATURE_EXTRAPOLATION in config:
+        s = await binary_sensor.new_binary_sensor(config[CONF_TEMPERATURE_EXTRAPOLATION])
+        cg.add(var.set_temperature_extrapolation_sensor(s))
+    if CONF_HUMIDITY_EXTRAPOLATION in config:
+        s = await binary_sensor.new_binary_sensor(config[CONF_HUMIDITY_EXTRAPOLATION])
+        cg.add(var.set_humidity_extrapolation_sensor(s))
     if CONF_CALIBRATION_EXTRAPOLATION in config:
         s = await binary_sensor.new_binary_sensor(config[CONF_CALIBRATION_EXTRAPOLATION])
         cg.add(var.set_calibration_extrapolation_sensor(s))

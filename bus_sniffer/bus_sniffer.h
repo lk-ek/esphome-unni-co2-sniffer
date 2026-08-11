@@ -51,8 +51,11 @@ class BusSniffer : public Component {
   }
 
   void set_debug_metrics(bool enabled) { this->debug_metrics_ = enabled; }
-  void set_thermal_transient_threshold(float value) {
-    this->thermal_transient_threshold_c_ = value;
+  void set_thermal_transient_on_rate(float value) {
+    this->thermal_transient_on_rate_c_per_min_ = value;
+  }
+  void set_thermal_transient_off_rate(float value) {
+    this->thermal_transient_off_rate_c_per_min_ = value;
   }
 
   void set_ref_period_sensor(sensor::Sensor *sensor) { this->ref_period_sensor_ = sensor; }
@@ -65,6 +68,12 @@ class BusSniffer : public Component {
 
   void set_thermal_transient_sensor(binary_sensor::BinarySensor *sensor) {
     this->thermal_transient_sensor_ = sensor;
+  }
+  void set_temperature_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
+    this->temperature_extrapolation_sensor_ = sensor;
+  }
+  void set_humidity_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
+    this->humidity_extrapolation_sensor_ = sensor;
   }
   void set_calibration_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
     this->calibration_extrapolation_sensor_ = sensor;
@@ -85,6 +94,8 @@ class BusSniffer : public Component {
   sensor::Sensor *rh_log_sensor_{nullptr};
   sensor::Sensor *measurement_quality_sensor_{nullptr};
   binary_sensor::BinarySensor *thermal_transient_sensor_{nullptr};
+  binary_sensor::BinarySensor *temperature_extrapolation_sensor_{nullptr};
+  binary_sensor::BinarySensor *humidity_extrapolation_sensor_{nullptr};
   binary_sensor::BinarySensor *calibration_extrapolation_sensor_{nullptr};
 
   void maybe_publish_ha_();
@@ -102,9 +113,12 @@ class BusSniffer : public Component {
   float ha_humidity_{0.0f};
 
   bool debug_metrics_{false};
-  float thermal_transient_threshold_c_{0.4f};
+  float thermal_transient_on_rate_c_per_min_{0.8f};
+  float thermal_transient_off_rate_c_per_min_{0.3f};
+  bool thermal_transient_active_{false};
   bool have_last_valid_temperature_{false};
   float last_valid_temperature_c_{0.0f};
+  uint32_t last_valid_temperature_ms_{0};
 
   bool have_last_ppm_{false};
   uint16_t last_ppm_{0};

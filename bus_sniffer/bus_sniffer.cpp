@@ -1,5 +1,6 @@
 #include "bus_sniffer.h"
 #include "calibration.h"
+#include "measurement_quality.h"
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
@@ -965,8 +966,6 @@ static constexpr int RTRH_GPIOS[3] = {3, 5, 4};
 // samples were seen and a 6.7 ms pseudo-period was nevertheless accepted.
 // Normal captures fill all 96 slots.  Require enough independent recurrences
 // and reject implausibly large state/REF ratios.
-static constexpr uint8_t RTRH_RH_STATE_SAMPLES_MIN = 32;
-static constexpr float RTRH_RH_RATIO_VALID_MAX = 20.0f;
 
 // Measurement quality limits.
 static constexpr float RTRH_REF_VALID_MIN_US = 72.0f;
@@ -1066,7 +1065,11 @@ struct RtRhDerived {
   float temperature_c{NAN};
   float humidity_percent{NAN};
   float quality_percent{0.0f};
+  measurement_quality::RejectReason reject_reason{
+      measurement_quality::RejectReason::NONE};
   bool thermal_transient{false};
+  bool temperature_extrapolation{false};
+  bool humidity_extrapolation{false};
   bool calibration_extrapolation{false};
 };
 
@@ -1638,12 +1641,13 @@ class RtRhTimingHandler
         "measurement,phase,count,period_mean_us,"
         "duration_ms,state_rh_median_us,state_rh_samples,"
         "state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,"
-        "humidity_percent,quality_percent,thermal_transient,"
-        "calibration_extrapolation\n"
-        "%lu,ref,%u,%.3f,%.3f,,,,,,,,,,,\n"
-        "%lu,rt,%u,%.3f,%.3f,,,,,,,,,,,\n"
+        "humidity_percent,quality_percent,reject_reason,"
+        "thermal_transient,temperature_extrapolation,"
+        "humidity_extrapolation,calibration_extrapolation\n"
+        "%lu,ref,%u,%.3f,%.3f,,,,,,,,,,,,,,,,\n"
+        "%lu,rt,%u,%.3f,%.3f,,,,,,,,,,,,,,,,\n"
         "%lu,rh,%u,%.3f,%.3f,%.3f,%u,%lu,%u,%.6f,%.6f,"
-        "%.3f,%.3f,%.1f,%u,%u\n",
+        "%.3f,%.3f,%.1f,%s,%u,%u,%u,%u\n",
         static_cast<unsigned long>(s.sequence),
         static_cast<unsigned>(s.ref.count),
         ref_us,
@@ -1668,7 +1672,12 @@ class RtRhTimingHandler
         have_derived ? d.temperature_c : NAN,
         have_derived ? d.humidity_percent : NAN,
         have_derived ? d.quality_percent : 0.0f,
+        have_derived
+            ? measurement_quality::reject_reason_to_string(d.reject_reason)
+            : "UNKNOWN",
         have_derived && d.thermal_transient ? 1U : 0U,
+        have_derived && d.temperature_extrapolation ? 1U : 0U,
+        have_derived && d.humidity_extrapolation ? 1U : 0U,
         have_derived && d.calibration_extrapolation ? 1U : 0U);
 
     if (n <= 0) {
@@ -2097,66 +2106,23 @@ void BusSniffer::loop()
         rtrh_rh_state_period_median(
             s.rh_state);
 
-    const bool ref_ok =
-        ref_period_us >= RTRH_REF_VALID_MIN_US &&
-        ref_period_us <= RTRH_REF_VALID_MAX_US &&
-        ref_duration_ms >=
-            RTRH_REF_DURATION_MIN_MS &&
-        ref_duration_ms <=
-            RTRH_REF_DURATION_MAX_MS &&
-        s.ref.count >= RTRH_REF_COUNT_MIN &&
-        s.ref.count <= RTRH_REF_COUNT_MAX;
+    measurement_quality::Inputs quality_inputs;
+    quality_inputs.ref_period_us = ref_period_us;
+    quality_inputs.ref_duration_ms = ref_duration_ms;
+    quality_inputs.ref_count = s.ref_count;
+    quality_inputs.rt_period_us = rt_period_us;
+    quality_inputs.rt_duration_ms = rt_duration_ms;
+    quality_inputs.rt_count = s.rt_temp_count;
+    quality_inputs.rh_duration_ms = rh_duration_ms;
+    quality_inputs.rh_state_us = rh_state_us;
+    quality_inputs.rh_state_samples = s.rh_state.sample_count;
+    quality_inputs.rh_state_seen = s.rh_state.seen;
+    quality_inputs.rh_ratio = rh_ratio;
 
-    const bool rt_ok =
-        rt_duration_ms >=
-            RTRH_RT_DURATION_MIN_MS &&
-        rt_duration_ms <=
-            RTRH_RT_DURATION_MAX_MS &&
-        s.rt_temp_count >=
-            RTRH_RT_TEMP_COUNT_MIN;
-
-    const float rt_period_us =
-        s.rt_temp_count
-            ? static_cast<float>(s.rt_temp_period_sum) /
-                  static_cast<float>(s.rt_temp_count)
-            : 0.0f;
-
-    const float rt_ratio =
-        ref_period_us > 0.0f
-            ? rt_period_us / ref_period_us
-            : NAN;
-
-    const float rh_ratio =
-        ref_period_us > 0.0f && rh_state_us > 0.0f
-            ? rh_state_us / ref_period_us
-            : NAN;
-
-    const bool rh_ok =
-        rh_duration_ms >=
-            RTRH_RH_DURATION_MIN_MS &&
-        rh_duration_ms <=
-            RTRH_RH_DURATION_MAX_MS &&
-        s.rh_state.sample_count >= RTRH_RH_STATE_SAMPLES_MIN &&
-        rh_state_us >= 40.0f &&
-        rh_state_us <= 60000.0f &&
-        std::isfinite(rh_ratio) &&
-        rh_ratio <= RTRH_RH_RATIO_VALID_MAX;
-
-    const bool measurement_valid =
-        ref_ok && rt_ok && rh_ok;
-
-    const float ref_score =
-        fmaxf(0.0f, 1.0f - fabsf(ref_period_us - 76.80f) / 2.0f);
-    const float rt_score =
-        fminf(1.0f,
-              static_cast<float>(s.rt_temp_count) /
-              static_cast<float>(RTRH_RT_TEMP_CYCLES));
-    const float rh_score =
-        fminf(1.0f,
-              static_cast<float>(s.rh_state.sample_count) /
-              static_cast<float>(RTRH_RH_STATE_PERIOD_SAMPLES));
-    const float quality_percent =
-        100.0f * (0.30f * ref_score + 0.35f * rt_score + 0.35f * rh_score);
+    const auto quality =
+        measurement_quality::evaluate(quality_inputs);
+    const bool measurement_valid = quality.valid;
+    const float quality_percent = quality.score_percent;
 
     ESP_LOGI(
         TAG,
@@ -2190,7 +2156,10 @@ void BusSniffer::loop()
               : NAN;
       rtrh_derived.humidity_percent = NAN;
       rtrh_derived.quality_percent = quality_percent;
+      rtrh_derived.reject_reason = quality.reason;
       rtrh_derived.thermal_transient = false;
+      rtrh_derived.temperature_extrapolation = true;
+      rtrh_derived.humidity_extrapolation = true;
       rtrh_derived.calibration_extrapolation = true;
 
       if (this->measurement_quality_sensor_ != nullptr)
@@ -2205,14 +2174,19 @@ void BusSniffer::loop()
         this->rt_ratio_sensor_->publish_state(rt_ratio);
       if (this->rh_ratio_sensor_ != nullptr && std::isfinite(rh_ratio))
         this->rh_ratio_sensor_->publish_state(rh_ratio);
+      if (this->temperature_extrapolation_sensor_ != nullptr)
+        this->temperature_extrapolation_sensor_->publish_state(true);
+      if (this->humidity_extrapolation_sensor_ != nullptr)
+        this->humidity_extrapolation_sensor_->publish_state(true);
       if (this->calibration_extrapolation_sensor_ != nullptr)
         this->calibration_extrapolation_sensor_->publish_state(true);
 
       ESP_LOGW(
           TAG,
           "RT/RH measurement %lu values not published: "
-          "quality check failed (quality %.0f%%)",
+          "REJECT=%s (quality %.0f%%)",
           static_cast<unsigned long>(s.sequence),
+          measurement_quality::reject_reason_to_string(quality.reason),
           quality_percent);
     } else {
       // Temperature and humidity calibration are deliberately isolated from
@@ -2225,17 +2199,40 @@ void BusSniffer::loop()
               rh_ratio,
               temperature_c);
 
-      const bool thermal_transient =
-          this->have_last_valid_temperature_ &&
-          fabsf(temperature_c - this->last_valid_temperature_c_) >=
-              this->thermal_transient_threshold_c_;
+      const uint32_t now_ms = millis();
+      float temperature_rate_c_per_min = 0.0f;
+      if (this->have_last_valid_temperature_) {
+        const uint32_t dt_ms = now_ms - this->last_valid_temperature_ms_;
+        if (dt_ms > 0) {
+          temperature_rate_c_per_min =
+              fabsf(temperature_c - this->last_valid_temperature_c_) *
+              60000.0f / static_cast<float>(dt_ms);
+        }
+      }
 
+      if (!this->thermal_transient_active_) {
+        if (this->have_last_valid_temperature_ &&
+            temperature_rate_c_per_min >=
+                this->thermal_transient_on_rate_c_per_min_) {
+          this->thermal_transient_active_ = true;
+        }
+      } else if (temperature_rate_c_per_min <=
+                 this->thermal_transient_off_rate_c_per_min_) {
+        this->thermal_transient_active_ = false;
+      }
+      const bool thermal_transient = this->thermal_transient_active_;
+
+      const bool temperature_extrapolation =
+          temperature_c < calibration::CAL_TEMP_MIN_C ||
+          temperature_c > calibration::CAL_TEMP_MAX_C;
+      const bool humidity_extrapolation =
+          rh_ratio < calibration::CAL_RH_RATIO_MIN ||
+          rh_ratio > calibration::CAL_RH_RATIO_MAX;
       const bool calibration_extrapolation =
-          calibration::is_extrapolation(
-              temperature_c,
-              rh_ratio);
+          temperature_extrapolation || humidity_extrapolation;
 
       this->last_valid_temperature_c_ = temperature_c;
+      this->last_valid_temperature_ms_ = now_ms;
       this->have_last_valid_temperature_ = true;
 
       rtrh_derived.sequence = s.sequence;
@@ -2245,7 +2242,13 @@ void BusSniffer::loop()
       rtrh_derived.temperature_c = temperature_c;
       rtrh_derived.humidity_percent = rh_percent;
       rtrh_derived.quality_percent = quality_percent;
+      rtrh_derived.reject_reason =
+          measurement_quality::RejectReason::NONE;
       rtrh_derived.thermal_transient = thermal_transient;
+      rtrh_derived.temperature_extrapolation =
+          temperature_extrapolation;
+      rtrh_derived.humidity_extrapolation =
+          humidity_extrapolation;
       rtrh_derived.calibration_extrapolation =
           calibration_extrapolation;
 
@@ -2273,12 +2276,15 @@ void BusSniffer::loop()
         ESP_LOGI(
             TAG,
             "RT/RH diagnostics %lu: quality %.0f%%, ln(RH/REF)=%.6f, "
-            "thermal_transient=%s, calibration_extrapolation=%s",
+            "|dT/dt|=%.2f C/min, thermal_transient=%s, "
+            "T_extrap=%s, RH_extrap=%s",
             static_cast<unsigned long>(s.sequence),
             quality_percent,
             rh_log,
+            temperature_rate_c_per_min,
             thermal_transient ? "YES" : "no",
-            calibration_extrapolation ? "YES" : "no");
+            temperature_extrapolation ? "YES" : "no",
+            humidity_extrapolation ? "YES" : "no");
       }
 
       if (this->ref_period_sensor_ != nullptr)
@@ -2297,6 +2303,12 @@ void BusSniffer::loop()
         this->measurement_quality_sensor_->publish_state(quality_percent);
       if (this->thermal_transient_sensor_ != nullptr)
         this->thermal_transient_sensor_->publish_state(thermal_transient);
+      if (this->temperature_extrapolation_sensor_ != nullptr)
+        this->temperature_extrapolation_sensor_->publish_state(
+            temperature_extrapolation);
+      if (this->humidity_extrapolation_sensor_ != nullptr)
+        this->humidity_extrapolation_sensor_->publish_state(
+            humidity_extrapolation);
       if (this->calibration_extrapolation_sensor_ != nullptr)
         this->calibration_extrapolation_sensor_->publish_state(
             calibration_extrapolation);

@@ -64,7 +64,8 @@ bus_sniffer:
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.
   debug_metrics: true
-  thermal_transient_threshold: 0.4
+  thermal_transient_on_rate: 0.8
+  thermal_transient_off_rate: 0.3
 
   ref_period:
     name: "RT RH REF Period"
@@ -82,6 +83,10 @@ bus_sniffer:
     name: "RT RH Measurement Quality"
   thermal_transient:
     name: "RT RH Thermal Transient"
+  temperature_extrapolation:
+    name: "RT RH Temperature Extrapolation"
+  humidity_extrapolation:
+    name: "RT RH Humidity Extrapolation"
   calibration_extrapolation:
     name: "RT RH Calibration Extrapolation"
 
