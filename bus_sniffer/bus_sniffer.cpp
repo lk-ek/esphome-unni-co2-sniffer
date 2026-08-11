@@ -1644,8 +1644,8 @@ class RtRhTimingHandler
         "humidity_percent,quality_percent,reject_reason,"
         "thermal_transient,temperature_extrapolation,"
         "humidity_extrapolation,calibration_extrapolation\n"
-        "%lu,ref,%u,%.3f,%.3f,,,,,,,,,,,,,,,,\n"
-        "%lu,rt,%u,%.3f,%.3f,,,,,,,,,,,,,,,,\n"
+        "%lu,ref,%u,%.3f,%.3f,,,,,,,,,,,,,,,\n"
+        "%lu,rt,%u,%.3f,%.3f,,,,,,,,,,,,,,,\n"
         "%lu,rh,%u,%.3f,%.3f,%.3f,%u,%lu,%u,%.6f,%.6f,"
         "%.3f,%.3f,%.1f,%s,%u,%u,%u,%u\n",
         static_cast<unsigned long>(s.sequence),

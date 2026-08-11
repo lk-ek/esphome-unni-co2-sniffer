@@ -35,3 +35,7 @@ keeping continuous connectable advertisements and the GATT/history server alive.
 - `ha_publish_interval` remains 30 s
 - first values still publish immediately
 - diagnostics remain available for testing
+
+## CSV fix
+
+The REF/RT rows now contain exactly the same 20 columns as the header/RH row. v7/v8 initially emitted one extra empty field on those two rows, causing CSV parsers to shift columns.
