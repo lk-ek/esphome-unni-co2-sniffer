@@ -65,9 +65,6 @@ esp32_ble_server:
   model: "MyCO2 Gadget"
   firmware_version: "1.0.0"
 
-web_server:
-  port: 80
-
 bus_sniffer:
   # Compile-time BLE feature selection.
   # For a genuine ble:false build, also remove/comment the top-level
@@ -86,6 +83,11 @@ bus_sniffer:
   # can initialize normally. After the delay the five lines become plain
   # high-impedance inputs without pulls and their edge ISRs are attached.
   sniffer_start_delay: 10s
+
+  # Compile-time capture/HTTP debug support. Set true only when raw captures
+  # are needed; then also add a top-level `web_server:` block. With false no
+  # capture HTTP handlers or RT/RH capture buffers are compiled in.
+  debug_capture: false
 
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.

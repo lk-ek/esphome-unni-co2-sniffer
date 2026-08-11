@@ -52,10 +52,8 @@ esp32:
       size: 0x10000
 
 # BLE deliberately omitted for timing A/B test.
-web_server:
-  port: 80
-
 bus_sniffer:
+  debug_capture: false
   # Compile-time BLE feature selection.
   # For a genuine ble:false build, also remove/comment the top-level
   # esp32_ble: and esp32_ble_server: blocks above.

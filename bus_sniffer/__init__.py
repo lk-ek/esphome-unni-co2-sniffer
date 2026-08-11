@@ -7,7 +7,7 @@ from esphome.core import TimePeriod
 
 # BLE is deliberately NOT a hard dependency anymore.  A real `ble: false`
 # build therefore does not need esp32_ble / esp32_ble_server in the YAML at all.
-DEPENDENCIES = ["web_server"]
+DEPENDENCIES = []
 AUTO_LOAD = ["sensor", "binary_sensor"]
 
 CONF_CO2 = "co2"
@@ -24,6 +24,7 @@ CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
+CONF_DEBUG_CAPTURE = "debug_capture"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -87,6 +88,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
             cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
+            cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
             cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(
                 min=0.05, max=20.0
             ),
@@ -187,10 +189,12 @@ async def to_code(config):
     ble_enabled = config[CONF_BLE]
     ble_live_enabled = config[CONF_BLE_LIVE]
     ble_history_enabled = config[CONF_BLE_HISTORY]
+    debug_capture_enabled = config[CONF_DEBUG_CAPTURE]
 
     cg.add_define("UNNI_BLE_ENABLED", 1 if ble_enabled else 0)
     cg.add_define("UNNI_BLE_LIVE_ENABLED", 1 if ble_live_enabled else 0)
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", 1 if ble_history_enabled else 0)
+    cg.add_define("RTRH_DEBUG_CAPTURE", 1 if debug_capture_enabled else 0)
 
     if ble_enabled:
         ble = await cg.get_variable(config[CONF_BLE_ID])

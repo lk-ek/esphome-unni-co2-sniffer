@@ -2,6 +2,10 @@
 #include "calibration.h"
 #include "measurement_quality.h"
 #include "ble_options.h"
+
+#ifndef RTRH_DEBUG_CAPTURE
+#define RTRH_DEBUG_CAPTURE 0
+#endif
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
 #endif
@@ -10,15 +14,15 @@
 #endif
 
 #include "esphome/core/log.h"
+#if RTRH_DEBUG_CAPTURE
 #include "esphome/components/web_server_base/web_server_base.h"
+#include "esp_http_server.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#endif
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
-#include "esp_http_server.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
 
 #include <climits>
 #include <cmath>
@@ -100,6 +104,7 @@ static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
 
+#if RTRH_DEBUG_CAPTURE
 /*
  * ============================================================================
  * Letzter Raw-Capture für HTTP
@@ -110,6 +115,7 @@ static std::string last_capture_data;
 
 static SemaphoreHandle_t last_capture_mutex =
     nullptr;
+#endif
 
 
 /*
@@ -695,6 +701,7 @@ static DecodeResult decode_i2c_capture(
 }
 
 
+#if RTRH_DEBUG_CAPTURE
 /*
  * ============================================================================
  * Raw-Capture archivieren
@@ -912,6 +919,8 @@ class CaptureHandler
 static CaptureHandler capture_handler;
 
 
+#endif
+
 /*
  * ============================================================================
  * RT/RH minimal hybrid decoder
@@ -944,14 +953,11 @@ static CaptureHandler capture_handler;
  * The G10-net-derived RH period is retained ONLY as a phase-duration /
  * quality accumulator.  It is never converted to humidity.
  *
- * Set RTRH_DEBUG_CAPTURE=0 for the lean production build.  This removes the
- * raw RT/RH capture buffer and both RT/RH CSV handlers without changing the
- * three-GPIO decoder.
+ * YAML debug_capture controls RTRH_DEBUG_CAPTURE at compile time. With
+ * debug_capture: false, all HTTP capture handlers, the retained I2C raw-capture
+ * copy, and the RT/RH debug capture buffer are omitted. The live CO2/RT/RH
+ * decoders are unchanged.
  */
-
-#ifndef RTRH_DEBUG_CAPTURE
-#define RTRH_DEBUG_CAPTURE 1
-#endif
 
 static constexpr gpio_num_t PIN_RTRH0 = GPIO_NUM_3;
 static constexpr gpio_num_t PIN_RTRH1 = GPIO_NUM_5;
@@ -1933,9 +1939,10 @@ void BusSniffer::setup()
   sensirion_history_setup();
 #endif
 
+#if RTRH_DEBUG_CAPTURE
   last_capture_mutex =
       xSemaphoreCreateMutex();
-
+#endif
 
   this->sniffer_boot_ms_ = millis();
   if (this->sniffer_start_delay_ms_ == 0) {
@@ -1947,6 +1954,7 @@ void BusSniffer::setup()
   }
 
 
+#if RTRH_DEBUG_CAPTURE
   if (
       web_server_base::global_web_server_base !=
       nullptr
@@ -1958,13 +1966,11 @@ void BusSniffer::setup()
             &capture_handler
         );
 
-#if RTRH_DEBUG_CAPTURE
     web_server_base::global_web_server_base->add_handler(
         &rtrh_capture_handler);
 
     web_server_base::global_web_server_base->add_handler(
         &rtrh_timing_handler);
-#endif
 
   } else {
 
@@ -1974,6 +1980,7 @@ void BusSniffer::setup()
     );
   }
 
+#endif
 
   /*
    * Diagnosezähler mit 0 initialisieren.
@@ -2652,16 +2659,17 @@ void BusSniffer::loop()
     }
 
 
+#if RTRH_DEBUG_CAPTURE
     /*
      * Den letzten Capture unabhängig vom Decoderergebnis
      * weiterhin für /capture aufbewahren.
      */
-
     store_raw_capture(
         samples,
         count,
         overflow
     );
+#endif
   }
 
 
