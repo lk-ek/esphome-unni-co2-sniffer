@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
 // Compile-time feature switches for the Unni CO2 sniffer.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "bus_sniffer.h"
 #include "calibration.h"
 #include "measurement_quality.h"

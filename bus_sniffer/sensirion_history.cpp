@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "ble_options.h"
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
