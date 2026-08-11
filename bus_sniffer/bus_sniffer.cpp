@@ -1732,12 +1732,13 @@ void BusSniffer::gatts_event_handler(
     esp_gatt_if_t gatts_if,
     esp_ble_gatts_cb_param_t *param)
 {
+  // Advertising ownership must see CONNECT/DISCONNECT regardless of whether
+  // history support is compiled in.
+  sensirion_ble_gatts_event_handler(event, param);
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_gatts_event_handler(event, gatts_if, param);
 #else
-  (void) event;
   (void) gatts_if;
-  (void) param;
 #endif
 }
 #endif

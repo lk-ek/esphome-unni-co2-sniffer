@@ -133,10 +133,12 @@ static uint16_t sensirion_ble_device_id = 0;
 // standard connectable advertiser defaults to ~20..40 ms.  The payload is
 // still the same Sensirion legacy advertisement, but the default interval is
 // deliberately much slower to reduce RF duty cycle.
-static uint32_t sensirion_ble_advertising_interval_ms = 10000;
+static uint32_t sensirion_ble_advertising_interval_ms = 2000;
 static std::vector<uint8_t> sensirion_ble_raw_advertisement;
 static uint32_t sensirion_ble_payload_version = 0;
 static uint32_t sensirion_ble_configured_version = 0;
+static bool sensirion_ble_gatt_connected = false;
+static bool sensirion_ble_refresh_pending = false;
 
 enum class SensirionAdvState : uint8_t {
   IDLE,
@@ -159,6 +161,17 @@ static void sensirion_ble_request_refresh()
       !esp32_ble::global_ble->is_active())
     return;
 
+  // Never manipulate GAP advertising while a GATT client is connected.
+  // A legacy advertiser is automatically stopped by the controller when the
+  // connection is established; stop/configure/start during that connection
+  // races ESPHome's BLE server and can make MyAmbience stick at
+  // "connecting to gadget" or abort a history transfer.  Keep only the most
+  // recent payload and restart advertising after DISCONNECT instead.
+  if (sensirion_ble_gatt_connected) {
+    sensirion_ble_refresh_pending = true;
+    return;
+  }
+
   if (sensirion_ble_adv_state == SensirionAdvState::ADVERTISING) {
     sensirion_ble_adv_state = SensirionAdvState::STOPPING;
     const esp_err_t err = esp_ble_gap_stop_advertising();
@@ -174,8 +187,11 @@ static void sensirion_ble_request_refresh()
 
 static void sensirion_ble_configure_raw_advertisement()
 {
-  if (sensirion_ble_raw_advertisement.empty())
+  if (sensirion_ble_raw_advertisement.empty() || sensirion_ble_gatt_connected) {
+    if (sensirion_ble_gatt_connected)
+      sensirion_ble_refresh_pending = true;
     return;
+  }
 
   sensirion_ble_adv_state = SensirionAdvState::CONFIGURING;
   sensirion_ble_configured_version = sensirion_ble_payload_version;
@@ -211,6 +227,13 @@ void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_c
           sensirion_ble_adv_state = SensirionAdvState::IDLE;
           break;
         }
+        // The config request can complete after a client has connected.  In
+        // that case starting advertising here would race the active GATT link.
+        if (sensirion_ble_gatt_connected) {
+          sensirion_ble_adv_state = SensirionAdvState::IDLE;
+          sensirion_ble_refresh_pending = true;
+          break;
+        }
         sensirion_ble_adv_state = SensirionAdvState::STARTING;
         const esp_err_t err = esp_ble_gap_start_advertising(&sensirion_ble_adv_params);
         if (err != ESP_OK) {
@@ -229,7 +252,8 @@ void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_c
         } else {
           sensirion_ble_adv_state = SensirionAdvState::IDLE;
         }
-      } else if (!sensirion_ble_raw_advertisement.empty() &&
+      } else if (!sensirion_ble_gatt_connected &&
+                 !sensirion_ble_raw_advertisement.empty() &&
                  param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
         // ESPHome's BLE server may restart its default 20..40 ms advertiser
         // after a disconnect. Replace it with our low-duty-cycle advertiser.
@@ -245,6 +269,44 @@ void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_c
     case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
       if (sensirion_ble_adv_state == SensirionAdvState::STOPPING) {
         sensirion_ble_adv_state = SensirionAdvState::IDLE;
+        if (sensirion_ble_gatt_connected) {
+          sensirion_ble_refresh_pending = true;
+        } else {
+          sensirion_ble_configure_raw_advertisement();
+        }
+      }
+      break;
+
+    default:
+      break;
+  }
+}
+
+
+void sensirion_ble_gatts_event_handler(
+    esp_gatts_cb_event_t event,
+    esp_ble_gatts_cb_param_t *param)
+{
+  switch (event) {
+    case ESP_GATTS_CONNECT_EVT:
+      sensirion_ble_gatt_connected = true;
+      // Connectable advertising stops automatically when the connection is
+      // accepted.  Do not treat that as a failed advertiser that needs to be
+      // restarted while the client is still connected.
+      sensirion_ble_adv_state = SensirionAdvState::IDLE;
+      ESP_LOGI(TAG, "Sensirion GATT connected (conn=%u); advertising refresh paused",
+               param != nullptr ? static_cast<unsigned>(param->connect.conn_id) : 0U);
+      break;
+
+    case ESP_GATTS_DISCONNECT_EVT:
+      sensirion_ble_gatt_connected = false;
+      sensirion_ble_adv_state = SensirionAdvState::IDLE;
+      ESP_LOGI(TAG, "Sensirion GATT disconnected; restoring slow advertising");
+      // Always restore our advertiser after a client disconnect.  This also
+      // replaces ESPHome's default fast advertiser with the current Sensirion
+      // payload and configured interval.
+      if (!sensirion_ble_raw_advertisement.empty()) {
+        sensirion_ble_refresh_pending = false;
         sensirion_ble_configure_raw_advertisement();
       }
       break;

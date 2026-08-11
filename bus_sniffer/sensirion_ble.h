@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <esp_gap_ble_api.h>
+#include <esp_gatts_api.h>
 
 namespace esphome {
 namespace bus_sniffer {
@@ -11,6 +12,7 @@ namespace bus_sniffer {
 void sensirion_ble_setup();
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms);
 void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
+void sensirion_ble_gatts_event_handler(esp_gatts_cb_event_t event, esp_ble_gatts_cb_param_t *param);
 void sensirion_ble_set_temperature_humidity(float temperature_c, float humidity_percent);
 void sensirion_ble_set_co2(uint16_t ppm);
 void sensirion_ble_commit_live_advertisement();

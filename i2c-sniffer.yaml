@@ -78,7 +78,7 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 10s
+  ble_advertising_interval: 2s
   ha_publish_interval: 30s
 
   # Boot-isolation test: leave D1/D2/D3/D5/D6 completely untouched by the
