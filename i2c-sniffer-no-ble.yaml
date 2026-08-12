@@ -1,8 +1,6 @@
 esphome:
   name: i2csniffer
   friendly_name: I2C-Sniffer
-  includes:
-    - <esp_mac.h>
 
 external_components:
   - source:
@@ -43,31 +41,21 @@ esp32:
   cpu_frequency: 80MHz
   framework:
     type: esp-idf
-  # Persistent Sensirion history store. This is storage configuration rather
-  # than GATT protocol configuration; the bus_sniffer component owns the format.
-  partitions:
-    - name: senshist
-      type: data
-      subtype: spiffs
-      size: 0x10000
-
 # BLE deliberately omitted for timing A/B test.
 bus_sniffer:
   debug_capture: false
-  # Compile-time BLE feature selection.
-  # For a genuine ble:false build, also remove/comment the top-level
-  # esp32_ble: and esp32_ble_server: blocks above.
+  # Genuine no-BLE build: no esp32_ble/esp32_ble_server components and no
+  # Sensirion history partition are present in this file.
   ble: false
   ble_live: false
   ble_history: false
 
-  # Ignored in a no-BLE build, but harmless to leave present.
-  ble_advertising_interval: 10s
   ha_publish_interval: 30s
+  sniffer_start_delay: 10s
 
   # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
   # individually without affecting decoding.
-  debug_metrics: true
+  debug_metrics: false
   thermal_transient_on_rate: 0.8
   thermal_transient_off_rate: 0.3
 

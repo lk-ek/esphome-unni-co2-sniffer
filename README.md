@@ -1,165 +1,150 @@
 # Unni CO₂ Sensor Smartification
 
-This project turns an otherwise standalone Unni CO₂ monitor into a networked sensor without replacing its original electronics.
+This project adds a Seeed Studio XIAO ESP32-C3 to an existing Unni CO₂ monitor as a **passive sniffer**. The original Unni MCU, display, buttons, alarms, CO₂ module, and RT/RH measurement circuitry remain in control; the ESP observes existing signals and publishes decoded measurements.
 
-A Seeed Studio XIAO ESP32-C3 is added as a **passive sniffer**. It observes the existing CO₂ and temperature/humidity measurement signals, decodes them, and makes the readings available through:
+The firmware exposes:
 
-- ESPHome and Home Assistant
-- Bluetooth Low Energy advertisements compatible with the Sensirion gadget format
-- a Sensirion-style GATT history service for history downloads in MyAmbience
+- CO₂, temperature, and relative humidity through ESPHome/Home Assistant
+- Sensirion-compatible BLE live advertisements
+- a Sensirion-style GATT history service usable by MyAmbience
+- optional raw/debug capture endpoints for reverse engineering
 
-The original Unni MCU, display, buttons, alarms, and measurement circuitry remain in place.
-
-This is a reverse-engineering project. The signal interpretation and calibration were derived experimentally and may not apply unchanged to other Unni hardware revisions.
+The signal interpretation and calibration were derived experimentally from the tested Unni hardware. Other hardware revisions may require new verification or calibration.
 
 ## Features
 
-- Passive CO₂ bus sniffing; the ESP does not act as the bus master
-- Passive decoding of the original temperature/humidity measurement timing
-- Temperature-compensated relative-humidity conversion
-- Measurement-quality and calibration-range diagnostics
-- Native ESPHome API for Home Assistant
-- Sensirion-compatible BLE live advertising
-- Sensirion-style BLE history storage and GATT download
-- Persistent BLE history in a dedicated flash partition
-- Configurable BLE, history, debug, and publish features at compile time
-- Low-power-oriented production configuration: 80 MHz CPU, Wi-Fi power saving, slow BLE advertising, and optional removal of debug capture infrastructure
-- GPL-3.0-or-later licensed
+- passive CO₂ bus capture and frame decoding
+- passive RT/RH timing capture using GPIO interrupts
+- calibrated temperature and temperature-compensated RH conversion
+- measurement-quality, thermal-transient, and calibration-range diagnostics
+- native ESPHome API for Home Assistant
+- compile-time BLE enable/disable
+- Sensirion-compatible live BLE advertising
+- persistent Sensirion-style history with GATT download
+- compile-time raw capture/debug HTTP support
+- production-oriented 80 MHz CPU configuration and Wi-Fi power saving
+- delayed GPIO/ISR initialization for boot isolation
+- GPL-3.0-or-later
 
 ## Hardware
 
 ### Required parts
 
 - Unni CO₂ monitor
-- [Seeed Studio XIAO ESP32-C3](https://www.seeedstudio.com/Seeed-XIAO-ESP32C3-p-5431.html)
-- Fine insulated wire suitable for PCB work
-- Soldering iron and fine solder
-- Ideally 4.7 kΩ to 10 kΩ series resistors for each sniffed signal line
-- A USB power source capable of powering both the Unni monitor and the XIAO ESP32-C3
+- Seeed Studio XIAO ESP32-C3
+- fine insulated wire suitable for PCB work
+- soldering equipment
+- optionally 4.7 kΩ–10 kΩ series resistors for the sniffed signal lines
+- a suitable 5 V supply
 
-The ESP and the Unni electronics share **+5 V and GND**. The ESP only observes the signal lines.
+The XIAO and Unni electronics share **5 V and GND**. The ESP only observes the signal lines.
 
-### Signal connections
+### Wiring
 
-The current firmware uses the following XIAO ESP32-C3 pins:
-
-| XIAO pin | ESP32-C3 GPIO | Unni signal | Purpose |
+| XIAO pin | ESP32-C3 GPIO | Unni signal | Function |
 |---|---:|---|---|
-| D5 | GPIO7 | CO₂ SCL | Clock of the CO₂ digital bus |
-| D4 | GPIO6 | CO₂ SDA | Data of the CO₂ digital bus |
-| D1 | GPIO3 | RT/RH G10 | RT/RH timing signal |
-| D3 | GPIO5 | RT/RH G11 | RT/RH state/timing signal |
-| D2 | GPIO4 | RT/RH G13 | RT/RH state/timing signal |
-| 5V | — | +5 V | Shared power |
-| GND | — | GND | Shared ground |
+| D5 | GPIO7 | CO₂ SCL | CO₂ bus clock |
+| D4 | GPIO6 | CO₂ SDA | CO₂ bus data |
+| D1 | GPIO3 | RT/RH G10 | RT/RH timing |
+| D3 | GPIO5 | RT/RH G11 | RT/RH state/timing |
+| D2 | GPIO4 | RT/RH G13 | RT/RH state/timing |
+| 5V | — | +5 V | shared supply |
+| GND | — | GND | shared ground |
 
-The former G12 signal was found to duplicate G10 and is not required by the current decoder.
+The previously investigated G12 signal duplicates G10 for the purposes of the current decoder and is not required.
 
-> **Image placeholder — Unni PCB overview**  
-> Add a photo showing the Unni main PCB, the CO₂ sensor board, the RT/RH sensor area, and the XIAO installation location.
-
-> **Image placeholder — signal test points**  
-> Add a close-up with the five sniffed signal pads labelled: CO₂ SCL, CO₂ SDA, G10, G11, and G13.
-
-> **Image placeholder — XIAO wiring**  
-> Add a photo or diagram showing D1/D2/D3/D4/D5, +5 V, GND, and the recommended series resistors.
-
-### Recommended series resistors
-
-For a permanent installation, placing approximately **10 kΩ in series with every signal connection to the XIAO** is recommended:
+For a permanent installation, a series resistor in each ESP sniffing branch is recommended:
 
 ```text
 Unni signal ---- 10 kΩ ---- XIAO GPIO
 ```
 
-The resistor belongs only in the ESP sniffing branch; do not insert it into the original Unni signal path.
+Do not put the resistor in series with the original Unni signal path.
 
-The ESP inputs are intended to remain high impedance. Series resistance further reduces the chance that ESP boot states, protection diodes, accidental pin configuration, or power-up sequencing can influence the original Unni electronics. The measured signal periods are long enough that 10 kΩ is not expected to be problematic for this passive input application.
+### Boot isolation and self-heating
 
-### Power and thermal considerations
+The production configuration runs the ESP32-C3 at 80 MHz and uses Wi-Fi power saving. `sniffer_start_delay` delays all custom GPIO configuration and ISR attachment; during that period the component leaves the five observed signal pins untouched. The supplied production configurations use 10 seconds.
 
-The production configuration runs the ESP32-C3 at 80 MHz and disables the heavy capture/debug infrastructure when it is not needed. This substantially reduces power consumption and ESP self-heating, which is desirable because the added board is physically close to temperature-sensitive circuitry.
+This is useful both for boot-isolation testing and because the added ESP sits near temperature-sensitive circuitry.
 
-The current configuration also supports a delayed sniffer initialization. During `sniffer_start_delay`, the custom component does not configure or read the five signal GPIOs. This is primarily a boot-isolation measure; Wi-Fi and BLE can initialize normally in parallel.
-
-## Software layout
-
-There are two related but distinct parts in this repository:
+## Repository layout
 
 ```text
-i2c-sniffer.yaml          ESPHome device project / firmware configuration
-bus_sniffer/              reusable ESPHome external component
+.
+├── i2c-sniffer.yaml              production build: BLE + history
+├── i2c-sniffer-debug.yaml        debug build: BLE + history + web capture
+├── i2c-sniffer-no-ble.yaml       genuine no-BLE build
+├── bus_sniffer/                  ESPHome external component
+│   ├── __init__.py               YAML schema + code generation
+│   ├── bus_sniffer.cpp/.h        orchestration, HA publishing, feature wiring
+│   ├── co2_decoder.cpp/.h        CO₂ GPIO capture + passive bus decoding
+│   ├── rtrh_decoder.cpp/.h       RT/RH ISR capture, quality, calibrated result
+│   ├── calibration.h             RT/RH calibration model and valid ranges
+│   ├── sensirion_sample.h        shared T/RH/CO₂ wire sample representation
+│   ├── sensirion_ble.cpp/.h      live BLE advertising and GAP/GATT handling
+│   ├── sensirion_history.cpp/.h  RAM/flash history and GATT download
+│   └── ble_options.h             compile-time BLE feature flags
+├── docs/
+│   ├── ISR_ARCHITECTURE.md       current ISR/concurrency design; read before edits
+│   └── history/                  dated/superseded engineering notes
+└── tools/                        reverse-engineering utilities; not firmware
 ```
 
-### The ESPHome project
+The architecture deliberately keeps timing-critical capture code out of `BusSniffer`. A completed RT/RH cycle is converted into a `rtrh_decoder::Measurement`; the orchestration layer then publishes diagnostics/HA values and updates BLE. Live BLE and history share `SensirionSample`, so the two paths cannot drift through duplicated encoding logic.
 
-`i2c-sniffer.yaml` describes one complete firmware image for the XIAO ESP32-C3. It contains the normal ESPHome configuration such as:
+## Build variants
 
-- board and ESP-IDF framework selection
-- Wi-Fi
-- native Home Assistant API
-- OTA updates
-- BLE controller/server configuration
-- flash partition for Sensirion-compatible history
-- the `bus_sniffer:` component instance and its user-facing options
-- the sensors and diagnostic entities that should be exposed
+### `i2c-sniffer.yaml` — production
 
-This is the file you normally copy, edit, compile, and flash for a specific device.
+This is the normal firmware:
 
-The project currently loads the component from the repository itself:
+- BLE enabled
+- live Sensirion-compatible advertising enabled
+- persistent BLE history enabled
+- `debug_capture: false`
+- `debug_metrics: false`
+- logger level `WARN`
+- HA publish interval 30 s
+- sniffer GPIO initialization delayed by 10 s
+
+The YAML includes the `senshist` data partition required by persistent history.
+
+### `i2c-sniffer-debug.yaml` — capture/debug
+
+This keeps the normal BLE/history features but additionally enables:
+
+- `web_server:`
+- `debug_capture: true`
+- `debug_metrics: true`
+- logger level `DEBUG`
+
+The debug build exposes the capture endpoints implemented by the decoders, including `/capture`, `/rt_rh_capture.csv`, and `/rt_rh_timing.csv`.
+
+Raw capture buffers and their HTTP handlers are compile-time gated and are absent from the normal production binary.
+
+### `i2c-sniffer-no-ble.yaml` — genuine no-BLE
+
+This build contains no `esp32_ble`, no BLE server, no Sensirion history partition, and compiles the component with:
 
 ```yaml
-external_components:
-  - source:
-      type: local
-      path: .
+ble: false
+ble_live: false
+ble_history: false
 ```
 
-ESPHome calls this mechanism an **External Component**. See the ESPHome documentation:  
-<https://esphome.io/components/external_components/>
+It retains the same 80 MHz, Wi-Fi, HA publish, and 10 s sniffer-start behavior as the production build so it is useful for BLE power/timing comparisons.
 
-### The `bus_sniffer` ESPHome component
+## ESPHome component configuration
 
-`bus_sniffer/` contains the reusable implementation. It is not a standalone firmware image.
-
-The directory contains both the ESPHome/Python integration layer and the C++ implementation:
-
-```text
-bus_sniffer/
-  __init__.py              YAML schema and ESPHome code generation
-  bus_sniffer.cpp/.h       thin ESPHome/HA/BLE orchestration layer
-  co2_decoder.cpp/.h       GPIO capture + passive CO₂/I²C decoding
-  rtrh_decoder.cpp/.h      RT/RH GPIO ISR, phase capture and raw snapshots
-  calibration.h            temperature/RH conversion coefficients and ranges
-  sensirion_ble.cpp/.h     Sensirion-compatible live BLE advertising
-  sensirion_history.cpp/.h RAM history, flash journal, and Sensirion GATT download
-  ble_options.h            compile-time BLE feature selection
-```
-
-This split is intentional. `BusSniffer` is now deliberately small: it starts the decoders, converts completed RT/RH snapshots into calibrated values, publishes ESPHome entities, and forwards valid measurements to BLE. The timing-critical GPIO/ISR code lives behind the two decoder APIs, so changes to Home Assistant or BLE no longer require editing the protocol decoders.
-
-A second example, `i2c-sniffer-no-ble.yaml`, demonstrates a genuine no-BLE build.
-
-## ESPHome configuration
-
-A reduced production-oriented configuration looks roughly like this:
+A minimal production-style component block is:
 
 ```yaml
-esp32:
-  board: seeed_xiao_esp32c3
-  cpu_frequency: 80MHz
-  framework:
-    type: esp-idf
-
-external_components:
-  - source:
-      type: local
-      path: .
-
 bus_sniffer:
   ble: true
   ble_live: true
   ble_history: true
+  ble_id: unni_ble
+  ble_server_id: unni_ble_server
 
   ble_advertising_interval: 2s
   ha_publish_interval: 30s
@@ -176,165 +161,114 @@ bus_sniffer:
     name: "RH Humidity"
 ```
 
-See `i2c-sniffer.yaml` for the complete configuration, including BLE server IDs, API encryption, OTA, Wi-Fi settings, history partitioning, and optional diagnostic sensors.
+Optional diagnostic outputs are configured independently:
 
-### Debug capture
+- `crc_errors`, `frame_errors`
+- `ref_period`, `rt_period`, `rh_state_period`
+- `rt_ratio`, `rh_ratio`, `rh_log`
+- `measurement_quality`
+- `thermal_transient`
+- `temperature_extrapolation`
+- `humidity_extrapolation`
+- `calibration_extrapolation`
 
-`debug_capture` is a compile-time option.
+`debug_metrics` controls detailed diagnostic logging. It does not need to be enabled merely to expose the diagnostic entities.
 
-```yaml
-bus_sniffer:
-  debug_capture: false
-```
+### Compile-time feature flags
 
-With `debug_capture: false`, the raw-capture archive, RT/RH debug buffers, CSV HTTP handlers, and related HTTP debug code are not compiled into the component. A `web_server:` block is therefore not required in the normal production build.
+The Python component translates YAML feature selection into C++ defines:
 
-When developing or reverse-engineering signals, enable it together with an ESPHome web server:
+- `UNNI_BLE_ENABLED`
+- `UNNI_BLE_LIVE_ENABLED`
+- `UNNI_BLE_HISTORY_ENABLED`
+- `RTRH_DEBUG_CAPTURE`
 
-```yaml
-web_server:
-  port: 80
+This is why the no-BLE and no-debug builds actually exclude the respective implementation rather than merely disabling it at runtime.
 
-bus_sniffer:
-  debug_capture: true
-```
+## Home Assistant behavior
 
-## Home Assistant
+The ESPHome native API is the normal network interface. The primary entities are CO₂, RT-derived temperature, and RH-derived humidity.
 
-The normal network interface is the **ESPHome native API**. Home Assistant can discover or add the device through its ESPHome integration and expose the configured sensor entities directly. Home Assistant documents the integration here:  
-<https://www.home-assistant.io/integrations/esphome/>
+`ha_publish_interval` throttles regular Home Assistant updates; the supplied configurations use 30 seconds. Internally the decoders and BLE path can still process new measurements more frequently. Initial valid values are published promptly rather than waiting for the first 30-second interval.
 
-The primary entities are:
+## CO₂ decoder
 
-- CO₂ concentration in ppm
-- RT-derived temperature
-- RH-derived relative humidity
+The CO₂ decoder passively observes SCL/SDA edges and reconstructs traffic without driving the original bus. Completed capture windows are decoded in normal task context rather than in the GPIO ISR. CRC and frame errors can be exposed as ESPHome diagnostic counters.
 
-Optional diagnostic entities include:
+The CO₂ decoder lives entirely in `bus_sniffer/co2_decoder.*`.
 
-- reference period
-- RT period and RT/reference ratio
-- RH state period and RH/reference ratio
-- logarithmic RH ratio
-- measurement quality
-- thermal-transient state
-- temperature/RH/calibration extrapolation flags
-- CO₂ CRC and frame error counters
+## RT/RH decoder
 
-`ha_publish_interval` controls how often decoded values are published to Home Assistant. The production configuration uses 30 seconds because Home Assistant generally does not need every raw measurement cycle.
+The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10/G11/G13 and derives normalized RT/reference and RH/reference values.
 
-The BLE path is independent of Home Assistant. Wi-Fi/API and BLE can therefore be used at the same time.
+The RT/RH decoder owns:
 
-## Sensirion-compatible Bluetooth support
+- the edge ISR and phase state
+- capture accumulators and snapshot handoff
+- period/statistical extraction
+- measurement validity/quality
+- calibrated temperature and RH result
+- calibration extrapolation flags
 
-The firmware implements its BLE support using ESPHome's ESP-IDF Bluetooth stack. It does **not** embed NimBLE-Arduino or the Sensirion Arduino library at runtime.
+Calibration coefficients and covered ranges live in `bus_sniffer/calibration.h`.
 
-The over-the-air format was developed against Sensirion's public Gadget BLE examples and protocol behavior. The current live advertisement uses the Sensirion company identifier and the `T_RH_CO2_ALT`/MyCO2-style sample layout for temperature, relative humidity, and CO₂.
+**Before modifying the GPIO ISR, phase boundaries, capture buffers, or snapshot handoff, read [`docs/ISR_ARCHITECTURE.md`](docs/ISR_ARCHITECTURE.md).** It documents the concurrency assumptions and the code that is timing-critical.
 
-Useful Sensirion references:
+## Sensirion-compatible BLE
 
-- Sensirion Gadget BLE library: <https://github.com/Sensirion/arduino-ble-gadget>
-- Sensirion demonstrators and MyAmbience: <https://sensirion.com/products/demonstrators-and-apps>
-- Sensirion SCD4x BLE Gadget resources: <https://sensirion.com/resource/software/ble-gadget/scd4x>
+The production firmware uses ESPHome's ESP-IDF BLE stack. It does **not** use NimBLE-Arduino or the Sensirion Arduino library at runtime.
 
-### Live advertisements
+The live path emits Sensirion-compatible manufacturer data using the `T_RH_CO2_ALT`-style layout for temperature, RH, and CO₂. The implementation intentionally keeps advertising slow compared with ESPHome defaults to reduce radio activity.
 
-Live temperature, humidity, and CO₂ values are encoded into Sensirion-compatible legacy BLE manufacturer data. Advertising is deliberately slower than ESPHome's normal connectable advertising in order to reduce RF duty cycle and power consumption.
+BLE connection/GATT handling is coordinated with ESPHome so a MyAmbience history connection can temporarily own the connection state and normal advertising resumes after disconnect.
 
-The default in this project is:
+## History
 
-```yaml
-ble_advertising_interval: 2s
-```
+With `ble_history: true`, the firmware maintains a Sensirion-style history ring and exposes it through GATT.
 
-### GATT history
+Current implementation characteristics include:
 
-The component also implements a Sensirion-style GATT history service. Samples are retained in RAM and persisted in a dedicated flash partition. MyAmbience can connect to the gadget and download the history.
+- 4096-sample RAM history
+- persistent flash journal in the `senshist` partition
+- metadata recovery after reboot
+- MyAmbience-compatible subscription/download behavior
+- shared 8-byte sample encoding with live BLE
 
-Advertising refreshes are paused while a GATT client is connected. This avoids a race between advertisement reconfiguration and the active history connection, which otherwise could leave MyAmbience stuck at "connecting to gadget" or interrupt downloads.
+Changing the history interval clears/reinitializes stored history as required by the current implementation.
 
-### Sensirion MyAmbience
+## Building
 
-[Sensirion MyAmbience](https://sensirion.com/products/demonstrators-and-apps) is the primary compatibility target for the BLE implementation. Sensirion describes MyAmbience as its app for viewing Bluetooth-enabled demonstrators and downloading historical data from devices that support it.
-
-Current official downloads are linked from Sensirion's page above for both iOS and Android.
-
-### "CO2 sensor" app
-
-The open-source **CO2 sensor** app by Simon Loffler is another useful BLE client for Sensirion-style CO₂ gadgets. It is available for iPhone, iPad, and macOS and is designed to read CO₂, temperature, and humidity from Bluetooth Sensirion SCD41-style devices.
-
-- App Store: <https://apps.apple.com/app/co2-sensor/id1643286074>
-- Source code: <https://github.com/sighmon/ios-ble-co2-sensor>
-
-Application behavior may differ because this project emulates the relevant BLE behavior rather than containing a genuine Sensirion SCD41.
-
-## Temperature and humidity decoding
-
-The Unni unit does not expose temperature and humidity as a straightforward digital register on the sniffed lines. The firmware measures timing relationships between the observed RT/RH signals and derives normalized ratios.
-
-Temperature is derived from the RT/reference timing ratio. Relative humidity uses a temperature-compensated logarithmic model based on the RH/reference ratio.
-
-The current coefficients are stored in `bus_sniffer/calibration.h`.
-
-Calibration has been derived experimentally from captured measurements. Recent testing with an independent BME280 placed next to the Unni showed the decoded ESP temperature and humidity to be much closer to the local reference than the Unni display during the Unni's post-boot warm-up period. The Unni display itself therefore should not automatically be treated as ground truth, especially shortly after power-up.
-
-Diagnostic extrapolation flags indicate when a measurement lies outside the range covered by the calibration data.
-
-## CO₂ decoding
-
-The CO₂ path passively observes the existing clock/data traffic between the Unni electronics and its CO₂ sensor circuitry. Frames are reconstructed from edges, validated, and decoded without driving the original bus.
-
-CRC and frame-error counters are available as optional ESPHome diagnostic sensors.
-
-## Building and flashing
-
-Install ESPHome using your preferred supported method, create a `secrets.yaml` containing the secrets referenced by `i2c-sniffer.yaml`, and build from the repository directory.
-
-For example:
+Create a `secrets.yaml` containing the keys referenced by the chosen YAML, then run for example:
 
 ```bash
 esphome compile i2c-sniffer.yaml
 esphome run i2c-sniffer.yaml
 ```
 
-After the first installation, OTA updates can be used normally.
+For the other variants:
 
-For ESPHome documentation, see:  
-<https://esphome.io/>
+```bash
+esphome compile i2c-sniffer-debug.yaml
+esphome compile i2c-sniffer-no-ble.yaml
+```
 
-## Development notes
+## Development documentation
 
-The interrupt-driven decoder is documented separately in
-[ISR_ARCHITECTURE.md](ISR_ARCHITECTURE.md). Read that document before changing
-GPIO interrupt handlers, timing thresholds, capture buffers, or the RT/RH
-phase state machine.
+Current documentation:
 
-The repository includes several dated calibration and development notes documenting the reverse-engineering process, BLE experiments, measurement-quality work, power-saving changes, and history-download fixes. They are useful when changing the low-level decoder, but are not required for a normal production build.
+- [`docs/ISR_ARCHITECTURE.md`](docs/ISR_ARCHITECTURE.md) — ISR, concurrency, capture handoff, timing-sensitive rules
+- [`tools/README.md`](tools/README.md) — reverse-engineering utilities
 
-If you change the hardware revision, pin assignment, calibration, or RT/RH sensor circuitry, verify the raw ratios and diagnostic quality metrics before trusting the converted values.
+The files under [`docs/history/`](docs/history/) are intentionally retained as **historical engineering notes**. They record calibration iterations, BLE experiments, power-saving tests, and previous refactors, but may refer to superseded code or configuration. They are not the source of truth for the current architecture.
 
-## Safety and warranty
+For current behavior, prefer this README, `docs/ISR_ARCHITECTURE.md`, and the source itself.
 
-This modification requires opening the device and soldering to its electronics. It can damage the monitor, the ESP, or the attached computer/power supply if wired incorrectly. Verify voltage levels and pin assignments on your own hardware before connecting the XIAO.
+## Safety
 
-This project is not affiliated with or endorsed by the manufacturer of the Unni monitor or by Sensirion. Sensirion names and protocol references are used only to describe compatibility with their published gadget ecosystem.
+Opening the monitor and soldering to its electronics can damage the Unni, the ESP, or connected equipment if wired incorrectly. Verify signal levels, pin assignments, polarity, and the power supply on the actual hardware before connecting the XIAO.
+
+The project is not affiliated with or endorsed by the manufacturer of the Unni monitor or by Sensirion. Sensirion names and protocol references describe compatibility with their published gadget ecosystem.
 
 ## License
 
 This project is licensed under **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)**. See [LICENSE](LICENSE).
-
-Third-party libraries, tools, applications, trademarks, and documentation remain subject to their respective licenses and owners.
-
-
-## Current code structure
-
-- `bus_sniffer.cpp`: orchestration, Home Assistant publishing and feature wiring
-- `co2_decoder.*`: passive CO2 bus capture/decoder
-- `rtrh_decoder.*`: RT/RH edge capture, calibration result and quality
-- `sensirion_sample.h`: shared T/RH/CO2 sample and Sensirion wire encoding
-- `sensirion_ble.*`: MyAmbience live advertisement and GAP/GATT connection handling
-- `sensirion_history.*`: grouped RAM/flash/GATT/download state for persistent Sensirion history
-
-The live BLE and history paths deliberately share the same encoded sample so the
-advertised value and the value stored in history cannot drift due to duplicated
-encoding logic.
