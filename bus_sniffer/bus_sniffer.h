@@ -2,13 +2,13 @@
 #pragma once
 
 #include "ble_options.h"
-#include "esphome/core/component.h"
-#include "esphome/components/sensor/sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
+#include "esphome/components/sensor/sensor.h"
+#include "esphome/core/component.h"
 #if UNNI_BLE_ENABLED
-#include <esp_gatts_api.h>
-#include <esp_gap_ble_api.h>
 #include "esphome/components/esp32_ble_server/ble_server.h"
+#include <esp_gap_ble_api.h>
+#include <esp_gatts_api.h>
 #endif
 
 namespace esphome {
@@ -18,87 +18,89 @@ class BusSniffer : public Component {
  public:
   void setup() override;
   void loop() override;
+
 #if UNNI_BLE_ENABLED
   void configure_gatt_server(esp32_ble_server::BLEServer *server);
-
   void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
-
-  void gatts_event_handler(esp_gatts_cb_event_t event,
-                           esp_gatt_if_t gatts_if,
+  void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                            esp_ble_gatts_cb_param_t *param);
-
   void set_ble_advertising_interval(uint32_t interval_ms);
 #endif
-  void set_ha_publish_interval(uint32_t interval_ms) { this->ha_publish_interval_ms_ = interval_ms; }
-  void set_sniffer_start_delay(uint32_t delay_ms) { this->sniffer_start_delay_ms_ = delay_ms; }
 
-  void set_co2_sensor(sensor::Sensor *sensor) {
-    this->co2_sensor_ = sensor;
-  }
+  void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
+  void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
+  void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
+  void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
+  void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
-  void set_crc_errors_sensor(sensor::Sensor *sensor) {
-    this->crc_errors_sensor_ = sensor;
-  }
-
-  void set_frame_errors_sensor(sensor::Sensor *sensor) {
-    this->frame_errors_sensor_ = sensor;
-  }
-
-  void set_rt_temperature_sensor(sensor::Sensor *sensor) {
-    this->rt_temperature_sensor_ = sensor;
-  }
-
-  void set_rh_humidity_sensor(sensor::Sensor *sensor) {
-    this->rh_humidity_sensor_ = sensor;
-  }
-
-  void set_debug_metrics(bool enabled) { this->debug_metrics_ = enabled; }
-  void set_thermal_transient_on_rate(float value) {
-    this->thermal_transient_on_rate_c_per_min_ = value;
-  }
-  void set_thermal_transient_off_rate(float value) {
-    this->thermal_transient_off_rate_c_per_min_ = value;
-  }
-
-  void set_ref_period_sensor(sensor::Sensor *sensor) { this->ref_period_sensor_ = sensor; }
-  void set_rt_period_sensor(sensor::Sensor *sensor) { this->rt_period_sensor_ = sensor; }
-  void set_rh_state_period_sensor(sensor::Sensor *sensor) { this->rh_state_period_sensor_ = sensor; }
-  void set_rt_ratio_sensor(sensor::Sensor *sensor) { this->rt_ratio_sensor_ = sensor; }
-  void set_rh_ratio_sensor(sensor::Sensor *sensor) { this->rh_ratio_sensor_ = sensor; }
-  void set_rh_log_sensor(sensor::Sensor *sensor) { this->rh_log_sensor_ = sensor; }
-  void set_measurement_quality_sensor(sensor::Sensor *sensor) { this->measurement_quality_sensor_ = sensor; }
-
-  void set_thermal_transient_sensor(binary_sensor::BinarySensor *sensor) {
-    this->thermal_transient_sensor_ = sensor;
-  }
-  void set_temperature_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
-    this->temperature_extrapolation_sensor_ = sensor;
-  }
-  void set_humidity_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
-    this->humidity_extrapolation_sensor_ = sensor;
-  }
-  void set_calibration_extrapolation_sensor(binary_sensor::BinarySensor *sensor) {
-    this->calibration_extrapolation_sensor_ = sensor;
-  }
+  // ESPHome codegen setters. Keeping these explicit preserves the existing YAML
+  // API while all runtime state is grouped below by responsibility.
+  void set_co2_sensor(sensor::Sensor *s) { this->out_.co2 = s; }
+  void set_crc_errors_sensor(sensor::Sensor *s) { this->out_.crc_errors = s; }
+  void set_frame_errors_sensor(sensor::Sensor *s) { this->out_.frame_errors = s; }
+  void set_rt_temperature_sensor(sensor::Sensor *s) { this->out_.temperature = s; }
+  void set_rh_humidity_sensor(sensor::Sensor *s) { this->out_.humidity = s; }
+  void set_ref_period_sensor(sensor::Sensor *s) { this->out_.ref_period = s; }
+  void set_rt_period_sensor(sensor::Sensor *s) { this->out_.rt_period = s; }
+  void set_rh_state_period_sensor(sensor::Sensor *s) { this->out_.rh_state_period = s; }
+  void set_rt_ratio_sensor(sensor::Sensor *s) { this->out_.rt_ratio = s; }
+  void set_rh_ratio_sensor(sensor::Sensor *s) { this->out_.rh_ratio = s; }
+  void set_rh_log_sensor(sensor::Sensor *s) { this->out_.rh_log = s; }
+  void set_measurement_quality_sensor(sensor::Sensor *s) { this->out_.quality = s; }
+  void set_thermal_transient_sensor(binary_sensor::BinarySensor *s) { this->out_.thermal_transient = s; }
+  void set_temperature_extrapolation_sensor(binary_sensor::BinarySensor *s) { this->out_.temperature_extrapolation = s; }
+  void set_humidity_extrapolation_sensor(binary_sensor::BinarySensor *s) { this->out_.humidity_extrapolation = s; }
+  void set_calibration_extrapolation_sensor(binary_sensor::BinarySensor *s) { this->out_.calibration_extrapolation = s; }
 
  protected:
-  sensor::Sensor *co2_sensor_{nullptr};
-  sensor::Sensor *crc_errors_sensor_{nullptr};
-  sensor::Sensor *frame_errors_sensor_{nullptr};
-  sensor::Sensor *rt_temperature_sensor_{nullptr};
-  sensor::Sensor *rh_humidity_sensor_{nullptr};
+  struct Outputs {
+    sensor::Sensor *co2{nullptr};
+    sensor::Sensor *crc_errors{nullptr};
+    sensor::Sensor *frame_errors{nullptr};
+    sensor::Sensor *temperature{nullptr};
+    sensor::Sensor *humidity{nullptr};
+    sensor::Sensor *ref_period{nullptr};
+    sensor::Sensor *rt_period{nullptr};
+    sensor::Sensor *rh_state_period{nullptr};
+    sensor::Sensor *rt_ratio{nullptr};
+    sensor::Sensor *rh_ratio{nullptr};
+    sensor::Sensor *rh_log{nullptr};
+    sensor::Sensor *quality{nullptr};
+    binary_sensor::BinarySensor *thermal_transient{nullptr};
+    binary_sensor::BinarySensor *temperature_extrapolation{nullptr};
+    binary_sensor::BinarySensor *humidity_extrapolation{nullptr};
+    binary_sensor::BinarySensor *calibration_extrapolation{nullptr};
+  } out_;
 
-  sensor::Sensor *ref_period_sensor_{nullptr};
-  sensor::Sensor *rt_period_sensor_{nullptr};
-  sensor::Sensor *rh_state_period_sensor_{nullptr};
-  sensor::Sensor *rt_ratio_sensor_{nullptr};
-  sensor::Sensor *rh_ratio_sensor_{nullptr};
-  sensor::Sensor *rh_log_sensor_{nullptr};
-  sensor::Sensor *measurement_quality_sensor_{nullptr};
-  binary_sensor::BinarySensor *thermal_transient_sensor_{nullptr};
-  binary_sensor::BinarySensor *temperature_extrapolation_sensor_{nullptr};
-  binary_sensor::BinarySensor *humidity_extrapolation_sensor_{nullptr};
-  binary_sensor::BinarySensor *calibration_extrapolation_sensor_{nullptr};
+  struct HaState {
+    uint32_t interval_ms{30000};
+    uint32_t last_publish_ms{0};
+    bool have_co2{false};
+    bool have_temperature{false};
+    bool have_humidity{false};
+    bool initial_co2_published{false};
+    bool initial_temperature_published{false};
+    bool initial_humidity_published{false};
+    float co2{0.0f};
+    float temperature{0.0f};
+    float humidity{0.0f};
+  } ha_;
+
+  struct ThermalState {
+    float on_rate{0.8f};
+    float off_rate{0.3f};
+    bool active{false};
+    bool have_previous{false};
+    float previous_temperature{0.0f};
+    uint32_t previous_ms{0};
+  } thermal_;
+
+  struct Co2State {
+    bool have_last_ppm{false};
+    uint16_t last_ppm{0};
+    uint32_t crc_errors{0};
+    uint32_t frame_errors{0};
+  } co2_;
 
   void maybe_publish_ha_();
   void process_rtrh_();
@@ -106,35 +108,10 @@ class BusSniffer : public Component {
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
 
-  uint32_t sniffer_start_delay_ms_{0};
-  uint32_t sniffer_boot_ms_{0};
-  bool sniffer_io_initialized_{false};
-
-  uint32_t ha_publish_interval_ms_{30000};
-  uint32_t last_ha_publish_ms_{0};
-  bool ha_have_co2_{false};
-  bool ha_have_temperature_{false};
-  bool ha_have_humidity_{false};
-  bool ha_initial_co2_published_{false};
-  bool ha_initial_temperature_published_{false};
-  bool ha_initial_humidity_published_{false};
-  float ha_co2_{0.0f};
-  float ha_temperature_{0.0f};
-  float ha_humidity_{0.0f};
-
+  uint32_t start_delay_ms_{0};
+  uint32_t boot_ms_{0};
+  bool io_initialized_{false};
   bool debug_metrics_{false};
-  float thermal_transient_on_rate_c_per_min_{0.8f};
-  float thermal_transient_off_rate_c_per_min_{0.3f};
-  bool thermal_transient_active_{false};
-  bool have_last_valid_temperature_{false};
-  float last_valid_temperature_c_{0.0f};
-  uint32_t last_valid_temperature_ms_{0};
-
-  bool have_last_ppm_{false};
-  uint16_t last_ppm_{0};
-
-  uint32_t crc_errors_{0};
-  uint32_t frame_errors_{0};
 };
 
 }  // namespace bus_sniffer

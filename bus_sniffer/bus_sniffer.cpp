@@ -73,7 +73,7 @@ void BusSniffer::gatts_event_handler(esp_gatts_cb_event_t event,
 #endif
 
 bool BusSniffer::initialize_sniffer_io_() {
-  if (this->sniffer_io_initialized_) return true;
+  if (this->io_initialized_) return true;
 
   // Both decoder modules use the same ESP-IDF GPIO ISR service.
   const esp_err_t err = gpio_install_isr_service(0);
@@ -91,9 +91,9 @@ bool BusSniffer::initialize_sniffer_io_() {
     return false;
   }
 
-  this->sniffer_io_initialized_ = true;
+  this->io_initialized_ = true;
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
-           static_cast<unsigned long>(millis() - this->sniffer_boot_ms_));
+           static_cast<unsigned long>(millis() - this->boot_ms_));
   return true;
 }
 
@@ -105,12 +105,12 @@ void BusSniffer::setup() {
   sensirion_history_setup();
 #endif
 
-  this->sniffer_boot_ms_ = millis();
-  if (this->sniffer_start_delay_ms_ == 0) {
+  this->boot_ms_ = millis();
+  if (this->start_delay_ms_ == 0) {
     this->initialize_sniffer_io_();
   } else {
     ESP_LOGI(TAG, "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
-             static_cast<unsigned long>(this->sniffer_start_delay_ms_));
+             static_cast<unsigned long>(this->start_delay_ms_));
   }
 
 #if RTRH_DEBUG_CAPTURE
@@ -121,58 +121,58 @@ void BusSniffer::setup() {
   ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
 #endif
 
-  publish(this->crc_errors_sensor_, 0.0f);
-  publish(this->frame_errors_sensor_, 0.0f);
+  publish(this->out_.crc_errors, 0.0f);
+  publish(this->out_.frame_errors, 0.0f);
   ESP_LOGI(TAG, "Passive CO2 + RT/RH sniffer ready");
 }
 
 void BusSniffer::maybe_publish_ha_() {
   const uint32_t now = millis();
-  if (this->last_ha_publish_ms_ &&
-      static_cast<uint32_t>(now - this->last_ha_publish_ms_) < this->ha_publish_interval_ms_)
+  if (this->ha_.last_publish_ms &&
+      static_cast<uint32_t>(now - this->ha_.last_publish_ms) < this->ha_.interval_ms)
     return;
 
   bool published = false;
-  if (this->ha_have_co2_ && this->co2_sensor_ && this->ha_initial_co2_published_) {
-    this->co2_sensor_->publish_state(this->ha_co2_);
+  if (this->ha_.have_co2 && this->out_.co2 && this->ha_.initial_co2_published) {
+    this->out_.co2->publish_state(this->ha_.co2);
     published = true;
   }
-  if (this->ha_have_temperature_ && this->rt_temperature_sensor_ &&
-      this->ha_initial_temperature_published_) {
-    this->rt_temperature_sensor_->publish_state(this->ha_temperature_);
+  if (this->ha_.have_temperature && this->out_.temperature &&
+      this->ha_.initial_temperature_published) {
+    this->out_.temperature->publish_state(this->ha_.temperature);
     published = true;
   }
-  if (this->ha_have_humidity_ && this->rh_humidity_sensor_ &&
-      this->ha_initial_humidity_published_) {
-    this->rh_humidity_sensor_->publish_state(this->ha_humidity_);
+  if (this->ha_.have_humidity && this->out_.humidity &&
+      this->ha_.initial_humidity_published) {
+    this->out_.humidity->publish_state(this->ha_.humidity);
     published = true;
   }
-  if (published) this->last_ha_publish_ms_ = now;
+  if (published) this->ha_.last_publish_ms = now;
 }
 
 float BusSniffer::update_thermal_transient_(float temperature_c) {
   const uint32_t now_ms = millis();
   float rate_c_per_min = 0.0f;
 
-  if (this->have_last_valid_temperature_) {
-    const uint32_t dt_ms = now_ms - this->last_valid_temperature_ms_;
+  if (this->thermal_.have_previous) {
+    const uint32_t dt_ms = now_ms - this->thermal_.previous_ms;
     if (dt_ms) {
-      rate_c_per_min = std::fabs(temperature_c - this->last_valid_temperature_c_) *
+      rate_c_per_min = std::fabs(temperature_c - this->thermal_.previous_temperature) *
                        60000.0f / static_cast<float>(dt_ms);
     }
   }
 
-  if (!this->thermal_transient_active_) {
-    if (this->have_last_valid_temperature_ &&
-        rate_c_per_min >= this->thermal_transient_on_rate_c_per_min_)
-      this->thermal_transient_active_ = true;
-  } else if (rate_c_per_min <= this->thermal_transient_off_rate_c_per_min_) {
-    this->thermal_transient_active_ = false;
+  if (!this->thermal_.active) {
+    if (this->thermal_.have_previous &&
+        rate_c_per_min >= this->thermal_.on_rate)
+      this->thermal_.active = true;
+  } else if (rate_c_per_min <= this->thermal_.off_rate) {
+    this->thermal_.active = false;
   }
 
-  this->last_valid_temperature_c_ = temperature_c;
-  this->last_valid_temperature_ms_ = now_ms;
-  this->have_last_valid_temperature_ = true;
+  this->thermal_.previous_temperature = temperature_c;
+  this->thermal_.previous_ms = now_ms;
+  this->thermal_.have_previous = true;
   return rate_c_per_min;
 }
 
@@ -192,15 +192,15 @@ void BusSniffer::process_rtrh_() {
            m.valid ? "VALID" : "REJECT");
 
   if (!m.valid) {
-    publish(this->measurement_quality_sensor_, m.quality_percent);
-    publish(this->ref_period_sensor_, m.ref_period_us);
-    publish_positive(this->rt_period_sensor_, m.rt_period_us);
-    publish_positive(this->rh_state_period_sensor_, m.rh_state_us);
-    publish_finite(this->rt_ratio_sensor_, m.rt_ratio);
-    publish_finite(this->rh_ratio_sensor_, m.rh_ratio);
-    publish(this->temperature_extrapolation_sensor_, true);
-    publish(this->humidity_extrapolation_sensor_, true);
-    publish(this->calibration_extrapolation_sensor_, true);
+    publish(this->out_.quality, m.quality_percent);
+    publish(this->out_.ref_period, m.ref_period_us);
+    publish_positive(this->out_.rt_period, m.rt_period_us);
+    publish_positive(this->out_.rh_state_period, m.rh_state_us);
+    publish_finite(this->out_.rt_ratio, m.rt_ratio);
+    publish_finite(this->out_.rh_ratio, m.rh_ratio);
+    publish(this->out_.temperature_extrapolation, true);
+    publish(this->out_.humidity_extrapolation, true);
+    publish(this->out_.calibration_extrapolation, true);
 
     ESP_LOGW(TAG, "RT/RH measurement %lu values not published: REJECT=%s (quality %.0f%%)",
              static_cast<unsigned long>(m.sequence),
@@ -210,7 +210,7 @@ void BusSniffer::process_rtrh_() {
   }
 
   const float temperature_rate = this->update_thermal_transient_(m.temperature_c);
-  m.thermal_transient = this->thermal_transient_active_;
+  m.thermal_transient = this->thermal_.active;
 
   ESP_LOGI(TAG, "RT/RH measurement %lu RT: %.3f / REF %.3f us = %.6f -> %.2f C",
            static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
@@ -229,17 +229,17 @@ void BusSniffer::process_rtrh_() {
              m.humidity_extrapolation ? "YES" : "no");
   }
 
-  publish(this->ref_period_sensor_, m.ref_period_us);
-  publish(this->rt_period_sensor_, m.rt_period_us);
-  publish(this->rh_state_period_sensor_, m.rh_state_us);
-  publish(this->rt_ratio_sensor_, m.rt_ratio);
-  publish(this->rh_ratio_sensor_, m.rh_ratio);
-  publish(this->rh_log_sensor_, m.rh_log);
-  publish(this->measurement_quality_sensor_, m.quality_percent);
-  publish(this->thermal_transient_sensor_, m.thermal_transient);
-  publish(this->temperature_extrapolation_sensor_, m.temperature_extrapolation);
-  publish(this->humidity_extrapolation_sensor_, m.humidity_extrapolation);
-  publish(this->calibration_extrapolation_sensor_, m.calibration_extrapolation);
+  publish(this->out_.ref_period, m.ref_period_us);
+  publish(this->out_.rt_period, m.rt_period_us);
+  publish(this->out_.rh_state_period, m.rh_state_us);
+  publish(this->out_.rt_ratio, m.rt_ratio);
+  publish(this->out_.rh_ratio, m.rh_ratio);
+  publish(this->out_.rh_log, m.rh_log);
+  publish(this->out_.quality, m.quality_percent);
+  publish(this->out_.thermal_transient, m.thermal_transient);
+  publish(this->out_.temperature_extrapolation, m.temperature_extrapolation);
+  publish(this->out_.humidity_extrapolation, m.humidity_extrapolation);
+  publish(this->out_.calibration_extrapolation, m.calibration_extrapolation);
 
 #if UNNI_BLE_ENABLED
   sensirion_ble_set_temperature_humidity(m.temperature_c, m.humidity_percent);
@@ -248,20 +248,20 @@ void BusSniffer::process_rtrh_() {
 #endif
 #endif
 
-  this->ha_temperature_ = m.temperature_c;
-  this->ha_humidity_ = m.humidity_percent;
-  this->ha_have_temperature_ = true;
-  this->ha_have_humidity_ = true;
+  this->ha_.temperature = m.temperature_c;
+  this->ha_.humidity = m.humidity_percent;
+  this->ha_.have_temperature = true;
+  this->ha_.have_humidity = true;
 
-  if (!this->ha_initial_temperature_published_ && this->rt_temperature_sensor_) {
-    this->rt_temperature_sensor_->publish_state(m.temperature_c);
-    this->ha_initial_temperature_published_ = true;
-    this->last_ha_publish_ms_ = millis();
+  if (!this->ha_.initial_temperature_published && this->out_.temperature) {
+    this->out_.temperature->publish_state(m.temperature_c);
+    this->ha_.initial_temperature_published = true;
+    this->ha_.last_publish_ms = millis();
   }
-  if (!this->ha_initial_humidity_published_ && this->rh_humidity_sensor_) {
-    this->rh_humidity_sensor_->publish_state(m.humidity_percent);
-    this->ha_initial_humidity_published_ = true;
-    this->last_ha_publish_ms_ = millis();
+  if (!this->ha_.initial_humidity_published && this->out_.humidity) {
+    this->out_.humidity->publish_state(m.humidity_percent);
+    this->ha_.initial_humidity_published = true;
+    this->ha_.last_publish_ms = millis();
   }
 
   rtrh_decoder::update_latest(m);
@@ -272,12 +272,12 @@ void BusSniffer::process_co2_() {
   if (!co2_decoder::poll(result)) return;
 
   if (result.crc_errors) {
-    this->crc_errors_ += result.crc_errors;
-    publish(this->crc_errors_sensor_, static_cast<float>(this->crc_errors_));
+    this->co2_.crc_errors += result.crc_errors;
+    publish(this->out_.crc_errors, static_cast<float>(this->co2_.crc_errors));
   }
   if (result.frame_errors) {
-    this->frame_errors_ += result.frame_errors;
-    publish(this->frame_errors_sensor_, static_cast<float>(this->frame_errors_));
+    this->co2_.frame_errors += result.frame_errors;
+    publish(this->out_.frame_errors, static_cast<float>(this->co2_.frame_errors));
   }
   if (!result.have_co2) return;
 
@@ -286,28 +286,28 @@ void BusSniffer::process_co2_() {
   sensirion_ble_set_co2(ppm);
 #endif
 
-  this->ha_co2_ = static_cast<float>(ppm);
-  this->ha_have_co2_ = true;
+  this->ha_.co2 = static_cast<float>(ppm);
+  this->ha_.have_co2 = true;
 
-  if (this->have_last_ppm_ && ppm == this->last_ppm_) {
+  if (this->co2_.have_last_ppm && ppm == this->co2_.last_ppm) {
     ESP_LOGV(TAG, "CO2 unchanged: %u ppm", ppm);
     return;
   }
 
-  this->have_last_ppm_ = true;
-  this->last_ppm_ = ppm;
+  this->co2_.have_last_ppm = true;
+  this->co2_.last_ppm = ppm;
   ESP_LOGI(TAG, "CO2: %u ppm", ppm);
 
-  if (!this->ha_initial_co2_published_ && this->co2_sensor_) {
-    this->co2_sensor_->publish_state(this->ha_co2_);
-    this->ha_initial_co2_published_ = true;
-    this->last_ha_publish_ms_ = millis();
+  if (!this->ha_.initial_co2_published && this->out_.co2) {
+    this->out_.co2->publish_state(this->ha_.co2);
+    this->ha_.initial_co2_published = true;
+    this->ha_.last_publish_ms = millis();
   }
 }
 
 void BusSniffer::loop() {
-  if (!this->sniffer_io_initialized_ &&
-      static_cast<uint32_t>(millis() - this->sniffer_boot_ms_) >= this->sniffer_start_delay_ms_)
+  if (!this->io_initialized_ &&
+      static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();
 
 #if UNNI_BLE_HISTORY_ENABLED
@@ -315,7 +315,7 @@ void BusSniffer::loop() {
 #endif
   this->maybe_publish_ha_();
 
-  if (!this->sniffer_io_initialized_) return;
+  if (!this->io_initialized_) return;
   this->process_rtrh_();
   this->process_co2_();
 }
