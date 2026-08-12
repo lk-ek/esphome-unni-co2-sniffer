@@ -220,9 +220,11 @@ void BusSniffer::loop() {
       if (this->humidity_extrapolation_sensor_) this->humidity_extrapolation_sensor_->publish_state(m.humidity_extrapolation);
       if (this->calibration_extrapolation_sensor_) this->calibration_extrapolation_sensor_->publish_state(m.calibration_extrapolation);
 
-#if UNNI_BLE_LIVE_ENABLED
+#if UNNI_BLE_ENABLED
       sensirion_ble_set_temperature_humidity(m.temperature_c, m.humidity_percent);
+#if UNNI_BLE_LIVE_ENABLED
       sensirion_ble_commit_live_advertisement();
+#endif
 #endif
 
       this->ha_temperature_ = m.temperature_c;
@@ -256,7 +258,7 @@ void BusSniffer::loop() {
     }
     if (co2.have_co2) {
       const uint16_t ppm = co2.co2_ppm;
-#if UNNI_BLE_LIVE_ENABLED
+#if UNNI_BLE_ENABLED
       sensirion_ble_set_co2(ppm);
 #endif
       this->ha_co2_ = static_cast<float>(ppm);

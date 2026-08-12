@@ -460,22 +460,16 @@ static void sens_history_flash_init()
 
 static SensHistorySample sens_history_current_sample()
 {
-  SensHistorySample s{};
-  const uint16_t rt = sensirion_ble_encode_temperature(sensirion_ble_temperature());
-  const uint16_t rh = sensirion_ble_encode_humidity(sensirion_ble_humidity());
-  sens_history_put_u16_le(&s.data[0], rt);
-  sens_history_put_u16_le(&s.data[2], rh);
-  sens_history_put_u16_le(&s.data[4], sensirion_ble_co2());
-  s.data[6] = 0;
-  s.data[7] = 0;
-  return s;
+  SensHistorySample out{};
+  const auto encoded = sensirion_ble_sample().encoded();
+  std::copy(encoded.begin(), encoded.end(), out.data);
+  return out;
 }
 
 static void sens_history_commit_sample()
 {
-  if (!sensirion_ble_has_temperature() ||
-      !sensirion_ble_has_humidity() ||
-      !sensirion_ble_has_co2())
+  const auto &sample = sensirion_ble_sample();
+  if (!sample.complete())
     return;
 
   sens_history[sens_history_head] = sens_history_current_sample();
@@ -494,9 +488,9 @@ static void sens_history_commit_sample()
            "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
            static_cast<unsigned>(sens_history_count),
            static_cast<unsigned>(SENS_HISTORY_CAPACITY),
-           sensirion_ble_temperature(),
-           sensirion_ble_humidity(),
-           static_cast<unsigned>(sensirion_ble_co2()));
+           sample.temperature_c,
+           sample.humidity_percent,
+           static_cast<unsigned>(sample.co2_ppm));
 }
 
 static void sens_history_sampling_tick()
@@ -504,8 +498,7 @@ static void sens_history_sampling_tick()
   const uint32_t now = sens_history_now_ms();
 
   if (!sens_history_sample_clock_started) {
-    if (sensirion_ble_has_temperature() && sensirion_ble_has_humidity() &&
-        sensirion_ble_has_co2()) {
+    if (sensirion_ble_sample().complete()) {
       sens_history_sample_clock_started = true;
       sens_history_last_sample_ms = now;
       sens_history_commit_sample();

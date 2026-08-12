@@ -319,3 +319,17 @@ This project is not affiliated with or endorsed by the manufacturer of the Unni 
 This project is licensed under **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)**. See [LICENSE](LICENSE).
 
 Third-party libraries, tools, applications, trademarks, and documentation remain subject to their respective licenses and owners.
+
+
+## Current code structure (refactor v11)
+
+- `bus_sniffer.cpp`: orchestration, Home Assistant publishing and feature wiring
+- `co2_decoder.*`: passive CO2 bus capture/decoder
+- `rtrh_decoder.*`: RT/RH edge capture, calibration result and quality
+- `sensirion_sample.h`: shared T/RH/CO2 sample and Sensirion wire encoding
+- `sensirion_ble.*`: MyAmbience live advertisement and GAP/GATT connection handling
+- `sensirion_history.*`: persistent history and Sensirion history GATT download
+
+The live BLE and history paths deliberately share the same encoded sample so the
+advertised value and the value stored in history cannot drift due to duplicated
+encoding logic.
