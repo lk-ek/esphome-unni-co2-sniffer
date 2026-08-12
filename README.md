@@ -335,3 +335,10 @@ bus_sniffer:
 ```
 
 The four GPIOs must be unique. The two RT/RH GPIOs are used as Light-sleep wake sources; the CO2 GPIOs are intentionally excluded from wakeup.
+
+
+### BLE identity
+
+When BLE is enabled, the component configures ESPHome's internal `esp32_ble`
+instance to use the Sensirion-compatible GAP/local name `S`. The ESPHome node
+name remains unchanged for Wi-Fi, OTA and Home Assistant.

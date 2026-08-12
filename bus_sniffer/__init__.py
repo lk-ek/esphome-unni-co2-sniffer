@@ -277,6 +277,10 @@ async def to_code(config):
 
     if ble_enabled:
         ble = await cg.get_variable(config[CONF_BLE_ID])
+        # Set the Sensirion GAP/local name on ESPHome's BLE component itself.
+        # This runs before component setup and prevents ESP32BLE from falling
+        # back to the ESPHome node name (for example "i2csniffer").
+        cg.add(ble.set_name("S"))
         esp32_ble.register_gatts_event_handler(ble, var)
         esp32_ble.register_gap_event_handler(ble, var)
 

@@ -233,8 +233,9 @@ const SensirionSample &sensirion_ble_sample() {
 }
 
 void sensirion_ble_setup() {
-  // This used to be supplied by the top-level esp32_ble.name YAML option.
-  // Keep the same Gadget identity now that BLE is component-managed.
+  // The component sets ESPHome's ESP32BLE name to "S" during codegen so the
+  // GAP name is correct before BLE setup. Re-apply it here defensively for
+  // direct IDF GAP users and to keep the runtime identity explicit.
   esp_ble_gap_set_device_name("S");
 
   adv_params = {
