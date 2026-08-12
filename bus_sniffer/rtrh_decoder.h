@@ -2,8 +2,13 @@
 #pragma once
 
 #include "measurement_quality.h"
+#include "esphome/core/defines.h"
 #include <cstdint>
 #include <cmath>
+
+#ifndef RTRH_DEBUG_CAPTURE
+#define RTRH_DEBUG_CAPTURE 0
+#endif
 
 namespace esphome {
 namespace bus_sniffer {

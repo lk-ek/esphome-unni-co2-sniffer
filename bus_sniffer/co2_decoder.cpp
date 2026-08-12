@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "co2_decoder.h"
 
-#ifndef RTRH_DEBUG_CAPTURE
-#define RTRH_DEBUG_CAPTURE 0
-#endif
 
 #include "esphome/core/log.h"
 #include "driver/gpio.h"

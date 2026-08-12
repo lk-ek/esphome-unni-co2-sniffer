@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "esphome/core/defines.h"
 #include <cstdint>
+
+#ifndef RTRH_DEBUG_CAPTURE
+#define RTRH_DEBUG_CAPTURE 0
+#endif
 
 namespace esphome {
 namespace bus_sniffer {

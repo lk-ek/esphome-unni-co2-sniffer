@@ -88,11 +88,12 @@ void BusSniffer::setup() {
 #endif
 
   this->sniffer_boot_ms_ = millis();
-  if (this->sniffer_start_delay_ms_ == 0)
+  if (this->sniffer_start_delay_ms_ == 0) {
     this->initialize_sniffer_io_();
-  else
+  } else {
     ESP_LOGI(TAG, "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
              static_cast<unsigned long>(this->sniffer_start_delay_ms_));
+  }
 
 #if RTRH_DEBUG_CAPTURE
   co2_decoder::register_debug_handler();
@@ -253,13 +254,14 @@ void BusSniffer::loop() {
       ESP_LOGI(TAG, "RT/RH measurement %lu RH: state %.3f / REF %.3f us = %.6f -> %.1f %%",
                static_cast<unsigned long>(s.sequence), rh_state_us, ref_period_us,
                rh_ratio, humidity_percent);
-      if (this->debug_metrics_)
+      if (this->debug_metrics_) {
         ESP_LOGI(TAG,
                  "RT/RH diagnostics %lu: quality %.0f%%, ln(RH/REF)=%.6f, |dT/dt|=%.2f C/min, "
                  "thermal_transient=%s, T_extrap=%s, RH_extrap=%s",
                  static_cast<unsigned long>(s.sequence), quality.score_percent, rh_log,
                  temperature_rate, d.thermal_transient ? "YES" : "no",
                  t_extrap ? "YES" : "no", rh_extrap ? "YES" : "no");
+      }
 
       if (this->ref_period_sensor_) this->ref_period_sensor_->publish_state(ref_period_us);
       if (this->rt_period_sensor_) this->rt_period_sensor_->publish_state(rt_period_us);
