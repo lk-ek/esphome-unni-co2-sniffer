@@ -31,7 +31,7 @@ static constexpr uint8_t SAMPLE_TYPE_T_RH_CO2_ALT = 0x08;
 static SensirionSample sample;
 static uint16_t device_id = 0;
 static bool device_id_ready = false;
-static uint32_t advertising_interval_ms = 2000;
+static uint32_t advertising_interval_ms = 5000;
 
 // Complete legacy advertising packet:
 // flags (3) + manufacturer data field (20) + complete name "S" (3).

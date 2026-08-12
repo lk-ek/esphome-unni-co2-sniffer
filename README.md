@@ -83,7 +83,7 @@ Only the two RT/RH inputs are configured as external Light-sleep wake sources:
 
 The CO₂ bus on GPIO6/GPIO7 is deliberately **not** a wake source. On the first RT/RH edge, the GPIO ISR acquires both an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock. This keeps the CPU fully awake at 80 MHz while the complete RT/RH transaction is captured and until one subsequent valid CO₂ frame has been decoded. CO₂ edge capture is disabled outside this active window, so partial bus traffic collected around sleep transitions is discarded instead of being counted as broken frames. The RT/RH transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. Once both conditions are satisfied both locks are released and automatic Light-sleep may resume. A 10-second failsafe releases the locks if a cycle cannot complete.
 
-Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. `i2c-sniffer-no-ble.yaml` is the cleanest baseline for measuring the savings attributable to BLE.
+Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. The BLE-enabled YAMLs therefore explicitly enable ESP-IDF Bluetooth modem sleep and PHY/MAC/baseband power-down. `i2c-sniffer-no-ble.yaml` remains the cleanest baseline for measuring the residual cost of BLE.
 
 This is useful both for boot-isolation testing and because the added ESP sits near temperature-sensitive circuitry.
 
@@ -168,7 +168,7 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 2s
+  ble_advertising_interval: 5s
   ha_publish_interval: 30s
   sniffer_start_delay: 10s
   light_sleep: true
@@ -244,7 +244,9 @@ Calibration coefficients and covered ranges live in `bus_sniffer/calibration.h`.
 
 The production firmware uses ESPHome's ESP-IDF BLE stack. It does **not** use NimBLE-Arduino or the Sensirion Arduino library at runtime.
 
-The live path emits Sensirion-compatible manufacturer data using the `T_RH_CO2_ALT`-style layout for temperature, RH, and CO₂. The implementation intentionally keeps advertising slow compared with ESPHome defaults to reduce radio activity.
+The live path emits Sensirion-compatible manufacturer data using the `T_RH_CO2_ALT`-style layout for temperature, RH, and CO₂. The default advertising interval is 5 seconds to reduce radio duty cycle while keeping discovery reasonably responsive.
+
+On ESP32-C3 BLE builds, the supplied YAML enables Bluetooth controller modem sleep (Mode 1), uses the main crystal as the Bluetooth low-power clock, keeps that crystal available during Light Sleep, and allows the shared Wi-Fi/Bluetooth MAC/baseband to power down while the PHY is idle. These options are intended to let BLE coexist with dynamic frequency scaling and automatic Light Sleep instead of keeping the radio subsystem continuously active.
 
 BLE connection/GATT handling is coordinated with ESPHome so a MyAmbience history connection can temporarily own the connection state and normal advertising resumes after disconnect.
 

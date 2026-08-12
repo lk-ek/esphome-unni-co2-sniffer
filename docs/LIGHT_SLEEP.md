@@ -30,6 +30,11 @@ esp32:
     sdkconfig_options:
       CONFIG_PM_ENABLE: y
       CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      CONFIG_BT_CTRL_MODEM_SLEEP: y
+      CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1: y
+      CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL: y
+      CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP: y
+      CONFIG_ESP_PHY_MAC_BB_PD: y
 ```
 
 The component options are:
@@ -48,8 +53,11 @@ at initialization.
 
 Automatic Light-sleep is cooperative. Wi-Fi, BLE, timers, or another ESP-IDF
 subsystem may hold a power-management lock and reduce or completely prevent
-actual Light-sleep residency. The no-BLE YAML is therefore the preferred
-baseline when measuring current consumption.
+actual Light-sleep residency. The BLE-enabled configurations explicitly enable
+ESP-IDF Bluetooth controller modem sleep (Mode 1), select the main XTAL as the
+Bluetooth low-power clock, keep it powered when required during Light Sleep,
+and permit PHY MAC/baseband power-down. The no-BLE YAML remains the preferred
+baseline when measuring the residual BLE cost.
 
 The wake source is level-triggered, not true edge-triggered. The implementation
 chooses the wake level opposite the observed idle level of each RT/RH line.

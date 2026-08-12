@@ -44,6 +44,13 @@ esp32:
     sdkconfig_options:
       CONFIG_PM_ENABLE: y
       CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
+      # Let the ESP32-C3 Bluetooth controller sleep between BLE events.
+      CONFIG_BT_CTRL_MODEM_SLEEP: y
+      CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1: y
+      CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL: y
+      CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP: y
+      # Power down shared Wi-Fi/Bluetooth MAC/baseband while PHY is idle.
+      CONFIG_ESP_PHY_MAC_BB_PD: y
   # Persistent Sensirion history store. This is storage configuration rather
   # than GATT protocol configuration; the bus_sniffer component owns the format.
   partitions:
@@ -76,7 +83,7 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 2s
+  ble_advertising_interval: 5s
   ha_publish_interval: 30s
 
   # Experimental ESP-IDF automatic Light-sleep. D1/GPIO3 and D2/GPIO4 wake
