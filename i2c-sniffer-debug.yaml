@@ -10,7 +10,7 @@ external_components:
       path: .
 
 logger:
-  level: WARN
+  level: DEBUG
 
 api:
   encryption:
