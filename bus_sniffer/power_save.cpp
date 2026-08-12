@@ -32,11 +32,12 @@ static void configure_wakeup_pin(gpio_num_t pin) {
   const int idle = gpio_get_level(pin);
   const gpio_int_type_t wake_level = idle ? GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL;
   const esp_err_t err = gpio_wakeup_enable(pin, wake_level);
-  if (err != ESP_OK)
+  if (err != ESP_OK) {
     ESP_LOGW(TAG, "gpio_wakeup_enable(GPIO%d) failed: %d", static_cast<int>(pin), err);
-  else
+  } else {
     ESP_LOGI(TAG, "GPIO%d Light-sleep wake on %s (idle=%d)", static_cast<int>(pin),
              idle ? "LOW" : "HIGH", idle);
+  }
 }
 
 bool setup(bool enabled_value, uint32_t max_awake_value_ms) {

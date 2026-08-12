@@ -168,7 +168,7 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 5s
+  ble_advertising_interval: 2s
   ha_publish_interval: 30s
   sniffer_start_delay: 10s
   light_sleep: true
@@ -244,7 +244,7 @@ Calibration coefficients and covered ranges live in `bus_sniffer/calibration.h`.
 
 The production firmware uses ESPHome's ESP-IDF BLE stack. It does **not** use NimBLE-Arduino or the Sensirion Arduino library at runtime.
 
-The live path emits Sensirion-compatible manufacturer data using the `T_RH_CO2_ALT`-style layout for temperature, RH, and CO₂. The default advertising interval is 5 seconds to reduce radio duty cycle while keeping discovery reasonably responsive.
+The live path emits Sensirion-compatible manufacturer data using the `T_RH_CO2_ALT`-style layout for temperature, RH, and CO₂. The default advertising interval is 2 seconds to improve MyAmbience discovery and connection latency while retaining Bluetooth modem sleep between BLE events.
 
 On ESP32-C3 BLE builds, the supplied YAML enables Bluetooth controller modem sleep (Mode 1), uses the main crystal as the Bluetooth low-power clock, keeps that crystal available during Light Sleep, and allows the shared Wi-Fi/Bluetooth MAC/baseband to power down while the PHY is idle. These options are intended to let BLE coexist with dynamic frequency scaling and automatic Light Sleep instead of keeping the radio subsystem continuously active.
 

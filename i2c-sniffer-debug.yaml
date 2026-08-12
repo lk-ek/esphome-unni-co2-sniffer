@@ -86,7 +86,7 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 5s
+  ble_advertising_interval: 2s
   ha_publish_interval: 30s
 
   # Experimental ESP-IDF automatic Light-sleep. D1/GPIO3 and D2/GPIO4 wake

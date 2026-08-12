@@ -156,7 +156,7 @@ _SCHEMA = {
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
     cv.Optional(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
     cv.Optional(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
-    cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="5s"): cv.All(
+    cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="2s"): cv.All(
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
