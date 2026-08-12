@@ -22,8 +22,8 @@ namespace bus_sniffer {
 namespace co2_decoder {
 
 static const char *TAG = "co2_decoder";
-static constexpr gpio_num_t PIN_SCL = GPIO_NUM_7;
-static constexpr gpio_num_t PIN_SDA = GPIO_NUM_6;
+static gpio_num_t pin_scl = GPIO_NUM_7;
+static gpio_num_t pin_sda = GPIO_NUM_6;
 static constexpr uint16_t MAX_SAMPLES = 4096;
 static constexpr uint32_t CAPTURE_TIMEOUT_US = 5000;
 
@@ -44,8 +44,8 @@ static volatile bool capture_overflow = false;
 
 static inline uint8_t IRAM_ATTR read_gpio_state() {
   uint8_t value = 0;
-  if (gpio_get_level(PIN_SCL)) value |= 0x01;
-  if (gpio_get_level(PIN_SDA)) value |= 0x02;
+  if (gpio_get_level(pin_scl)) value |= 0x01;
+  if (gpio_get_level(pin_sda)) value |= 0x02;
   return value;
 }
 static inline bool scl_level(uint8_t value) { return (value & 0x01) != 0; }
@@ -250,25 +250,27 @@ void register_debug_handler() {
 }
 #endif
 
-bool setup() {
+bool setup(uint8_t sda_pin, uint8_t scl_pin) {
+  pin_sda = static_cast<gpio_num_t>(sda_pin);
+  pin_scl = static_cast<gpio_num_t>(scl_pin);
   gpio_config_t io{};
   io.mode = GPIO_MODE_INPUT;
   io.pull_up_en = GPIO_PULLUP_DISABLE;
   io.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io.intr_type = GPIO_INTR_DISABLE;
-  io.pin_bit_mask = (1ULL << PIN_SCL) | (1ULL << PIN_SDA);
+  io.pin_bit_mask = (1ULL << pin_scl) | (1ULL << pin_sda);
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 
-  gpio_set_intr_type(PIN_SCL, GPIO_INTR_ANYEDGE);
-  gpio_set_intr_type(PIN_SDA, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(pin_scl, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_ANYEDGE);
   last_value = read_gpio_state();
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
-  err = gpio_isr_handler_add(PIN_SCL, gpio_isr, nullptr);
+  err = gpio_isr_handler_add(pin_scl, gpio_isr, nullptr);
   if (err != ESP_OK) return false;
-  err = gpio_isr_handler_add(PIN_SDA, gpio_isr, nullptr);
+  err = gpio_isr_handler_add(pin_sda, gpio_isr, nullptr);
   return err == ESP_OK;
 }
 
@@ -278,8 +280,8 @@ void set_capture_enabled(bool enabled) {
 
   // Stop both edge sources while resetting shared ISR state so no half-frame
   // can leak across a sleep/awake boundary.
-  gpio_intr_disable(PIN_SCL);
-  gpio_intr_disable(PIN_SDA);
+  gpio_intr_disable(pin_scl);
+  gpio_intr_disable(pin_sda);
   capture_enabled = enabled;
   capturing = false;
   sample_count = 0;
@@ -290,8 +292,8 @@ void set_capture_enabled(bool enabled) {
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
   capturing = enabled;
   if (enabled) {
-    gpio_intr_enable(PIN_SCL);
-    gpio_intr_enable(PIN_SDA);
+    gpio_intr_enable(pin_scl);
+    gpio_intr_enable(pin_sda);
   }
 }
 

@@ -20,9 +20,9 @@ namespace bus_sniffer {
 namespace rtrh_decoder {
 
 static const char *TAG = "rtrh_decoder";
-static constexpr gpio_num_t PIN_G10 = GPIO_NUM_3;
-static constexpr gpio_num_t PIN_G13 = GPIO_NUM_4;
-static constexpr gpio_num_t PINS[] = {PIN_G10, PIN_G13};
+static gpio_num_t pin_g10 = GPIO_NUM_3;
+static gpio_num_t pin_g13 = GPIO_NUM_4;
+static gpio_num_t pins[] = {GPIO_NUM_3, GPIO_NUM_4};
 
 // The controller spends ~125 ms in REF and ~127 ms in RT. Phase identity is
 // deliberately based on elapsed time, never on RC period or cycle count.
@@ -119,8 +119,8 @@ static DecoderState decoder;
 
 static inline uint8_t IRAM_ATTR read_state() {
   uint8_t value = 0;
-  if (gpio_get_level(PIN_G10)) value |= 0x01;
-  if (gpio_get_level(PIN_G13)) value |= 0x08;
+  if (gpio_get_level(pin_g10)) value |= 0x01;
+  if (gpio_get_level(pin_g13)) value |= 0x08;
   return value;
 }
 
@@ -258,7 +258,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
   if (encoded < 1 || encoded > 2) return;
   const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
-  const gpio_num_t pin = PINS[pin_index];
+  const gpio_num_t pin = pins[pin_index];
   const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
   const uint8_t previous = decoder.pin_level[pin_index];
   if (level == previous) return;
@@ -336,25 +336,29 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 #endif
 }
 
-bool setup() {
+bool setup(uint8_t g10_pin, uint8_t g13_pin) {
+  pin_g10 = static_cast<gpio_num_t>(g10_pin);
+  pin_g13 = static_cast<gpio_num_t>(g13_pin);
+  pins[0] = pin_g10;
+  pins[1] = pin_g13;
   gpio_config_t io{};
   io.mode = GPIO_MODE_INPUT;
   io.pull_up_en = GPIO_PULLUP_DISABLE;
   io.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io.intr_type = GPIO_INTR_DISABLE;
-  io.pin_bit_mask = (1ULL << PIN_G10) | (1ULL << PIN_G13);
+  io.pin_bit_mask = (1ULL << pin_g10) | (1ULL << pin_g13);
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 
-  for (gpio_num_t pin : PINS) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
+  for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   decoder.gpio_state = read_state();
-  for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
+  for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
 #if RTRH_DEBUG_CAPTURE
   debug.last_value = read_state();
 #endif
 
   for (uint8_t i = 0; i < 2; i++) {
-    err = gpio_isr_handler_add(PINS[i], gpio_isr,
+    err = gpio_isr_handler_add(pins[i], gpio_isr,
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
     if (err != ESP_OK) return false;
   }
@@ -368,14 +372,14 @@ void loop() {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
     const uint32_t last = decoder.last_edge_us;
     if (last && static_cast<uint32_t>(now - last) > MEASUREMENT_QUIET_US) {
-      for (gpio_num_t pin : PINS) gpio_intr_disable(pin);
+      for (gpio_num_t pin : pins) gpio_intr_disable(pin);
       const uint32_t now2 = static_cast<uint32_t>(esp_timer_get_time());
       const uint32_t last2 = decoder.last_edge_us;
       if (decoder.collecting && last2 && static_cast<uint32_t>(now2 - last2) > MEASUREMENT_QUIET_US)
         finalize_measurement();
       decoder.gpio_state = read_state();
-      for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
-      for (gpio_num_t pin : PINS) gpio_intr_enable(pin);
+      for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
+      for (gpio_num_t pin : pins) gpio_intr_enable(pin);
     }
   }
 

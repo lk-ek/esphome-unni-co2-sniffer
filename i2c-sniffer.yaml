@@ -41,16 +41,6 @@ esp32:
   cpu_frequency: 80MHz
   framework:
     type: esp-idf
-    sdkconfig_options:
-      CONFIG_PM_ENABLE: y
-      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
-      # Let the ESP32-C3 Bluetooth controller sleep between BLE events.
-      CONFIG_BT_CTRL_MODEM_SLEEP: y
-      CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1: y
-      CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL: y
-      CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP: y
-      # Power down shared Wi-Fi/Bluetooth MAC/baseband while PHY is idle.
-      CONFIG_ESP_PHY_MAC_BB_PD: y
   # Persistent Sensirion history store. This is storage configuration rather
   # than GATT protocol configuration; the bus_sniffer component owns the format.
   partitions:
@@ -83,17 +73,9 @@ bus_sniffer:
   ble_id: unni_ble
   ble_server_id: unni_ble_server
 
-  ble_advertising_interval: 2s
   ha_publish_interval: 30s
 
-  # Experimental ESP-IDF automatic Light-sleep. D1/GPIO3 and D2/GPIO4 wake
-  # the CPU; CO2 D4/D5 are intentionally not wake sources. The first RT/RH
-  # edge takes a NO_LIGHT_SLEEP lock until the RT/RH transaction has ended and
-  # one subsequent valid CO2 frame has been decoded (10 s failsafe).
-  light_sleep: true
-  light_sleep_max_awake: 10s
-
-  # Boot-isolation test: leave D1/D2/D5/D6 completely untouched by the
+  # Boot-isolation test: leave the four configured signal GPIOs untouched by the
   # custom component during the first 10 seconds after MCU startup. Wi-Fi/BLE
   # can initialize normally. After the delay the four lines become plain
   # high-impedance inputs without pulls and their edge ISRs are attached.

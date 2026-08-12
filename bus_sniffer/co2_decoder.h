@@ -20,7 +20,7 @@ struct Result {
 };
 
 // GPIO6/D4 = SDA, GPIO7/D5 = SCL.
-bool setup();
+bool setup(uint8_t sda_pin, uint8_t scl_pin);
 
 // Enable/disable edge capture. Enabling starts with a clean decoder state;
 // disabling drops any partial transaction collected so far.

@@ -8,9 +8,10 @@ namespace esphome {
 namespace bus_sniffer {
 namespace power_save {
 
-// Configure ESP-IDF automatic Light-sleep. GPIO3/GPIO4 are used only as
-// wake sources; CO2 GPIO6/GPIO7 deliberately are not.
-bool setup(bool enabled, uint32_t max_awake_ms);
+// Configure ESP-IDF automatic Light-sleep. The RT/RH GPIOs are wake sources;
+// the CO2 bus GPIOs deliberately are not.
+bool setup(bool enabled, uint32_t max_awake_ms, uint8_t g10_pin, uint8_t g13_pin,
+           uint8_t co2_sda_pin, uint8_t co2_scl_pin);
 
 // Called from the RT/RH GPIO ISR. esp_pm_lock_acquire() is explicitly ISR-safe.
 void on_rtrh_edge_from_isr();

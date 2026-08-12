@@ -41,9 +41,6 @@ esp32:
   cpu_frequency: 80MHz
   framework:
     type: esp-idf
-    sdkconfig_options:
-      CONFIG_PM_ENABLE: y
-      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
 # BLE deliberately omitted for timing A/B test.
 bus_sniffer:
   debug_capture: false
@@ -55,11 +52,6 @@ bus_sniffer:
 
   ha_publish_interval: 30s
 
-  # Experimental ESP-IDF automatic Light-sleep. D1/GPIO3 and D2/GPIO4 wake
-  # the CPU; CO2 D4/D5 are intentionally not wake sources. The first RT/RH
-  # edge takes a NO_LIGHT_SLEEP lock until the RT/RH transaction has ended and
-  # one subsequent valid CO2 frame has been decoded (10 s failsafe).
-  light_sleep: true
   light_sleep_max_awake: 10s
   sniffer_start_delay: 10s
 

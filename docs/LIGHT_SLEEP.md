@@ -7,7 +7,7 @@ runs ESPHome networking and, in the normal build, BLE.
 ## Wake/awake sequence
 
 1. In idle periods ESP-IDF may enter automatic Light-sleep.
-2. GPIO3/G10 or GPIO4/G13 wakes the CPU on the first RT/RH transition.
+2. The configured RT/RH G10 or G13 GPIO wakes the CPU on the first RT/RH transition (defaults: GPIO3/GPIO4).
 3. The RT/RH ISR immediately acquires both an `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock.
 4. The complete RT/RH waveform is captured without sleeping between edges and the CPU remains fixed at 80 MHz for the active capture window.
 5. The decoder finalizes after 100 ms of silence. The measured RT/RH waveform
@@ -21,33 +21,35 @@ The CO2 SCL/SDA pins are intentionally not GPIO wake sources. Their ISR capture 
 
 ## Configuration
 
-The ESP-IDF build needs power management and tickless idle:
+The component owns the required ESP-IDF sdkconfig. Users do **not** need a
+`sdkconfig_options:` block for power management or BLE modem sleep. When
+`light_sleep` is enabled (the default), `bus_sniffer/__init__.py` enables power
+management, tickless idle and shared PHY/MAC/baseband power-down. BLE builds
+also enable Bluetooth controller modem sleep and select the main XTAL as the
+Bluetooth low-power clock.
 
-```yaml
-esp32:
-  framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_PM_ENABLE: y
-      CONFIG_FREERTOS_USE_TICKLESS_IDLE: y
-      CONFIG_BT_CTRL_MODEM_SLEEP: y
-      CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1: y
-      CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL: y
-      CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP: y
-      CONFIG_ESP_PHY_MAC_BB_PD: y
-```
-
-The component options are:
+All power-saving defaults remain overrideable from `bus_sniffer:` when needed:
 
 ```yaml
 bus_sniffer:
-  light_sleep: true
-  light_sleep_max_awake: 10s
+  light_sleep: true             # default
+  light_sleep_max_awake: 10s    # default
+  ble_advertising_interval: 2s  # default
 ```
 
-When enabled the component configures automatic power management for 40..80 MHz
-and enables GPIO wake for GPIO3/GPIO4 on the level opposite the idle level seen
-at initialization.
+The signal GPIOs are also configurable. The tested XIAO ESP32-C3 wiring remains
+the default:
+
+```yaml
+bus_sniffer:
+  rtrh_g10_pin: 3
+  rtrh_g13_pin: 4
+  co2_sda_pin: 6
+  co2_scl_pin: 7
+```
+
+The four GPIOs must be unique. Only the configured RT/RH GPIOs are Light-sleep
+wake sources; the configured CO2 SDA/SCL GPIOs are deliberately excluded.
 
 ## Important limitations
 

@@ -81,9 +81,9 @@ Only the two RT/RH inputs are configured as external Light-sleep wake sources:
 - D1 / GPIO3 / G10
 - D2 / GPIO4 / G13
 
-The CO₂ bus on GPIO6/GPIO7 is deliberately **not** a wake source. On the first RT/RH edge, the GPIO ISR acquires both an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock. This keeps the CPU fully awake at 80 MHz while the complete RT/RH transaction is captured and until one subsequent valid CO₂ frame has been decoded. CO₂ edge capture is disabled outside this active window, so partial bus traffic collected around sleep transitions is discarded instead of being counted as broken frames. The RT/RH transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. Once both conditions are satisfied both locks are released and automatic Light-sleep may resume. A 10-second failsafe releases the locks if a cycle cannot complete.
+The configured CO₂ SDA/SCL pins (GPIO6/GPIO7 by default) are deliberately **not** wake sources. On the first RT/RH edge, the GPIO ISR acquires both an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock. This keeps the CPU fully awake at 80 MHz while the complete RT/RH transaction is captured and until one subsequent valid CO₂ frame has been decoded. CO₂ edge capture is disabled outside this active window, so partial bus traffic collected around sleep transitions is discarded instead of being counted as broken frames. The RT/RH transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. Once both conditions are satisfied both locks are released and automatic Light-sleep may resume. A 10-second failsafe releases the locks if a cycle cannot complete.
 
-Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. The BLE-enabled YAMLs therefore explicitly enable ESP-IDF Bluetooth modem sleep and PHY/MAC/baseband power-down. `i2c-sniffer-no-ble.yaml` remains the cleanest baseline for measuring the residual cost of BLE.
+Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. The component therefore enables ESP-IDF Bluetooth modem sleep and PHY/MAC/baseband power-down automatically for BLE builds. `i2c-sniffer-no-ble.yaml` remains the cleanest baseline for measuring the residual cost of BLE.
 
 This is useful both for boot-isolation testing and because the added ESP sits near temperature-sensitive circuitry.
 
@@ -301,3 +301,22 @@ The project is not affiliated with or endorsed by the manufacturer of the Unni m
 ## License
 
 This project is licensed under **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)**. See [LICENSE](LICENSE).
+
+### Power-saving and GPIO defaults
+
+`bus_sniffer` now owns the ESP-IDF power-management configuration. Automatic Light Sleep is enabled by default and the required ESP-IDF sdkconfig options are added by the component, so users do not need to copy them into the `esp32.framework.sdkconfig_options` YAML section.
+
+The current wiring remains the default and can be overridden when needed:
+
+```yaml
+bus_sniffer:
+  light_sleep: true             # default
+  light_sleep_max_awake: 10s
+  ble_advertising_interval: 2s  # default
+  rtrh_g10_pin: 3
+  rtrh_g13_pin: 4
+  co2_sda_pin: 6
+  co2_scl_pin: 7
+```
+
+The four GPIOs must be unique. The two RT/RH GPIOs are used as Light-sleep wake sources; the CO2 GPIOs are intentionally excluded from wakeup.

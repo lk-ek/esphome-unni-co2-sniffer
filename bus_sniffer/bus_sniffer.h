@@ -32,6 +32,8 @@ class BusSniffer : public Component {
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
   void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
+  void set_rtrh_pins(uint8_t g10, uint8_t g13) { this->rtrh_g10_pin_ = g10; this->rtrh_g13_pin_ = g13; }
+  void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
@@ -114,8 +116,12 @@ class BusSniffer : public Component {
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
   bool debug_metrics_{false};
-  bool light_sleep_enabled_{false};
+  bool light_sleep_enabled_{true};
   uint32_t light_sleep_max_awake_ms_{10000};
+  uint8_t rtrh_g10_pin_{3};
+  uint8_t rtrh_g13_pin_{4};
+  uint8_t co2_sda_pin_{6};
+  uint8_t co2_scl_pin_{7};
 };
 
 }  // namespace bus_sniffer

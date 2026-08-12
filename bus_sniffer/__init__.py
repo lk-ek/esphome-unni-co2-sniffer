@@ -3,6 +3,7 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 
 from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor
+from esphome.components.esp32 import add_idf_sdkconfig_option
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
 from esphome.core import TimePeriod
 
@@ -28,6 +29,10 @@ CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
 CONF_LIGHT_SLEEP = "light_sleep"
 CONF_LIGHT_SLEEP_MAX_AWAKE = "light_sleep_max_awake"
+CONF_RTRH_G10_PIN = "rtrh_g10_pin"
+CONF_RTRH_G13_PIN = "rtrh_g13_pin"
+CONF_CO2_SDA_PIN = "co2_sda_pin"
+CONF_CO2_SCL_PIN = "co2_scl_pin"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -135,6 +140,10 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
+    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]]
+    if len(set(pins)) != len(pins):
+        raise cv.Invalid("RT/RH and CO2 GPIOs must be unique")
+
     if config[CONF_BLE_LIVE] and not config[CONF_BLE]:
         raise cv.Invalid("ble_live: true requires ble: true")
     if config[CONF_BLE_HISTORY] and not config[CONF_BLE]:
@@ -164,8 +173,12 @@ _SCHEMA = {
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
-    cv.Optional(CONF_LIGHT_SLEEP, default=False): cv.boolean,
+    cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_RTRH_G10_PIN, default=3): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_RTRH_G13_PIN, default=4): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_CO2_SCL_PIN, default=7): cv.int_range(min=0, max=21),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -197,6 +210,18 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     ble_enabled = config[CONF_BLE]
+
+    if config[CONF_LIGHT_SLEEP]:
+        add_idf_sdkconfig_option("CONFIG_PM_ENABLE", True)
+        add_idf_sdkconfig_option("CONFIG_FREERTOS_USE_TICKLESS_IDLE", True)
+        add_idf_sdkconfig_option("CONFIG_ESP_PHY_MAC_BB_PD", True)
+
+    if ble_enabled:
+        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP", True)
+        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1", True)
+        add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
+        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
+
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
@@ -216,6 +241,8 @@ async def to_code(config):
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))
     cg.add(var.set_light_sleep_max_awake(config[CONF_LIGHT_SLEEP_MAX_AWAKE]))
+    cg.add(var.set_rtrh_pins(config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN]))
+    cg.add(var.set_co2_pins(config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 
