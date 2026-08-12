@@ -270,6 +270,13 @@ async def to_code(config):
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
 
+    # Child sensor entities are created from this component schema rather than
+    # from a top-level `sensor:` platform entry. Ensure the core/API/web-server
+    # sensor domain is compiled in so App-registered child sensors are exposed.
+    cg.add_define("USE_SENSOR")
+    if config[CONF_DEBUG_METRICS]:
+        cg.add_define("USE_BINARY_SENSOR")
+
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
