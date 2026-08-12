@@ -22,6 +22,10 @@ struct Result {
 // GPIO6/D4 = SDA, GPIO7/D5 = SCL.
 bool setup();
 
+// Enable/disable edge capture. Enabling starts with a clean decoder state;
+// disabling drops any partial transaction collected so far.
+void set_capture_enabled(bool enabled);
+
 // Returns true when a complete capture was consumed. The result may contain
 // only diagnostics (CRC/frame errors) and no CO2 value.
 bool poll(Result &result);

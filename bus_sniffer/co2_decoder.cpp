@@ -38,6 +38,7 @@ static volatile uint32_t last_edge = 0;
 static volatile uint8_t last_value = 0xff;
 static volatile uint8_t capture_initial_value = 0xff;
 static volatile bool capturing = true;
+static bool capture_enabled = true;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
@@ -271,7 +272,31 @@ bool setup() {
   return err == ESP_OK;
 }
 
+
+void set_capture_enabled(bool enabled) {
+  if (capture_enabled == enabled) return;
+
+  // Stop both edge sources while resetting shared ISR state so no half-frame
+  // can leak across a sleep/awake boundary.
+  gpio_intr_disable(PIN_SCL);
+  gpio_intr_disable(PIN_SDA);
+  capture_enabled = enabled;
+  capturing = false;
+  sample_count = 0;
+  capture_finished = false;
+  capture_overflow = false;
+  last_value = read_gpio_state();
+  capture_initial_value = last_value;
+  last_edge = static_cast<uint32_t>(esp_timer_get_time());
+  capturing = enabled;
+  if (enabled) {
+    gpio_intr_enable(PIN_SCL);
+    gpio_intr_enable(PIN_SDA);
+  }
+}
+
 bool poll(Result &result) {
+  if (!capture_enabled) return false;
   if (!capture_finished) {
     if (sample_count == 0) return false;
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());

@@ -17,6 +17,7 @@ static constexpr gpio_num_t PIN_G13 = GPIO_NUM_4;
 
 static bool configured = false;
 static esp_pm_lock_handle_t awake_lock = nullptr;
+static esp_pm_lock_handle_t cpu_lock = nullptr;
 static volatile bool lock_held = false;
 static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
@@ -54,7 +55,12 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms) {
 
   err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_rtrh", &awake_lock);
   if (err != ESP_OK) {
-    ESP_LOGE(TAG, "esp_pm_lock_create failed: %d", err);
+    ESP_LOGE(TAG, "esp_pm_lock_create(NO_LIGHT_SLEEP) failed: %d", err);
+    return false;
+  }
+  err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_capture_cpu", &cpu_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(CPU_FREQ_MAX) failed: %d", err);
     return false;
   }
 
@@ -68,20 +74,23 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms) {
 
   configured = true;
   ESP_LOGI(TAG,
-           "Auto Light-sleep enabled: CPU 40..80 MHz; wake GPIO3/GPIO4; "
-           "CO2 GPIO6/GPIO7 excluded; awake timeout %lu ms",
+           "Auto Light-sleep enabled: CPU 40..80 MHz, forced 80 MHz while capturing; "
+           "wake GPIO3/GPIO4; CO2 GPIO6/GPIO7 excluded; awake timeout %lu ms",
            static_cast<unsigned long>(max_awake_ms));
   return true;
 }
 
 void IRAM_ATTR on_rtrh_edge_from_isr() {
-  if (!configured || awake_lock == nullptr || lock_held) return;
-  if (esp_pm_lock_acquire(awake_lock) == ESP_OK) {
-    lock_held = true;
-    wake_started_us = static_cast<uint64_t>(esp_timer_get_time());
-    rtrh_complete = false;
-    co2_after_rtrh = false;
+  if (!configured || awake_lock == nullptr || cpu_lock == nullptr || lock_held) return;
+  if (esp_pm_lock_acquire(awake_lock) != ESP_OK) return;
+  if (esp_pm_lock_acquire(cpu_lock) != ESP_OK) {
+    esp_pm_lock_release(awake_lock);
+    return;
   }
+  lock_held = true;
+  wake_started_us = static_cast<uint64_t>(esp_timer_get_time());
+  rtrh_complete = false;
+  co2_after_rtrh = false;
 }
 
 void on_rtrh_complete(bool valid) {
@@ -98,7 +107,7 @@ void on_valid_co2() {
 }
 
 void loop() {
-  if (!configured || !lock_held || awake_lock == nullptr) return;
+  if (!configured || !lock_held || awake_lock == nullptr || cpu_lock == nullptr) return;
 
   const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
   const uint64_t elapsed_us = now_us - wake_started_us;
@@ -111,9 +120,10 @@ void loop() {
   lock_held = false;
   rtrh_complete = false;
   co2_after_rtrh = false;
-  const esp_err_t err = esp_pm_lock_release(awake_lock);
-  if (err != ESP_OK) {
-    ESP_LOGE(TAG, "esp_pm_lock_release failed: %d", err);
+  const esp_err_t cpu_err = esp_pm_lock_release(cpu_lock);
+  const esp_err_t sleep_err = esp_pm_lock_release(awake_lock);
+  if (cpu_err != ESP_OK || sleep_err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_release failed: CPU=%d sleep=%d", cpu_err, sleep_err);
     return;
   }
 

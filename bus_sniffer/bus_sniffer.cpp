@@ -93,8 +93,13 @@ bool BusSniffer::initialize_sniffer_io_() {
   }
 
   this->io_initialized_ = true;
-  if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_))
+  if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_)) {
     ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
+  } else if (power_save::enabled()) {
+    // CO2 traffic must not wake the chip or leave partial I2C transactions
+    // behind while the CPU is sleeping. It is enabled only in an RT/RH window.
+    co2_decoder::set_capture_enabled(false);
+  }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
   return true;
@@ -321,9 +326,18 @@ void BusSniffer::loop() {
   this->maybe_publish_ha_();
 
   if (!this->io_initialized_) return;
+
+  if (power_save::enabled())
+    co2_decoder::set_capture_enabled(power_save::awake_window_active());
+
   this->process_rtrh_();
   this->process_co2_();
   power_save::loop();
+
+  // power_save::loop() may have just closed the window. Drop any partial CO2
+  // transaction immediately instead of carrying it into the next sleep cycle.
+  if (power_save::enabled())
+    co2_decoder::set_capture_enabled(power_save::awake_window_active());
 }
 
 }  // namespace bus_sniffer

@@ -8,19 +8,16 @@ runs ESPHome networking and, in the normal build, BLE.
 
 1. In idle periods ESP-IDF may enter automatic Light-sleep.
 2. GPIO3/G10 or GPIO4/G13 wakes the CPU on the first RT/RH transition.
-3. The RT/RH ISR immediately acquires an `ESP_PM_NO_LIGHT_SLEEP` lock.
-4. The complete RT/RH waveform is captured without sleeping between edges.
+3. The RT/RH ISR immediately acquires both an `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock.
+4. The complete RT/RH waveform is captured without sleeping between edges and the CPU remains fixed at 80 MHz for the active capture window.
 5. The decoder finalizes after 100 ms of silence. The measured RT/RH waveform
    itself is approximately 383 ms on the tested Unni hardware.
-6. The lock remains held until the CO2 decoder sees one valid frame after the
-   RT/RH transaction has completed.
-7. The lock is released; automatic Light-sleep is permitted again.
-8. A configurable failsafe (`light_sleep_max_awake`, default 10 s) releases the
-   lock even if the expected completion path is not reached.
+6. CO2 edge capture is enabled only while this awake window is active. Partial CO2 transactions from idle/sleep intervals are discarded.
+7. Both locks remain held until the CO2 decoder sees one valid frame after the RT/RH transaction has completed.
+8. Both locks are released; CO2 edge capture is disabled and automatic Light-sleep is permitted again.
+9. A configurable failsafe (`light_sleep_max_awake`, default 10 s) releases the locks even if the expected completion path is not reached.
 
-The CO2 SCL/SDA pins are intentionally not GPIO wake sources. Keeping the CPU
-awake after RT/RH until one valid CO2 frame provides a deterministic sample
-without waking on every CO2 bus transaction during the idle interval.
+The CO2 SCL/SDA pins are intentionally not GPIO wake sources. Their ISR capture is also disabled outside an active RT/RH awake window. Keeping the CPU awake at 80 MHz after RT/RH until one valid CO2 frame provides a deterministic sample without waking on every CO2 bus transaction during the idle interval or decoding half-frames collected around sleep transitions.
 
 ## Configuration
 

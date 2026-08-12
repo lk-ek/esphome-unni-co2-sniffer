@@ -81,7 +81,7 @@ Only the two RT/RH inputs are configured as external Light-sleep wake sources:
 - D1 / GPIO3 / G10
 - D2 / GPIO4 / G13
 
-The CO₂ bus on GPIO6/GPIO7 is deliberately **not** a wake source. On the first RT/RH edge, the GPIO ISR acquires an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock. This keeps the CPU fully awake while the complete RT/RH transaction is captured. The transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. The lock then remains held until one subsequent valid CO₂ frame has been decoded. Once both conditions are satisfied the lock is released and automatic Light-sleep may resume. A 10-second failsafe releases the lock if a cycle cannot complete.
+The CO₂ bus on GPIO6/GPIO7 is deliberately **not** a wake source. On the first RT/RH edge, the GPIO ISR acquires both an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock. This keeps the CPU fully awake at 80 MHz while the complete RT/RH transaction is captured and until one subsequent valid CO₂ frame has been decoded. CO₂ edge capture is disabled outside this active window, so partial bus traffic collected around sleep transitions is discarded instead of being counted as broken frames. The RT/RH transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. Once both conditions are satisfied both locks are released and automatic Light-sleep may resume. A 10-second failsafe releases the locks if a cycle cannot complete.
 
 Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. `i2c-sniffer-no-ble.yaml` is the cleanest baseline for measuring the savings attributable to BLE.
 
@@ -99,7 +99,7 @@ This is useful both for boot-isolation testing and because the added ESP sits ne
 │   ├── bus_sniffer.cpp/.h        orchestration, HA publishing, feature wiring
 │   ├── co2_decoder.cpp/.h        CO₂ GPIO capture + passive bus decoding
 │   ├── rtrh_decoder.cpp/.h       RT/RH ISR capture, quality, calibrated result
-│   ├── power_save.cpp/.h         automatic Light-sleep + RT/RH awake-window lock
+│   ├── power_save.cpp/.h         Light-sleep + 80 MHz capture-window PM locks
 │   ├── calibration.h             RT/RH calibration model and valid ranges
 │   ├── sensirion_sample.h        shared T/RH/CO₂ wire sample representation
 │   ├── sensirion_ble.cpp/.h      live BLE advertising and GAP/GATT handling
