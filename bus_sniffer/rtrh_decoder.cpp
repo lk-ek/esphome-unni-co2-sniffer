@@ -56,7 +56,7 @@ struct Snapshot {
   uint32_t sequence{0};
 };
 
-enum Phase : uint8_t { WAIT_REF = 0, REF, RT, RH };
+enum class Phase : uint8_t { WAIT_REF = 0, REF, RT, RH };
 
 // Capture acceptance limits. These are deliberately kept next to the decoder
 // because they describe whether one decoded RT/RH cycle is trustworthy.
@@ -92,23 +92,30 @@ const char *reject_reason_to_string(RejectReason reason) {
   return "UNKNOWN";
 }
 
-static volatile bool collecting = false;
-static volatile uint32_t measurement_start_us = 0;
-static volatile uint32_t last_any_us = 0;
-static volatile uint8_t last_state = 0;
-static volatile uint32_t last_g10_fall_us = 0;
-static volatile bool have_g10_rise = false;
-static volatile uint8_t phase = WAIT_REF;
-static Accum ref;
-static Accum rt;
-static Accum rh_timing;
-static volatile uint32_t rt_temp_period_sum = 0;
-static volatile uint16_t rt_temp_count = 0;
-static RhStateStats rh_state;
-static Snapshot latest_snapshot;
-static volatile bool snapshot_ready = false;
-static volatile uint8_t pin_level[3] = {0, 0, 0};
-static Measurement latest_measurement;
+struct DecoderState {
+  volatile bool collecting{false};
+  volatile uint32_t measurement_start_us{0};
+  volatile uint32_t last_edge_us{0};
+  volatile uint8_t gpio_state{0};
+  volatile uint32_t last_g10_fall_us{0};
+  volatile bool have_g10_rise{false};
+  volatile Phase phase{Phase::WAIT_REF};
+
+  Accum ref;
+  Accum rt;
+  Accum rh;
+  volatile uint32_t rt_temperature_period_sum{0};
+  volatile uint16_t rt_temperature_count{0};
+  RhStateStats rh_state;
+
+  Snapshot snapshot;
+  volatile bool snapshot_ready{false};
+  volatile uint8_t pin_level[3]{0, 0, 0};
+  uint32_t last_polled_sequence{0};
+  Measurement latest_measurement;
+};
+
+static DecoderState decoder;
 
 static inline uint8_t IRAM_ATTR read_state() {
   uint8_t value = 0;
@@ -124,26 +131,26 @@ static inline void IRAM_ATTR clear_accum(Accum &a) {
 }
 
 static inline void IRAM_ATTR clear_rh_state() {
-  rh_state.last_us = 0;
-  rh_state.write_pos = 0;
-  rh_state.sample_count = 0;
-  rh_state.seen = 0;
-  for (uint8_t i = 0; i < RH_STATE_PERIOD_SAMPLES; i++) rh_state.samples[i] = 0;
+  decoder.rh_state.last_us = 0;
+  decoder.rh_state.write_pos = 0;
+  decoder.rh_state.sample_count = 0;
+  decoder.rh_state.seen = 0;
+  for (uint8_t i = 0; i < RH_STATE_PERIOD_SAMPLES; i++) decoder.rh_state.samples[i] = 0;
 }
 
 static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
-  collecting = true;
-  measurement_start_us = now;
-  last_any_us = now;
-  last_state = state;
-  last_g10_fall_us = 0;
-  have_g10_rise = false;
-  phase = REF;
-  clear_accum(ref);
-  clear_accum(rt);
-  clear_accum(rh_timing);
-  rt_temp_period_sum = 0;
-  rt_temp_count = 0;
+  decoder.collecting = true;
+  decoder.measurement_start_us = now;
+  decoder.last_edge_us = now;
+  decoder.gpio_state = state;
+  decoder.last_g10_fall_us = 0;
+  decoder.have_g10_rise = false;
+  decoder.phase = Phase::REF;
+  clear_accum(decoder.ref);
+  clear_accum(decoder.rt);
+  clear_accum(decoder.rh);
+  decoder.rt_temperature_period_sum = 0;
+  decoder.rt_temperature_count = 0;
   clear_rh_state();
 }
 
@@ -153,29 +160,29 @@ static inline void IRAM_ATTR add_period(Accum &a, uint32_t period) {
 }
 
 static inline void IRAM_ATTR update_phase(uint32_t now) {
-  const uint32_t elapsed = static_cast<uint32_t>(now - measurement_start_us);
-  uint8_t next = elapsed < REF_PHASE_END_US ? REF :
-                 elapsed < RT_PHASE_END_US ? RT : RH;
-  if (next == phase) return;
-  phase = next;
-  last_g10_fall_us = 0;  // Never let a period cross a fixed phase boundary.
-  have_g10_rise = false;
-  if (next == RH) rh_state.last_us = 0;
+  const uint32_t elapsed = static_cast<uint32_t>(now - decoder.measurement_start_us);
+  const Phase next = elapsed < REF_PHASE_END_US ? Phase::REF :
+                     elapsed < RT_PHASE_END_US ? Phase::RT : Phase::RH;
+  if (next == decoder.phase) return;
+  decoder.phase = next;
+  decoder.last_g10_fall_us = 0;  // Never let a period cross a fixed phase boundary.
+  decoder.have_g10_rise = false;
+  if (next == Phase::RH) decoder.rh_state.last_us = 0;
 }
 
 static inline void IRAM_ATTR observe_rh_state(uint32_t now, uint8_t state) {
   // Characteristic RH state: G10=0, G11=0, G13=1.
-  if (phase != RH || (state & 0x0B) != 0x08) return;
-  if (rh_state.last_us != 0) {
-    const uint32_t dt = static_cast<uint32_t>(now - rh_state.last_us);
+  if (decoder.phase != Phase::RH || (state & 0x0B) != 0x08) return;
+  if (decoder.rh_state.last_us != 0) {
+    const uint32_t dt = static_cast<uint32_t>(now - decoder.rh_state.last_us);
     if (dt >= 40 && dt <= 60000) {
-      rh_state.samples[rh_state.write_pos] = static_cast<uint16_t>(dt);
-      rh_state.write_pos = static_cast<uint8_t>((rh_state.write_pos + 1) % RH_STATE_PERIOD_SAMPLES);
-      if (rh_state.sample_count < RH_STATE_PERIOD_SAMPLES) rh_state.sample_count++;
+      decoder.rh_state.samples[decoder.rh_state.write_pos] = static_cast<uint16_t>(dt);
+      decoder.rh_state.write_pos = static_cast<uint8_t>((decoder.rh_state.write_pos + 1) % RH_STATE_PERIOD_SAMPLES);
+      if (decoder.rh_state.sample_count < RH_STATE_PERIOD_SAMPLES) decoder.rh_state.sample_count++;
     }
   }
-  rh_state.last_us = now;
-  rh_state.seen++;
+  decoder.rh_state.last_us = now;
+  decoder.rh_state.seen++;
 }
 
 static float rh_state_period_median(const RhStateStats &s) {
@@ -197,22 +204,22 @@ static float rh_state_period_median(const RhStateStats &s) {
 }
 
 static void finalize_measurement() {
-  if (!collecting) return;
-  if (!ref.count || !rt.count || !rh_timing.count) {
-    collecting = false;
+  if (!decoder.collecting) return;
+  if (!decoder.ref.count || !decoder.rt.count || !decoder.rh.count) {
+    decoder.collecting = false;
     return;
   }
   Snapshot next{};
-  next.ref = ref;
-  next.rt = rt;
-  next.rh_timing = rh_timing;
-  next.rt_temp_period_sum = rt_temp_period_sum;
-  next.rt_temp_count = rt_temp_count;
-  next.rh_state = rh_state;
-  next.sequence = latest_snapshot.sequence + 1;
-  latest_snapshot = next;
-  snapshot_ready = true;
-  collecting = false;
+  next.ref = decoder.ref;
+  next.rt = decoder.rt;
+  next.rh_timing = decoder.rh;
+  next.rt_temp_period_sum = decoder.rt_temperature_period_sum;
+  next.rt_temp_count = decoder.rt_temperature_count;
+  next.rh_state = decoder.rh_state;
+  next.sequence = decoder.snapshot.sequence + 1;
+  decoder.snapshot = next;
+  decoder.snapshot_ready = true;
+  decoder.collecting = false;
 }
 
 #if RTRH_DEBUG_CAPTURE
@@ -221,16 +228,19 @@ static constexpr uint16_t MAX_SAMPLES = 1536;
 static constexpr uint32_t CAPTURE_DECIMATION = 16;
 static constexpr uint32_t CAPTURE_UNUSUAL_DECIMATION = 8;
 struct __attribute__((packed)) DebugSample { uint32_t t_us; uint16_t edge_no; uint8_t value; };
-static volatile DebugSample samples[MAX_SAMPLES];
-static volatile uint16_t sample_count = 0;
-static volatile uint16_t capture_edge_no = 0;
-static volatile uint16_t capture_unusual_no = 0;
-static volatile uint8_t debug_last_value = 0xff;
-static volatile uint32_t capture_start_us = 0;
-static volatile bool capturing = false;
-static volatile bool capture_ready = false;
-static volatile bool overflow = false;
-static volatile uint32_t capture_sequence = 0;
+struct DebugCaptureState {
+  volatile DebugSample samples[MAX_SAMPLES];
+  volatile uint16_t sample_count{0};
+  volatile uint16_t edge_count{0};
+  volatile uint16_t unusual_count{0};
+  volatile uint8_t last_value{0xff};
+  volatile uint32_t start_us{0};
+  volatile bool capturing{false};
+  volatile bool ready{false};
+  volatile bool overflow{false};
+  volatile uint32_t sequence{0};
+};
+static DebugCaptureState debug;
 #endif
 
 static void IRAM_ATTR gpio_isr(void *arg) {
@@ -239,78 +249,78 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
   const gpio_num_t pin = PINS[pin_index];
   const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
-  const uint8_t previous = pin_level[pin_index];
+  const uint8_t previous = decoder.pin_level[pin_index];
   if (level == previous) return;
-  pin_level[pin_index] = level;
+  decoder.pin_level[pin_index] = level;
 
   const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   const uint8_t state = read_state();
-  if (!collecting) reset_measurement(now, state);
-  else last_any_us = now;
+  if (!decoder.collecting) reset_measurement(now, state);
+  else decoder.last_edge_us = now;
   update_phase(now);
 
   // REF/RT timing comes only from the physical G10 IRQ. This avoids ordering
   // errors when several sensor lines change almost simultaneously.
   const bool is_g10_irq = pin_index == 0;
-  if (is_g10_irq && previous == 0 && level != 0) have_g10_rise = true;
+  if (is_g10_irq && previous == 0 && level != 0) decoder.have_g10_rise = true;
   if (is_g10_irq && previous != 0 && level == 0) {
-    const uint32_t previous_fall = last_g10_fall_us;
-    last_g10_fall_us = now;
-    if (previous_fall && have_g10_rise) {
+    const uint32_t previous_fall = decoder.last_g10_fall_us;
+    decoder.last_g10_fall_us = now;
+    if (previous_fall && decoder.have_g10_rise) {
       const uint32_t period = static_cast<uint32_t>(now - previous_fall);
       if (period <= CYCLE_MAX_US) {
-        if (phase == REF) add_period(ref, period);
-        else if (phase == RT) {
-          add_period(rt, period);
-          if (rt_temp_count < RT_TEMP_CYCLES) {
-            rt_temp_period_sum += period;
-            rt_temp_count++;
+        if (decoder.phase == Phase::REF) add_period(decoder.ref, period);
+        else if (decoder.phase == Phase::RT) {
+          add_period(decoder.rt, period);
+          if (decoder.rt_temperature_count < RT_TEMP_CYCLES) {
+            decoder.rt_temperature_period_sum += period;
+            decoder.rt_temperature_count++;
           }
-        } else if (phase == RH) {
-          add_period(rh_timing, period);
+        } else if (decoder.phase == Phase::RH) {
+          add_period(decoder.rh, period);
         }
       }
     }
-    have_g10_rise = false;
+    decoder.have_g10_rise = false;
   }
 
-  if (state != last_state) {
+  if (state != decoder.gpio_state) {
     observe_rh_state(now, state);
-    last_state = state;
+    decoder.gpio_state = state;
   }
 
 #if RTRH_DEBUG_CAPTURE
-  if (capture_ready) return;
+  if (debug.ready) return;
   const uint8_t value = read_state();
-  if (value == debug_last_value) return;
-  debug_last_value = value;
-  if (!capturing) {
-    capturing = true;
-    capture_start_us = now;
-    sample_count = capture_edge_no = capture_unusual_no = 0;
-    overflow = false;
+  if (value == debug.last_value) return;
+  debug.last_value = value;
+  if (!debug.capturing) {
+    debug.capturing = true;
+    debug.start_us = now;
+    debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+    debug.overflow = false;
   }
-  const uint16_t edge_no = capture_edge_no++;
+  const uint16_t edge_no = debug.edge_count++;
   const bool unusual = value != 0x00 && value != 0x0F;
   const bool time_anchor = edge_no == 0 || (edge_no % CAPTURE_DECIMATION) == 0;
   bool unusual_anchor = false;
   if (unusual) {
-    const uint16_t unusual_no = capture_unusual_no++;
+    const uint16_t unusual_no = debug.unusual_count++;
     unusual_anchor = unusual_no == 0 || (unusual_no % CAPTURE_UNUSUAL_DECIMATION) == 0;
   }
   if (!time_anchor && !unusual_anchor) return;
-  const uint16_t index = sample_count;
+  const uint16_t index = debug.sample_count;
   if (index >= MAX_SAMPLES) {
-    overflow = true;
-    capturing = false;
-    capture_ready = true;
-    capture_sequence++;
+    debug.overflow = true;
+    debug.capturing = false;
+    debug.ready = true;
+    debug.sequence++;
     return;
   }
-  samples[index].t_us = static_cast<uint32_t>(now - capture_start_us);
-  samples[index].edge_no = edge_no;
-  samples[index].value = value;
-  sample_count = index + 1;
+  debug.samples[index].t_us = static_cast<uint32_t>(now - debug.start_us);
+  debug.samples[index].edge_no = edge_no;
+  debug.samples[index].value = value;
+  debug.sample_count = index + 1;
 #endif
 }
 
@@ -325,10 +335,10 @@ bool setup() {
   if (err != ESP_OK) return false;
 
   for (gpio_num_t pin : PINS) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
-  last_state = read_state();
-  for (uint8_t i = 0; i < 3; i++) pin_level[i] = gpio_get_level(PINS[i]);
+  decoder.gpio_state = read_state();
+  for (uint8_t i = 0; i < 3; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
 #if RTRH_DEBUG_CAPTURE
-  debug_last_value = read_state();
+  debug.last_value = read_state();
 #endif
 
   for (uint8_t i = 0; i < 3; i++) {
@@ -341,31 +351,31 @@ bool setup() {
 
 void loop() {
   // A measurement is complete after the sensor has been silent for 15 s.
-  if (collecting) {
+  if (decoder.collecting) {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-    const uint32_t last = last_any_us;
+    const uint32_t last = decoder.last_edge_us;
     if (last && static_cast<uint32_t>(now - last) > MEASUREMENT_QUIET_US) {
       for (gpio_num_t pin : PINS) gpio_intr_disable(pin);
       const uint32_t now2 = static_cast<uint32_t>(esp_timer_get_time());
-      const uint32_t last2 = last_any_us;
-      if (collecting && last2 && static_cast<uint32_t>(now2 - last2) > MEASUREMENT_QUIET_US)
+      const uint32_t last2 = decoder.last_edge_us;
+      if (decoder.collecting && last2 && static_cast<uint32_t>(now2 - last2) > MEASUREMENT_QUIET_US)
         finalize_measurement();
-      last_state = read_state();
-      for (uint8_t i = 0; i < 3; i++) pin_level[i] = gpio_get_level(PINS[i]);
+      decoder.gpio_state = read_state();
+      for (uint8_t i = 0; i < 3; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
       for (gpio_num_t pin : PINS) gpio_intr_enable(pin);
     }
   }
 
 #if RTRH_DEBUG_CAPTURE
-  if (capturing && !capture_ready) {
+  if (debug.capturing && !debug.ready) {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-    if (static_cast<uint32_t>(now - capture_start_us) >= CAPTURE_US) {
-      capturing = false;
-      capture_ready = true;
-      capture_sequence++;
+    if (static_cast<uint32_t>(now - debug.start_us) >= CAPTURE_US) {
+      debug.capturing = false;
+      debug.ready = true;
+      debug.sequence++;
       ESP_LOGI(TAG, "RT/RH edge capture ready: %u events, sequence %lu%s",
-               sample_count, static_cast<unsigned long>(capture_sequence),
-               overflow ? " OVERFLOW" : "");
+               debug.sample_count, static_cast<unsigned long>(debug.sequence),
+               debug.overflow ? " OVERFLOW" : "");
     }
   }
 #endif
@@ -457,15 +467,14 @@ static Measurement derive(const Snapshot &s) {
 }
 
 bool poll(Measurement &measurement) {
-  static uint32_t last_sequence = 0;
-  if (!snapshot_ready || latest_snapshot.sequence == last_sequence) return false;
-  measurement = derive(latest_snapshot);
-  latest_measurement = measurement;
-  last_sequence = measurement.sequence;
+  if (!decoder.snapshot_ready || decoder.snapshot.sequence == decoder.last_polled_sequence) return false;
+  measurement = derive(decoder.snapshot);
+  decoder.latest_measurement = measurement;
+  decoder.last_polled_sequence = measurement.sequence;
   return true;
 }
 
-void update_latest(const Measurement &measurement) { latest_measurement = measurement; }
+void update_latest(const Measurement &measurement) { decoder.latest_measurement = measurement; }
 
 #if RTRH_DEBUG_CAPTURE
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
@@ -476,23 +485,23 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     return request->url_to(url) == "/rt_rh_capture.csv";
   }
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override {
-    if (!capture_ready || !sample_count) { request->send(204, "text/plain", nullptr); return; }
+    if (!debug.ready || !debug.sample_count) { request->send(204, "text/plain", nullptr); return; }
     httpd_req_t *req = *request;
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_capture.csv\"");
     static constexpr char HEADER[] = "sequence,t_us,edge_no,gpio10,gpio11,gpio13,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
-    const uint16_t count = sample_count;
-    const uint32_t sequence = capture_sequence;
-    const bool did_overflow = overflow;
+    const uint16_t count = debug.sample_count;
+    const uint32_t sequence = debug.sequence;
+    const bool did_overflow = debug.overflow;
     char chunk[128], line[80];
     size_t used = 0;
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
-      const uint8_t v = samples[i].value;
+      const uint8_t v = debug.samples[i].value;
       const int n = snprintf(line, sizeof(line), "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
-          static_cast<unsigned long>(sequence), static_cast<unsigned long>(samples[i].t_us),
-          static_cast<unsigned>(samples[i].edge_no), (v & 0x01) ? 1U : 0U,
+          static_cast<unsigned long>(sequence), static_cast<unsigned long>(debug.samples[i].t_us),
+          static_cast<unsigned>(debug.samples[i].edge_no), (v & 0x01) ? 1U : 0U,
           (v & 0x02) ? 1U : 0U, (v & 0x08) ? 1U : 0U, v, did_overflow ? 1U : 0U);
       if (n <= 0) continue;
       const size_t len = static_cast<size_t>(n);
@@ -501,8 +510,8 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     }
     if (err == ESP_OK && used) err = httpd_resp_send_chunk(req, chunk, used);
     if (err == ESP_OK) httpd_resp_send_chunk(req, nullptr, 0);
-    sample_count = capture_edge_no = capture_unusual_no = 0;
-    overflow = capture_ready = capturing = false;
+    debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+    debug.overflow = debug.ready = debug.capturing = false;
     if (err != ESP_OK) ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
   }
 };
@@ -516,13 +525,13 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     return request->url_to(url) == "/rt_rh_timing.csv";
   }
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override {
-    if (!snapshot_ready) { request->send(204, "text/plain", nullptr); return; }
-    const Snapshot s = latest_snapshot;
+    if (!decoder.snapshot_ready) { request->send(204, "text/plain", nullptr); return; }
+    const Snapshot s = decoder.snapshot;
     const float ref_us = s.ref.count ? float(s.ref.period_sum) / s.ref.count : 0.0f;
     const float rt_us = s.rt.count ? float(s.rt.period_sum) / s.rt.count : 0.0f;
     const float rh_us = s.rh_timing.count ? float(s.rh_timing.period_sum) / s.rh_timing.count : 0.0f;
     const float rh_state_us = rh_state_period_median(s.rh_state);
-    const Measurement d = latest_measurement;
+    const Measurement d = decoder.latest_measurement;
     const bool have = d.sequence == s.sequence;
     char body[1024];
     const int n = snprintf(body, sizeof(body),
