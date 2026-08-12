@@ -263,12 +263,18 @@ intentionally outside the handler.
 ## Why the ISR does not finalize a measurement
 
 The RT/RH sequence does not end with a dedicated digital end marker. The normal
-`rtrh_decoder::loop()` considers the measurement complete after 15 seconds with
-no new edge:
+`rtrh_decoder::loop()` considers the measurement complete after 100 ms with no
+new edge:
 
 ```cpp
-MEASUREMENT_QUIET_US = 15000000;
+MEASUREMENT_QUIET_US = 100000;
 ```
+
+The accepted RH-state interval can be as long as 60 ms, so 100 ms remains above
+the longest valid intra-measurement gap while avoiding the historical 15-second
+post-measurement delay. On the tested hardware the full REF+RT+RH waveform lasts
+about 383 ms, so a normal snapshot is ready roughly half a second after the first
+edge.
 
 Before copying the live accumulator into `decoder.snapshot`, it disables both RT/RH GPIO interrupts, checks the quiet condition again, performs the
 copy, refreshes current pin levels, and re-enables the interrupts.
@@ -361,3 +367,17 @@ Before changing ISR-related code, check all of the following:
 If a change affects timing constants, pin assignments, state masks, sample
 limits, buffer sizes, or ISR synchronization, treat it as a protocol-level
 change rather than a cosmetic refactor and validate it against raw captures.
+
+## Automatic Light-sleep interaction
+
+When `light_sleep: true`, the first RT/RH GPIO ISR edge calls
+`power_save::on_rtrh_edge_from_isr()`. That function acquires an
+`ESP_PM_NO_LIGHT_SLEEP` lock. `esp_pm_lock_acquire()` is used here specifically
+because ESP-IDF permits it from ISR context. The lock is guarded so subsequent
+RT/RH edges do not recursively acquire it.
+
+Do not move the first-edge lock acquisition out of the ISR: automatic
+Light-sleep between RT/RH edges would add wake latency to ISR timestamps and
+could corrupt period measurements. The lock is released only from normal task
+context after RT/RH completion plus a subsequent valid CO2 frame, or the
+failsafe timeout.

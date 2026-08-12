@@ -2,6 +2,7 @@
 #include "rtrh_decoder.h"
 
 #include "calibration.h"
+#include "power_save.h"
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
@@ -25,7 +26,7 @@ static constexpr gpio_num_t PINS[] = {PIN_G10, PIN_G13};
 
 // The controller spends ~125 ms in REF and ~127 ms in RT. Phase identity is
 // deliberately based on elapsed time, never on RC period or cycle count.
-static constexpr uint32_t MEASUREMENT_QUIET_US = 15000000;
+static constexpr uint32_t MEASUREMENT_QUIET_US = 100000;
 static constexpr uint32_t REF_PHASE_END_US = 125000;
 static constexpr uint32_t RT_PHASE_END_US = 252000;
 static constexpr uint32_t CYCLE_MAX_US = 20000;
@@ -253,6 +254,7 @@ static DebugCaptureState debug;
 #endif
 
 static void IRAM_ATTR gpio_isr(void *arg) {
+  power_save::on_rtrh_edge_from_isr();
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
   if (encoded < 1 || encoded > 2) return;
   const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
@@ -360,7 +362,8 @@ bool setup() {
 }
 
 void loop() {
-  // A measurement is complete after the sensor has been silent for 15 s.
+  // RH can legitimately contain periods up to 60 ms. 100 ms of silence therefore
+  // terminates the ~383 ms RT/RH transaction safely without the former 15 s delay.
   if (decoder.collecting) {
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
     const uint32_t last = decoder.last_edge_us;

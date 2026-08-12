@@ -4,6 +4,7 @@
 #include "ble_options.h"
 #include "co2_decoder.h"
 #include "rtrh_decoder.h"
+#include "power_save.h"
 
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
@@ -92,6 +93,8 @@ bool BusSniffer::initialize_sniffer_io_() {
   }
 
   this->io_initialized_ = true;
+  if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_))
+    ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
   return true;
@@ -181,6 +184,7 @@ void BusSniffer::process_rtrh_() {
 
   rtrh_decoder::Measurement m;
   if (!rtrh_decoder::poll(m)) return;
+  power_save::on_rtrh_complete(m.valid);
 
   ESP_LOGI(TAG,
            "RT/RH measurement %lu quality: REF %.3f us / %.3f ms / %u, "
@@ -280,6 +284,7 @@ void BusSniffer::process_co2_() {
     publish(this->out_.frame_errors, static_cast<float>(this->co2_.frame_errors));
   }
   if (!result.have_co2) return;
+  power_save::on_valid_co2();
 
   const uint16_t ppm = result.co2_ppm;
 #if UNNI_BLE_ENABLED
@@ -318,6 +323,7 @@ void BusSniffer::loop() {
   if (!this->io_initialized_) return;
   this->process_rtrh_();
   this->process_co2_();
+  power_save::loop();
 }
 
 }  // namespace bus_sniffer

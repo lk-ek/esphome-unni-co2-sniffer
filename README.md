@@ -22,7 +22,7 @@ The signal interpretation and calibration were derived experimentally from the t
 - Sensirion-compatible live BLE advertising
 - persistent Sensirion-style history with GATT download
 - compile-time raw capture/debug HTTP support
-- production-oriented 80 MHz CPU configuration and Wi-Fi power saving
+- production-oriented 80 MHz CPU configuration, Wi-Fi power saving, and optional automatic Light-sleep
 - delayed GPIO/ISR initialization for boot isolation
 - GPL-3.0-or-later
 
@@ -64,7 +64,26 @@ Do not put the resistor in series with the original Unni signal path.
 
 ### Boot isolation and self-heating
 
-The production configuration runs the ESP32-C3 at 80 MHz and uses Wi-Fi power saving. `sniffer_start_delay` delays all custom GPIO configuration and ISR attachment; during that period the component leaves the four observed signal pins untouched. The supplied production configurations use 10 seconds.
+The production configuration runs the ESP32-C3 at 80 MHz, uses Wi-Fi power saving, and enables ESP-IDF automatic Light-sleep. `sniffer_start_delay` delays all custom GPIO configuration and ISR attachment; during that period the component leaves the four observed signal pins untouched. The supplied production configurations use 10 seconds.
+
+### Automatic Light-sleep
+
+The supplied YAML files enable `CONFIG_PM_ENABLE` and FreeRTOS tickless idle, then configure:
+
+```yaml
+bus_sniffer:
+  light_sleep: true
+  light_sleep_max_awake: 10s
+```
+
+Only the two RT/RH inputs are configured as external Light-sleep wake sources:
+
+- D1 / GPIO3 / G10
+- D2 / GPIO4 / G13
+
+The CO₂ bus on GPIO6/GPIO7 is deliberately **not** a wake source. On the first RT/RH edge, the GPIO ISR acquires an ESP-IDF `ESP_PM_NO_LIGHT_SLEEP` lock. This keeps the CPU fully awake while the complete RT/RH transaction is captured. The transaction normally occupies about 383 ms and is finalized after 100 ms of bus silence. The lock then remains held until one subsequent valid CO₂ frame has been decoded. Once both conditions are satisfied the lock is released and automatic Light-sleep may resume. A 10-second failsafe releases the lock if a cycle cannot complete.
+
+Wi-Fi/BLE and other ESP-IDF subsystems can hold their own power-management locks, so `light_sleep: true` permits automatic Light-sleep but does not guarantee that every idle interval reaches Light-sleep. `i2c-sniffer-no-ble.yaml` is the cleanest baseline for measuring the savings attributable to BLE.
 
 This is useful both for boot-isolation testing and because the added ESP sits near temperature-sensitive circuitry.
 
@@ -80,6 +99,7 @@ This is useful both for boot-isolation testing and because the added ESP sits ne
 │   ├── bus_sniffer.cpp/.h        orchestration, HA publishing, feature wiring
 │   ├── co2_decoder.cpp/.h        CO₂ GPIO capture + passive bus decoding
 │   ├── rtrh_decoder.cpp/.h       RT/RH ISR capture, quality, calibrated result
+│   ├── power_save.cpp/.h         automatic Light-sleep + RT/RH awake-window lock
 │   ├── calibration.h             RT/RH calibration model and valid ranges
 │   ├── sensirion_sample.h        shared T/RH/CO₂ wire sample representation
 │   ├── sensirion_ble.cpp/.h      live BLE advertising and GAP/GATT handling
@@ -107,6 +127,7 @@ This is the normal firmware:
 - logger level `WARN`
 - HA publish interval 30 s
 - sniffer GPIO initialization delayed by 10 s
+- automatic Light-sleep enabled; RT/RH GPIO wake + CO₂ completion gate
 
 The YAML includes the `senshist` data partition required by persistent history.
 
@@ -150,6 +171,8 @@ bus_sniffer:
   ble_advertising_interval: 2s
   ha_publish_interval: 30s
   sniffer_start_delay: 10s
+  light_sleep: true
+  light_sleep_max_awake: 10s
 
   debug_capture: false
   debug_metrics: false
@@ -201,6 +224,8 @@ The CO₂ decoder lives entirely in `bus_sniffer/co2_decoder.*`.
 ## RT/RH decoder
 
 The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10 and G13 and derives normalized RT/reference and RH/reference values. D3/GPIO5 (the Unni G11 signal used during reverse engineering) is not required by the production decoder.
+
+The RT/RH decoder now finalizes a transaction after 100 ms of silence rather than the historical 15-second quiet delay. This is intentionally longer than the maximum accepted 60 ms RH state period while allowing the power-save state machine to proceed roughly half a second after the RT/RH cycle begins.
 
 The RT/RH decoder owns:
 
@@ -258,6 +283,7 @@ esphome compile i2c-sniffer-no-ble.yaml
 Current documentation:
 
 - [`docs/ISR_ARCHITECTURE.md`](docs/ISR_ARCHITECTURE.md) — ISR, concurrency, capture handoff, timing-sensitive rules
+- [`docs/LIGHT_SLEEP.md`](docs/LIGHT_SLEEP.md) — automatic Light-sleep wake/lock state machine and limitations
 - [`tools/README.md`](tools/README.md) — reverse-engineering utilities
 
 The files under [`docs/history/`](docs/history/) are intentionally retained as **historical engineering notes**. They record calibration iterations, BLE experiments, power-saving tests, and previous refactors, but may refer to superseded code or configuration. They are not the source of truth for the current architecture.

@@ -30,6 +30,8 @@ class BusSniffer : public Component {
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
+  void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
+  void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
@@ -112,6 +114,8 @@ class BusSniffer : public Component {
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
   bool debug_metrics_{false};
+  bool light_sleep_enabled_{false};
+  uint32_t light_sleep_max_awake_ms_{10000};
 };
 
 }  // namespace bus_sniffer
