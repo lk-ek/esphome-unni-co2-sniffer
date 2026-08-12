@@ -304,6 +304,11 @@ For ESPHome documentation, see:
 
 ## Development notes
 
+The interrupt-driven decoder is documented separately in
+[ISR_ARCHITECTURE.md](ISR_ARCHITECTURE.md). Read that document before changing
+GPIO interrupt handlers, timing thresholds, capture buffers, or the RT/RH
+phase state machine.
+
 The repository includes several dated calibration and development notes documenting the reverse-engineering process, BLE experiments, measurement-quality work, power-saving changes, and history-download fixes. They are useful when changing the low-level decoder, but are not required for a normal production build.
 
 If you change the hardware revision, pin assignment, calibration, or RT/RH sensor circuitry, verify the raw ratios and diagnostic quality metrics before trusting the converted values.
@@ -321,7 +326,7 @@ This project is licensed under **GNU General Public License v3.0 or later (`GPL-
 Third-party libraries, tools, applications, trademarks, and documentation remain subject to their respective licenses and owners.
 
 
-## Current code structure (refactor v11)
+## Current code structure
 
 - `bus_sniffer.cpp`: orchestration, Home Assistant publishing and feature wiring
 - `co2_decoder.*`: passive CO2 bus capture/decoder

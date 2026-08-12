@@ -101,6 +101,9 @@ class BusSniffer : public Component {
   binary_sensor::BinarySensor *calibration_extrapolation_sensor_{nullptr};
 
   void maybe_publish_ha_();
+  void process_rtrh_();
+  void process_co2_();
+  float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
 
   uint32_t sniffer_start_delay_ms_{0};
