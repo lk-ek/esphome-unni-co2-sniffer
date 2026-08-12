@@ -4,67 +4,43 @@
 #include "sensirion_history.h"
 #include "sensirion_ble.h"
 
-#include "esphome/core/log.h"
+#include "esphome/components/esp32_ble_server/ble_2902.h"
+#include "esphome/components/esp32_ble_server/ble_characteristic.h"
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include "esphome/components/esp32_ble_server/ble_service.h"
-#include "esphome/components/esp32_ble_server/ble_characteristic.h"
-#include "esphome/components/esp32_ble_server/ble_2902.h"
+#include "esphome/core/log.h"
 
 #include "esp_partition.h"
 #include "esp_timer.h"
 
-#include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
 #include <utility>
 #include <vector>
 
-namespace esphome {
-namespace bus_sniffer {
+namespace esphome::bus_sniffer {
+namespace {
 
-/*
- * ============================================================================
- * Sensirion-compatible history logger + download protocol
- * ============================================================================
- *
- * The official Gadget library uses:
- *   8001 READ|WRITE  history interval in milliseconds (uint32 LE)
- *   8002 READ        number of available samples (uint32 LE)
- *   8003 WRITE       requested number of samples (uint32 LE; 0 = all)
- *   8004 NOTIFY      20-byte download packets
- *
- * T_RH_CO2_ALT history samples are 8 bytes:
- *   T raw u16 LE, RH raw u16 LE, CO2 ppm u16 LE, 00 00.
- * Download type is 7 and two samples fit in each 20-byte packet.
- *
- * RAM keeps 4096 samples.  At 1 minute this is 68 h 16 min, i.e. about
- * 2.84 days.  The flash partition is an append-only physical log larger than
- * the logical RAM history.  This lets us erase a flash sector only after all
- * records in it are older than the 4096-sample logical window.
- */
+static const char *const TAG = "sensirion_history";
 
-static constexpr size_t SENS_HISTORY_SAMPLE_SIZE = 8;
-static constexpr size_t SENS_HISTORY_CAPACITY = 4096;
-static constexpr uint32_t SENS_HISTORY_DEFAULT_INTERVAL_MS = 600000;
-static constexpr uint32_t SENS_HISTORY_FLASH_FLUSH_MS = 600000;
-static constexpr size_t SENS_HISTORY_FLASH_SECTOR = 4096;
-static constexpr size_t SENS_HISTORY_FLASH_META_SECTOR = 0;
-static constexpr size_t SENS_HISTORY_FLASH_DATA_FIRST_SECTOR = 1;
-static constexpr size_t SENS_HISTORY_FLASH_DATA_SECTORS = 14;
-static constexpr size_t SENS_HISTORY_FLASH_SAMPLES_PER_SECTOR =
-    SENS_HISTORY_FLASH_SECTOR / SENS_HISTORY_SAMPLE_SIZE;  // 512
-static constexpr size_t SENS_HISTORY_FLASH_CAPACITY =
-    SENS_HISTORY_FLASH_DATA_SECTORS * SENS_HISTORY_FLASH_SAMPLES_PER_SECTOR; // 7168
-static constexpr uint32_t SENS_HISTORY_META_MAGIC = 0x53474832; // "SGH2"
-static constexpr uint16_t SENS_HISTORY_META_VERSION = 2;
-static constexpr uint16_t SENS_HISTORY_DOWNLOAD_TYPE = 7;
+constexpr size_t SAMPLE_SIZE = 8;
+constexpr uint16_t RAM_CAPACITY = 4096;
+constexpr uint32_t DEFAULT_INTERVAL_MS = 600000;
+constexpr uint32_t FLASH_FLUSH_MS = 600000;
+constexpr size_t FLASH_SECTOR_SIZE = 4096;
+constexpr uint16_t FLASH_DATA_SECTORS = 14;
+constexpr uint16_t FLASH_SAMPLES_PER_SECTOR = FLASH_SECTOR_SIZE / SAMPLE_SIZE;
+constexpr uint16_t FLASH_CAPACITY = FLASH_DATA_SECTORS * FLASH_SAMPLES_PER_SECTOR;
+constexpr uint32_t META_MAGIC = 0x53474832;  // "SGH2"
+constexpr uint16_t META_VERSION = 2;
+constexpr uint16_t DOWNLOAD_TYPE = 7;
 
-struct SensHistorySample {
-  uint8_t data[SENS_HISTORY_SAMPLE_SIZE];
-};
+using Sample = std::array<uint8_t, SAMPLE_SIZE>;
 
-struct __attribute__((packed)) SensHistoryMeta {
+struct __attribute__((packed)) FlashMeta {
   uint32_t magic;
   uint16_t version;
   uint16_t size;
@@ -76,742 +52,532 @@ struct __attribute__((packed)) SensHistoryMeta {
   uint32_t crc;
   uint32_t reserved1;
 };
-static_assert(sizeof(SensHistoryMeta) == 32, "history meta record must be 32 bytes");
+static_assert(sizeof(FlashMeta) == 32);
 
-static SensHistorySample sens_history[SENS_HISTORY_CAPACITY];
-static uint16_t sens_history_head = 0;  // next RAM write slot
-static uint16_t sens_history_count = 0;
-static uint32_t sens_history_interval_ms = SENS_HISTORY_DEFAULT_INTERVAL_MS;
-static uint32_t sens_history_latest_ms = 0;
-static uint32_t sens_history_last_sample_ms = 0;
-static bool sens_history_sample_clock_started = false;
+struct HistoryState {
+  std::array<Sample, RAM_CAPACITY> samples{};
+  uint16_t head{0};
+  uint16_t count{0};
+  uint16_t pending{0};
+  uint32_t interval_ms{DEFAULT_INTERVAL_MS};
+  uint32_t latest_ms{0};
+  uint32_t last_sample_ms{0};
+  bool clock_started{false};
+};
 
-static const esp_partition_t *sens_history_partition = nullptr;
-static bool sens_history_flash_ready = false;
-static uint16_t sens_history_flash_write_slot = 0;
-static uint16_t sens_history_persisted_count = 0;
-static uint16_t sens_history_pending_count = 0;
-static uint32_t sens_history_meta_generation = 0;
-static uint16_t sens_history_meta_next_slot = 0;
-static uint32_t sens_history_last_flush_ms = 0;
+struct FlashState {
+  const esp_partition_t *partition{nullptr};
+  bool ready{false};
+  uint16_t write_slot{0};
+  uint16_t persisted{0};
+  uint32_t generation{0};
+  uint16_t next_meta_slot{0};
+  uint32_t last_flush_ms{0};
+};
 
-static esp32_ble_server::BLECharacteristic *sens_history_count_char = nullptr;
-static esp32_ble_server::BLECharacteristic *sens_history_interval_char = nullptr;
-static esp32_ble_server::BLECharacteristic *sens_history_requested_char = nullptr;
-static esp32_ble_server::BLECharacteristic *sens_history_download_char = nullptr;
-
-class SensirionHistoryCCCD : public esp32_ble_server::BLE2902 {
+class HistoryCCCD : public esp32_ble_server::BLE2902 {
  public:
-  uint16_t get_handle() const { return this->handle_; }
+  uint16_t handle() const { return handle_; }
 };
 
-static SensirionHistoryCCCD *sens_history_download_cccd = nullptr;
-static bool sens_history_gatt_bound = false;
-
-static uint32_t sens_history_requested_samples = 0;
-
-enum class SensHistoryDownloadState : uint8_t {
-  INACTIVE = 0,
-  START,
-  DOWNLOADING,
+struct GattState {
+  esp32_ble_server::BLECharacteristic *count{nullptr};
+  esp32_ble_server::BLECharacteristic *interval{nullptr};
+  esp32_ble_server::BLECharacteristic *requested{nullptr};
+  esp32_ble_server::BLECharacteristic *download{nullptr};
+  HistoryCCCD *download_cccd{nullptr};
+  bool bound{false};
 };
-static SensHistoryDownloadState sens_history_download_state =
-    SensHistoryDownloadState::INACTIVE;
-static uint16_t sens_history_download_sequence = 0;
-static uint16_t sens_history_download_count = 0;
-static uint16_t sens_history_download_sent = 0;
-static uint16_t sens_history_download_start_logical = 0;
-static uint32_t sens_history_download_age_ms = 0;
-static uint32_t sens_history_last_packet_ms = 0;
 
-static inline uint32_t sens_history_now_ms()
-{
+enum class DownloadPhase : uint8_t { INACTIVE, HEADER, DATA };
+struct DownloadState {
+  DownloadPhase phase{DownloadPhase::INACTIVE};
+  uint32_t requested{0};
+  uint16_t count{0};
+  uint16_t sent{0};
+  uint16_t sequence{0};
+  uint16_t start_logical{0};
+  uint32_t age_ms{0};
+  uint32_t last_packet_ms{0};
+};
+
+HistoryState history;
+FlashState flash;
+GattState gatt;
+DownloadState download;
+
+uint32_t now_ms() {
   return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
 }
 
-static inline uint32_t sens_history_get_u32_le(std::span<const uint8_t> x)
-{
+uint32_t get_u32_le(std::span<const uint8_t> x) {
   return static_cast<uint32_t>(x[0]) |
          (static_cast<uint32_t>(x[1]) << 8) |
          (static_cast<uint32_t>(x[2]) << 16) |
          (static_cast<uint32_t>(x[3]) << 24);
 }
 
-static inline void sens_history_put_u16_le(uint8_t *p, uint16_t v)
-{
-  p[0] = static_cast<uint8_t>(v & 0xFF);
-  p[1] = static_cast<uint8_t>((v >> 8) & 0xFF);
+void put_u16_le(uint8_t *p, uint16_t v) {
+  p[0] = static_cast<uint8_t>(v);
+  p[1] = static_cast<uint8_t>(v >> 8);
 }
 
-static inline void sens_history_put_u32_le(uint8_t *p, uint32_t v)
-{
-  p[0] = static_cast<uint8_t>(v & 0xFF);
-  p[1] = static_cast<uint8_t>((v >> 8) & 0xFF);
-  p[2] = static_cast<uint8_t>((v >> 16) & 0xFF);
-  p[3] = static_cast<uint8_t>((v >> 24) & 0xFF);
+void put_u32_le(uint8_t *p, uint32_t v) {
+  for (uint8_t i = 0; i < 4; ++i)
+    p[i] = static_cast<uint8_t>(v >> (8 * i));
 }
 
-static uint32_t sens_history_meta_crc(const SensHistoryMeta &m)
-{
-  // FNV-1a over the record excluding crc/reserved1.
-  const uint8_t *p = reinterpret_cast<const uint8_t *>(&m);
-  constexpr size_t n = offsetof(SensHistoryMeta, crc);
-  uint32_t h = 2166136261UL;
-  for (size_t i = 0; i < n; i++) {
-    h ^= p[i];
-    h *= 16777619UL;
+uint32_t meta_crc(const FlashMeta &meta) {
+  const auto *p = reinterpret_cast<const uint8_t *>(&meta);
+  uint32_t hash = 2166136261UL;
+  for (size_t i = 0; i < offsetof(FlashMeta, crc); ++i) {
+    hash ^= p[i];
+    hash *= 16777619UL;
   }
-  return h;
+  return hash;
 }
 
-static bool sens_history_meta_valid(const SensHistoryMeta &m)
-{
-  return m.magic == SENS_HISTORY_META_MAGIC &&
-         m.version == SENS_HISTORY_META_VERSION &&
-         m.size == sizeof(SensHistoryMeta) &&
-         m.count <= SENS_HISTORY_CAPACITY &&
-         m.flash_write_slot < SENS_HISTORY_FLASH_CAPACITY &&
-         m.interval_ms > 0 &&
-         m.crc == sens_history_meta_crc(m);
+bool valid_meta(const FlashMeta &meta) {
+  return meta.magic == META_MAGIC && meta.version == META_VERSION &&
+         meta.size == sizeof(FlashMeta) && meta.count <= RAM_CAPACITY &&
+         meta.flash_write_slot < FLASH_CAPACITY && meta.interval_ms > 0 &&
+         meta.crc == meta_crc(meta);
 }
 
-static size_t sens_history_flash_sample_offset(uint16_t slot)
-{
-  return SENS_HISTORY_FLASH_DATA_FIRST_SECTOR * SENS_HISTORY_FLASH_SECTOR +
-         static_cast<size_t>(slot) * SENS_HISTORY_SAMPLE_SIZE;
+size_t sample_offset(uint16_t slot) {
+  return FLASH_SECTOR_SIZE + static_cast<size_t>(slot) * SAMPLE_SIZE;
 }
 
-static bool sens_history_write_meta()
-{
-  if (!sens_history_flash_ready)
+Sample logical_sample(uint16_t logical) {
+  const uint16_t oldest = static_cast<uint16_t>(
+      (history.head + RAM_CAPACITY - history.count) % RAM_CAPACITY);
+  return history.samples[(oldest + logical) % RAM_CAPACITY];
+}
+
+void sync_gatt() {
+  auto u32 = [](uint32_t v) {
+    return std::vector<uint8_t>{static_cast<uint8_t>(v), static_cast<uint8_t>(v >> 8),
+                                static_cast<uint8_t>(v >> 16), static_cast<uint8_t>(v >> 24)};
+  };
+  if (gatt.count != nullptr)
+    gatt.count->set_value(u32(history.count));
+  if (gatt.interval != nullptr)
+    gatt.interval->set_value(u32(history.interval_ms));
+}
+
+bool write_meta() {
+  if (!flash.ready)
     return false;
 
-  constexpr uint16_t records_per_sector =
-      SENS_HISTORY_FLASH_SECTOR / sizeof(SensHistoryMeta);
-
-  if (sens_history_meta_next_slot >= records_per_sector) {
-    esp_err_t err = esp_partition_erase_range(
-        sens_history_partition,
-        SENS_HISTORY_FLASH_META_SECTOR * SENS_HISTORY_FLASH_SECTOR,
-        SENS_HISTORY_FLASH_SECTOR);
+  constexpr uint16_t RECORDS_PER_SECTOR = FLASH_SECTOR_SIZE / sizeof(FlashMeta);
+  if (flash.next_meta_slot >= RECORDS_PER_SECTOR) {
+    const esp_err_t err = esp_partition_erase_range(flash.partition, 0, FLASH_SECTOR_SIZE);
     if (err != ESP_OK) {
-      ESP_LOGE("sensirion_history", "metadata sector erase failed: %d", err);
+      ESP_LOGE(TAG, "metadata sector erase failed: %d", err);
       return false;
     }
-    sens_history_meta_next_slot = 0;
+    flash.next_meta_slot = 0;
   }
 
-  SensHistoryMeta m{};
-  m.magic = SENS_HISTORY_META_MAGIC;
-  m.version = SENS_HISTORY_META_VERSION;
-  m.size = sizeof(SensHistoryMeta);
-  m.generation = ++sens_history_meta_generation;
-  m.interval_ms = sens_history_interval_ms;
-  m.count = sens_history_persisted_count;
-  m.flash_write_slot = sens_history_flash_write_slot;
-  m.crc = sens_history_meta_crc(m);
+  FlashMeta meta{};
+  meta.magic = META_MAGIC;
+  meta.version = META_VERSION;
+  meta.size = sizeof(FlashMeta);
+  meta.generation = ++flash.generation;
+  meta.interval_ms = history.interval_ms;
+  meta.count = flash.persisted;
+  meta.flash_write_slot = flash.write_slot;
+  meta.crc = meta_crc(meta);
 
-  const size_t offset = static_cast<size_t>(sens_history_meta_next_slot) *
-                        sizeof(SensHistoryMeta);
-  esp_err_t err = esp_partition_write(
-      sens_history_partition, offset, &m, sizeof(m));
+  const size_t offset = static_cast<size_t>(flash.next_meta_slot) * sizeof(meta);
+  const esp_err_t err = esp_partition_write(flash.partition, offset, &meta, sizeof(meta));
   if (err != ESP_OK) {
-    ESP_LOGE("sensirion_history", "metadata write failed: %d", err);
+    ESP_LOGE(TAG, "metadata write failed: %d", err);
     return false;
   }
-
-  sens_history_meta_next_slot++;
+  ++flash.next_meta_slot;
   return true;
 }
 
-static void sens_history_sync_gatt_values()
-{
-  if (sens_history_count_char != nullptr) {
-    const uint32_t n = sens_history_count;
-    sens_history_count_char->set_value({
-        static_cast<uint8_t>(n & 0xFF),
-        static_cast<uint8_t>((n >> 8) & 0xFF),
-        static_cast<uint8_t>((n >> 16) & 0xFF),
-        static_cast<uint8_t>((n >> 24) & 0xFF)});
-  }
-  if (sens_history_interval_char != nullptr) {
-    const uint32_t ms = sens_history_interval_ms;
-    sens_history_interval_char->set_value({
-        static_cast<uint8_t>(ms & 0xFF),
-        static_cast<uint8_t>((ms >> 8) & 0xFF),
-        static_cast<uint8_t>((ms >> 16) & 0xFF),
-        static_cast<uint8_t>((ms >> 24) & 0xFF)});
-  }
-}
+void clear_history() {
+  history.head = history.count = history.pending = 0;
+  history.latest_ms = history.last_sample_ms = 0;
+  history.clock_started = false;
+  flash.write_slot = flash.persisted = 0;
+  download = {};
 
-static void sens_history_flash_clear()
-{
-  sens_history_head = 0;
-  sens_history_count = 0;
-  sens_history_pending_count = 0;
-  sens_history_persisted_count = 0;
-  sens_history_flash_write_slot = 0;
-  sens_history_sample_clock_started = false;
-  sens_history_latest_ms = 0;
-  sens_history_last_sample_ms = 0;
-  sens_history_download_state = SensHistoryDownloadState::INACTIVE;
-
-  if (sens_history_flash_ready) {
-    const size_t erase_len =
-        (1 + SENS_HISTORY_FLASH_DATA_SECTORS) * SENS_HISTORY_FLASH_SECTOR;
-    esp_err_t err = esp_partition_erase_range(
-        sens_history_partition, 0, erase_len);
+  if (flash.ready) {
+    const size_t bytes = (1 + FLASH_DATA_SECTORS) * FLASH_SECTOR_SIZE;
+    const esp_err_t err = esp_partition_erase_range(flash.partition, 0, bytes);
     if (err != ESP_OK) {
-      ESP_LOGE("sensirion_history", "history erase failed: %d", err);
+      ESP_LOGE(TAG, "history erase failed: %d", err);
     } else {
-      sens_history_meta_generation = 0;
-      sens_history_meta_next_slot = 0;
-      sens_history_write_meta();
+      flash.generation = 0;
+      flash.next_meta_slot = 0;
+      write_meta();
     }
   }
-
-  sens_history_sync_gatt_values();
+  sync_gatt();
 }
 
-static void sens_history_set_interval(uint32_t ms)
-{
-  if (ms == 0)
+void set_interval(uint32_t ms) {
+  if (ms == 0 || ms == history.interval_ms)
     return;
-
-  if (ms == sens_history_interval_ms)
-    return;
-
-  ESP_LOGI("sensirion_history",
-           "logging interval changed %u -> %u ms; clearing history",
-           static_cast<unsigned>(sens_history_interval_ms),
-           static_cast<unsigned>(ms));
-
-  sens_history_interval_ms = ms;
-  sens_history_flash_clear();
+  ESP_LOGI(TAG, "logging interval changed %u -> %u ms; clearing history",
+           static_cast<unsigned>(history.interval_ms), static_cast<unsigned>(ms));
+  history.interval_ms = ms;
+  clear_history();
 }
 
-static bool sens_history_flash_flush()
-{
-  if (!sens_history_flash_ready || sens_history_pending_count == 0)
+bool flush_flash() {
+  if (!flash.ready || history.pending == 0)
     return true;
 
-  // The pending samples are the newest pending_count entries in the RAM ring.
-  uint16_t first_ram = static_cast<uint16_t>(
-      (sens_history_head + SENS_HISTORY_CAPACITY - sens_history_pending_count) %
-      SENS_HISTORY_CAPACITY);
+  const uint16_t pending = history.pending;
+  const uint16_t first_ram = static_cast<uint16_t>(
+      (history.head + RAM_CAPACITY - pending) % RAM_CAPACITY);
+  uint16_t write_slot = flash.write_slot;
+  uint16_t persisted = flash.persisted;
 
-  uint16_t new_flash_write_slot = sens_history_flash_write_slot;
-  uint16_t new_persisted_count = sens_history_persisted_count;
-
-  for (uint16_t i = 0; i < sens_history_pending_count; i++) {
-    const uint16_t flash_slot = new_flash_write_slot;
-    if ((flash_slot % SENS_HISTORY_FLASH_SAMPLES_PER_SECTOR) == 0) {
-      const size_t sector = SENS_HISTORY_FLASH_DATA_FIRST_SECTOR +
-          flash_slot / SENS_HISTORY_FLASH_SAMPLES_PER_SECTOR;
-      esp_err_t err = esp_partition_erase_range(
-          sens_history_partition,
-          sector * SENS_HISTORY_FLASH_SECTOR,
-          SENS_HISTORY_FLASH_SECTOR);
+  for (uint16_t i = 0; i < pending; ++i) {
+    if ((write_slot % FLASH_SAMPLES_PER_SECTOR) == 0) {
+      const size_t sector = 1 + write_slot / FLASH_SAMPLES_PER_SECTOR;
+      const esp_err_t err = esp_partition_erase_range(
+          flash.partition, sector * FLASH_SECTOR_SIZE, FLASH_SECTOR_SIZE);
       if (err != ESP_OK) {
-        ESP_LOGE("sensirion_history", "data sector erase failed: %d", err);
+        ESP_LOGE(TAG, "data sector erase failed: %d", err);
         return false;
       }
     }
 
-    const uint16_t ram_slot = static_cast<uint16_t>(
-        (first_ram + i) % SENS_HISTORY_CAPACITY);
-    esp_err_t err = esp_partition_write(
-        sens_history_partition,
-        sens_history_flash_sample_offset(flash_slot),
-        sens_history[ram_slot].data,
-        SENS_HISTORY_SAMPLE_SIZE);
+    const uint16_t ram_slot = (first_ram + i) % RAM_CAPACITY;
+    const esp_err_t err = esp_partition_write(
+        flash.partition, sample_offset(write_slot), history.samples[ram_slot].data(), SAMPLE_SIZE);
     if (err != ESP_OK) {
-      ESP_LOGE("sensirion_history", "sample flash write failed: %d", err);
+      ESP_LOGE(TAG, "sample flash write failed: %d", err);
       return false;
     }
-
-    new_flash_write_slot = static_cast<uint16_t>(
-        (new_flash_write_slot + 1) % SENS_HISTORY_FLASH_CAPACITY);
-    if (new_persisted_count < SENS_HISTORY_CAPACITY)
-      new_persisted_count++;
+    write_slot = (write_slot + 1) % FLASH_CAPACITY;
+    if (persisted < RAM_CAPACITY)
+      ++persisted;
   }
 
-  // Commit the in-RAM flash journal pointers only after the complete batch has
-  // been written successfully. If power fails before the metadata record, the
-  // old journal entry remains authoritative and this batch is simply ignored.
-  sens_history_flash_write_slot = new_flash_write_slot;
-  sens_history_persisted_count = new_persisted_count;
-
-  const uint16_t flushed = sens_history_pending_count;
-  sens_history_pending_count = 0;
-  sens_history_last_flush_ms = sens_history_now_ms();
-
-  if (!sens_history_write_meta())
+  flash.write_slot = write_slot;
+  flash.persisted = persisted;
+  history.pending = 0;
+  flash.last_flush_ms = now_ms();
+  if (!write_meta())
     return false;
 
-  ESP_LOGI("sensirion_history",
-           "flushed %u sample(s) to flash; persisted=%u, flash_slot=%u",
-           static_cast<unsigned>(flushed),
-           static_cast<unsigned>(sens_history_persisted_count),
-           static_cast<unsigned>(sens_history_flash_write_slot));
+  ESP_LOGI(TAG, "flushed %u sample(s) to flash; persisted=%u, flash_slot=%u",
+           static_cast<unsigned>(pending), static_cast<unsigned>(flash.persisted),
+           static_cast<unsigned>(flash.write_slot));
   return true;
 }
 
-static void sens_history_flash_init()
-{
-  sens_history_partition = esp_partition_find_first(
-      ESP_PARTITION_TYPE_DATA,
-      ESP_PARTITION_SUBTYPE_ANY,
-      "senshist");
-
-  if (sens_history_partition == nullptr) {
-    ESP_LOGW("sensirion_history",
-             "no 'senshist' partition; history works in RAM only");
+void init_flash() {
+  flash.partition = esp_partition_find_first(
+      ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "senshist");
+  if (flash.partition == nullptr) {
+    ESP_LOGW(TAG, "no 'senshist' partition; history works in RAM only");
     return;
   }
 
-  const size_t required =
-      (1 + SENS_HISTORY_FLASH_DATA_SECTORS) * SENS_HISTORY_FLASH_SECTOR;
-  if (sens_history_partition->size < required) {
-    ESP_LOGE("sensirion_history",
-             "senshist partition too small: %u < %u",
-             static_cast<unsigned>(sens_history_partition->size),
-             static_cast<unsigned>(required));
+  const size_t required = (1 + FLASH_DATA_SECTORS) * FLASH_SECTOR_SIZE;
+  if (flash.partition->size < required) {
+    ESP_LOGE(TAG, "senshist partition too small: %u < %u",
+             static_cast<unsigned>(flash.partition->size), static_cast<unsigned>(required));
     return;
   }
+  flash.ready = true;
 
-  sens_history_flash_ready = true;
-
-  constexpr uint16_t records_per_sector =
-      SENS_HISTORY_FLASH_SECTOR / sizeof(SensHistoryMeta);
-  SensHistoryMeta best{};
+  constexpr uint16_t RECORDS_PER_SECTOR = FLASH_SECTOR_SIZE / sizeof(FlashMeta);
+  FlashMeta best{};
   bool found = false;
   uint16_t best_slot = 0;
-
-  for (uint16_t slot = 0; slot < records_per_sector; slot++) {
-    SensHistoryMeta m{};
-    const size_t off = static_cast<size_t>(slot) * sizeof(m);
-    if (esp_partition_read(sens_history_partition, off, &m, sizeof(m)) != ESP_OK)
+  for (uint16_t slot = 0; slot < RECORDS_PER_SECTOR; ++slot) {
+    FlashMeta meta{};
+    if (esp_partition_read(flash.partition, slot * sizeof(meta), &meta, sizeof(meta)) != ESP_OK)
       break;
-    if (!sens_history_meta_valid(m))
-      continue;
-    if (!found || m.generation > best.generation) {
-      best = m;
+    if (valid_meta(meta) && (!found || meta.generation > best.generation)) {
+      best = meta;
       best_slot = slot;
       found = true;
     }
   }
 
   if (!found) {
-    ESP_LOGI("sensirion_history", "initializing empty flash history");
-    sens_history_meta_generation = 0;
-    sens_history_meta_next_slot = 0;
-    // Erase only the metadata sector now. Data sectors are lazily erased before
-    // their first write.
-    esp_partition_erase_range(sens_history_partition, 0, SENS_HISTORY_FLASH_SECTOR);
-    sens_history_write_meta();
+    ESP_LOGI(TAG, "initializing empty flash history");
+    flash.generation = 0;
+    flash.next_meta_slot = 0;
+    esp_partition_erase_range(flash.partition, 0, FLASH_SECTOR_SIZE);
+    write_meta();
     return;
   }
 
-  sens_history_interval_ms = best.interval_ms;
-  sens_history_flash_write_slot = best.flash_write_slot;
-  sens_history_persisted_count = best.count;
-  sens_history_meta_generation = best.generation;
-  sens_history_meta_next_slot = static_cast<uint16_t>(best_slot + 1);
+  history.interval_ms = best.interval_ms;
+  flash.write_slot = best.flash_write_slot;
+  flash.persisted = best.count;
+  flash.generation = best.generation;
+  flash.next_meta_slot = best_slot + 1;
 
-  // Rebuild RAM history in chronological order from the newest persisted
-  // logical window in the larger circular flash log.
-  const uint16_t n = best.count;
   const uint16_t first_flash = static_cast<uint16_t>(
-      (best.flash_write_slot + SENS_HISTORY_FLASH_CAPACITY - n) %
-      SENS_HISTORY_FLASH_CAPACITY);
-
-  sens_history_head = 0;
-  sens_history_count = 0;
-  for (uint16_t i = 0; i < n; i++) {
-    const uint16_t flash_slot = static_cast<uint16_t>(
-        (first_flash + i) % SENS_HISTORY_FLASH_CAPACITY);
-    SensHistorySample sample{};
-    if (esp_partition_read(
-            sens_history_partition,
-            sens_history_flash_sample_offset(flash_slot),
-            sample.data,
-            SENS_HISTORY_SAMPLE_SIZE) != ESP_OK) {
-      ESP_LOGW("sensirion_history", "flash history read stopped at %u", i);
+      (best.flash_write_slot + FLASH_CAPACITY - best.count) % FLASH_CAPACITY);
+  for (uint16_t i = 0; i < best.count; ++i) {
+    const uint16_t slot = (first_flash + i) % FLASH_CAPACITY;
+    Sample sample{};
+    if (esp_partition_read(flash.partition, sample_offset(slot), sample.data(), SAMPLE_SIZE) != ESP_OK) {
+      ESP_LOGW(TAG, "flash history read stopped at %u", i);
       break;
     }
-    sens_history[sens_history_head] = sample;
-    sens_history_head = static_cast<uint16_t>(
-        (sens_history_head + 1) % SENS_HISTORY_CAPACITY);
-    if (sens_history_count < SENS_HISTORY_CAPACITY)
-      sens_history_count++;
+    history.samples[history.head] = sample;
+    history.head = (history.head + 1) % RAM_CAPACITY;
+    if (history.count < RAM_CAPACITY)
+      ++history.count;
   }
-  sens_history_persisted_count = sens_history_count;
-  sens_history_pending_count = 0;
-  sens_history_latest_ms = sens_history_now_ms();
-  sens_history_last_flush_ms = sens_history_latest_ms;
+  flash.persisted = history.count;
+  history.latest_ms = flash.last_flush_ms = now_ms();
 
-  ESP_LOGI("sensirion_history",
-           "restored %u sample(s), interval=%u ms, flash_slot=%u",
-           static_cast<unsigned>(sens_history_count),
-           static_cast<unsigned>(sens_history_interval_ms),
-           static_cast<unsigned>(sens_history_flash_write_slot));
+  ESP_LOGI(TAG, "restored %u sample(s), interval=%u ms, flash_slot=%u",
+           static_cast<unsigned>(history.count), static_cast<unsigned>(history.interval_ms),
+           static_cast<unsigned>(flash.write_slot));
 }
 
-static SensHistorySample sens_history_current_sample()
-{
-  SensHistorySample out{};
-  const auto encoded = sensirion_ble_sample().encoded();
-  std::copy(encoded.begin(), encoded.end(), out.data);
-  return out;
-}
-
-static void sens_history_commit_sample()
-{
+void commit_sample() {
   const auto &sample = sensirion_ble_sample();
   if (!sample.complete())
     return;
 
-  sens_history[sens_history_head] = sens_history_current_sample();
-  sens_history_head = static_cast<uint16_t>(
-      (sens_history_head + 1) % SENS_HISTORY_CAPACITY);
-  if (sens_history_count < SENS_HISTORY_CAPACITY)
-    sens_history_count++;
+  history.samples[history.head] = sample.encoded();
+  history.head = (history.head + 1) % RAM_CAPACITY;
+  if (history.count < RAM_CAPACITY)
+    ++history.count;
+  if (history.pending < RAM_CAPACITY)
+    ++history.pending;
+  history.latest_ms = now_ms();
+  sync_gatt();
 
-  if (sens_history_pending_count < SENS_HISTORY_CAPACITY)
-    sens_history_pending_count++;
-
-  sens_history_latest_ms = sens_history_now_ms();
-  sens_history_sync_gatt_values();
-
-  ESP_LOGI("sensirion_history",
-           "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
-           static_cast<unsigned>(sens_history_count),
-           static_cast<unsigned>(SENS_HISTORY_CAPACITY),
-           sample.temperature_c,
-           sample.humidity_percent,
-           static_cast<unsigned>(sample.co2_ppm));
+  ESP_LOGI(TAG, "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
+           static_cast<unsigned>(history.count), static_cast<unsigned>(RAM_CAPACITY),
+           sample.temperature_c, sample.humidity_percent, static_cast<unsigned>(sample.co2_ppm));
 }
 
-static void sens_history_sampling_tick()
-{
-  const uint32_t now = sens_history_now_ms();
-
-  if (!sens_history_sample_clock_started) {
+void sampling_tick() {
+  const uint32_t now = now_ms();
+  if (!history.clock_started) {
     if (sensirion_ble_sample().complete()) {
-      sens_history_sample_clock_started = true;
-      sens_history_last_sample_ms = now;
-      sens_history_commit_sample();
+      history.clock_started = true;
+      history.last_sample_ms = now;
+      commit_sample();
     }
-  } else if (static_cast<uint32_t>(now - sens_history_last_sample_ms) >=
-             sens_history_interval_ms) {
-    // Keep phase stable even if loop execution is delayed.
-    sens_history_last_sample_ms += sens_history_interval_ms;
-    if (static_cast<uint32_t>(now - sens_history_last_sample_ms) >=
-        sens_history_interval_ms) {
-      // Do not backfill stale duplicated measurements after a long pause.
-      sens_history_last_sample_ms = now;
-    }
-    sens_history_commit_sample();
+  } else if (static_cast<uint32_t>(now - history.last_sample_ms) >= history.interval_ms) {
+    history.last_sample_ms += history.interval_ms;
+    if (static_cast<uint32_t>(now - history.last_sample_ms) >= history.interval_ms)
+      history.last_sample_ms = now;  // no stale backfill after a long pause
+    commit_sample();
   }
 
-  if (sens_history_pending_count > 0 &&
-      static_cast<uint32_t>(now - sens_history_last_flush_ms) >=
-          SENS_HISTORY_FLASH_FLUSH_MS) {
-    sens_history_flash_flush();
-  }
+  if (history.pending > 0 &&
+      static_cast<uint32_t>(now - flash.last_flush_ms) >= FLASH_FLUSH_MS)
+    flush_flash();
 }
 
-static SensHistorySample sens_history_get_logical(uint16_t logical_index)
-{
-  // logical_index 0 = oldest sample currently retained.
-  const uint16_t oldest = static_cast<uint16_t>(
-      (sens_history_head + SENS_HISTORY_CAPACITY - sens_history_count) %
-      SENS_HISTORY_CAPACITY);
-  const uint16_t slot = static_cast<uint16_t>(
-      (oldest + logical_index) % SENS_HISTORY_CAPACITY);
-  return sens_history[slot];
+void start_download() {
+  if (gatt.download == nullptr)
+    return;
+
+  uint16_t n = history.count;
+  if (download.requested > 0 && download.requested < n)
+    n = static_cast<uint16_t>(download.requested);
+
+  download.count = n;
+  download.sent = 0;
+  download.sequence = 0;
+  download.start_logical = history.count - n;
+  download.age_ms = history.count ? now_ms() - history.latest_ms : 0;
+  download.phase = DownloadPhase::HEADER;
+  download.last_packet_ms = 0;
+
+  ESP_LOGI(TAG, "history download subscribed: requested=%u available=%u sending=%u age=%u ms",
+           static_cast<unsigned>(download.requested), static_cast<unsigned>(history.count),
+           static_cast<unsigned>(n), static_cast<unsigned>(download.age_ms));
 }
 
-static void sens_history_start_download()
-{
-  if (sens_history_download_char == nullptr)
+void download_tick() {
+  if (download.phase == DownloadPhase::INACTIVE || gatt.download == nullptr)
     return;
 
-  uint32_t requested = sens_history_requested_samples;
-  uint16_t n = sens_history_count;
-  if (requested > 0 && requested < n)
-    n = static_cast<uint16_t>(requested);
-
-  sens_history_download_count = n;
-  sens_history_download_sent = 0;
-  sens_history_download_sequence = 0;
-  sens_history_download_start_logical = static_cast<uint16_t>(
-      sens_history_count - n);
-
-  const uint32_t now = sens_history_now_ms();
-  sens_history_download_age_ms =
-      (sens_history_count > 0)
-          ? static_cast<uint32_t>(now - sens_history_latest_ms)
-          : 0;
-  sens_history_download_state = SensHistoryDownloadState::START;
-  sens_history_last_packet_ms = 0;
-
-  ESP_LOGI("sensirion_history",
-           "history download subscribed: requested=%u available=%u sending=%u age=%u ms",
-           static_cast<unsigned>(requested),
-           static_cast<unsigned>(sens_history_count),
-           static_cast<unsigned>(n),
-           static_cast<unsigned>(sens_history_download_age_ms));
-}
-
-static void sens_history_download_tick()
-{
-  if (sens_history_download_state == SensHistoryDownloadState::INACTIVE ||
-      sens_history_download_char == nullptr)
+  const uint32_t now = now_ms();
+  if (download.last_packet_ms != 0 && now - download.last_packet_ms < 4)
     return;
-
-  const uint32_t now = sens_history_now_ms();
-  if (sens_history_last_packet_ms != 0 &&
-      static_cast<uint32_t>(now - sens_history_last_packet_ms) < 4)
-    return;
-  sens_history_last_packet_ms = now;
+  download.last_packet_ms = now;
 
   std::vector<uint8_t> packet(20, 0);
-
-  if (sens_history_download_state == SensHistoryDownloadState::START) {
-    // Header sequence bytes 0..3 stay zero, matching Sensirion DownloadHeader.
-    sens_history_put_u16_le(&packet[4], SENS_HISTORY_DOWNLOAD_TYPE);
-    sens_history_put_u32_le(&packet[6], sens_history_interval_ms);
-    sens_history_put_u32_le(&packet[10], sens_history_download_age_ms);
-    sens_history_put_u16_le(&packet[14], sens_history_download_count);
-
-    sens_history_download_char->set_value(std::move(packet));
-    sens_history_download_char->notify();
-    sens_history_download_sequence = 1;
-
-    if (sens_history_download_count == 0) {
-      sens_history_download_state = SensHistoryDownloadState::INACTIVE;
-      ESP_LOGI("sensirion_history", "history download complete (0 samples)");
+  if (download.phase == DownloadPhase::HEADER) {
+    put_u16_le(&packet[4], DOWNLOAD_TYPE);
+    put_u32_le(&packet[6], history.interval_ms);
+    put_u32_le(&packet[10], download.age_ms);
+    put_u16_le(&packet[14], download.count);
+    gatt.download->set_value(std::move(packet));
+    gatt.download->notify();
+    download.sequence = 1;
+    if (download.count == 0) {
+      download.phase = DownloadPhase::INACTIVE;
+      ESP_LOGI(TAG, "history download complete (0 samples)");
     } else {
-      sens_history_download_state = SensHistoryDownloadState::DOWNLOADING;
+      download.phase = DownloadPhase::DATA;
     }
     return;
   }
 
-  sens_history_put_u16_le(&packet[0], sens_history_download_sequence);
-
-  uint8_t packet_samples = 0;
-  while (packet_samples < 2 &&
-         sens_history_download_sent < sens_history_download_count) {
-    const uint16_t logical = static_cast<uint16_t>(
-        sens_history_download_start_logical + sens_history_download_sent);
-    const SensHistorySample s = sens_history_get_logical(logical);
-    memcpy(&packet[2 + packet_samples * SENS_HISTORY_SAMPLE_SIZE],
-           s.data, SENS_HISTORY_SAMPLE_SIZE);
-    packet_samples++;
-    sens_history_download_sent++;
+  put_u16_le(&packet[0], download.sequence);
+  for (uint8_t in_packet = 0; in_packet < 2 && download.sent < download.count; ++in_packet) {
+    const Sample sample = logical_sample(download.start_logical + download.sent++);
+    memcpy(&packet[2 + in_packet * SAMPLE_SIZE], sample.data(), SAMPLE_SIZE);
   }
+  gatt.download->set_value(std::move(packet));
+  gatt.download->notify();
+  ++download.sequence;
 
-  sens_history_download_char->set_value(std::move(packet));
-  sens_history_download_char->notify();
-  sens_history_download_sequence++;
-
-  if (sens_history_download_sent >= sens_history_download_count) {
-    ESP_LOGI("sensirion_history",
-             "history download complete: %u sample(s), %u data packet(s)",
-             static_cast<unsigned>(sens_history_download_count),
-             static_cast<unsigned>(sens_history_download_sequence - 1));
-    sens_history_download_state = SensHistoryDownloadState::INACTIVE;
-    sens_history_requested_samples = 0;
+  if (download.sent >= download.count) {
+    ESP_LOGI(TAG, "history download complete: %u sample(s), %u data packet(s)",
+             static_cast<unsigned>(download.count), static_cast<unsigned>(download.sequence - 1));
+    download.phase = DownloadPhase::INACTIVE;
+    download.requested = 0;
   }
 }
 
-static void sens_history_configure_gatt(esp32_ble_server::BLEServer *server)
-{
-  if (sens_history_gatt_bound || server == nullptr)
+esp32_ble_server::BLECharacteristic *get_or_create_characteristic(
+    esp32_ble_server::BLEService *service, const char *uuid, uint32_t properties) {
+  const auto id = esp32_ble::ESPBTUUID::from_raw(uuid);
+  auto *characteristic = service->get_characteristic(id);
+  return characteristic != nullptr ? characteristic : service->create_characteristic(id, properties);
+}
+
+void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
+  if (gatt.bound || server == nullptr)
     return;
 
   using esp32_ble::ESPBTUUID;
   using esp32_ble_server::BLECharacteristic;
-
-  // Device Information (0x180A) stays owned by ESPHome.  It is generic
-  // metadata, not part of the Sensirion history protocol.  Keeping it out of
-  // this component also avoids coupling to ESPHome's DIS handle allocation.
-
-  auto download_uuid = ESPBTUUID::from_raw(
-      "00008000-B38D-4985-720E-0F993A68EE41");
-  auto *service = server->get_service(download_uuid);
+  const auto service_uuid = ESPBTUUID::from_raw("00008000-B38D-4985-720E-0F993A68EE41");
+  auto *service = server->get_service(service_uuid);
+  if (service == nullptr)
+    service = server->create_service(service_uuid, false, 10);
   if (service == nullptr) {
-    // Service declaration + 4 characteristics + one CCCD = 10 handles.
-    service = server->create_service(download_uuid, false, 10);
-  }
-  if (service == nullptr) {
-    ESP_LOGE("sensirion_history", "failed to create 0x8000 history service");
+    ESP_LOGE(TAG, "failed to create 0x8000 history service");
     return;
   }
 
-  sens_history_count_char = service->get_characteristic(
-      ESPBTUUID::from_raw("00008002-B38D-4985-720E-0F993A68EE41"));
-  if (sens_history_count_char == nullptr) {
-    sens_history_count_char = service->create_characteristic(
-        ESPBTUUID::from_raw("00008002-B38D-4985-720E-0F993A68EE41"),
-        BLECharacteristic::PROPERTY_READ);
+  gatt.count = get_or_create_characteristic(
+      service, "00008002-B38D-4985-720E-0F993A68EE41", BLECharacteristic::PROPERTY_READ);
+  gatt.requested = get_or_create_characteristic(
+      service, "00008003-B38D-4985-720E-0F993A68EE41", BLECharacteristic::PROPERTY_WRITE);
+  gatt.interval = get_or_create_characteristic(
+      service, "00008001-B38D-4985-720E-0F993A68EE41",
+      BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
+  const auto download_uuid = ESPBTUUID::from_raw("00008004-B38D-4985-720E-0F993A68EE41");
+  gatt.download = service->get_characteristic(download_uuid);
+  if (gatt.download == nullptr) {
+    gatt.download = service->create_characteristic(
+        download_uuid, BLECharacteristic::PROPERTY_NOTIFY);
+    if (gatt.download != nullptr) {
+      gatt.download_cccd = new HistoryCCCD();
+      gatt.download_cccd->set_value({0x00, 0x00});
+      gatt.download->add_descriptor(gatt.download_cccd);
+    }
   }
 
-  sens_history_requested_char = service->get_characteristic(
-      ESPBTUUID::from_raw("00008003-B38D-4985-720E-0F993A68EE41"));
-  if (sens_history_requested_char == nullptr) {
-    sens_history_requested_char = service->create_characteristic(
-        ESPBTUUID::from_raw("00008003-B38D-4985-720E-0F993A68EE41"),
-        BLECharacteristic::PROPERTY_WRITE);
-  }
-
-  sens_history_interval_char = service->get_characteristic(
-      ESPBTUUID::from_raw("00008001-B38D-4985-720E-0F993A68EE41"));
-  if (sens_history_interval_char == nullptr) {
-    sens_history_interval_char = service->create_characteristic(
-        ESPBTUUID::from_raw("00008001-B38D-4985-720E-0F993A68EE41"),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE);
-  }
-
-  sens_history_download_char = service->get_characteristic(
-      ESPBTUUID::from_raw("00008004-B38D-4985-720E-0F993A68EE41"));
-  if (sens_history_download_char == nullptr) {
-    sens_history_download_char = service->create_characteristic(
-        ESPBTUUID::from_raw("00008004-B38D-4985-720E-0F993A68EE41"),
-        BLECharacteristic::PROPERTY_NOTIFY);
-    sens_history_download_cccd = new SensirionHistoryCCCD();
-    sens_history_download_cccd->set_value({0x00, 0x00});
-    sens_history_download_char->add_descriptor(sens_history_download_cccd);
-  }
-
-  if (sens_history_count_char == nullptr ||
-      sens_history_requested_char == nullptr ||
-      sens_history_interval_char == nullptr ||
-      sens_history_download_char == nullptr ||
-      sens_history_download_cccd == nullptr) {
-    ESP_LOGE("sensirion_history", "failed to create complete Sensirion GATT topology");
+  if (gatt.count == nullptr || gatt.requested == nullptr || gatt.interval == nullptr ||
+      gatt.download == nullptr || gatt.download_cccd == nullptr) {
+    ESP_LOGE(TAG, "failed to create complete Sensirion GATT topology");
     return;
   }
 
-  sens_history_count_char->set_value({0, 0, 0, 0});
-  sens_history_requested_char->set_value({0, 0, 0, 0});
-  sens_history_download_char->set_value(std::vector<uint8_t>(20, 0));
+  gatt.count->set_value({0, 0, 0, 0});
+  gatt.requested->set_value({0, 0, 0, 0});
+  gatt.download->set_value(std::vector<uint8_t>(20, 0));
 
-  sens_history_requested_char->on_write(
-      [](std::span<const uint8_t> x, uint16_t conn_id) {
-        if (x.size() < 4)
-          return;
-        sens_history_requested_samples = sens_history_get_u32_le(x);
-        ESP_LOGI("sensirion_history",
-                 "8003 requested samples = %u (conn=%u)",
-                 static_cast<unsigned>(sens_history_requested_samples),
-                 static_cast<unsigned>(conn_id));
-      });
+  gatt.requested->on_write([](std::span<const uint8_t> x, uint16_t conn_id) {
+    if (x.size() < 4)
+      return;
+    download.requested = get_u32_le(x);
+    ESP_LOGI(TAG, "8003 requested samples = %u (conn=%u)",
+             static_cast<unsigned>(download.requested), static_cast<unsigned>(conn_id));
+  });
+  gatt.interval->on_write([](std::span<const uint8_t> x, uint16_t conn_id) {
+    if (x.size() < 4)
+      return;
+    const uint32_t ms = get_u32_le(x);
+    ESP_LOGI(TAG, "8001 history interval WRITE = %u ms (conn=%u)",
+             static_cast<unsigned>(ms), static_cast<unsigned>(conn_id));
+    set_interval(ms);
+  });
 
-  sens_history_interval_char->on_write(
-      [](std::span<const uint8_t> x, uint16_t conn_id) {
-        if (x.size() < 4)
-          return;
-        const uint32_t ms = sens_history_get_u32_le(x);
-        ESP_LOGI("sensirion_history",
-                 "8001 history interval WRITE = %u ms (conn=%u)",
-                 static_cast<unsigned>(ms),
-                 static_cast<unsigned>(conn_id));
-        sens_history_set_interval(ms);
-      });
-
-  sens_history_sync_gatt_values();
-
-  // Non-DIS services must be explicitly queued for start.
+  sync_gatt();
   server->enqueue_start_service(service);
 
-  auto settings_uuid = ESPBTUUID::from_raw(
-      "00008100-B38D-4985-720E-0F993A68EE41");
+  const auto settings_uuid = ESPBTUUID::from_raw("00008100-B38D-4985-720E-0F993A68EE41");
   auto *settings = server->get_service(settings_uuid);
   if (settings == nullptr)
     settings = server->create_service(settings_uuid, false, 1);
   if (settings != nullptr)
     server->enqueue_start_service(settings);
 
-  sens_history_gatt_bound = true;
-  ESP_LOGI("sensirion_history",
-           "Sensirion GATT configured in component: %u sample(s), interval=%u ms",
-           static_cast<unsigned>(sens_history_count),
-           static_cast<unsigned>(sens_history_interval_ms));
+  gatt.bound = true;
+  ESP_LOGI(TAG, "Sensirion GATT configured in component: %u sample(s), interval=%u ms",
+           static_cast<unsigned>(history.count), static_cast<unsigned>(history.interval_ms));
 }
 
+}  // namespace
 
-void sensirion_history_setup()
-{
-  sens_history_flash_init();
-
-  // GATT characteristics may already have been created with the compile-time
-  // defaults before flash restoration runs. Publish the restored interval and
-  // sample count immediately so MyAmbience sees the persistent state on its
-  // first read after boot, rather than 600000 ms / 0 samples until the next
-  // history sample is recorded.
-  sens_history_sync_gatt_values();
-
-  sens_history_last_flush_ms = sens_history_now_ms();
+void sensirion_history_setup() {
+  init_flash();
+  sync_gatt();
+  flash.last_flush_ms = now_ms();
 }
 
-void sensirion_history_loop()
-{
-  sens_history_sampling_tick();
-  sens_history_download_tick();
+void sensirion_history_loop() {
+  sampling_tick();
+  download_tick();
 }
 
-void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server)
-{
-  sens_history_configure_gatt(server);
+void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server) {
+  configure_gatt_impl(server);
 }
 
 void sensirion_history_gatts_event_handler(
-    esp_gatts_cb_event_t event,
-    esp_gatt_if_t,
-    esp_ble_gatts_cb_param_t *param)
-{
+    esp_gatts_cb_event_t event, esp_gatt_if_t, esp_ble_gatts_cb_param_t *param) {
   if (param == nullptr)
     return;
-
   if (event == ESP_GATTS_DISCONNECT_EVT) {
-    sens_history_download_state = SensHistoryDownloadState::INACTIVE;
-    sens_history_requested_samples = 0;
+    download.phase = DownloadPhase::INACTIVE;
+    download.requested = 0;
     return;
   }
-
   if (event != ESP_GATTS_WRITE_EVT || param->write.is_prep)
     return;
 
-  ESP_LOGD("sensirion_history",
-           "GATT WRITE handle=0x%04X len=%u conn=%u",
-           static_cast<unsigned>(param->write.handle),
-           static_cast<unsigned>(param->write.len),
+  ESP_LOGD(TAG, "GATT WRITE handle=0x%04X len=%u conn=%u",
+           static_cast<unsigned>(param->write.handle), static_cast<unsigned>(param->write.len),
            static_cast<unsigned>(param->write.conn_id));
 
-  if (sens_history_download_cccd == nullptr ||
-      param->write.handle != sens_history_download_cccd->get_handle() ||
+  if (gatt.download_cccd == nullptr || param->write.handle != gatt.download_cccd->handle() ||
       param->write.len != 2)
     return;
 
   const uint8_t lo = param->write.value[0];
   const uint8_t hi = param->write.value[1];
-  ESP_LOGI("sensirion_history",
-           "8004 CCCD WRITE = %02X %02X (conn=%u, handle=0x%04X)",
-           lo, hi, static_cast<unsigned>(param->write.conn_id),
-           static_cast<unsigned>(param->write.handle));
+  ESP_LOGI(TAG, "8004 CCCD WRITE = %02X %02X (conn=%u, handle=0x%04X)", lo, hi,
+           static_cast<unsigned>(param->write.conn_id), static_cast<unsigned>(param->write.handle));
 
   if (lo == 0x01 && hi == 0x00) {
-    sens_history_start_download();
+    start_download();
   } else if (lo == 0x00 && hi == 0x00) {
-    sens_history_download_state = SensHistoryDownloadState::INACTIVE;
-    ESP_LOGI("sensirion_history", "history download unsubscribed");
+    download.phase = DownloadPhase::INACTIVE;
+    ESP_LOGI(TAG, "history download unsubscribed");
   }
 }
 
-}  // namespace bus_sniffer
-}  // namespace esphome
-
+}  // namespace esphome::bus_sniffer
 #endif  // UNNI_BLE_HISTORY_ENABLED

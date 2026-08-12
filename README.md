@@ -132,7 +132,7 @@ bus_sniffer/
   rtrh_decoder.cpp/.h      RT/RH GPIO ISR, phase capture and raw snapshots
   calibration.h            temperature/RH conversion coefficients and ranges
   sensirion_ble.cpp/.h     Sensirion-compatible live BLE advertising
-  sensirion_history.cpp/.h Sensirion-style GATT history and persistence
+  sensirion_history.cpp/.h RAM history, flash journal, and Sensirion GATT download
   ble_options.h            compile-time BLE feature selection
 ```
 
@@ -328,7 +328,7 @@ Third-party libraries, tools, applications, trademarks, and documentation remain
 - `rtrh_decoder.*`: RT/RH edge capture, calibration result and quality
 - `sensirion_sample.h`: shared T/RH/CO2 sample and Sensirion wire encoding
 - `sensirion_ble.*`: MyAmbience live advertisement and GAP/GATT connection handling
-- `sensirion_history.*`: persistent history and Sensirion history GATT download
+- `sensirion_history.*`: grouped RAM/flash/GATT/download state for persistent Sensirion history
 
 The live BLE and history paths deliberately share the same encoded sample so the
 advertised value and the value stored in history cannot drift due to duplicated
