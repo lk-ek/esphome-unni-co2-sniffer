@@ -233,6 +233,10 @@ const SensirionSample &sensirion_ble_sample() {
 }
 
 void sensirion_ble_setup() {
+  // This used to be supplied by the top-level esp32_ble.name YAML option.
+  // Keep the same Gadget identity now that BLE is component-managed.
+  esp_ble_gap_set_device_name("S");
+
   adv_params = {
       .adv_int_min = 0,
       .adv_int_max = 0,

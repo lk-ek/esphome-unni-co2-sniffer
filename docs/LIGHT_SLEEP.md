@@ -22,7 +22,9 @@ The CO2 SCL/SDA pins are intentionally not GPIO wake sources. Their ISR capture 
 ## Configuration
 
 The component owns the required ESP-IDF sdkconfig. Users do **not** need a
-`sdkconfig_options:` block for power management or BLE modem sleep. When
+`sdkconfig_options:` block for power management or BLE modem sleep. It also
+requests the tested 80 MHz ESP32-C3 CPU default, and BLE history requests its
+own `senshist` flash partition automatically. When
 `light_sleep` is enabled (the default), `bus_sniffer/__init__.py` enables power
 management, tickless idle and shared PHY/MAC/baseband power-down. BLE builds
 also enable Bluetooth controller modem sleep and select the main XTAL as the

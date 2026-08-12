@@ -129,7 +129,7 @@ This is the normal firmware:
 - sniffer GPIO initialization delayed by 10 s
 - automatic Light-sleep enabled; RT/RH GPIO wake + CO₂ completion gate
 
-The YAML includes the `senshist` data partition required by persistent history.
+The component automatically requests the `senshist` data partition required by persistent history; no partition YAML is needed.
 
 ### `i2c-sniffer-debug.yaml` — capture/debug
 
@@ -158,25 +158,36 @@ It retains the same 80 MHz, Wi-Fi, HA publish, and 10 s sniffer-start behavior a
 
 ## ESPHome component configuration
 
-A minimal production-style component block is:
+The production defaults are intentionally self-contained. A normal user configuration only needs:
+
+```yaml
+bus_sniffer:
+  sniffer_start_delay: 10s
+```
+
+Everything else below has a component default and only needs to be specified when overriding it:
 
 ```yaml
 bus_sniffer:
   ble: true
   ble_live: true
   ble_history: true
-  ble_id: unni_ble
-  ble_server_id: unni_ble_server
-
   ble_advertising_interval: 2s
-  ha_publish_interval: 30s
-  sniffer_start_delay: 10s
+
   light_sleep: true
   light_sleep_max_awake: 10s
+  ha_publish_interval: 30s
 
-  debug_capture: false
+  rtrh_g10_pin: 3
+  rtrh_g13_pin: 4
+  co2_sda_pin: 6
+  co2_scl_pin: 7
+
   debug_metrics: false
+  debug_capture: false
 
+  # Primary HA entities are created automatically. These blocks are only
+  # needed to override names/icons or other ESPHome sensor options.
   co2:
     name: "CO2"
   rt_temperature:
@@ -185,7 +196,11 @@ bus_sniffer:
     name: "RH Humidity"
 ```
 
-Optional diagnostic outputs are configured independently:
+`esp32_ble:` and `esp32_ble_server:` are dynamically auto-loaded when `ble: true`; the user does not define them. The component also owns the tested 80 MHz ESP32-C3 CPU configuration and the 64 KiB `senshist` partition required when BLE history is enabled. ESPHome supports component-driven auto-loading and component-requested custom partitions, which keeps those implementation details out of user YAML.
+
+The three primary Home Assistant sensors (`co2`, `rt_temperature`, and `rh_humidity`) are enabled automatically. Their normal ESPHome sensor configuration can still be overridden with the corresponding blocks.
+
+When `debug_metrics: true`, all diagnostic entities are created automatically:
 
 - `crc_errors`, `frame_errors`
 - `ref_period`, `rt_period`, `rh_state_period`
@@ -196,7 +211,7 @@ Optional diagnostic outputs are configured independently:
 - `humidity_extrapolation`
 - `calibration_extrapolation`
 
-`debug_metrics` controls detailed diagnostic logging. It does not need to be enabled merely to expose the diagnostic entities.
+No individual diagnostic entity definitions are required in YAML.
 
 ### Compile-time feature flags
 

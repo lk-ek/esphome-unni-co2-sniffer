@@ -3,14 +3,20 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 
 from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor
-from esphome.components.esp32 import add_idf_sdkconfig_option
+from esphome.components.esp32 import add_idf_sdkconfig_option, add_partition
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
 from esphome.core import TimePeriod
 
 # BLE is deliberately NOT a hard dependency. A real `ble: false` build therefore
 # does not need esp32_ble / esp32_ble_server in the YAML at all.
 DEPENDENCIES = []
-AUTO_LOAD = ["sensor", "binary_sensor"]
+
+
+def AUTO_LOAD(config):
+    loads = ["sensor", "binary_sensor"]
+    if config.get(CONF_BLE, True):
+        loads.append("esp32_ble_server")
+    return loads
 
 CONF_CO2 = "co2"
 CONF_CRC_ERRORS = "crc_errors"
@@ -149,11 +155,15 @@ def _validate_features(config):
     if config[CONF_BLE_HISTORY] and not config[CONF_BLE]:
         raise cv.Invalid("ble_history: true requires ble: true")
 
-    if config[CONF_BLE]:
-        if CONF_BLE_ID not in config:
-            raise cv.Invalid("ble: true requires ble_id")
-        if CONF_BLE_SERVER_ID not in config:
-            raise cv.Invalid("ble: true requires ble_server_id")
+    if not config[CONF_BLE]:
+        config.pop(CONF_BLE_ID, None)
+        config.pop(CONF_BLE_SERVER_ID, None)
+
+    if not config[CONF_DEBUG_METRICS]:
+        for key in DEBUG_SENSOR_DEFAULTS:
+            config.pop(key, None)
+        for key in DEBUG_BINARY_DEFAULTS:
+            config.pop(key, None)
 
     return config
 
@@ -163,8 +173,8 @@ _SCHEMA = {
     cv.Optional(CONF_BLE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
-    cv.Optional(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
-    cv.Optional(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
+    cv.GenerateID(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
+    cv.GenerateID(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
     cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="2s"): cv.All(
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
@@ -183,10 +193,40 @@ _SCHEMA = {
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
 
+PRIMARY_SENSOR_DEFAULTS = {
+    CONF_CO2: {"name": "CO2", "icon": "mdi:molecule-co2"},
+    CONF_RT_TEMPERATURE: {"name": "RT Temperature", "icon": "mdi:thermometer"},
+    CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
+}
+
+DEBUG_SENSOR_DEFAULTS = {
+    CONF_CRC_ERRORS: {"name": "CO2 Sniffer CRC Errors"},
+    CONF_FRAME_ERRORS: {"name": "CO2 Sniffer Frame Errors"},
+    CONF_REF_PERIOD: {"name": "RT RH REF Period"},
+    CONF_RT_PERIOD: {"name": "RT RH RT Period"},
+    CONF_RH_STATE_PERIOD: {"name": "RT RH RH State Period"},
+    CONF_RT_RATIO: {"name": "RT RH RT Ratio"},
+    CONF_RH_RATIO: {"name": "RT RH RH Ratio"},
+    CONF_RH_LOG: {"name": "RT RH RH Log Ratio"},
+    CONF_MEASUREMENT_QUALITY: {"name": "RT RH Measurement Quality"},
+}
+
+DEBUG_BINARY_DEFAULTS = {
+    CONF_THERMAL_TRANSIENT: {"name": "RT RH Thermal Transient"},
+    CONF_TEMPERATURE_EXTRAPOLATION: {"name": "RT RH Temperature Extrapolation"},
+    CONF_HUMIDITY_EXTRAPOLATION: {"name": "RT RH Humidity Extrapolation"},
+    CONF_CALIBRATION_EXTRAPOLATION: {"name": "RT RH Calibration Extrapolation"},
+}
+
 for key, (schema, _) in SENSOR_OUTPUTS.items():
-    _SCHEMA[cv.Required(key) if key == CONF_CO2 else cv.Optional(key)] = schema
+    if key in PRIMARY_SENSOR_DEFAULTS:
+        _SCHEMA[cv.Optional(key, default=PRIMARY_SENSOR_DEFAULTS[key])] = schema
+    elif key in DEBUG_SENSOR_DEFAULTS:
+        _SCHEMA[cv.Optional(key, default=DEBUG_SENSOR_DEFAULTS[key])] = schema
+    else:
+        _SCHEMA[cv.Optional(key)] = schema
 for key in BINARY_OUTPUTS:
-    _SCHEMA[cv.Optional(key)] = _diagnostic_binary_sensor()
+    _SCHEMA[cv.Optional(key, default=DEBUG_BINARY_DEFAULTS[key])] = _diagnostic_binary_sensor()
 
 CONFIG_SCHEMA = cv.All(cv.Schema(_SCHEMA).extend(cv.COMPONENT_SCHEMA), _validate_features)
 
@@ -210,6 +250,14 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     ble_enabled = config[CONF_BLE]
+
+    # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
+    # Keep that platform detail out of user YAML.
+    add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
+    add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
+
+    if config[CONF_BLE_HISTORY]:
+        add_partition("senshist", "data", "spiffs", 0x10000)
 
     if config[CONF_LIGHT_SLEEP]:
         add_idf_sdkconfig_option("CONFIG_PM_ENABLE", True)

@@ -36,71 +36,15 @@ captive_portal:
 
 esp32:
   board: seeed_xiao_esp32c3
-  # ESP32-C3 supports 80/160 MHz. 80 MHz lowers active CPU power substantially;
-  # measurement-quality diagnostics make timing regressions immediately visible.
-  cpu_frequency: 80MHz
   framework:
     type: esp-idf
 # BLE deliberately omitted for timing A/B test.
+
 bus_sniffer:
-  debug_capture: false
-  # Genuine no-BLE build: no esp32_ble/esp32_ble_server components and no
-  # Sensirion history partition are present in this file.
   ble: false
   ble_live: false
   ble_history: false
-
   ha_publish_interval: 30s
-
-  light_sleep_max_awake: 10s
   sniffer_start_delay: 10s
-
-  # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
-  # individually without affecting decoding.
   debug_metrics: false
-  thermal_transient_on_rate: 0.8
-  thermal_transient_off_rate: 0.3
-
-  ref_period:
-    name: "RT RH REF Period"
-  rt_period:
-    name: "RT RH RT Period"
-  rh_state_period:
-    name: "RT RH RH State Period"
-  rt_ratio:
-    name: "RT RH RT Ratio"
-  rh_ratio:
-    name: "RT RH RH Ratio"
-  rh_log:
-    name: "RT RH RH Log Ratio"
-  measurement_quality:
-    name: "RT RH Measurement Quality"
-  thermal_transient:
-    name: "RT RH Thermal Transient"
-  temperature_extrapolation:
-    name: "RT RH Temperature Extrapolation"
-  humidity_extrapolation:
-    name: "RT RH Humidity Extrapolation"
-  calibration_extrapolation:
-    name: "RT RH Calibration Extrapolation"
-
-  co2:
-    name: "CO2"
-    id: cd40_co2
-    icon: mdi:molecule-co2
-
-  crc_errors:
-    name: "CO2 Sniffer CRC Errors"
-
-  frame_errors:
-    name: "CO2 Sniffer Frame Errors"
-
-  rt_temperature:
-    name: "RT Temperature"
-    id: rt_temperature
-    icon: mdi:thermometer
-
-  rh_humidity:
-    name: "RH Humidity"
-    id: rh_humidity
-    icon: mdi:water-percent
+  debug_capture: false

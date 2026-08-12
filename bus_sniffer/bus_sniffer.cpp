@@ -17,6 +17,7 @@
 #include "esphome/core/log.h"
 
 #include <cmath>
+#include <string>
 
 namespace esphome {
 namespace bus_sniffer {
@@ -45,10 +46,21 @@ inline void publish_finite(sensor::Sensor *sensor, float value) {
 
 #if UNNI_BLE_ENABLED
 void BusSniffer::configure_gatt_server(esp32_ble_server::BLEServer *server) {
+  // The BLE server is auto-loaded by the component, so reproduce the Gadget
+  // Device Information identity that previously lived in user YAML.
+  if (server != nullptr) {
+    auto *info = server->get_service(esp32_ble::ESPBTUUID::from_uint16(0x180A));
+    if (info != nullptr) {
+      if (auto *manufacturer = info->get_characteristic(0x2A29))
+        manufacturer->set_value(std::string("Sensirion"));
+      if (auto *model = info->get_characteristic(0x2A24))
+        model->set_value(std::string("MyCO2 Gadget"));
+      if (auto *firmware = info->get_characteristic(0x2A26))
+        firmware->set_value(std::string("1.0.1"));
+    }
+  }
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_configure_gatt(server);
-#else
-  (void) server;
 #endif
 }
 
