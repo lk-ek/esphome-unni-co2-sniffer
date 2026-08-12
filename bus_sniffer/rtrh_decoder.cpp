@@ -20,9 +20,8 @@ namespace rtrh_decoder {
 
 static const char *TAG = "rtrh_decoder";
 static constexpr gpio_num_t PIN_G10 = GPIO_NUM_3;
-static constexpr gpio_num_t PIN_G11 = GPIO_NUM_5;
 static constexpr gpio_num_t PIN_G13 = GPIO_NUM_4;
-static constexpr gpio_num_t PINS[] = {PIN_G10, PIN_G11, PIN_G13};
+static constexpr gpio_num_t PINS[] = {PIN_G10, PIN_G13};
 
 // The controller spends ~125 ms in REF and ~127 ms in RT. Phase identity is
 // deliberately based on elapsed time, never on RC period or cycle count.
@@ -53,7 +52,6 @@ struct Snapshot {
   uint32_t rt_temp_period_sum{0};
   uint16_t rt_temp_count{0};
   RhStateStats rh_state;
-  RhStateStats rh_state_2pin;  // Shadow decoder using only G10 + G13.
   uint32_t sequence{0};
 };
 
@@ -108,12 +106,10 @@ struct DecoderState {
   volatile uint32_t rt_temperature_period_sum{0};
   volatile uint16_t rt_temperature_count{0};
   RhStateStats rh_state;
-  RhStateStats rh_state_2pin;
-  volatile uint8_t gpio_state_2pin{0};
 
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
-  volatile uint8_t pin_level[3]{0, 0, 0};
+  volatile uint8_t pin_level[2]{0, 0};
   uint32_t last_polled_sequence{0};
   Measurement latest_measurement;
 };
@@ -123,7 +119,6 @@ static DecoderState decoder;
 static inline uint8_t IRAM_ATTR read_state() {
   uint8_t value = 0;
   if (gpio_get_level(PIN_G10)) value |= 0x01;
-  if (gpio_get_level(PIN_G11)) value |= 0x02;
   if (gpio_get_level(PIN_G13)) value |= 0x08;
   return value;
 }
@@ -143,7 +138,6 @@ static inline void IRAM_ATTR clear_rh_state_stats(RhStateStats &s) {
 
 static inline void IRAM_ATTR clear_rh_state() {
   clear_rh_state_stats(decoder.rh_state);
-  clear_rh_state_stats(decoder.rh_state_2pin);
 }
 
 static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
@@ -151,7 +145,6 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.measurement_start_us = now;
   decoder.last_edge_us = now;
   decoder.gpio_state = state;
-  decoder.gpio_state_2pin = state & 0x09;
   decoder.last_g10_fall_us = 0;
   decoder.have_g10_rise = false;
   decoder.phase = Phase::REF;
@@ -178,7 +171,6 @@ static inline void IRAM_ATTR update_phase(uint32_t now) {
   decoder.have_g10_rise = false;
   if (next == Phase::RH) {
     decoder.rh_state.last_us = 0;
-    decoder.rh_state_2pin.last_us = 0;
   }
 }
 
@@ -196,17 +188,10 @@ static inline void IRAM_ATTR observe_rh_stats(uint32_t now, RhStateStats &stats)
 }
 
 static inline void IRAM_ATTR observe_rh_state(uint32_t now, uint8_t state) {
-  // Production/reference decoder: characteristic state G10=0, G11=0, G13=1.
-  if (decoder.phase != Phase::RH || (state & 0x0B) != 0x08) return;
+  // Characteristic RH state using only the two required RT/RH lines:
+  // G10=0, G13=1. D3/G11 was verified redundant and is intentionally not read.
+  if (decoder.phase != Phase::RH || (state & 0x09) != 0x08) return;
   observe_rh_stats(now, decoder.rh_state);
-}
-
-static inline void IRAM_ATTR observe_rh_state_2pin(uint32_t now, uint8_t state_2pin) {
-  // Experimental shadow decoder: same characteristic state after projecting
-  // away G11/D3.  It is updated ONLY by physical G10/G13 interrupts, exactly
-  // as the decoder would behave if D3 were not connected.
-  if (decoder.phase != Phase::RH || (state_2pin & 0x09) != 0x08) return;
-  observe_rh_stats(now, decoder.rh_state_2pin);
 }
 
 static float rh_state_period_median(const RhStateStats &s) {
@@ -240,7 +225,6 @@ static void finalize_measurement() {
   next.rt_temp_period_sum = decoder.rt_temperature_period_sum;
   next.rt_temp_count = decoder.rt_temperature_count;
   next.rh_state = decoder.rh_state;
-  next.rh_state_2pin = decoder.rh_state_2pin;
   next.sequence = decoder.snapshot.sequence + 1;
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
@@ -270,7 +254,7 @@ static DebugCaptureState debug;
 
 static void IRAM_ATTR gpio_isr(void *arg) {
   const intptr_t encoded = reinterpret_cast<intptr_t>(arg);
-  if (encoded < 1 || encoded > 3) return;
+  if (encoded < 1 || encoded > 2) return;
   const uint8_t pin_index = static_cast<uint8_t>(encoded - 1);
   const gpio_num_t pin = PINS[pin_index];
   const uint8_t level = static_cast<uint8_t>(gpio_get_level(pin));
@@ -314,15 +298,6 @@ static void IRAM_ATTR gpio_isr(void *arg) {
     decoder.gpio_state = state;
   }
 
-  // Shadow path for a future two-wire RT/RH hookup. Ignore G11 IRQs entirely;
-  // only a real G10/G13 edge may create a two-pin state transition.
-  if (pin_index != 1) {
-    const uint8_t state_2pin = state & 0x09;
-    if (state_2pin != decoder.gpio_state_2pin) {
-      observe_rh_state_2pin(now, state_2pin);
-      decoder.gpio_state_2pin = state_2pin;
-    }
-  }
 
 #if RTRH_DEBUG_CAPTURE
   if (debug.ready) return;
@@ -336,7 +311,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
     debug.overflow = false;
   }
   const uint16_t edge_no = debug.edge_count++;
-  const bool unusual = value != 0x00 && value != 0x0F;
+  const bool unusual = value != 0x00 && value != 0x09;
   const bool time_anchor = edge_no == 0 || (edge_no % CAPTURE_DECIMATION) == 0;
   bool unusual_anchor = false;
   if (unusual) {
@@ -365,19 +340,18 @@ bool setup() {
   io.pull_up_en = GPIO_PULLUP_DISABLE;
   io.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io.intr_type = GPIO_INTR_DISABLE;
-  io.pin_bit_mask = (1ULL << PIN_G10) | (1ULL << PIN_G11) | (1ULL << PIN_G13);
+  io.pin_bit_mask = (1ULL << PIN_G10) | (1ULL << PIN_G13);
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 
   for (gpio_num_t pin : PINS) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   decoder.gpio_state = read_state();
-  decoder.gpio_state_2pin = decoder.gpio_state & 0x09;
-  for (uint8_t i = 0; i < 3; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
+  for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
 #if RTRH_DEBUG_CAPTURE
   debug.last_value = read_state();
 #endif
 
-  for (uint8_t i = 0; i < 3; i++) {
+  for (uint8_t i = 0; i < 2; i++) {
     err = gpio_isr_handler_add(PINS[i], gpio_isr,
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
     if (err != ESP_OK) return false;
@@ -397,8 +371,7 @@ void loop() {
       if (decoder.collecting && last2 && static_cast<uint32_t>(now2 - last2) > MEASUREMENT_QUIET_US)
         finalize_measurement();
       decoder.gpio_state = read_state();
-      decoder.gpio_state_2pin = decoder.gpio_state & 0x09;
-      for (uint8_t i = 0; i < 3; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
+      for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(PINS[i]);
       for (gpio_num_t pin : PINS) gpio_intr_enable(pin);
     }
   }
@@ -527,7 +500,7 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_capture.csv\"");
-    static constexpr char HEADER[] = "sequence,t_us,edge_no,gpio10,gpio11,gpio13,state,overflow\n";
+    static constexpr char HEADER[] = "sequence,t_us,edge_no,gpio10,gpio13,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     const uint16_t count = debug.sample_count;
     const uint32_t sequence = debug.sequence;
@@ -536,10 +509,10 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     size_t used = 0;
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
       const uint8_t v = debug.samples[i].value;
-      const int n = snprintf(line, sizeof(line), "%lu,%lu,%u,%u,%u,%u,0x%02X,%u\n",
+      const int n = snprintf(line, sizeof(line), "%lu,%lu,%u,%u,%u,0x%02X,%u\n",
           static_cast<unsigned long>(sequence), static_cast<unsigned long>(debug.samples[i].t_us),
           static_cast<unsigned>(debug.samples[i].edge_no), (v & 0x01) ? 1U : 0U,
-          (v & 0x02) ? 1U : 0U, (v & 0x08) ? 1U : 0U, v, did_overflow ? 1U : 0U);
+          (v & 0x08) ? 1U : 0U, v, did_overflow ? 1U : 0U);
       if (n <= 0) continue;
       const size_t len = static_cast<size_t>(n);
       if (used + len > sizeof(chunk)) { err = httpd_resp_send_chunk(req, chunk, used); used = 0; }
@@ -590,7 +563,6 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     const float rt_us = s.rt.count ? float(s.rt.period_sum) / s.rt.count : 0.0f;
     const float rh_us = s.rh_timing.count ? float(s.rh_timing.period_sum) / s.rh_timing.count : 0.0f;
     const float rh_state_us = rh_state_period_median(s.rh_state);
-    const float rh_state_2pin_us = rh_state_period_median(s.rh_state_2pin);
     const Measurement d = decoder.latest_measurement;
     const bool have = d.sequence == s.sequence;
 
@@ -598,7 +570,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     // HTTP server task.  Convert floats to short fixed-point strings first,
     // then serialize the CSV using integer/string printf only.
     char ref_period[20], ref_duration[20], rt_period[20], rt_duration[20];
-    char rh_period[20], rh_duration[20], rh_state[20], rh_state_2pin[20];
+    char rh_period[20], rh_duration[20], rh_state[20];
     char rt_ratio[24], rh_ratio[24], temperature[20], humidity[20], quality[16];
     format_fixed(ref_period, sizeof(ref_period), ref_us, 3);
     format_fixed(ref_duration, sizeof(ref_duration), float(s.ref.period_sum) / 1000.0f, 3);
@@ -607,7 +579,6 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     format_fixed(rh_period, sizeof(rh_period), rh_us, 3);
     format_fixed(rh_duration, sizeof(rh_duration), float(s.rh_timing.period_sum) / 1000.0f, 3);
     format_fixed(rh_state, sizeof(rh_state), rh_state_us, 3);
-    format_fixed(rh_state_2pin, sizeof(rh_state_2pin), rh_state_2pin_us, 3);
     format_fixed(rt_ratio, sizeof(rt_ratio), have ? d.rt_ratio : NAN, 6);
     format_fixed(rh_ratio, sizeof(rh_ratio), have ? d.rh_ratio : NAN, 6);
     format_fixed(temperature, sizeof(temperature), have ? d.temperature_c : NAN, 3);
@@ -620,19 +591,19 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "measurement,phase,count,period_mean_us,duration_ms,state_rh_median_us,state_rh_samples,state_rh_seen,state_rh_2pin_median_us,state_rh_2pin_samples,state_rh_2pin_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
+        "measurement,phase,count,period_mean_us,duration_ms,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     char line[384];
 
     if (err == ESP_OK) {
-      const int n = snprintf(line, sizeof(line), "%lu,ref,%u,%s,%s,,,,,,,,,,,,,,,,,,\n",
+      const int n = snprintf(line, sizeof(line), "%lu,ref,%u,%s,%s,,,,,,,,,,,,,,,\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.ref.count),
           ref_period, ref_duration);
       if (n <= 0 || static_cast<size_t>(n) >= sizeof(line)) err = ESP_FAIL;
       else err = httpd_resp_send_chunk(req, line, n);
     }
     if (err == ESP_OK) {
-      const int n = snprintf(line, sizeof(line), "%lu,rt,%u,%s,%s,,,,,,,,,,,,,,,,,,\n",
+      const int n = snprintf(line, sizeof(line), "%lu,rt,%u,%s,%s,,,,,,,,,,,,,,,\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.rt.count),
           rt_period, rt_duration);
       if (n <= 0 || static_cast<size_t>(n) >= sizeof(line)) err = ESP_FAIL;
@@ -640,12 +611,10 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     }
     if (err == ESP_OK) {
       const int n = snprintf(line, sizeof(line),
-          "%lu,rh,%u,%s,%s,%s,%u,%lu,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
+          "%lu,rh,%u,%s,%s,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.rh_timing.count),
           rh_period, rh_duration, rh_state, static_cast<unsigned>(s.rh_state.sample_count),
-          static_cast<unsigned long>(s.rh_state.seen), rh_state_2pin,
-          static_cast<unsigned>(s.rh_state_2pin.sample_count), static_cast<unsigned long>(s.rh_state_2pin.seen),
-          have && d.valid ? 1U : 0U, rt_ratio, rh_ratio, temperature, humidity, quality,
+          static_cast<unsigned long>(s.rh_state.seen), have && d.valid ? 1U : 0U, rt_ratio, rh_ratio, temperature, humidity, quality,
           have ? reject_reason_to_string(d.reject_reason) : "UNKNOWN",
           have && d.thermal_transient ? 1U : 0U, have && d.temperature_extrapolation ? 1U : 0U,
           have && d.humidity_extrapolation ? 1U : 0U, have && d.calibration_extrapolation ? 1U : 0U);

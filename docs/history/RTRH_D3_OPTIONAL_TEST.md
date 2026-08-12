@@ -1,3 +1,7 @@
+# RESOLVED: D3/G11 is not required
+
+The shadow test documented below was completed successfully. The production decoder now uses only G10/D1 and G13/D2; D3/GPIO5 is free. This file is retained as historical validation context.
+
 # RT/RH D3/G11 optionality shadow test — 2026-08-12
 
 This build keeps the validated three-pin RT/RH decoder unchanged and adds a
@@ -23,3 +27,17 @@ RH observable.
 
 The existing stored debug captures are decimated, so they cannot exactly replay
 the ISR with G11 removed; this on-device shadow measurement is the lossless test.
+
+## Result
+
+Validation capture set `rh_th_nod3_260811-1.zip` produced:
+
+| Capture | 3-pin median | 2-pin median | 3-pin samples/seen | 2-pin samples/seen |
+|---|---:|---:|---:|---:|
+| 1 | 687.000 µs | 687.000 µs | 96 / 189 | 96 / 189 |
+| 2 | 689.000 µs | 689.000 µs | 96 / 189 | 96 / 189 |
+| 3 | 686.000 µs | 686.000 µs | 96 / 190 | 96 / 190 |
+
+The two-pin path therefore observed the same recurrence events and produced the
+same median in all validation captures. Production code was changed to use only
+G10/D1 and G13/D2; G11/D3 was removed from GPIO configuration and ISR handling.

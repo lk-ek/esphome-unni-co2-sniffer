@@ -46,12 +46,13 @@ The XIAO and Unni electronics share **5 V and GND**. The ESP only observes the s
 | D5 | GPIO7 | CO₂ SCL | CO₂ bus clock |
 | D4 | GPIO6 | CO₂ SDA | CO₂ bus data |
 | D1 | GPIO3 | RT/RH G10 | RT/RH timing |
-| D3 | GPIO5 | RT/RH G11 | RT/RH state/timing |
 | D2 | GPIO4 | RT/RH G13 | RT/RH state/timing |
 | 5V | — | +5 V | shared supply |
 | GND | — | GND | shared ground |
 
-The previously investigated G12 signal duplicates G10 for the purposes of the current decoder and is not required.
+D3 / GPIO5 (Unni G11) is intentionally not connected. A live shadow-decoder test against the former three-line implementation produced identical RH-state median, sample count, and event count, so G11 adds no information used by the production calculation.
+
+The previously investigated G12 signal also duplicates G10 for the purposes of the current decoder and is not required.
 
 For a permanent installation, a series resistor in each ESP sniffing branch is recommended:
 
@@ -63,7 +64,7 @@ Do not put the resistor in series with the original Unni signal path.
 
 ### Boot isolation and self-heating
 
-The production configuration runs the ESP32-C3 at 80 MHz and uses Wi-Fi power saving. `sniffer_start_delay` delays all custom GPIO configuration and ISR attachment; during that period the component leaves the five observed signal pins untouched. The supplied production configurations use 10 seconds.
+The production configuration runs the ESP32-C3 at 80 MHz and uses Wi-Fi power saving. `sniffer_start_delay` delays all custom GPIO configuration and ISR attachment; during that period the component leaves the four observed signal pins untouched. The supplied production configurations use 10 seconds.
 
 This is useful both for boot-isolation testing and because the added ESP sits near temperature-sensitive circuitry.
 
@@ -199,7 +200,7 @@ The CO₂ decoder lives entirely in `bus_sniffer/co2_decoder.*`.
 
 ## RT/RH decoder
 
-The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10/G11/G13 and derives normalized RT/reference and RH/reference values.
+The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10 and G13 and derives normalized RT/reference and RH/reference values. D3/GPIO5 (the Unni G11 signal used during reverse engineering) is not required by the production decoder.
 
 The RT/RH decoder owns:
 

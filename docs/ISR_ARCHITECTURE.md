@@ -143,17 +143,16 @@ Source: `bus_sniffer/rtrh_decoder.cpp`
 
 ## Pins
 
-The RT/RH decoder observes three original Unni signals:
+The RT/RH decoder observes two original Unni signals:
 
 - G10: GPIO3 / D1
-- G11: GPIO5 / D3
 - G13: GPIO4 / D2
 
-All three pins use `GPIO_INTR_ANYEDGE`.
+Both pins use `GPIO_INTR_ANYEDGE`. D3/GPIO5 (G11) was used during reverse engineering but is not required by the production decoder.
 
 The ISR receives an encoded pin index through its `void *arg`; this lets one
 handler distinguish which physical pin caused the interrupt without registering
-three separate functions.
+two separate functions.
 
 ## Decoder state
 
@@ -168,7 +167,7 @@ Important members are:
 - `collecting`: currently inside a sensor measurement sequence
 - `measurement_start_us`: timestamp used to determine REF/RT/RH phase
 - `last_edge_us`: most recent observed edge, used for end-of-measurement detection
-- `gpio_state`: last combined G10/G11/G13 state
+- `gpio_state`: last combined G10/G13 state
 - `last_g10_fall_us`: previous G10 falling edge
 - `have_g10_rise`: protects against accepting an incomplete G10 period
 - `phase`: REF, RT or RH
@@ -201,15 +200,14 @@ protocol constants.**
 
 ## Only the physical G10 IRQ measures G10 periods
 
-The ISR always reads the complete three-pin state, but REF/RT/RH period timing is
+The ISR reads the complete two-pin G10/G13 state, but REF/RT/RH period timing is
 updated only if the interrupt was caused by physical G10:
 
 ```cpp
 const bool is_g10_irq = pin_index == 0;
 ```
 
-This is critical when multiple lines change almost simultaneously. If a G11 or
-G13 interrupt were allowed to infer a G10 transition from the aggregate state,
+This is critical when multiple lines change almost simultaneously. If a G13 interrupt were allowed to infer a G10 transition from the aggregate state,
 IRQ ordering could create a false period.
 
 A valid G10 period requires:
@@ -241,14 +239,16 @@ while the other describes the subset used for temperature.
 During RH the decoder also watches for the characteristic combined state:
 
 ```text
-G10=0, G11=0, G13=1
+G10=0, G13=1
 ```
 
 In bit form the test is:
 
 ```cpp
-(state & 0x0B) == 0x08
+(state & 0x09) == 0x08
 ```
+
+D3/G11 was removed after a live shadow-decoder comparison showed identical RH median, sample count, and event count for the two-pin and three-pin state definitions across the validation captures.
 
 The time between recurrences of this state is stored in a 96-entry ring:
 
@@ -270,8 +270,7 @@ no new edge:
 MEASUREMENT_QUIET_US = 15000000;
 ```
 
-Before copying the live accumulator into `decoder.snapshot`, it disables all
-three RT/RH GPIO interrupts, checks the quiet condition again, performs the
+Before copying the live accumulator into `decoder.snapshot`, it disables both RT/RH GPIO interrupts, checks the quiet condition again, performs the
 copy, refreshes current pin levels, and re-enables the interrupts.
 
 That second check is important. An edge may occur between the first quiet-time
@@ -352,7 +351,7 @@ Before changing ISR-related code, check all of the following:
 5. Can a G10 period accidentally cross a REF/RT/RH phase boundary?
 6. Is the first CO₂ bus state before the first captured edge still preserved?
 7. Is CO₂ decoding still done only after capture is stopped?
-8. Is RT/RH snapshot copying still protected by disabling/rechecking the three
+8. Is RT/RH snapshot copying still protected by disabling/rechecking the two
    RT/RH GPIO interrupts?
 9. Are ISR-shared fields still fixed-size and allocation-free?
 10. Have both `debug_capture: false` and `debug_capture: true` builds been tested?
