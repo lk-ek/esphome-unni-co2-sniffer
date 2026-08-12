@@ -45,25 +45,6 @@ inline void publish_finite(sensor::Sensor *sensor, float value) {
 }  // namespace
 
 #if UNNI_BLE_ENABLED
-void BusSniffer::configure_gatt_server(esp32_ble_server::BLEServer *server) {
-  // The BLE server is auto-loaded by the component, so reproduce the Gadget
-  // Device Information identity that previously lived in user YAML.
-  if (server != nullptr) {
-    auto *info = server->get_service(esp32_ble::ESPBTUUID::from_uint16(0x180A));
-    if (info != nullptr) {
-      if (auto *manufacturer = info->get_characteristic(0x2A29))
-        manufacturer->set_value(std::string("Sensirion"));
-      if (auto *model = info->get_characteristic(0x2A24))
-        model->set_value(std::string("MyCO2 Gadget"));
-      if (auto *firmware = info->get_characteristic(0x2A26))
-        firmware->set_value(std::string("1.0.1"));
-    }
-  }
-#if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_configure_gatt(server);
-#endif
-}
-
 void BusSniffer::set_ble_advertising_interval(uint32_t interval_ms) {
   sensirion_ble_set_advertising_interval(interval_ms);
 }
@@ -122,6 +103,28 @@ bool BusSniffer::initialize_sniffer_io_() {
 void BusSniffer::setup() {
 #if UNNI_BLE_ENABLED
   sensirion_ble_setup();
+
+  // GATT topology must be built at runtime, not from a codegen setter.
+  // ESPHome creates the BLEServer object before all of its generated setup
+  // statements (notably set_parent()) have necessarily been emitted. Calling
+  // BLEServer::create_service() from codegen can therefore dereference an
+  // unset parent. By setup() time all generated wiring is complete.
+  if (this->gatt_server_ != nullptr) {
+    auto *info = this->gatt_server_->get_service(esp32_ble::ESPBTUUID::from_uint16(0x180A));
+    if (info != nullptr) {
+      if (auto *manufacturer = info->get_characteristic(0x2A29))
+        manufacturer->set_value(std::string("Sensirion"));
+      if (auto *model = info->get_characteristic(0x2A24))
+        model->set_value(std::string("MyCO2 Gadget"));
+      if (auto *firmware = info->get_characteristic(0x2A26))
+        firmware->set_value(std::string("1.0.1"));
+    }
+#if UNNI_BLE_HISTORY_ENABLED
+    sensirion_history_configure_gatt(this->gatt_server_);
+#endif
+  } else {
+    ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
+  }
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_setup();

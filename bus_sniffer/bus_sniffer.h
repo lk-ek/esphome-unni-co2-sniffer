@@ -20,7 +20,7 @@ class BusSniffer : public Component {
   void loop() override;
 
 #if UNNI_BLE_ENABLED
-  void configure_gatt_server(esp32_ble_server::BLEServer *server);
+  void set_gatt_server(esp32_ble_server::BLEServer *server) { this->gatt_server_ = server; }
   void gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
   void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                            esp_ble_gatts_cb_param_t *param);
@@ -116,6 +116,9 @@ class BusSniffer : public Component {
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
   bool debug_metrics_{false};
+#if UNNI_BLE_ENABLED
+  esp32_ble_server::BLEServer *gatt_server_{nullptr};
+#endif
   bool light_sleep_enabled_{true};
   uint32_t light_sleep_max_awake_ms_{10000};
   uint8_t rtrh_g10_pin_{3};

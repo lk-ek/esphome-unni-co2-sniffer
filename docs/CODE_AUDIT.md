@@ -45,3 +45,15 @@ For current behavior, use:
 3. the source under `bus_sniffer/`
 
 `docs/history/` is rationale/history only.
+
+## BLE server initialization ordering fix (2026-08-12)
+
+The component-managed YAML refactor initially called `BLEServer::create_service()`
+from a generated setter while ESPHome code generation was still wiring the
+BLE server. In ESPHome 2026.7.4 the server parent is assigned later by
+`BLEServer::set_parent()`, while `create_service()` may immediately access the
+parent when deciding whether to create a live service.
+
+The component now stores the generated BLE server pointer only. Device
+Information customization and Sensirion GATT service creation are deferred to
+`BusSniffer::setup()`, after all generated object wiring has completed.

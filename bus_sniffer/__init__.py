@@ -281,7 +281,7 @@ async def to_code(config):
         esp32_ble.register_gap_event_handler(ble, var)
 
         server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
-        cg.add(var.configure_gatt_server(server))
+        cg.add(var.set_gatt_server(server))
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
