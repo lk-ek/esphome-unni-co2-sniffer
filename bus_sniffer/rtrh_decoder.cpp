@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rtrh_decoder.h"
 
-
+#include "calibration.h"
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
@@ -31,8 +31,66 @@ static constexpr uint32_t REF_PHASE_END_US = 125000;
 static constexpr uint32_t RT_PHASE_END_US = 252000;
 static constexpr uint32_t CYCLE_MAX_US = 20000;
 static constexpr uint16_t RT_TEMP_CYCLES = 880;
+static constexpr uint8_t RH_STATE_PERIOD_SAMPLES = 96;
+
+struct Accum {
+  uint32_t period_sum{0};
+  uint16_t count{0};
+};
+
+struct RhStateStats {
+  uint32_t last_us{0};
+  uint16_t samples[RH_STATE_PERIOD_SAMPLES]{};
+  uint8_t write_pos{0};
+  uint8_t sample_count{0};
+  uint32_t seen{0};
+};
+
+struct Snapshot {
+  Accum ref;
+  Accum rt;
+  Accum rh_timing;
+  uint32_t rt_temp_period_sum{0};
+  uint16_t rt_temp_count{0};
+  RhStateStats rh_state;
+  uint32_t sequence{0};
+};
 
 enum Phase : uint8_t { WAIT_REF = 0, REF, RT, RH };
+
+// Capture acceptance limits. These are deliberately kept next to the decoder
+// because they describe whether one decoded RT/RH cycle is trustworthy.
+static constexpr float REF_PERIOD_MIN_US = 72.0f;
+static constexpr float REF_PERIOD_MAX_US = 82.0f;
+static constexpr float REF_DURATION_MIN_MS = 122.0f;
+static constexpr float REF_DURATION_MAX_MS = 128.0f;
+static constexpr float RT_PERIOD_MIN_US = 100.0f;
+static constexpr float RT_PERIOD_MAX_US = 220.0f;
+static constexpr float RT_DURATION_MIN_MS = 123.0f;
+static constexpr float RT_DURATION_MAX_MS = 130.0f;
+static constexpr uint16_t RT_COUNT_MIN = 600;
+static constexpr float RH_DURATION_MIN_MS = 127.0f;
+static constexpr float RH_DURATION_MAX_MS = 134.0f;
+static constexpr uint8_t RH_STATE_SAMPLES_MIN = 32;
+static constexpr float RH_STATE_MIN_US = 40.0f;
+static constexpr float RH_STATE_MAX_US = 60000.0f;
+static constexpr float RH_RATIO_VALID_MAX = 20.0f;
+
+const char *reject_reason_to_string(RejectReason reason) {
+  switch (reason) {
+    case RejectReason::NONE: return "NONE";
+    case RejectReason::REF_PERIOD: return "REF_PERIOD";
+    case RejectReason::REF_DURATION: return "REF_DURATION";
+    case RejectReason::RT_PERIOD: return "RT_PERIOD";
+    case RejectReason::RT_DURATION: return "RT_DURATION";
+    case RejectReason::RT_COUNT: return "RT_COUNT";
+    case RejectReason::RH_DURATION: return "RH_DURATION";
+    case RejectReason::RH_TOO_FEW_SAMPLES: return "RH_TOO_FEW_SAMPLES";
+    case RejectReason::RH_STATE_PERIOD: return "RH_STATE_PERIOD";
+    case RejectReason::RH_RATIO_IMPLAUSIBLE: return "RH_RATIO_IMPLAUSIBLE";
+  }
+  return "UNKNOWN";
+}
 
 static volatile bool collecting = false;
 static volatile uint32_t measurement_start_us = 0;
@@ -50,7 +108,7 @@ static RhStateStats rh_state;
 static Snapshot latest_snapshot;
 static volatile bool snapshot_ready = false;
 static volatile uint8_t pin_level[3] = {0, 0, 0};
-static Derived latest_derived;
+static Measurement latest_measurement;
 
 static inline uint8_t IRAM_ATTR read_state() {
   uint8_t value = 0;
@@ -120,7 +178,7 @@ static inline void IRAM_ATTR observe_rh_state(uint32_t now, uint8_t state) {
   rh_state.seen++;
 }
 
-float rh_state_period_median(const RhStateStats &s) {
+static float rh_state_period_median(const RhStateStats &s) {
   const uint8_t n = s.sample_count;
   if (!n) return 0.0f;
   uint16_t tmp[RH_STATE_PERIOD_SAMPLES];
@@ -313,15 +371,101 @@ void loop() {
 #endif
 }
 
-bool poll(Snapshot &snapshot) {
+static RejectReason reject_reason(const Measurement &m) {
+  if (!std::isfinite(m.ref_period_us) || m.ref_period_us < REF_PERIOD_MIN_US ||
+      m.ref_period_us > REF_PERIOD_MAX_US)
+    return RejectReason::REF_PERIOD;
+  if (!std::isfinite(m.ref_duration_ms) || m.ref_duration_ms < REF_DURATION_MIN_MS ||
+      m.ref_duration_ms > REF_DURATION_MAX_MS)
+    return RejectReason::REF_DURATION;
+  if (!std::isfinite(m.rt_period_us) || m.rt_period_us < RT_PERIOD_MIN_US ||
+      m.rt_period_us > RT_PERIOD_MAX_US)
+    return RejectReason::RT_PERIOD;
+  if (!std::isfinite(m.rt_duration_ms) || m.rt_duration_ms < RT_DURATION_MIN_MS ||
+      m.rt_duration_ms > RT_DURATION_MAX_MS)
+    return RejectReason::RT_DURATION;
+  if (m.rt_count < RT_COUNT_MIN) return RejectReason::RT_COUNT;
+  if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
+      m.rh_duration_ms > RH_DURATION_MAX_MS)
+    return RejectReason::RH_DURATION;
+  if (m.rh_state_samples < RH_STATE_SAMPLES_MIN) return RejectReason::RH_TOO_FEW_SAMPLES;
+  if (!std::isfinite(m.rh_state_us) || m.rh_state_us < RH_STATE_MIN_US ||
+      m.rh_state_us > RH_STATE_MAX_US)
+    return RejectReason::RH_STATE_PERIOD;
+  if (!std::isfinite(m.rh_ratio) || m.rh_ratio <= 0.0f || m.rh_ratio > RH_RATIO_VALID_MAX)
+    return RejectReason::RH_RATIO_IMPLAUSIBLE;
+  return RejectReason::NONE;
+}
+
+static float quality_score(const Measurement &m) {
+  const float ref_score = std::fmax(0.0f, 1.0f - std::fabs(m.ref_period_us - 76.75f) / 2.0f);
+  const float rt_score = std::fmin(1.0f, static_cast<float>(m.rt_count) / 880.0f);
+  const float rh_fill_score = std::fmin(1.0f, static_cast<float>(m.rh_state_samples) / 96.0f);
+
+  float rh_seen_score = 1.0f;
+  if (m.rh_state_seen > 0) {
+    const float ratio = static_cast<float>(m.rh_state_seen) / static_cast<float>(m.rh_state_samples);
+    rh_seen_score = std::fmin(1.0f, ratio / 2.0f);
+  }
+
+  return 100.0f * (0.25f * ref_score + 0.30f * rt_score +
+                   0.30f * rh_fill_score + 0.15f * rh_seen_score);
+}
+
+static Measurement derive(const Snapshot &s) {
+  Measurement m;
+  m.sequence = s.sequence;
+  m.ref_count = s.ref.count;
+  m.rt_phase_count = s.rt.count;
+  m.rt_count = s.rt_temp_count;
+  m.rh_state_samples = s.rh_state.sample_count;
+  m.rh_state_seen = s.rh_state.seen;
+
+  m.ref_period_us = s.ref.count ? float(s.ref.period_sum) / s.ref.count : 0.0f;
+  m.ref_duration_ms = float(s.ref.period_sum) / 1000.0f;
+  m.rt_phase_period_us = s.rt.count ? float(s.rt.period_sum) / s.rt.count : 0.0f;
+  m.rt_duration_ms = float(s.rt.period_sum) / 1000.0f;
+  m.rt_period_us = s.rt_temp_count ? float(s.rt_temp_period_sum) / s.rt_temp_count : 0.0f;
+  m.rh_duration_ms = float(s.rh_timing.period_sum) / 1000.0f;
+  m.rh_state_us = rh_state_period_median(s.rh_state);
+  m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
+  m.rh_ratio = m.ref_period_us > 0.0f && m.rh_state_us > 0.0f
+                   ? m.rh_state_us / m.ref_period_us : NAN;
+
+  m.reject_reason = reject_reason(m);
+  m.valid = m.reject_reason == RejectReason::NONE;
+  if (!m.valid) {
+    // Preserve the old behaviour: rejected captures report 0% quality and
+    // expose a temperature estimate only when RT/REF itself is finite.
+    m.temperature_c = std::isfinite(m.rt_ratio) ? calibration::temperature_from_ratio(m.rt_ratio) : NAN;
+    m.temperature_extrapolation = true;
+    m.humidity_extrapolation = true;
+    m.calibration_extrapolation = true;
+    return m;
+  }
+
+  m.quality_percent = quality_score(m);
+  m.temperature_c = calibration::temperature_from_ratio(m.rt_ratio);
+  m.rh_log = calibration::log_rh_ratio(m.rh_ratio);
+  m.humidity_percent = calibration::humidity_from_ratio_temperature(m.rh_ratio, m.temperature_c);
+  m.temperature_extrapolation = m.temperature_c < calibration::CAL_TEMP_MIN_C ||
+                                m.temperature_c > calibration::CAL_TEMP_MAX_C;
+  m.humidity_extrapolation = m.rh_ratio < calibration::CAL_RH_RATIO_MIN ||
+                             m.rh_ratio > calibration::CAL_RH_RATIO_MAX;
+  m.calibration_extrapolation = m.temperature_extrapolation || m.humidity_extrapolation;
+  return m;
+}
+
+bool poll(Measurement &measurement) {
   static uint32_t last_sequence = 0;
   if (!snapshot_ready || latest_snapshot.sequence == last_sequence) return false;
-  snapshot = latest_snapshot;
-  last_sequence = snapshot.sequence;
+  measurement = derive(latest_snapshot);
+  latest_measurement = measurement;
+  last_sequence = measurement.sequence;
   return true;
 }
 
-void set_derived(const Derived &derived) { latest_derived = derived; }
+void update_latest(const Measurement &measurement) { latest_measurement = measurement; }
 
 #if RTRH_DEBUG_CAPTURE
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
@@ -378,7 +522,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     const float rt_us = s.rt.count ? float(s.rt.period_sum) / s.rt.count : 0.0f;
     const float rh_us = s.rh_timing.count ? float(s.rh_timing.period_sum) / s.rh_timing.count : 0.0f;
     const float rh_state_us = rh_state_period_median(s.rh_state);
-    const Derived d = latest_derived;
+    const Measurement d = latest_measurement;
     const bool have = d.sequence == s.sequence;
     char body[1024];
     const int n = snprintf(body, sizeof(body),
@@ -392,7 +536,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
         rh_state_us, static_cast<unsigned>(s.rh_state.sample_count), static_cast<unsigned long>(s.rh_state.seen),
         have && d.valid ? 1U : 0U, have ? d.rt_ratio : NAN, have ? d.rh_ratio : NAN,
         have ? d.temperature_c : NAN, have ? d.humidity_percent : NAN, have ? d.quality_percent : 0.0f,
-        have ? measurement_quality::reject_reason_to_string(d.reject_reason) : "UNKNOWN",
+        have ? reject_reason_to_string(d.reject_reason) : "UNKNOWN",
         have && d.thermal_transient ? 1U : 0U, have && d.temperature_extrapolation ? 1U : 0U,
         have && d.humidity_extrapolation ? 1U : 0U, have && d.calibration_extrapolation ? 1U : 0U);
     if (n <= 0) { request->send(500, "text/plain", nullptr); return; }

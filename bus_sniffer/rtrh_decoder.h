@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include "measurement_quality.h"
 #include "esphome/core/defines.h"
-#include <cstdint>
+
 #include <cmath>
+#include <cstdint>
 
 #ifndef RTRH_DEBUG_CAPTURE
 #define RTRH_DEBUG_CAPTURE 0
@@ -14,39 +14,47 @@ namespace esphome {
 namespace bus_sniffer {
 namespace rtrh_decoder {
 
-struct Accum {
-  uint32_t period_sum{0};
-  uint16_t count{0};
+enum class RejectReason : uint8_t {
+  NONE = 0,
+  REF_PERIOD,
+  REF_DURATION,
+  RT_PERIOD,
+  RT_DURATION,
+  RT_COUNT,
+  RH_DURATION,
+  RH_TOO_FEW_SAMPLES,
+  RH_STATE_PERIOD,
+  RH_RATIO_IMPLAUSIBLE,
 };
 
-static constexpr uint8_t RH_STATE_PERIOD_SAMPLES = 96;
-struct RhStateStats {
-  uint32_t last_us{0};
-  uint16_t samples[RH_STATE_PERIOD_SAMPLES]{};
-  uint8_t write_pos{0};
-  uint8_t sample_count{0};
-  uint32_t seen{0};
-};
+const char *reject_reason_to_string(RejectReason reason);
 
-struct Snapshot {
-  Accum ref;
-  Accum rt;
-  Accum rh_timing;
-  uint32_t rt_temp_period_sum{0};
-  uint16_t rt_temp_count{0};
-  RhStateStats rh_state;
-  uint32_t sequence{0};
-};
-
-struct Derived {
+struct Measurement {
   uint32_t sequence{0};
   bool valid{false};
+
+  // Timing diagnostics retained for optional ESPHome entities and CSV debug.
+  float ref_period_us{NAN};
+  float ref_duration_ms{NAN};
+  uint16_t ref_count{0};
+  float rt_phase_period_us{NAN};
+  float rt_duration_ms{NAN};
+  uint16_t rt_phase_count{0};
+  float rt_period_us{NAN};
+  uint16_t rt_count{0};
+  float rh_duration_ms{NAN};
+  float rh_state_us{NAN};
+  uint8_t rh_state_samples{0};
+  uint32_t rh_state_seen{0};
+
   float rt_ratio{NAN};
   float rh_ratio{NAN};
+  float rh_log{NAN};
   float temperature_c{NAN};
   float humidity_percent{NAN};
   float quality_percent{0.0f};
-  measurement_quality::RejectReason reject_reason{measurement_quality::RejectReason::NONE};
+  RejectReason reject_reason{RejectReason::NONE};
+
   bool thermal_transient{false};
   bool temperature_extrapolation{false};
   bool humidity_extrapolation{false};
@@ -56,9 +64,8 @@ struct Derived {
 // GPIO3/D1 = G10, GPIO5/D3 = G11, GPIO4/D2 = G13.
 bool setup();
 void loop();
-bool poll(Snapshot &snapshot);
-float rh_state_period_median(const RhStateStats &stats);
-void set_derived(const Derived &derived);
+bool poll(Measurement &measurement);
+void update_latest(const Measurement &measurement);
 
 #if RTRH_DEBUG_CAPTURE
 void register_debug_handlers();

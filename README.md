@@ -131,7 +131,6 @@ bus_sniffer/
   co2_decoder.cpp/.h       GPIO capture + passive CO₂/I²C decoding
   rtrh_decoder.cpp/.h      RT/RH GPIO ISR, phase capture and raw snapshots
   calibration.h            temperature/RH conversion coefficients and ranges
-  measurement_quality.h    measurement-quality logic
   sensirion_ble.cpp/.h     Sensirion-compatible live BLE advertising
   sensirion_history.cpp/.h Sensirion-style GATT history and persistence
   ble_options.h            compile-time BLE feature selection
