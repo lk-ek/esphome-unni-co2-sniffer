@@ -1,0 +1,143 @@
+esphome:
+  name: i2csniffer
+  friendly_name: I2C-Sniffer
+  includes:
+    - <esp_mac.h>
+
+external_components:
+  - source:
+      type: local
+      path: .
+
+logger:
+  level: WARN
+
+api:
+  encryption:
+    key: !secret i2csniffer__encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret i2csniffer__ota
+    allow_partition_access: true
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # ESP32 already defaults to LIGHT modem sleep. HIGH saves more RF power;
+  # if your AP proves unreliable, change this back to LIGHT.
+  power_save_mode: HIGH
+  # Skip the normal active channel scan on reconnect/boot. ESPHome falls back
+  # to scanning automatically if the remembered AP cannot be reached.
+  fast_connect: true
+  ap:
+    ssid: "I2CSniffer Fallback Hotspot"
+    password: !secret i2csniffer__ap_password
+
+captive_portal:
+
+web_server:
+  port: 80
+
+esp32:
+  board: seeed_xiao_esp32c3
+  # ESP32-C3 supports 80/160 MHz. 80 MHz lowers active CPU power substantially;
+  # measurement-quality diagnostics make timing regressions immediately visible.
+  cpu_frequency: 80MHz
+  framework:
+    type: esp-idf
+  # Persistent Sensirion history store. This is storage configuration rather
+  # than GATT protocol configuration; the bus_sniffer component owns the format.
+  partitions:
+    - name: senshist
+      type: data
+      subtype: spiffs
+      size: 0x10000
+
+# User-facing BLE configuration only.  Sensirion services/characteristics,
+# callbacks, System ID and history protocol are created by bus_sniffer itself.
+esp32_ble:
+  id: unni_ble
+  name: "S"
+  advertising: true
+
+esp32_ble_server:
+  id: unni_ble_server
+  max_clients: 1
+  manufacturer: "Sensirion"
+  model: "MyCO2 Gadget"
+  firmware_version: "1.0.1"
+
+bus_sniffer:
+  # Compile-time BLE feature selection.
+  # For a genuine ble:false build, also remove/comment the top-level
+  # esp32_ble: and esp32_ble_server: blocks above.
+  ble: true
+  ble_live: true
+  ble_history: true
+  ble_id: unni_ble
+  ble_server_id: unni_ble_server
+
+  ble_advertising_interval: 2s
+  ha_publish_interval: 30s
+
+  # Boot-isolation test: leave D1/D2/D3/D5/D6 completely untouched by the
+  # custom component during the first 10 seconds after MCU startup. Wi-Fi/BLE
+  # can initialize normally. After the delay the five lines become plain
+  # high-impedance inputs without pulls and their edge ISRs are attached.
+  sniffer_start_delay: 10s
+
+  # Compile-time capture/HTTP debug support. Set true only when raw captures
+  # are needed; then also add a top-level `web_server:` block. With false no
+  # capture HTTP handlers or RT/RH capture buffers are compiled in.
+  debug_capture: true
+
+  # Detailed logs/CSV metadata. HA diagnostic entities below may be removed
+  # individually without affecting decoding.
+  debug_metrics: true
+  thermal_transient_on_rate: 0.8
+  thermal_transient_off_rate: 0.3
+
+  ref_period:
+    name: "RT RH REF Period"
+  rt_period:
+    name: "RT RH RT Period"
+  rh_state_period:
+    name: "RT RH RH State Period"
+  rt_ratio:
+    name: "RT RH RT Ratio"
+  rh_ratio:
+    name: "RT RH RH Ratio"
+  rh_log:
+    name: "RT RH RH Log Ratio"
+  measurement_quality:
+    name: "RT RH Measurement Quality"
+  thermal_transient:
+    name: "RT RH Thermal Transient"
+  temperature_extrapolation:
+    name: "RT RH Temperature Extrapolation"
+  humidity_extrapolation:
+    name: "RT RH Humidity Extrapolation"
+  calibration_extrapolation:
+    name: "RT RH Calibration Extrapolation"
+
+  co2:
+    name: "CO2"
+    id: cd40_co2
+    icon: mdi:molecule-co2
+
+  crc_errors:
+    name: "CO2 Sniffer CRC Errors"
+
+  frame_errors:
+    name: "CO2 Sniffer Frame Errors"
+
+  rt_temperature:
+    name: "RT Temperature"
+    id: rt_temperature
+    icon: mdi:thermometer
+
+  rh_humidity:
+    name: "RH Humidity"
+    id: rh_humidity
+    icon: mdi:water-percent
