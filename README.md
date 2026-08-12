@@ -127,7 +127,9 @@ The directory contains both the ESPHome/Python integration layer and the C++ imp
 ```text
 bus_sniffer/
   __init__.py              YAML schema and ESPHome code generation
-  bus_sniffer.cpp/.h       signal capture, decoding and component runtime
+  bus_sniffer.cpp/.h       thin ESPHome/HA/BLE orchestration layer
+  co2_decoder.cpp/.h       GPIO capture + passive CO₂/I²C decoding
+  rtrh_decoder.cpp/.h      RT/RH GPIO ISR, phase capture and raw snapshots
   calibration.h            temperature/RH conversion coefficients and ranges
   measurement_quality.h    measurement-quality logic
   sensirion_ble.cpp/.h     Sensirion-compatible live BLE advertising
@@ -135,7 +137,7 @@ bus_sniffer/
   ble_options.h            compile-time BLE feature selection
 ```
 
-This split is intentional. The YAML project selects features and defines entities; the external component implements the actual protocol decoding and BLE behavior.
+This split is intentional. `BusSniffer` is now deliberately small: it starts the decoders, converts completed RT/RH snapshots into calibrated values, publishes ESPHome entities, and forwards valid measurements to BLE. The timing-critical GPIO/ISR code lives behind the two decoder APIs, so changes to Home Assistant or BLE no longer require editing the protocol decoders.
 
 A second example, `i2c-sniffer-no-ble.yaml`, demonstrates a genuine no-BLE build.
 
