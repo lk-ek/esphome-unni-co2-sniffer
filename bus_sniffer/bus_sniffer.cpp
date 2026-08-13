@@ -91,6 +91,60 @@ float BusSniffer::battery_percent_from_voltage_(float voltage) {
   return 0.0f;
 }
 
+
+bool BusSniffer::setup_usb_power_() {
+  gpio_config_t cfg{};
+  cfg.pin_bit_mask = 1ULL << this->usb_power_.pin;
+  cfg.mode = GPIO_MODE_INPUT;
+  cfg.pull_up_en = GPIO_PULLUP_DISABLE;
+  cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  cfg.intr_type = GPIO_INTR_DISABLE;
+  const esp_err_t err = gpio_config(&cfg);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "USB power GPIO%u setup failed: %d", this->usb_power_.pin, err);
+    return false;
+  }
+
+  this->usb_power_.initialized = true;
+  this->usb_power_.candidate = gpio_get_level(static_cast<gpio_num_t>(this->usb_power_.pin)) != 0;
+  this->usb_power_.candidate_since_ms = millis();
+  ESP_LOGI(TAG, "USB/VBUS detection enabled on GPIO%u", this->usb_power_.pin);
+  return true;
+}
+
+void BusSniffer::process_usb_power_() {
+  if (!this->usb_power_.initialized) return;
+
+  const bool raw = gpio_get_level(static_cast<gpio_num_t>(this->usb_power_.pin)) != 0;
+  const uint32_t now = millis();
+  if (raw != this->usb_power_.candidate) {
+    this->usb_power_.candidate = raw;
+    this->usb_power_.candidate_since_ms = now;
+    return;
+  }
+
+  // USB insertion/removal is slow compared with the MCU. Debounce the divider
+  // input so a transition cannot briefly invalidate/re-enable battery SOC.
+  constexpr uint32_t DEBOUNCE_MS = 100;
+  if (static_cast<uint32_t>(now - this->usb_power_.candidate_since_ms) < DEBOUNCE_MS) return;
+  if (this->usb_power_.have_state && this->usb_power_.state == raw) return;
+
+  this->usb_power_.state = raw;
+  this->usb_power_.have_state = true;
+  publish(this->out_.usb_power, raw);
+  ESP_LOGI(TAG, "USB Power: %s", raw ? "ON" : "OFF");
+
+  // Cell voltage is not a useful open-circuit SOC estimate while USB is
+  // present and the battery node may be driven by the charger. Mark Battery
+  // Level unavailable until the device is back on battery power.
+  if (raw && this->out_.battery_level)
+    this->out_.battery_level->publish_state(NAN);
+
+  // Measure immediately after a power-source transition rather than waiting
+  // for the regular battery interval.
+  this->battery_.last_measure_ms = 0;
+}
+
 bool BusSniffer::setup_battery_adc_() {
   // ESP32-C3 GPIO0..GPIO4 map directly to ADC1 channels 0..4. Keeping the
   // battery input on ADC1 avoids the C3 ADC2/Wi-Fi limitations.
@@ -139,6 +193,9 @@ bool BusSniffer::setup_battery_adc_() {
 
 void BusSniffer::process_battery_() {
   if (!this->battery_.initialized) return;
+  // Wait for the debounced VBUS state before interpreting the battery node.
+  // This avoids briefly reporting a charger-held ~4.2 V node as 100% SOC at boot.
+  if (this->usb_power_.initialized && !this->usb_power_.have_state) return;
   const uint32_t now = millis();
   if (this->battery_.last_measure_ms != 0 &&
       static_cast<uint32_t>(now - this->battery_.last_measure_ms) < this->battery_.interval_ms)
@@ -171,10 +228,18 @@ void BusSniffer::process_battery_() {
 
   const float adc_voltage = static_cast<float>(sum_mv) / static_cast<float>(valid) / 1000.0f;
   const float battery_voltage = adc_voltage * this->battery_.divider_ratio;
-  const float battery_level = battery_percent_from_voltage_(battery_voltage);
   publish(this->out_.battery_voltage, battery_voltage);
-  publish(this->out_.battery_level, battery_level);
-  ESP_LOGD(TAG, "Battery: %.3f V -> %.0f %%", battery_voltage, battery_level);
+
+  if (this->usb_power_.have_state && this->usb_power_.state) {
+    // With VBUS present this is the charger/BAT-node voltage and must not be
+    // interpreted as an open-circuit battery state of charge.
+    if (this->out_.battery_level) this->out_.battery_level->publish_state(NAN);
+    ESP_LOGD(TAG, "Battery node: %.3f V (USB power present; SOC unavailable)", battery_voltage);
+  } else {
+    const float battery_level = battery_percent_from_voltage_(battery_voltage);
+    publish(this->out_.battery_level, battery_level);
+    ESP_LOGD(TAG, "Battery: %.3f V -> %.0f %%", battery_voltage, battery_level);
+  }
 }
 
 bool BusSniffer::initialize_sniffer_io_() {
@@ -241,6 +306,7 @@ void BusSniffer::setup() {
   sensirion_history_setup();
 #endif
 
+  this->setup_usb_power_();
   this->setup_battery_adc_();
   this->boot_ms_ = millis();
   if (this->start_delay_ms_ == 0) {
@@ -453,6 +519,7 @@ void BusSniffer::loop() {
   sensirion_history_loop();
 #endif
   this->maybe_publish_ha_();
+  this->process_usb_power_();
   this->process_battery_();
 
   if (!this->io_initialized_) return;

@@ -148,7 +148,7 @@ The RT/RH decoder observes two original Unni signals:
 - G10: GPIO3 / D1
 - G13: GPIO4 / D2
 
-Both pins use `GPIO_INTR_ANYEDGE`. D3/GPIO5 (G11) was used during reverse engineering but is not required by the production decoder.
+Both pins use `GPIO_INTR_ANYEDGE`. The former G11 input was used during reverse engineering but is not required by the production decoder. XIAO D3/GPIO5 is now repurposed for USB/VBUS detection and is not part of the RT/RH ISR path.
 
 The ISR receives an encoded pin index through its `void *arg`; this lets one
 handler distinguish which physical pin caused the interrupt without registering

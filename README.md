@@ -49,12 +49,15 @@ The XIAO and Unni electronics share **5 V and GND**. The ESP only observes the s
 | D1 | GPIO3 | RT/RH G10 | RT/RH timing |
 | D2 | GPIO4 | RT/RH G13 | RT/RH state/timing |
 | D0 | GPIO2 / ADC1_CH2 | battery divider midpoint | battery voltage (1 MΩ / 1 MΩ) |
+| D3 | GPIO5 | VBUS divider midpoint | USB power detection (220 kΩ / 220 kΩ) |
 | 5V | — | +5 V | shared supply |
 | GND | — | GND | shared ground |
 
 For battery monitoring, connect D0/GPIO2 to the midpoint of a 1 MΩ / 1 MΩ divider directly across battery + and battery −/GND, with 0.1 µF from the midpoint to GND. This divides a 4.20 V full cell to about 2.10 V at the ADC while drawing only about 2.1 µA.
 
-D3 / GPIO5 (Unni G11) is intentionally not connected. A live shadow-decoder test against the former three-line implementation produced identical RH-state median, sample count, and event count, so G11 adds no information used by the production calculation.
+For USB/VBUS detection, connect D3/GPIO5 to the midpoint of a 220 kΩ / 220 kΩ divider between VBUS/5 V and GND. The component publishes `USB Power` automatically. With USB present, `Battery Voltage` remains visible but `Battery Level` is marked unavailable because the charger can hold the battery node near 4.2 V even when that voltage is not a meaningful open-circuit state-of-charge reading. After USB is removed, the battery is measured again immediately.
+
+The former Unni G11 RT/RH wire is intentionally not connected. A live shadow-decoder test against the former three-line implementation produced identical RH-state median, sample count, and event count, so G11 adds no information used by the production calculation. XIAO D3/GPIO5 is now repurposed for USB/VBUS detection instead.
 
 The previously investigated G12 signal also duplicates G10 for the purposes of the current decoder and is not required.
 
@@ -242,7 +245,7 @@ The CO₂ decoder lives entirely in `bus_sniffer/co2_decoder.*`.
 
 ## RT/RH decoder
 
-The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10 and G13 and derives normalized RT/reference and RH/reference values. D3/GPIO5 (the Unni G11 signal used during reverse engineering) is not required by the production decoder.
+The RT/RH measurement is not exposed as a simple digital register. The firmware captures timing relationships on G10 and G13 and derives normalized RT/reference and RH/reference values. The former Unni G11 signal used during reverse engineering is not required by the production decoder; XIAO D3/GPIO5 is therefore available for, and now defaults to, USB/VBUS detection.
 
 The RT/RH decoder now finalizes a transaction after 100 ms of silence rather than the historical 15-second quiet delay. This is intentionally longer than the maximum accepted 60 ms RH state period while allowing the power-save state machine to proceed roughly half a second after the RT/RH cycle begins.
 
@@ -339,9 +342,10 @@ bus_sniffer:
   battery_pin: 2
   battery_update_interval: 60s
   battery_divider_ratio: 2.0
+  usb_power_pin: 5
 ```
 
-The signal and battery GPIOs must be unique. `battery_pin` is restricted to ESP32-C3 ADC1 GPIO0..GPIO4; GPIO2/D0 is the default. The battery ADC uses ESP-IDF curve-fitting calibration and 12 dB attenuation. `Battery Voltage` and `Battery Level` are created automatically. The percentage is a voltage-based estimate using a piecewise single-cell Li-ion/LiPo discharge curve, so load, chemistry and temperature can shift it. The 1 MΩ / 1 MΩ divider ratio is 2.0; change `battery_divider_ratio` if the resistor values differ.
+The signal, battery ADC and USB-power GPIOs must be unique. `battery_pin` is restricted to ESP32-C3 ADC1 GPIO0..GPIO4; GPIO2/D0 is the default. The battery ADC uses ESP-IDF curve-fitting calibration and 12 dB attenuation. `Battery Voltage`, `Battery Level` and the `USB Power` binary sensor are created automatically. The percentage is a voltage-based estimate using a piecewise single-cell Li-ion/LiPo discharge curve, so load, chemistry and temperature can shift it. The 1 MΩ / 1 MΩ divider ratio is 2.0; change `battery_divider_ratio` if the resistor values differ.
 
 The four sniffer GPIOs must be unique. The two RT/RH GPIOs are used as Light-sleep wake sources; the CO2 GPIOs are intentionally excluded from wakeup.
 

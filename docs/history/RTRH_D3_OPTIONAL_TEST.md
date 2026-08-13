@@ -1,6 +1,6 @@
 # RESOLVED: D3/G11 is not required
 
-The shadow test documented below was completed successfully. The production decoder now uses only G10/D1 and G13/D2; D3/GPIO5 is free. This file is retained as historical validation context.
+The shadow test documented below was completed successfully. The production decoder now uses only G10/D1 and G13/D2; D3/GPIO5 became free for other uses and is now used for USB/VBUS detection. This file is retained as historical validation context.
 
 # RT/RH D3/G11 optionality shadow test — 2026-08-12
 

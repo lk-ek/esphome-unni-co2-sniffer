@@ -44,6 +44,8 @@ CONF_BATTERY_UPDATE_INTERVAL = "battery_update_interval"
 CONF_BATTERY_DIVIDER_RATIO = "battery_divider_ratio"
 CONF_BATTERY_VOLTAGE = "battery_voltage"
 CONF_BATTERY_LEVEL = "battery_level"
+CONF_USB_POWER_PIN = "usb_power_pin"
+CONF_USB_POWER = "usb_power"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -161,6 +163,7 @@ SENSOR_OUTPUTS = {
 }
 
 BINARY_OUTPUTS = {
+    CONF_USB_POWER: "set_usb_power_sensor",
     CONF_THERMAL_TRANSIENT: "set_thermal_transient_sensor",
     CONF_TEMPERATURE_EXTRAPOLATION: "set_temperature_extrapolation_sensor",
     CONF_HUMIDITY_EXTRAPOLATION: "set_humidity_extrapolation_sensor",
@@ -169,9 +172,9 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
-    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN]]
+    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
     if len(set(pins)) != len(pins):
-        raise cv.Invalid("RT/RH, CO2 and battery GPIOs must be unique")
+        raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
     if config[CONF_BATTERY_PIN] not in range(0, 5):
         raise cv.Invalid("battery_pin must be an ESP32-C3 ADC1 GPIO (0..4)")
 
@@ -217,6 +220,7 @@ _SCHEMA = {
     cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
     cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
+    cv.Optional(CONF_USB_POWER_PIN, default=5): cv.int_range(min=0, max=21),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -256,7 +260,10 @@ for key, (schema, _) in SENSOR_OUTPUTS.items():
     else:
         _SCHEMA[cv.Optional(key)] = schema
 for key in BINARY_OUTPUTS:
-    _SCHEMA[cv.Optional(key, default=DEBUG_BINARY_DEFAULTS[key])] = _diagnostic_binary_sensor()
+    if key == CONF_USB_POWER:
+        _SCHEMA[cv.Optional(key, default={"name": "USB Power", "device_class": "power"})] = binary_sensor.binary_sensor_schema()
+    else:
+        _SCHEMA[cv.Optional(key, default=DEBUG_BINARY_DEFAULTS[key])] = _diagnostic_binary_sensor()
 
 CONFIG_SCHEMA = cv.All(cv.Schema(_SCHEMA).extend(cv.COMPONENT_SCHEMA), _validate_features)
 
@@ -304,8 +311,9 @@ async def to_code(config):
     # from a top-level `sensor:` platform entry. Ensure the core/API/web-server
     # sensor domain is compiled in so App-registered child sensors are exposed.
     cg.add_define("USE_SENSOR")
-    if config[CONF_DEBUG_METRICS]:
-        cg.add_define("USE_BINARY_SENSOR")
+    # USB Power is a primary binary sensor; diagnostic binary sensors are
+    # additionally instantiated when debug_metrics is enabled.
+    cg.add_define("USE_BINARY_SENSOR")
 
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
@@ -335,6 +343,7 @@ async def to_code(config):
     cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))
     cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))
     cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))
+    cg.add(var.set_usb_power_pin(config[CONF_USB_POWER_PIN]))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 

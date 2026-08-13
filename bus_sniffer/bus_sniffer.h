@@ -39,6 +39,7 @@ class BusSniffer : public Component {
   void set_battery_pin(uint8_t pin) { this->battery_.pin = pin; }
   void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
   void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
+  void set_usb_power_pin(uint8_t pin) { this->usb_power_.pin = pin; }
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
@@ -51,6 +52,7 @@ class BusSniffer : public Component {
   void set_rh_humidity_sensor(sensor::Sensor *s) { this->out_.humidity = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->out_.battery_voltage = s; }
   void set_battery_level_sensor(sensor::Sensor *s) { this->out_.battery_level = s; }
+  void set_usb_power_sensor(binary_sensor::BinarySensor *s) { this->out_.usb_power = s; }
   void set_ref_period_sensor(sensor::Sensor *s) { this->out_.ref_period = s; }
   void set_rt_period_sensor(sensor::Sensor *s) { this->out_.rt_period = s; }
   void set_rh_state_period_sensor(sensor::Sensor *s) { this->out_.rh_state_period = s; }
@@ -72,6 +74,7 @@ class BusSniffer : public Component {
     sensor::Sensor *humidity{nullptr};
     sensor::Sensor *battery_voltage{nullptr};
     sensor::Sensor *battery_level{nullptr};
+    binary_sensor::BinarySensor *usb_power{nullptr};
     sensor::Sensor *ref_period{nullptr};
     sensor::Sensor *rt_period{nullptr};
     sensor::Sensor *rh_state_period{nullptr};
@@ -127,11 +130,22 @@ class BusSniffer : public Component {
     adc_cali_handle_t cali_handle{nullptr};
   } battery_;
 
+  struct UsbPowerState {
+    uint8_t pin{5};
+    bool initialized{false};
+    bool have_state{false};
+    bool state{false};
+    bool candidate{false};
+    uint32_t candidate_since_ms{0};
+  } usb_power_;
+
   void maybe_publish_ha_();
   void process_rtrh_();
   void process_co2_();
   bool setup_battery_adc_();
   void process_battery_();
+  bool setup_usb_power_();
+  void process_usb_power_();
   static float battery_percent_from_voltage_(float voltage);
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
