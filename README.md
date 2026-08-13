@@ -18,6 +18,7 @@ The signal interpretation and calibration were derived experimentally from the t
 - calibrated temperature and temperature-compensated RH conversion
 - measurement-quality, thermal-transient, and calibration-range diagnostics
 - native ESPHome API for Home Assistant
+- calibrated Li-ion/LiPo battery voltage and estimated state-of-charge monitoring
 - compile-time BLE enable/disable
 - Sensirion-compatible live BLE advertising
 - persistent Sensirion-style history with GATT download
@@ -47,8 +48,11 @@ The XIAO and Unni electronics share **5 V and GND**. The ESP only observes the s
 | D4 | GPIO6 | CO₂ SDA | CO₂ bus data |
 | D1 | GPIO3 | RT/RH G10 | RT/RH timing |
 | D2 | GPIO4 | RT/RH G13 | RT/RH state/timing |
+| D0 | GPIO2 / ADC1_CH2 | battery divider midpoint | battery voltage (1 MΩ / 1 MΩ) |
 | 5V | — | +5 V | shared supply |
 | GND | — | GND | shared ground |
+
+For battery monitoring, connect D0/GPIO2 to the midpoint of a 1 MΩ / 1 MΩ divider directly across battery + and battery −/GND, with 0.1 µF from the midpoint to GND. This divides a 4.20 V full cell to about 2.10 V at the ADC while drawing only about 2.1 µA.
 
 D3 / GPIO5 (Unni G11) is intentionally not connected. A live shadow-decoder test against the former three-line implementation produced identical RH-state median, sample count, and event count, so G11 adds no information used by the production calculation.
 
@@ -332,9 +336,14 @@ bus_sniffer:
   rtrh_g13_pin: 4
   co2_sda_pin: 6
   co2_scl_pin: 7
+  battery_pin: 2
+  battery_update_interval: 60s
+  battery_divider_ratio: 2.0
 ```
 
-The four GPIOs must be unique. The two RT/RH GPIOs are used as Light-sleep wake sources; the CO2 GPIOs are intentionally excluded from wakeup.
+The signal and battery GPIOs must be unique. `battery_pin` is restricted to ESP32-C3 ADC1 GPIO0..GPIO4; GPIO2/D0 is the default. The battery ADC uses ESP-IDF curve-fitting calibration and 12 dB attenuation. `Battery Voltage` and `Battery Level` are created automatically. The percentage is a voltage-based estimate using a piecewise single-cell Li-ion/LiPo discharge curve, so load, chemistry and temperature can shift it. The 1 MΩ / 1 MΩ divider ratio is 2.0; change `battery_divider_ratio` if the resistor values differ.
+
+The four sniffer GPIOs must be unique. The two RT/RH GPIOs are used as Light-sleep wake sources; the CO2 GPIOs are intentionally excluded from wakeup.
 
 
 ### BLE identity

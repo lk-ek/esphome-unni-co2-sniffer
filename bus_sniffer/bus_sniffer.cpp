@@ -14,6 +14,7 @@
 #endif
 
 #include "driver/gpio.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esphome/core/log.h"
 
 #include <cmath>
@@ -65,6 +66,116 @@ void BusSniffer::gatts_event_handler(esp_gatts_cb_event_t event,
 #endif
 }
 #endif
+
+float BusSniffer::battery_percent_from_voltage_(float voltage) {
+  // Approximate single-cell Li-ion/LiPo state of charge under a light load.
+  // The curve is intentionally conservative near the empty end. Voltage-based
+  // SOC is an estimate; chemistry, load and temperature all shift the curve.
+  struct Point { float v; float pct; };
+  static const Point curve[] = {
+      {3.30f, 0.0f}, {3.55f, 10.0f}, {3.65f, 20.0f}, {3.70f, 30.0f},
+      {3.74f, 40.0f}, {3.79f, 50.0f}, {3.85f, 60.0f}, {3.92f, 70.0f},
+      {4.00f, 80.0f}, {4.10f, 90.0f}, {4.20f, 100.0f},
+  };
+
+  if (voltage <= curve[0].v) return 0.0f;
+  constexpr size_t n = sizeof(curve) / sizeof(curve[0]);
+  if (voltage >= curve[n - 1].v) return 100.0f;
+  for (size_t i = 1; i < n; i++) {
+    if (voltage <= curve[i].v) {
+      const float span = curve[i].v - curve[i - 1].v;
+      const float t = (voltage - curve[i - 1].v) / span;
+      return curve[i - 1].pct + t * (curve[i].pct - curve[i - 1].pct);
+    }
+  }
+  return 0.0f;
+}
+
+bool BusSniffer::setup_battery_adc_() {
+  // ESP32-C3 GPIO0..GPIO4 map directly to ADC1 channels 0..4. Keeping the
+  // battery input on ADC1 avoids the C3 ADC2/Wi-Fi limitations.
+  if (this->battery_.pin > 4) {
+    ESP_LOGE(TAG, "Battery GPIO%u is not an ESP32-C3 ADC1 pin", this->battery_.pin);
+    return false;
+  }
+  this->battery_.unit = ADC_UNIT_1;
+  this->battery_.channel = static_cast<adc_channel_t>(this->battery_.pin);
+
+  adc_oneshot_unit_init_cfg_t unit_cfg{};
+  unit_cfg.unit_id = this->battery_.unit;
+  unit_cfg.ulp_mode = ADC_ULP_MODE_DISABLE;
+  esp_err_t err = adc_oneshot_new_unit(&unit_cfg, &this->battery_.adc_handle);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Battery ADC unit setup failed: %d", err);
+    return false;
+  }
+
+  adc_oneshot_chan_cfg_t chan_cfg{};
+  chan_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
+  chan_cfg.atten = ADC_ATTEN_DB_12;
+  err = adc_oneshot_config_channel(this->battery_.adc_handle, this->battery_.channel, &chan_cfg);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Battery ADC channel setup failed: %d", err);
+    return false;
+  }
+
+  adc_cali_curve_fitting_config_t cali_cfg{};
+  cali_cfg.unit_id = this->battery_.unit;
+  cali_cfg.chan = this->battery_.channel;
+  cali_cfg.atten = ADC_ATTEN_DB_12;
+  cali_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
+  err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &this->battery_.cali_handle);
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG, "Battery ADC calibration unavailable (%d); battery entities disabled", err);
+    return false;
+  }
+
+  this->battery_.initialized = true;
+  ESP_LOGI(TAG, "Battery ADC enabled on GPIO%u / ADC1_CH%u, divider %.3fx",
+           this->battery_.pin, static_cast<unsigned>(this->battery_.channel),
+           this->battery_.divider_ratio);
+  return true;
+}
+
+void BusSniffer::process_battery_() {
+  if (!this->battery_.initialized) return;
+  const uint32_t now = millis();
+  if (this->battery_.last_measure_ms != 0 &&
+      static_cast<uint32_t>(now - this->battery_.last_measure_ms) < this->battery_.interval_ms)
+    return;
+
+  // Never insert an ADC polling conversion into the timing-critical capture
+  // window. Wait until Light-sleep is permitted again.
+  if (power_save::enabled() && power_save::awake_window_active()) return;
+
+  // Average several calibrated samples. The external 100 nF capacitor provides
+  // a low-impedance source for the ADC despite the 1 MΩ / 1 MΩ divider.
+  constexpr int SAMPLE_COUNT = 8;
+  int64_t sum_mv = 0;
+  int valid = 0;
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    int raw = 0;
+    if (adc_oneshot_read(this->battery_.adc_handle, this->battery_.channel, &raw) != ESP_OK)
+      continue;
+    int mv = 0;
+    if (adc_cali_raw_to_voltage(this->battery_.cali_handle, raw, &mv) != ESP_OK)
+      continue;
+    sum_mv += mv;
+    valid++;
+  }
+  this->battery_.last_measure_ms = now;
+  if (valid == 0) {
+    ESP_LOGW(TAG, "Battery ADC read failed");
+    return;
+  }
+
+  const float adc_voltage = static_cast<float>(sum_mv) / static_cast<float>(valid) / 1000.0f;
+  const float battery_voltage = adc_voltage * this->battery_.divider_ratio;
+  const float battery_level = battery_percent_from_voltage_(battery_voltage);
+  publish(this->out_.battery_voltage, battery_voltage);
+  publish(this->out_.battery_level, battery_level);
+  ESP_LOGD(TAG, "Battery: %.3f V -> %.0f %%", battery_voltage, battery_level);
+}
 
 bool BusSniffer::initialize_sniffer_io_() {
   if (this->io_initialized_) return true;
@@ -130,6 +241,7 @@ void BusSniffer::setup() {
   sensirion_history_setup();
 #endif
 
+  this->setup_battery_adc_();
   this->boot_ms_ = millis();
   if (this->start_delay_ms_ == 0) {
     this->initialize_sniffer_io_();
@@ -341,6 +453,7 @@ void BusSniffer::loop() {
   sensirion_history_loop();
 #endif
   this->maybe_publish_ha_();
+  this->process_battery_();
 
   if (!this->io_initialized_) return;
 

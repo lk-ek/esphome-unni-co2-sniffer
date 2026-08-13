@@ -39,6 +39,11 @@ CONF_RTRH_G10_PIN = "rtrh_g10_pin"
 CONF_RTRH_G13_PIN = "rtrh_g13_pin"
 CONF_CO2_SDA_PIN = "co2_sda_pin"
 CONF_CO2_SCL_PIN = "co2_scl_pin"
+CONF_BATTERY_PIN = "battery_pin"
+CONF_BATTERY_UPDATE_INTERVAL = "battery_update_interval"
+CONF_BATTERY_DIVIDER_RATIO = "battery_divider_ratio"
+CONF_BATTERY_VOLTAGE = "battery_voltage"
+CONF_BATTERY_LEVEL = "battery_level"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -107,6 +112,24 @@ SENSOR_OUTPUTS = {
         ),
         "set_rh_humidity_sensor",
     ),
+    CONF_BATTERY_VOLTAGE: (
+        _sensor_schema(
+            unit_of_measurement="V",
+            accuracy_decimals=3,
+            device_class="voltage",
+            state_class="measurement",
+        ),
+        "set_battery_voltage_sensor",
+    ),
+    CONF_BATTERY_LEVEL: (
+        _sensor_schema(
+            unit_of_measurement="%",
+            accuracy_decimals=0,
+            device_class="battery",
+            state_class="measurement",
+        ),
+        "set_battery_level_sensor",
+    ),
     CONF_REF_PERIOD: (
         _diagnostic_sensor(unit_of_measurement="µs", accuracy_decimals=3, state_class="measurement"),
         "set_ref_period_sensor",
@@ -146,9 +169,11 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
-    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]]
+    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN]]
     if len(set(pins)) != len(pins):
-        raise cv.Invalid("RT/RH and CO2 GPIOs must be unique")
+        raise cv.Invalid("RT/RH, CO2 and battery GPIOs must be unique")
+    if config[CONF_BATTERY_PIN] not in range(0, 5):
+        raise cv.Invalid("battery_pin must be an ESP32-C3 ADC1 GPIO (0..4)")
 
     if config[CONF_BLE_LIVE] and not config[CONF_BLE]:
         raise cv.Invalid("ble_live: true requires ble: true")
@@ -189,6 +214,9 @@ _SCHEMA = {
     cv.Optional(CONF_RTRH_G13_PIN, default=4): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SCL_PIN, default=7): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
+    cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -197,6 +225,8 @@ PRIMARY_SENSOR_DEFAULTS = {
     CONF_CO2: {"name": "CO2", "icon": "mdi:molecule-co2"},
     CONF_RT_TEMPERATURE: {"name": "RT Temperature", "icon": "mdi:thermometer"},
     CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
+    CONF_BATTERY_VOLTAGE: {"name": "Battery Voltage", "icon": "mdi:battery"},
+    CONF_BATTERY_LEVEL: {"name": "Battery Level", "icon": "mdi:battery"},
 }
 
 DEBUG_SENSOR_DEFAULTS = {
@@ -302,6 +332,9 @@ async def to_code(config):
     cg.add(var.set_light_sleep_max_awake(config[CONF_LIGHT_SLEEP_MAX_AWAKE]))
     cg.add(var.set_rtrh_pins(config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN]))
     cg.add(var.set_co2_pins(config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]))
+    cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))
+    cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))
+    cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 

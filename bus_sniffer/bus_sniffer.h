@@ -5,6 +5,8 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/core/component.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
 #if UNNI_BLE_ENABLED
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include <esp_gap_ble_api.h>
@@ -34,6 +36,9 @@ class BusSniffer : public Component {
   void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
   void set_rtrh_pins(uint8_t g10, uint8_t g13) { this->rtrh_g10_pin_ = g10; this->rtrh_g13_pin_ = g13; }
   void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
+  void set_battery_pin(uint8_t pin) { this->battery_.pin = pin; }
+  void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
+  void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
@@ -44,6 +49,8 @@ class BusSniffer : public Component {
   void set_frame_errors_sensor(sensor::Sensor *s) { this->out_.frame_errors = s; }
   void set_rt_temperature_sensor(sensor::Sensor *s) { this->out_.temperature = s; }
   void set_rh_humidity_sensor(sensor::Sensor *s) { this->out_.humidity = s; }
+  void set_battery_voltage_sensor(sensor::Sensor *s) { this->out_.battery_voltage = s; }
+  void set_battery_level_sensor(sensor::Sensor *s) { this->out_.battery_level = s; }
   void set_ref_period_sensor(sensor::Sensor *s) { this->out_.ref_period = s; }
   void set_rt_period_sensor(sensor::Sensor *s) { this->out_.rt_period = s; }
   void set_rh_state_period_sensor(sensor::Sensor *s) { this->out_.rh_state_period = s; }
@@ -63,6 +70,8 @@ class BusSniffer : public Component {
     sensor::Sensor *frame_errors{nullptr};
     sensor::Sensor *temperature{nullptr};
     sensor::Sensor *humidity{nullptr};
+    sensor::Sensor *battery_voltage{nullptr};
+    sensor::Sensor *battery_level{nullptr};
     sensor::Sensor *ref_period{nullptr};
     sensor::Sensor *rt_period{nullptr};
     sensor::Sensor *rh_state_period{nullptr};
@@ -106,9 +115,24 @@ class BusSniffer : public Component {
     uint32_t frame_errors{0};
   } co2_;
 
+  struct BatteryState {
+    uint8_t pin{2};
+    uint32_t interval_ms{60000};
+    uint32_t last_measure_ms{0};
+    float divider_ratio{2.0f};
+    bool initialized{false};
+    adc_unit_t unit{ADC_UNIT_1};
+    adc_channel_t channel{ADC_CHANNEL_2};
+    adc_oneshot_unit_handle_t adc_handle{nullptr};
+    adc_cali_handle_t cali_handle{nullptr};
+  } battery_;
+
   void maybe_publish_ha_();
   void process_rtrh_();
   void process_co2_();
+  bool setup_battery_adc_();
+  void process_battery_();
+  static float battery_percent_from_voltage_(float voltage);
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
 
