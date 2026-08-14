@@ -4,6 +4,7 @@
 
 #include "ble_options.h"
 #include "co2_decoder.h"
+#include "i2c_sniffer.h"
 #include "rtrh_decoder.h"
 #include "power_save.h"
 
@@ -141,7 +142,7 @@ void BusSniffer::process_usb_power_() {
   // Light-sleep window and only capture CO2 while that window is active.
   power_save::set_external_power(raw);
   if (this->io_initialized_ && power_save::enabled())
-    co2_decoder::set_capture_enabled(raw || power_save::awake_window_active());
+    i2c_sniffer::set_capture_enabled(raw || power_save::awake_window_active());
 
 #if UNNI_BLE_ENABLED
   const uint32_t adv_ms = raw ? this->ble_usb_advertising_interval_ms_
@@ -277,8 +278,8 @@ bool BusSniffer::initialize_sniffer_io_() {
     return false;
   }
 
-  if (!co2_decoder::setup(this->co2_sda_pin_, this->co2_scl_pin_)) {
-    ESP_LOGE(TAG, "CO2 decoder GPIO/ISR setup failed");
+  if (!i2c_sniffer::setup(this->co2_sda_pin_, this->co2_scl_pin_)) {
+    ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
   }
   if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
@@ -296,7 +297,7 @@ bool BusSniffer::initialize_sniffer_io_() {
     // immediately apply the matching USB/battery power policy.
     const bool usb = this->usb_powered_();
     power_save::set_external_power(usb);
-    co2_decoder::set_capture_enabled(usb);
+    i2c_sniffer::set_capture_enabled(usb);
   }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
@@ -344,7 +345,7 @@ void BusSniffer::setup() {
   }
 
 #if RTRH_DEBUG_CAPTURE
-  co2_decoder::register_debug_handler();
+  i2c_sniffer::register_debug_handler();
   rtrh_decoder::register_debug_handlers();
   ESP_LOGD(TAG, "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv");
 #else
@@ -533,8 +534,18 @@ void BusSniffer::process_rtrh_() {
 }
 
 void BusSniffer::process_co2_() {
+  static i2c_sniffer::Capture capture;
+  if (!i2c_sniffer::poll(capture)) return;
+
   co2_decoder::Result result;
-  if (!co2_decoder::poll(result)) return;
+  result.frame_errors = capture.frame_errors;
+  for (uint8_t i = 0; i < capture.frame_count; i++) {
+    const auto &frame = capture.frames[i];
+    if (co2_decoder::process_frame(frame, result)) continue;
+#if RTRH_DEBUG_CAPTURE
+    i2c_sniffer::log_frame(frame, "Unhandled I2C frame");
+#endif
+  }
 
   if (result.crc_errors) {
     this->co2_.crc_errors += result.crc_errors;
@@ -594,7 +605,7 @@ void BusSniffer::loop() {
   if (!this->io_initialized_) return;
 
   if (power_save::enabled())
-    co2_decoder::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
+    i2c_sniffer::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
 
   this->process_rtrh_();
   this->process_co2_();
@@ -603,7 +614,7 @@ void BusSniffer::loop() {
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
   if (power_save::enabled())
-    co2_decoder::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
+    i2c_sniffer::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
 }
 
 }  // namespace bus_sniffer

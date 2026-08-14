@@ -277,3 +277,13 @@ The development process converged on a few principles that are useful when chang
 ## 2026-08-14: VBUS-aware runtime power policy
 
 After battery and VBUS sensing were available, the power strategy was split by power source rather than applying the same low-power behavior all the time. USB operation now keeps the ESP32-C3 awake at 80 MHz and captures the CO2 bus continuously, while battery operation retains the RT/RH-triggered Light-Sleep capture window. Home Assistant receives fresh measurements immediately on USB but only the latest cached sensor set once per minute on battery. Sensirion-compatible BLE advertising also changes dynamically from 2 seconds on USB to 5 seconds on battery. This preserves responsiveness when external power is available without giving up the measured battery savings.
+
+## 2026-08-14: Generic passive I²C framing layer
+
+The CO₂ path was split into a generic passive `i2c_sniffer` and a protocol-only
+`co2_decoder`. GPIO edge capture, START/repeated-START/STOP detection, 7-bit
+address/direction decoding, ACK/NACK reconstruction, capture enable/disable and
+the raw `/capture` endpoint now live in the generic layer. The CO₂ decoder only
+claims the observed 0x62 / 0xEC05 exchange, validates its CRC and produces ppm.
+Debug-capture builds additionally log every reconstructed I²C frame that is not
+claimed by the CO₂ decoder.

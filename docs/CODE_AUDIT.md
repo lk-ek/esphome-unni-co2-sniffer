@@ -12,7 +12,8 @@ No timing thresholds, ISR logic, calibration equations, BLE protocol bytes, hist
 The current responsibility split is:
 
 - `bus_sniffer.cpp/.h`: orchestration and ESPHome-facing state
-- `co2_decoder.cpp/.h`: passive CO₂ capture/decode
+- `i2c_sniffer.cpp/.h`: generic passive I²C edge capture and frame reconstruction
+- `co2_decoder.cpp/.h`: CO₂ command/response and CRC decoding over generic I²C frames
 - `rtrh_decoder.cpp/.h`: RT/RH capture, validation, quality, calibrated result
 - `sensirion_sample.h`: common BLE/history sample encoding
 - `sensirion_ble.cpp/.h`: live BLE and GAP/GATT connection handling

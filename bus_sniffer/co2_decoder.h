@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include "esphome/core/defines.h"
-#include <cstdint>
+#include "i2c_sniffer.h"
 
-#ifndef RTRH_DEBUG_CAPTURE
-#define RTRH_DEBUG_CAPTURE 0
-#endif
+#include <cstdint>
 
 namespace esphome {
 namespace bus_sniffer {
@@ -20,20 +17,9 @@ struct Result {
   uint32_t frame_errors{0};
 };
 
-// GPIO6/D4 = SDA, GPIO7/D5 = SCL.
-bool setup(uint8_t sda_pin, uint8_t scl_pin);
-
-// Enable/disable edge capture. Enabling starts with a clean decoder state;
-// disabling drops any partial transaction collected so far.
-void set_capture_enabled(bool enabled);
-
-// Returns true when a complete capture was consumed. The result may contain
-// only diagnostics (CRC/frame errors) and no CO2 value.
-bool poll(Result &result);
-
-#if RTRH_DEBUG_CAPTURE
-void register_debug_handler();
-#endif
+// Consume one generic I2C frame. Returns true if the frame belongs to the
+// observed CO2 protocol, even when it is malformed and only updates diagnostics.
+bool process_frame(const i2c_sniffer::Frame &frame, Result &result);
 
 }  // namespace co2_decoder
 }  // namespace bus_sniffer

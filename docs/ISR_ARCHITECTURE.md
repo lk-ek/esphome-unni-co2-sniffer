@@ -4,8 +4,8 @@
 # ISR architecture and critical decoder code
 
 This document describes the interrupt-driven parts of the Unni sniffer. It is
-intended for anyone changing `co2_decoder.cpp`, `rtrh_decoder.cpp`, pin
-assignments, timing limits, or debug capture.
+intended for anyone changing `i2c_sniffer.cpp`, `co2_decoder.cpp`,
+`rtrh_decoder.cpp`, pin assignments, timing limits, or debug capture.
 
 The important design rule is simple:
 
@@ -23,7 +23,7 @@ or pull-downs and never drive the Unni signal lines.
 gpio_install_isr_service(0);
 ```
 
-`co2_decoder::setup()` and `rtrh_decoder::setup()` then attach their own handlers
+`i2c_sniffer::setup()` and `rtrh_decoder::setup()` then attach their own handlers
 to that shared service.
 
 The service is installed with flags `0`, not `ESP_INTR_FLAG_IRAM`. The handlers
@@ -51,9 +51,9 @@ is to copy the minimum information needed to reconstruct the signal later.
 
 ---
 
-# CO₂ ISR
+# I²C / CO₂-bus ISR
 
-Source: `bus_sniffer/co2_decoder.cpp`
+Source: `bus_sniffer/i2c_sniffer.cpp`
 
 ## Pins
 
@@ -66,7 +66,7 @@ Both pins use `GPIO_INTR_ANYEDGE` and both call the same `gpio_isr()`.
 
 ## What happens on every edge
 
-The CO₂ ISR does this:
+The passive I²C ISR does this:
 
 1. Return immediately if capture is paused.
 2. Read the current microsecond timestamp using `esp_timer_get_time()`.
@@ -110,7 +110,7 @@ Removing that field can make the first transaction in a capture undecodable.
 
 ## Handoff to the normal loop
 
-`co2_decoder::poll()` waits until the bus has been quiet for at least 5000 µs:
+`i2c_sniffer::poll()` waits until the bus has been quiet for at least 5000 µs:
 
 ```cpp
 CAPTURE_TIMEOUT_US = 5000;
@@ -119,17 +119,27 @@ CAPTURE_TIMEOUT_US = 5000;
 It then sets `capturing = false`, decodes the frozen edge buffer in normal task
 context, resets the capture state, and enables capture again.
 
-The decoder reconstructs START, STOP, rising-clock data bits and ACK/NACK bits.
-Only then does it validate the Sensirion CRC and expose a CO₂ value.
+The generic I²C layer reconstructs START, repeated START, STOP, rising-clock
+data bits, 7-bit address/direction and ACK/NACK bits into fixed-size
+`i2c_sniffer::Frame` objects. Frames use 7-bit addressing and retain up to 32
+data bytes in fixed storage; longer frames are marked truncated rather than
+allocating dynamically. `BusSniffer` then passes each frame to
+`co2_decoder::process_frame()`. Only the CO₂ protocol layer knows about address
+0x62, command 0xEC05, the Sensirion-compatible CRC or ppm values.
+
+In debug-capture builds, frames not claimed by `co2_decoder` are logged from
+normal task context. Raw edge serialization for `/capture` also belongs to the
+generic I²C layer; neither operation runs in the ISR.
 
 ### Critical point
 
-Do not move `decode_capture()` or CRC processing into `gpio_isr()`. The current
-split is intentional: edge capture is timing-sensitive; frame decoding is not.
+Do not move I²C framing or CO₂ CRC processing into `gpio_isr()`. The current
+split is intentional: edge capture is timing-sensitive; frame/protocol decoding
+is not.
 
 ### Concurrency note
 
-The CO₂ capture state is shared through `volatile` variables. `volatile` forces
+The I²C capture state is shared through `volatile` variables. `volatile` forces
 actual memory accesses; it is **not** a mutex and does not make multi-step state
 changes atomic. The current design minimizes the overlap by stopping capture
 before decoding and only restarting after the buffer has been reset.
@@ -359,7 +369,7 @@ Before changing ISR-related code, check all of the following:
 4. Are RT periods still measured only from a physical RT IRQ?
 5. Can a RT period accidentally cross a REF/RT/RH phase boundary?
 6. Is the first CO₂ bus state before the first captured edge still preserved?
-7. Is CO₂ decoding still done only after capture is stopped?
+7. Are I²C framing and CO₂ decoding still done only after capture is stopped?
 8. Is RT/RH snapshot copying still protected by disabling/rechecking the two
    RT/RH GPIO interrupts?
 9. Are ISR-shared fields still fixed-size and allocation-free?

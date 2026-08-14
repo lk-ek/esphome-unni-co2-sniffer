@@ -157,6 +157,8 @@ bus_sniffer:
 
 With `debug_metrics: true`, the component additionally creates decoder-quality, timing, frame-error and calibration diagnostic entities automatically.
 
+In the debug build (`debug_capture: true`, logger level `DEBUG`), every valid I²C frame that is not claimed by the CO₂ protocol decoder is logged in compact form, including 7-bit address, direction, ACK/NACK state, data bytes and frame termination. The existing `/capture` endpoint remains available for raw edge captures.
+
 ## Automatic USB / battery power policy
 
 The VBUS detector automatically selects one of two runtime policies. No Home Assistant automation is required.
@@ -221,7 +223,8 @@ bus_sniffer/          ESPHome external component
   __init__.py         configuration schema and code generation
   bus_sniffer.*       orchestration and entity publishing
   rtrh_decoder.*      RT/RH timing decoder
-  co2_decoder.*       passive CO₂ bus decoder
+  i2c_sniffer.*       generic passive I²C edge capture and framing
+  co2_decoder.*       CO₂ protocol/CRC decoder consuming I²C frames
   power_save.*        Light-Sleep capture-window control
   calibration.h       RT/RH calibration
   sensirion_ble.*     BLE live advertising
