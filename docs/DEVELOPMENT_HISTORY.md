@@ -296,3 +296,10 @@ The top-level ESPHome integration was renamed from the generic historical `bus_s
 ## 2026-08-14: I²C frame validity and suspicious-capture freeze
 
 Debug logging of newly generalized I²C traffic exposed occasional reconstructed frames that looked like unrelated slave addresses or one-byte commands. Correlation with the decoded CO₂ values showed that some were fragments of normal 0x62 traffic after missed or ambiguously segmented edges. The generic framer now assigns a structural `FrameStatus` and separates malformed captures from valid-but-unhandled I²C frames. Malformed frames are counted once and are never offered to the CO₂ protocol decoder. Structurally valid CO₂ frames that fail CRC, ACK, or length checks are also treated as suspicious for debug capture purposes. Debug builds freeze the first suspicious raw I²C capture until `/capture` is downloaded, making the actual edge sequence available before later normal traffic can overwrite it. The raw format was advanced to `LA02` to preserve the pre-first-edge bus state, and `capture2vcd.py` was updated to read both `LA02` and historical `LA01` captures.
+
+## 2026-08-14 — Debug capture HTTP reliability
+
+- Stream I2C `/capture` and RT/RH `/rt_rh_capture.csv` downloads in ~1 KiB chunks.
+- Preserve frozen/snapshotted debug data when an HTTP transfer fails or the client disconnects.
+- Release an I2C suspicious-capture freeze only after a complete successful transfer.
+- Reduce RT/RH CSV HTTP chunk count and log ESP-IDF send errors with retry semantics.

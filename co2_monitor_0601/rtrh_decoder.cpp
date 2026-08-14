@@ -14,6 +14,7 @@
 #if RTRH_DEBUG_CAPTURE
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esp_http_server.h"
+#include <string>
 #endif
 
 namespace esphome {
@@ -508,13 +509,20 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_status(req, "200 OK");
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_capture.csv\"");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     static constexpr char HEADER[] = "sequence,t_us,edge_no,gpio10,gpio13,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     const uint16_t count = debug.sample_count;
     const uint32_t sequence = debug.sequence;
     const bool did_overflow = debug.overflow;
-    char chunk[128], line[80];
-    size_t used = 0;
+
+    // The old 128-byte buffer caused hundreds of HTTP chunks for one capture.
+    // Build ~1 KiB chunks on the heap instead; debug.ready keeps the ISR from
+    // modifying the captured samples while this handler is streaming them.
+    static constexpr size_t HTTP_CHUNK_BYTES = 1024;
+    std::string chunk;
+    chunk.reserve(HTTP_CHUNK_BYTES + 96);
+    char line[96];
     for (uint16_t i = 0; i < count && err == ESP_OK; i++) {
       const uint8_t v = debug.samples[i].value;
       const int n = snprintf(line, sizeof(line), "%lu,%lu,%u,%u,%u,0x%02X,%u\n",
@@ -523,14 +531,27 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
           (v & 0x08) ? 1U : 0U, v, did_overflow ? 1U : 0U);
       if (n <= 0) continue;
       const size_t len = static_cast<size_t>(n);
-      if (used + len > sizeof(chunk)) { err = httpd_resp_send_chunk(req, chunk, used); used = 0; }
-      if (err == ESP_OK && len <= sizeof(chunk)) { memcpy(chunk + used, line, len); used += len; }
+      if (!chunk.empty() && chunk.size() + len > HTTP_CHUNK_BYTES) {
+        err = httpd_resp_send_chunk(req, chunk.data(), chunk.size());
+        chunk.clear();
+      }
+      if (err == ESP_OK) chunk.append(line, len);
     }
-    if (err == ESP_OK && used) err = httpd_resp_send_chunk(req, chunk, used);
-    if (err == ESP_OK) httpd_resp_send_chunk(req, nullptr, 0);
-    debug.sample_count = debug.edge_count = debug.unusual_count = 0;
-    debug.overflow = debug.ready = debug.capturing = false;
-    if (err != ESP_OK) ESP_LOGW(TAG, "rt_rh_capture.csv client disconnected (%d)", err);
+    if (err == ESP_OK && !chunk.empty()) err = httpd_resp_send_chunk(req, chunk.data(), chunk.size());
+    if (err == ESP_OK) err = httpd_resp_send_chunk(req, nullptr, 0);
+
+    if (err == ESP_OK) {
+      // Only consume the snapshot after a complete HTTP transfer. A disconnected
+      // curl/client can retry without waiting for another RT/RH measurement.
+      debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+      debug.overflow = debug.ready = debug.capturing = false;
+      ESP_LOGD(TAG, "Downloaded RT/RH raw capture #%lu (%u samples)",
+               static_cast<unsigned long>(sequence), static_cast<unsigned>(count));
+    } else {
+      ESP_LOGW(TAG, "rt_rh_capture.csv send failed (%d/0x%04X); capture #%lu preserved for retry",
+               static_cast<int>(err), static_cast<unsigned>(err),
+               static_cast<unsigned long>(sequence));
+    }
   }
 };
 static CaptureHandler capture_handler;

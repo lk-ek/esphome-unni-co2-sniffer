@@ -257,6 +257,23 @@ static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
   return sequence;
 }
 
+static esp_err_t send_binary_capture(httpd_req_t *req, const std::string &output) {
+  // ESPHome's ESP-IDF AsyncWebServer response wrapper sends an in-memory
+  // response with one httpd_resp_send() call. Use moderate HTTP chunks here
+  // instead so a ~20 KiB logic capture does not have to fit into one socket
+  // send window and can make forward progress on a busy Wi-Fi connection.
+  static constexpr size_t HTTP_CHUNK_BYTES = 1024;
+  size_t offset = 0;
+  while (offset < output.size()) {
+    const size_t remaining = output.size() - offset;
+    const size_t chunk_size = remaining < HTTP_CHUNK_BYTES ? remaining : HTTP_CHUNK_BYTES;
+    const esp_err_t err = httpd_resp_send_chunk(req, output.data() + offset, chunk_size);
+    if (err != ESP_OK) return err;
+    offset += chunk_size;
+  }
+  return httpd_resp_send_chunk(req, nullptr, 0);
+}
+
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
@@ -267,29 +284,49 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
 
   void handleRequest(web_server_idf::AsyncWebServerRequest *request) override {
     std::string output;
-    bool released_freeze = false;
+    bool was_frozen = false;
     uint32_t sequence = 0;
     if (last_capture_mutex &&
         xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
       output = last_capture_data;
       sequence = last_capture_sequence;
-      if (last_capture_frozen && !output.empty()) {
-        last_capture_frozen = false;
-        released_freeze = true;
-      }
+      was_frozen = last_capture_frozen && !output.empty();
       xSemaphoreGive(last_capture_mutex);
     }
     if (output.empty()) {
       request->send(204, "text/plain", nullptr);
       return;
     }
-    auto *response = request->beginResponse(200, "application/octet-stream", output);
-    response->addHeader("Content-Disposition", "attachment; filename=\"capture.la\"");
-    request->send(response);
-    if (released_freeze) {
-      ESP_LOGD(TAG, "Released frozen raw I2C capture #%lu after /capture download",
+
+    httpd_req_t *req = *request;
+    httpd_resp_set_status(req, "200 OK");
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"capture.la\"");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    const esp_err_t err = send_binary_capture(req, output);
+
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "/capture send failed (%d/0x%04X); raw I2C capture #%lu preserved for retry",
+               static_cast<int>(err), static_cast<unsigned>(err),
                static_cast<unsigned long>(sequence));
-      (void) sequence;
+      return;
+    }
+
+    // A failed or disconnected transfer must never destroy the one trace we
+    // froze specifically to diagnose an intermittent framing error. Release it
+    // only after the terminating HTTP chunk was sent successfully.
+    bool released_freeze = false;
+    if (was_frozen && last_capture_mutex &&
+        xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      if (last_capture_frozen && last_capture_sequence == sequence) {
+        last_capture_frozen = false;
+        released_freeze = true;
+      }
+      xSemaphoreGive(last_capture_mutex);
+    }
+    if (released_freeze) {
+      ESP_LOGD(TAG, "Released frozen raw I2C capture #%lu after successful /capture download",
+               static_cast<unsigned long>(sequence));
     }
   }
 };

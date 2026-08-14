@@ -161,7 +161,7 @@ With `debug_metrics: true`, the component additionally creates decoder-quality, 
 
 In the debug build (`debug_capture: true`, logger level `DEBUG`), structurally valid I²C frames that are not claimed by the CO₂ protocol decoder are logged as `Unhandled I2C frame`. Framing failures are logged separately as `Malformed I2C frame` with a status such as `INCOMPLETE_BYTE`, `CAPTURE_END_IN_FRAME`, or `TRUNCATED`. Malformed frames are never passed to the CO₂ decoder.
 
-The first malformed, otherwise unhandled, or protocol-invalid CO₂ transaction (CRC/ACK/length failure) freezes its raw edge capture so that later normal traffic cannot overwrite the interesting waveform. Download `/capture` to retrieve that frozen trace; the successful download releases the freeze for the next suspicious transaction. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
+The first malformed, otherwise unhandled, or protocol-invalid CO₂ transaction (CRC/ACK/length failure) freezes its raw edge capture so that later normal traffic cannot overwrite the interesting waveform. Download `/capture` to retrieve that frozen trace; only a successful, complete HTTP transfer releases the freeze, so a disconnected or timed-out client can simply retry. Debug downloads are streamed in moderate chunks to avoid large one-shot socket writes. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
 
 ## Automatic USB / battery power policy
 

@@ -139,9 +139,12 @@ In debug-capture builds, malformed frames, valid frames not claimed by
 `co2_decoder`, and structurally valid CO₂ frames rejected by CRC/ACK/length
 checks are logged separately from normal task context. The first suspicious
 transaction freezes the corresponding raw edge buffer; later
-captures cannot overwrite it until `/capture` is downloaded. Raw captures use
-`LA02`, which includes the bus state before the first edge so the first
-START/STOP transition can be reconstructed exactly. None of this processing
+captures cannot overwrite it until `/capture` is downloaded successfully. The
+HTTP handler streams the binary trace in moderate chunks and only releases the
+freeze after the terminating chunk succeeds; a failed transfer therefore leaves
+the same trace available for retry. Raw captures use `LA02`, which includes the
+bus state before the first edge so the first START/STOP transition can be
+reconstructed exactly. None of this processing
 runs in the ISR.
 
 ### Critical point
@@ -367,7 +370,9 @@ When `debug.ready` is true, the ISR stops collecting debug samples but continues
 normal RT/RH decoding.
 
 HTTP serialization for `/rt_rh_capture.csv` and `/rt_rh_timing.csv` occurs in
-web-server/task context, never in the ISR.
+web-server/task context, never in the ISR. The raw capture CSV is emitted in
+roughly 1 KiB chunks; if the client disconnects or a socket send times out, the
+ready debug capture is retained so the same snapshot can be requested again.
 
 ---
 
