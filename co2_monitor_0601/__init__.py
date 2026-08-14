@@ -4,7 +4,11 @@ import esphome.codegen as cg
 import esphome.config_validation as cv
 
 from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor
-from esphome.components.esp32 import add_idf_sdkconfig_option, add_partition
+from esphome.components.esp32 import (
+    add_idf_sdkconfig_option,
+    add_partition,
+    include_builtin_idf_component,
+)
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
 from esphome.core import TimePeriod
 
@@ -289,6 +293,15 @@ async def _configure_outputs(var, config):
 
 
 async def to_code(config):
+    # RMT is a built-in ESP-IDF component, but ESPHome only links built-in IDF
+    # components that are explicitly requested by generated code.
+    include_builtin_idf_component("esp_driver_rmt")
+    # RMT RX uses ping-pong interrupts to copy hardware symbols into our user
+    # buffer. Keep that ISR operational during flash cache-off windows so the
+    # hardware-assist path remains useful under the very latency that can make
+    # GPIO edge capture lose a pulse.
+    add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
+
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 

@@ -541,6 +541,19 @@ void CO2Monitor0601::process_co2_() {
   result.frame_errors = capture.frame_errors;
 #if RTRH_DEBUG_CAPTURE
   const char *freeze_reason = capture.frame_errors ? "I2C framing/capture error" : nullptr;
+  if (capture.rmt_repaired_edges != 0) {
+    ESP_LOGD(TAG,
+             "RMT recovered %u missing SCL edge(s): GPIO=%u, RMT=%u",
+             static_cast<unsigned>(capture.rmt_repaired_edges),
+             static_cast<unsigned>(capture.gpio_scl_edges),
+             static_cast<unsigned>(capture.rmt_scl_edges));
+    if (!freeze_reason) freeze_reason = "RMT recovered missing SCL edge(s)";
+  }
+  if (capture.coalesced_edges_resolved != 0) {
+    ESP_LOGD(TAG, "Resolved %u coalesced SDA/SCL edge sample(s)",
+             static_cast<unsigned>(capture.coalesced_edges_resolved));
+    if (!freeze_reason) freeze_reason = "coalesced SDA/SCL GPIO edge(s)";
+  }
 #endif
   for (uint8_t i = 0; i < capture.frame_count; i++) {
     const auto &frame = capture.frames[i];

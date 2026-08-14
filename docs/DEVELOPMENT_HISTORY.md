@@ -303,3 +303,18 @@ Debug logging of newly generalized I²C traffic exposed occasional reconstructed
 - Preserve frozen/snapshotted debug data when an HTTP transfer fails or the client disconnects.
 - Release an I2C suspicious-capture freeze only after a complete successful transfer.
 - Reduce RT/RH CSV HTTP chunk count and log ESP-IDF send errors with retry semantics.
+
+## 2026-08-14 — RMT-assisted I²C SCL recovery
+
+Two frozen VCD captures isolated separate GPIO-capture failure modes. In one,
+an SDA setup edge and following SCL rise were collapsed into a single ISR
+sample; in the other, a complete SCL high/low pulse was absent from the GPIO
+trace even though the CO₂ sensor had received the command. The generic I²C
+sniffer now resolves the first case contextually and uses an ESP32-C3 RMT RX
+channel as an independent SCL pulse timeline for the second. RMT repair is
+strictly conservative and falls back to GPIO-only decoding whenever the two
+timelines cannot be aligned safely. The original GPIO waveform is still frozen
+for debug download whenever a repair is used. RMT RX ISR handling is made
+cache-safe, internal pulls are restored to disabled after RMT allocation, and
+the RMT channel follows the existing USB/battery capture policy.
+

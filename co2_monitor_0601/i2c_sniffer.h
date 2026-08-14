@@ -63,6 +63,16 @@ struct Capture {
   // Generic framing/capture failures. Consumers can fold these into their own
   // diagnostics without the I2C layer knowing anything about the protocol.
   uint32_t frame_errors{0};
+
+  // Hardware-assisted SCL capture diagnostics. The GPIO ISR remains the
+  // source of SDA transitions, while ESP32-C3 RMT provides an independent
+  // hardware timeline for SCL. Missing GPIO SCL edges can be reconstructed
+  // from that timeline before framing.
+  bool rmt_used{false};
+  uint16_t gpio_scl_edges{0};
+  uint16_t rmt_scl_edges{0};
+  uint16_t rmt_repaired_edges{0};
+  uint16_t coalesced_edges_resolved{0};
 #if RTRH_DEBUG_CAPTURE
   // Sequence of the raw /capture snapshot corresponding to this decoded
   // capture. Zero means it was not stored (for example because an earlier

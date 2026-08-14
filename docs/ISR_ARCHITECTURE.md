@@ -12,8 +12,11 @@ The important design rule is simple:
 > **The ISRs capture timing and state only. Expensive interpretation happens in
 > the normal ESPHome loop.**
 
-Both decoders are passive. They configure their GPIOs as inputs without pull-ups
-or pull-downs and never drive the Unni signal lines.
+Both decoders are passive. They leave the observed GPIOs as inputs without
+internal pull-ups or pull-downs and never drive the 0601 signal lines. The
+ESP-IDF RMT RX allocator currently enables a pull-up as an implementation side
+effect; `i2c_sniffer` immediately disables that pull-up again after allocating
+the SCL RMT channel.
 
 ## Shared GPIO ISR service
 
@@ -87,6 +90,32 @@ struct Sample {
 
 No I²C decoding occurs in the ISR.
 
+## RMT SCL hardware assist
+
+The shared GPIO ISR can occasionally be delayed long enough that two nearby
+SCL transitions collapse into no observable GPIO state change. To make SCL
+capture independent of that CPU latency, `i2c_sniffer` also configures one
+ESP32-C3 RMT RX channel on SCL at 1 MHz resolution. RMT stores pulse levels and
+durations in hardware and the normal loop aligns that timeline with the GPIO
+SCL edges after the 5 ms bus-idle boundary.
+
+The GPIO buffer remains the source of SDA and remains the raw waveform exposed
+through `/capture`. RMT is only an assist layer: if its timeline is a strict
+match/superset of the GPIO SCL timeline, missing SCL edges may be inserted into
+the in-memory copy before framing. If alignment, levels, capacity, or ordering
+do not agree, no repair is attempted. A completely full RMT user buffer is also
+rejected for repair because excess symbols may have been truncated.
+
+The RMT RX interrupt is configured cache-safe because the ESP-IDF non-DMA RX
+path uses interrupt-driven ping-pong copies from the peripheral memory. The RMT
+channel follows the same capture-enable policy as the GPIO sniffer and is
+disabled during battery idle periods rather than retaining its power-management
+lock unnecessarily.
+
+ESP-IDF's RMT RX allocation currently enables an internal GPIO pull-up; setup
+immediately disables both internal pulls again to preserve the passive bus
+interface.
+
 ## Why both pins use the same handler
 
 An I²C START/STOP condition depends on the relationship between SDA and SCL, not
@@ -99,6 +128,13 @@ redundant work:
 ```cpp
 if (value == last_value) return;
 ```
+
+The opposite failure mode is also possible: a delayed ISR can observe an SDA
+change and an SCL rise only after both have happened. When that combined sample
+occurs in the middle of a byte, the framer treats it as SDA setup followed by
+the SCL sampling edge, rather than misclassifying it as START/STOP. This rule
+was derived from a captured real transaction and is intentionally limited to
+positions where START/STOP would not be a legal byte boundary.
 
 ## Why `capture_initial_value` matters
 
