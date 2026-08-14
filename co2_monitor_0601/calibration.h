@@ -6,7 +6,7 @@
 #include <limits>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace calibration {
 
 /*
@@ -84,5 +84,5 @@ inline bool is_extrapolation(float temperature_c, float rh_ratio) {
 }
 
 }  // namespace calibration
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

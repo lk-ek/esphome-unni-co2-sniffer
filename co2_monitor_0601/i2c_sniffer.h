@@ -11,7 +11,7 @@
 #endif
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace i2c_sniffer {
 
 static constexpr uint8_t MAX_DATA_BYTES = 32;
@@ -71,5 +71,5 @@ void log_frame(const Frame &frame, const char *label = "I2C frame");
 #endif
 
 }  // namespace i2c_sniffer
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

@@ -8,7 +8,7 @@ The custom sniffer now supports `sniffer_start_delay`.
 The production/test YAML sets:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   sniffer_start_delay: 10s
 ```
 

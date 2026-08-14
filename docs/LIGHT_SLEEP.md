@@ -30,15 +30,15 @@ The component owns the required ESP-IDF sdkconfig. Users do **not** need a
 `sdkconfig_options:` block for power management or BLE modem sleep. It also
 requests the tested 80 MHz ESP32-C3 CPU default, and BLE history requests its
 own `senshist` flash partition automatically. When
-`light_sleep` is enabled (the default), `bus_sniffer/__init__.py` enables power
+`light_sleep` is enabled (the default), `co2_monitor_0601/__init__.py` enables power
 management, tickless idle and shared PHY/MAC/baseband power-down. BLE builds
 also enable Bluetooth controller modem sleep and select the main XTAL as the
 Bluetooth low-power clock.
 
-All power-saving defaults remain overrideable from `bus_sniffer:` when needed:
+All power-saving defaults remain overrideable from `co2_monitor_0601:` when needed:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   light_sleep: true             # default
   light_sleep_max_awake: 10s    # default
   ha_publish_interval: 60s              # battery HA throttle, default
@@ -50,7 +50,7 @@ The signal GPIOs are also configurable. The tested XIAO ESP32-C3 wiring remains
 the default:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   rt_pin: 3
   rh_pin: 4
   co2_sda_pin: 6

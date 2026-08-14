@@ -42,7 +42,7 @@ esp32:
   framework:
     type: esp-idf
 
-bus_sniffer:
+co2_monitor_0601:
   sniffer_start_delay: 10s
   debug_metrics: false
   debug_capture: false

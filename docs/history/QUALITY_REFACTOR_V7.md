@@ -9,7 +9,7 @@ Calibration coefficients are unchanged from v4/v6.
 
 - `calibration.h`: sensor calibration model and validated calibration envelope
 - `measurement_quality.h`: decoder acceptance rules, score and structured reject reason
-- `bus_sniffer.cpp`: capture/decoder, diagnostics, publishing, BLE/history integration
+- `co2_monitor_0601.cpp`: capture/decoder, diagnostics, publishing, BLE/history integration
 
 ## Structured reject reasons
 

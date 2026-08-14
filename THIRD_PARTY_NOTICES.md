@@ -13,7 +13,7 @@ License: BSD-3-Clause. Copyright 2024 Sensirion AG. See [LICENSES/Sensirion-UPT-
 
 Relevant local code:
 
-- `bus_sniffer/sensirion_sample.h`: the temperature/humidity sample encoding formulas and `T_RH_CO2_ALT` byte layout are adapted from / compatible with Sensirion UPT Core's BLE protocol implementation.
+- `co2_monitor_0601/sensirion_sample.h`: the temperature/humidity sample encoding formulas and `T_RH_CO2_ALT` byte layout are adapted from / compatible with Sensirion UPT Core's BLE protocol implementation.
 
 ## Sensirion Gadget BLE Arduino Library 1.5.0
 
@@ -23,14 +23,14 @@ License: BSD-3-Clause. Copyright (c) 2020, Sensirion AG. See [LICENSES/Sensirion
 
 Relevant local code:
 
-- `bus_sniffer/sensirion_ble.cpp`: Gadget/MyAmbience-compatible advertising layout and device-identity behavior are implemented with reference to the upstream Gadget BLE behavior.
-- `bus_sniffer/sensirion_history.cpp`: Gadget/MyAmbience-compatible GATT UUID topology and history-download wire format are implemented with reference to the upstream Gadget BLE implementation.
+- `co2_monitor_0601/sensirion_ble.cpp`: Gadget/MyAmbience-compatible advertising layout and device-identity behavior are implemented with reference to the upstream Gadget BLE behavior.
+- `co2_monitor_0601/sensirion_history.cpp`: Gadget/MyAmbience-compatible GATT UUID topology and history-download wire format are implemented with reference to the upstream Gadget BLE implementation.
 
 The local RAM/flash history ring, persistence/journaling, power policy, passive sensor decoders, ESPHome integration, and orchestration are project-specific implementations and are not claimed to originate from Sensirion Gadget BLE.
 
 ## Sensirion CO2 wire protocol
 
-`bus_sniffer/co2_decoder.cpp` implements the CRC-8 parameters and frame semantics used by the observed SCD4x-compatible CO2 transaction. This is recorded as protocol provenance; it is not treated as a vendored Sensirion driver or library dependency.
+`co2_monitor_0601/co2_decoder.cpp` implements the CRC-8 parameters and frame semantics used by the observed SCD4x-compatible CO2 transaction. This is recorded as protocol provenance; it is not treated as a vendored Sensirion driver or library dependency.
 
 ## Runtime dependencies
 

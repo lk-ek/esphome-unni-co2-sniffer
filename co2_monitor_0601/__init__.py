@@ -63,8 +63,8 @@ CONF_TEMPERATURE_EXTRAPOLATION = "temperature_extrapolation"
 CONF_HUMIDITY_EXTRAPOLATION = "humidity_extrapolation"
 CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 
-bus_sniffer_ns = cg.esphome_ns.namespace("bus_sniffer")
-BusSniffer = bus_sniffer_ns.class_("BusSniffer", cg.Component)
+co2_monitor_0601_ns = cg.esphome_ns.namespace("co2_monitor_0601")
+CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
 
 
 def _sensor_schema(**kwargs):
@@ -79,7 +79,7 @@ def _diagnostic_binary_sensor():
     return binary_sensor.binary_sensor_schema(entity_category=ENTITY_CATEGORY_DIAGNOSTIC)
 
 
-# YAML key -> (schema, BusSniffer setter)
+# YAML key -> (schema, CO2Monitor0601 setter)
 SENSOR_OUTPUTS = {
     CONF_CO2: (
         _sensor_schema(
@@ -199,7 +199,7 @@ def _validate_features(config):
 
 
 _SCHEMA = {
-    cv.GenerateID(): cv.declare_id(BusSniffer),
+    cv.GenerateID(): cv.declare_id(CO2Monitor0601),
     cv.Optional(CONF_BLE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,

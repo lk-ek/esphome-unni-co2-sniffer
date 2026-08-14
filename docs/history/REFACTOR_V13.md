@@ -9,7 +9,7 @@ calibration behaviour.
 - Re-applies the hardware-tested RT/RH `DecoderState` / `DebugCaptureState`
   grouping to the project ZIP used as the source for this revision.
 - Removes the stale, unused `measurement_quality.h` file.
-- Splits `BusSniffer::loop()` into orchestration plus `process_rtrh_()`,
+- Splits `CO2Monitor0601::loop()` into orchestration plus `process_rtrh_()`,
   `process_co2_()` and `update_thermal_transient_()`.
 - Replaces repetitive optional sensor publication checks with small local
   publishing helpers.

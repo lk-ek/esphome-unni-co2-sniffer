@@ -17,7 +17,7 @@
 #endif
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace rtrh_decoder {
 
 static const char *TAG = "rtrh_decoder";
@@ -646,5 +646,5 @@ void register_debug_handlers() {
 #endif
 
 }  // namespace rtrh_decoder
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

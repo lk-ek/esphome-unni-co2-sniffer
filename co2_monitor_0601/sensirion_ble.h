@@ -11,7 +11,7 @@
 #include <esp_gatts_api.h>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
 void sensirion_ble_setup();
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms);
@@ -25,7 +25,7 @@ void sensirion_ble_commit_live_advertisement();
 const SensirionSample &sensirion_ble_sample();
 uint16_t sensirion_ble_get_device_id();
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome
 
 #endif

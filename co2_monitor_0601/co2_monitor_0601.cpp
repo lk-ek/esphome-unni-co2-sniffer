@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "bus_sniffer.h"
+#include "co2_monitor_0601.h"
 
 #include "ble_options.h"
 #include "co2_decoder.h"
@@ -23,9 +23,9 @@
 #include <string>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
-static const char *TAG = "bus_sniffer";
+static const char *TAG = "co2_monitor_0601";
 
 namespace {
 
@@ -48,17 +48,17 @@ inline void publish_finite(sensor::Sensor *sensor, float value) {
 }  // namespace
 
 #if UNNI_BLE_ENABLED
-void BusSniffer::set_ble_advertising_interval(uint32_t interval_ms) {
+void CO2Monitor0601::set_ble_advertising_interval(uint32_t interval_ms) {
   this->ble_usb_advertising_interval_ms_ = interval_ms;
   sensirion_ble_set_advertising_interval(interval_ms);
 }
 
-void BusSniffer::gap_event_handler(esp_gap_ble_cb_event_t event,
+void CO2Monitor0601::gap_event_handler(esp_gap_ble_cb_event_t event,
                                    esp_ble_gap_cb_param_t *param) {
   sensirion_ble_gap_event_handler(event, param);
 }
 
-void BusSniffer::gatts_event_handler(esp_gatts_cb_event_t event,
+void CO2Monitor0601::gatts_event_handler(esp_gatts_cb_event_t event,
                                      esp_gatt_if_t gatts_if,
                                      esp_ble_gatts_cb_param_t *param) {
   sensirion_ble_gatts_event_handler(event, param);
@@ -70,7 +70,7 @@ void BusSniffer::gatts_event_handler(esp_gatts_cb_event_t event,
 }
 #endif
 
-float BusSniffer::battery_percent_from_voltage_(float voltage) {
+float CO2Monitor0601::battery_percent_from_voltage_(float voltage) {
   // Approximate single-cell Li-ion/LiPo state of charge under a light load.
   // The curve is intentionally conservative near the empty end. Voltage-based
   // SOC is an estimate; chemistry, load and temperature all shift the curve.
@@ -95,7 +95,7 @@ float BusSniffer::battery_percent_from_voltage_(float voltage) {
 }
 
 
-bool BusSniffer::setup_usb_power_() {
+bool CO2Monitor0601::setup_usb_power_() {
   gpio_config_t cfg{};
   cfg.pin_bit_mask = 1ULL << this->usb_power_.pin;
   cfg.mode = GPIO_MODE_INPUT;
@@ -115,7 +115,7 @@ bool BusSniffer::setup_usb_power_() {
   return true;
 }
 
-void BusSniffer::process_usb_power_() {
+void CO2Monitor0601::process_usb_power_() {
   if (!this->usb_power_.initialized) return;
 
   const bool raw = gpio_get_level(static_cast<gpio_num_t>(this->usb_power_.pin)) != 0;
@@ -171,7 +171,7 @@ void BusSniffer::process_usb_power_() {
   this->battery_.last_measure_ms = 0;
 }
 
-bool BusSniffer::setup_battery_adc_() {
+bool CO2Monitor0601::setup_battery_adc_() {
   // ESP32-C3 GPIO0..GPIO4 map directly to ADC1 channels 0..4. Keeping the
   // battery input on ADC1 avoids the C3 ADC2/Wi-Fi limitations.
   if (this->battery_.pin > 4) {
@@ -217,7 +217,7 @@ bool BusSniffer::setup_battery_adc_() {
   return true;
 }
 
-void BusSniffer::process_battery_() {
+void CO2Monitor0601::process_battery_() {
   if (!this->battery_.initialized) return;
   // Wait for the debounced VBUS state before interpreting the battery node.
   // This avoids briefly reporting a charger-held ~4.2 V node as 100% SOC at boot.
@@ -268,7 +268,7 @@ void BusSniffer::process_battery_() {
   }
 }
 
-bool BusSniffer::initialize_sniffer_io_() {
+bool CO2Monitor0601::initialize_sniffer_io_() {
   if (this->io_initialized_) return true;
 
   // Both decoder modules use the same ESP-IDF GPIO ISR service.
@@ -304,7 +304,7 @@ bool BusSniffer::initialize_sniffer_io_() {
   return true;
 }
 
-void BusSniffer::setup() {
+void CO2Monitor0601::setup() {
 #if UNNI_BLE_ENABLED
   sensirion_ble_setup();
 
@@ -357,7 +357,7 @@ void BusSniffer::setup() {
   ESP_LOGI(TAG, "Passive CO2 + RT/RH sniffer ready");
 }
 
-void BusSniffer::publish_cached_ha_now_() {
+void CO2Monitor0601::publish_cached_ha_now_() {
   bool published = false;
   if (this->ha_.have_co2 && this->out_.co2) {
     this->out_.co2->publish_state(this->ha_.co2);
@@ -377,7 +377,7 @@ void BusSniffer::publish_cached_ha_now_() {
   if (published) this->ha_.last_publish_ms = millis();
 }
 
-void BusSniffer::maybe_publish_ha_() {
+void CO2Monitor0601::maybe_publish_ha_() {
   // On USB power every fresh measurement is published directly from its
   // decoder. The interval below is deliberately a battery-mode throttle.
   if (this->usb_powered_()) return;
@@ -405,7 +405,7 @@ void BusSniffer::maybe_publish_ha_() {
   if (published) this->ha_.last_publish_ms = now;
 }
 
-float BusSniffer::update_thermal_transient_(float temperature_c) {
+float CO2Monitor0601::update_thermal_transient_(float temperature_c) {
   const uint32_t now_ms = millis();
   float rate_c_per_min = 0.0f;
 
@@ -431,7 +431,7 @@ float BusSniffer::update_thermal_transient_(float temperature_c) {
   return rate_c_per_min;
 }
 
-void BusSniffer::process_rtrh_() {
+void CO2Monitor0601::process_rtrh_() {
   rtrh_decoder::loop();
 
   rtrh_decoder::Measurement m;
@@ -533,7 +533,7 @@ void BusSniffer::process_rtrh_() {
   rtrh_decoder::update_latest(m);
 }
 
-void BusSniffer::process_co2_() {
+void CO2Monitor0601::process_co2_() {
   static i2c_sniffer::Capture capture;
   if (!i2c_sniffer::poll(capture)) return;
 
@@ -590,7 +590,7 @@ void BusSniffer::process_co2_() {
   }
 }
 
-void BusSniffer::loop() {
+void CO2Monitor0601::loop() {
   if (!this->io_initialized_ &&
       static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();
@@ -617,5 +617,5 @@ void BusSniffer::loop() {
     i2c_sniffer::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
 }
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

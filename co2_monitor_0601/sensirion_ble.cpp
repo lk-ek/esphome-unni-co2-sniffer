@@ -19,7 +19,7 @@
 #include <array>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
 static const char *TAG = "sensirion_ble";
 
@@ -278,6 +278,6 @@ void sensirion_ble_setup() {
   ESP_LOGI(TAG, "advertising interval: %u ms", static_cast<unsigned>(advertising_interval_ms));
 }
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome
 #endif

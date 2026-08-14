@@ -12,7 +12,7 @@ For the current implementation, use these sources in this order:
 1. [`../../README.md`](../../README.md) — current project usage, wiring, build variants, and feature overview.
 2. [`../DEVELOPMENT_HISTORY.md`](../DEVELOPMENT_HISTORY.md) — chronological development process and rationale for the current design.
 3. [`../ISR_ARCHITECTURE.md`](../ISR_ARCHITECTURE.md) — current interrupt/capture architecture and critical timing rules.
-4. The source under [`../../bus_sniffer/`](../../bus_sniffer/) — authoritative implementation.
+4. The source under [`../../co2_monitor_0601/`](../../co2_monitor_0601/) — authoritative implementation.
 5. These historical notes — detailed experiment records and superseded implementations.
 
 Do not copy code or configuration from a historical note without checking it against the current source tree.

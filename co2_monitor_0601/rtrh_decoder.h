@@ -12,7 +12,7 @@
 #endif
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace rtrh_decoder {
 
 enum class RejectReason : uint8_t {
@@ -73,5 +73,5 @@ void register_debug_handlers();
 #endif
 
 }  // namespace rtrh_decoder
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

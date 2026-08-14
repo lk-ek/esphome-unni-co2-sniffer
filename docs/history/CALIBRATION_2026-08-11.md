@@ -7,7 +7,7 @@ Basis: synchronized `rt_rh_timing40-*.csv` captures whose filenames encode the o
 
 Usable timing points: **14**. Missing timing CSVs (e.g. 40-11/40-14) were not invented from logs.
 
-Fit used in `bus_sniffer.cpp`:
+Fit used in `co2_monitor_0601.cpp`:
 
 ```text
 T_C  = -21.433346 * (RT_period / REF_period) + 64.034661

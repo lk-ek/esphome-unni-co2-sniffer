@@ -5,6 +5,8 @@
 
 This project adds a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor as a **passive sniffer**. The original Unni electronics remain in control; the ESP only observes existing signals and publishes the decoded measurements.
 
+The tested device is sold as **CO2 Monitor Carbon Dioxide Detector 0601**. The ESPHome component is therefore named `co2_monitor_0601`. Older configurations using the former `bus_sniffer:` component key must be changed to `co2_monitor_0601:`.
+
 ## What it provides
 
 - CO₂, temperature and relative humidity in ESPHome / Home Assistant
@@ -76,10 +78,10 @@ The component publishes this as the `USB Power` binary sensor.
 
 ## Default pin assignment
 
-The defaults can be overridden in `bus_sniffer:`:
+The defaults can be overridden in `co2_monitor_0601:`:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   rt_pin: 3
   rh_pin: 4
   co2_sda_pin: 6
@@ -95,14 +97,14 @@ All configured pins must be unique. `battery_pin` must be an ESP32-C3 ADC1 GPIO 
 The component intentionally owns most platform details. A normal configuration only needs the component itself; all options below already have defaults:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   sniffer_start_delay: 10s
 ```
 
 Useful optional settings:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   # BLE
   ble: true
   ble_live: true
@@ -146,7 +148,7 @@ Normal builds create:
 The primary sensor definitions can still be overridden, for example:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   co2:
     name: "Living Room CO2"
   rt_temperature:
@@ -195,7 +197,7 @@ With `ble_history: true`, a project-specific persistent history ring is stored i
 To build without BLE:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   ble: false
   ble_live: false
   ble_history: false
@@ -219,16 +221,16 @@ esphome run i2c-sniffer.yaml
 ## Repository layout
 
 ```text
-bus_sniffer/          ESPHome external component
-  __init__.py         configuration schema and code generation
-  bus_sniffer.*       orchestration and entity publishing
-  rtrh_decoder.*      RT/RH timing decoder
-  i2c_sniffer.*       generic passive I²C edge capture and framing
-  co2_decoder.*       CO₂ protocol/CRC decoder consuming I²C frames
-  power_save.*        Light-Sleep capture-window control
-  calibration.h       RT/RH calibration
-  sensirion_ble.*     BLE live advertising
-  sensirion_history.* persistent BLE history / GATT
+co2_monitor_0601/       ESPHome external component
+  __init__.py              configuration schema and code generation
+  co2_monitor_0601.*       orchestration and entity publishing
+  rtrh_decoder.*           RT/RH timing decoder
+  i2c_sniffer.*            generic passive I²C edge capture and framing
+  co2_decoder.*            CO₂ protocol/CRC decoder consuming I²C frames
+  power_save.*             Light-Sleep capture-window control
+  calibration.h            RT/RH calibration
+  sensirion_ble.*          BLE live advertising
+  sensirion_history.*      persistent BLE history / GATT
 docs/
   DEVELOPMENT_HISTORY.md development process and design rationale
   ISR_ARCHITECTURE.md    timing-critical ISR design

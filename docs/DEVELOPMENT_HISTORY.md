@@ -244,7 +244,7 @@ This incident is one reason current debug paths deliberately avoid unnecessarily
 
 When `esp32_ble` and `esp32_ble_server` were moved out of user YAML and into component-managed setup, an initialization-order bug caused a boot-time load-access fault in `BLEServer::create_service()`.
 
-The cause was creating GATT services before ESPHome had finished wiring the BLE server's parent object. The component now stores the generated server pointer during code generation and defers actual GATT service creation until `BusSniffer::setup()`.
+The cause was creating GATT services before ESPHome had finished wiring the BLE server's parent object. The component now stores the generated server pointer during code generation and defers actual GATT service creation until `CO2Monitor0601::setup()`.
 
 This preserved the simplified YAML without relying on fragile initialization timing.
 
@@ -287,3 +287,7 @@ the raw `/capture` endpoint now live in the generic layer. The CO₂ decoder onl
 claims the observed 0x62 / 0xEC05 exchange, validates its CRC and produces ppm.
 Debug-capture builds additionally log every reconstructed I²C frame that is not
 claimed by the CO₂ decoder.
+
+## 2026-08-14: Component renamed for device identity
+
+The top-level ESPHome integration was renamed from the generic historical `bus_sniffer` name to `co2_monitor_0601`, matching the tested device designation **CO2 Monitor Carbon Dioxide Detector 0601**. The C++ namespace and orchestrator class are now `co2_monitor_0601` and `CO2Monitor0601`; the component source files were renamed accordingly. This is intentionally a breaking configuration rename: YAML now uses `co2_monitor_0601:` rather than keeping a legacy alias. Internal protocol modules such as `i2c_sniffer`, `co2_decoder`, and `rtrh_decoder` retain their descriptive names.

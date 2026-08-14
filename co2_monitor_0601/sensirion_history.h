@@ -8,7 +8,7 @@
 #include "esphome/components/esp32_ble_server/ble_server.h"
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
 void sensirion_history_setup();
 void sensirion_history_loop();
@@ -17,7 +17,7 @@ void sensirion_history_gatts_event_handler(esp_gatts_cb_event_t event,
                                            esp_gatt_if_t gatts_if,
                                            esp_ble_gatts_cb_param_t *param);
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome
 
 #endif  // UNNI_BLE_HISTORY_ENABLED

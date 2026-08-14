@@ -10,7 +10,7 @@
 #include <cstdint>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
 struct SensirionSample {
   float temperature_c{0.0f};
@@ -48,5 +48,5 @@ struct SensirionSample {
   }
 };
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

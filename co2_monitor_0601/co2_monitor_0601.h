@@ -15,9 +15,9 @@
 #endif
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 
-class BusSniffer : public Component {
+class CO2Monitor0601 : public Component {
  public:
   void setup() override;
   void loop() override;
@@ -171,5 +171,5 @@ class BusSniffer : public Component {
   uint8_t co2_scl_pin_{7};
 };
 
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

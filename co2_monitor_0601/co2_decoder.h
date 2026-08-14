@@ -7,7 +7,7 @@
 #include <cstdint>
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace co2_decoder {
 
 struct Result {
@@ -22,5 +22,5 @@ struct Result {
 bool process_frame(const i2c_sniffer::Frame &frame, Result &result);
 
 }  // namespace co2_decoder
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

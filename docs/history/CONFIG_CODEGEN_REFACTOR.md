@@ -7,7 +7,7 @@ The ESPHome YAML API is intentionally unchanged.
 
 ## Python side
 
-`bus_sniffer/__init__.py` now has two declarative output tables:
+`co2_monitor_0601/__init__.py` now has two declarative output tables:
 
 - `SENSOR_OUTPUTS`
 - `BINARY_OUTPUTS`

@@ -9,7 +9,7 @@
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace power_save {
 
 static const char *TAG = "unni_power";
@@ -154,7 +154,7 @@ void IRAM_ATTR on_rtrh_edge_from_isr() {
 void on_rtrh_complete(bool valid) {
   if (!configured || !lock_held) return;
   // Even a rejected complete cycle is enough to avoid being stuck awake; the
-  // validity is logged by BusSniffer and the next cycle gets another chance.
+  // validity is logged by CO2Monitor0601 and the next cycle gets another chance.
   (void) valid;
   rtrh_complete = true;
 }
@@ -202,5 +202,5 @@ bool enabled() { return configured; }
 bool awake_window_active() { return lock_held; }
 
 }  // namespace power_save
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

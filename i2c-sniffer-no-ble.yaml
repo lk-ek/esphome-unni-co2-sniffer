@@ -43,7 +43,7 @@ esp32:
     type: esp-idf
 # BLE deliberately omitted for timing A/B test.
 
-bus_sniffer:
+co2_monitor_0601:
   ble: false
   ble_live: false
   ble_history: false

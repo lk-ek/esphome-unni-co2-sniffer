@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 
-namespace esphome::bus_sniffer {
+namespace esphome::co2_monitor_0601 {
 namespace {
 
 static const char *const TAG = "sensirion_history";
@@ -586,5 +586,5 @@ void sensirion_history_gatts_event_handler(
   }
 }
 
-}  // namespace esphome::bus_sniffer
+}  // namespace esphome::co2_monitor_0601
 #endif  // UNNI_BLE_HISTORY_ENABLED

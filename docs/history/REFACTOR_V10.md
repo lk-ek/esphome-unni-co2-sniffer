@@ -17,7 +17,7 @@ The RT/RH component boundary now follows the data flow rather than the historica
 
 Its public output is one `rtrh_decoder::Measurement`. Internal ISR accumulators, snapshots, and median buffers are no longer exposed in the header.
 
-`BusSniffer` owns only integration concerns:
+`CO2Monitor0601` owns only integration concerns:
 
 - thermal-transient state across measurements
 - optional diagnostic entity publishing

@@ -3,7 +3,7 @@
 #include "co2_decoder.h"
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace co2_decoder {
 
 static constexpr uint8_t CO2_I2C_ADDRESS = 0x62;
@@ -57,5 +57,5 @@ bool process_frame(const i2c_sniffer::Frame &frame, Result &result) {
 }
 
 }  // namespace co2_decoder
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

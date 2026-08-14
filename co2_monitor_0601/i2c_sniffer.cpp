@@ -19,7 +19,7 @@
 #endif
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace i2c_sniffer {
 
 #if RTRH_DEBUG_CAPTURE
@@ -351,5 +351,5 @@ bool poll(Capture &capture) {
 }
 
 }  // namespace i2c_sniffer
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

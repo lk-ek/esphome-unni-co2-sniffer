@@ -6,7 +6,7 @@
 #include "esp_attr.h"
 
 namespace esphome {
-namespace bus_sniffer {
+namespace co2_monitor_0601 {
 namespace power_save {
 
 // Configure ESP-IDF automatic Light-sleep. The RT/RH GPIOs are wake sources;
@@ -34,5 +34,5 @@ bool enabled();
 bool awake_window_active();
 
 }  // namespace power_save
-}  // namespace bus_sniffer
+}  // namespace co2_monitor_0601
 }  // namespace esphome

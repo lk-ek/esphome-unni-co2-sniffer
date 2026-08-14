@@ -6,7 +6,7 @@
 The hard-coded `RTRH_DEBUG_CAPTURE` switch is now exposed as an ESPHome option:
 
 ```yaml
-bus_sniffer:
+co2_monitor_0601:
   debug_capture: false
 ```
 
@@ -35,7 +35,7 @@ Add a top-level web server explicitly:
 web_server:
   port: 80
 
-bus_sniffer:
+co2_monitor_0601:
   debug_capture: true
 ```
 

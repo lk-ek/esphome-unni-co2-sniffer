@@ -17,7 +17,7 @@ or pull-downs and never drive the Unni signal lines.
 
 ## Shared GPIO ISR service
 
-`BusSniffer::initialize_sniffer_io_()` installs the ESP-IDF GPIO ISR service once:
+`CO2Monitor0601::initialize_sniffer_io_()` installs the ESP-IDF GPIO ISR service once:
 
 ```cpp
 gpio_install_isr_service(0);
@@ -53,7 +53,7 @@ is to copy the minimum information needed to reconstruct the signal later.
 
 # I²C / CO₂-bus ISR
 
-Source: `bus_sniffer/i2c_sniffer.cpp`
+Source: `co2_monitor_0601/i2c_sniffer.cpp`
 
 ## Pins
 
@@ -123,7 +123,7 @@ The generic I²C layer reconstructs START, repeated START, STOP, rising-clock
 data bits, 7-bit address/direction and ACK/NACK bits into fixed-size
 `i2c_sniffer::Frame` objects. Frames use 7-bit addressing and retain up to 32
 data bytes in fixed storage; longer frames are marked truncated rather than
-allocating dynamically. `BusSniffer` then passes each frame to
+allocating dynamically. `CO2Monitor0601` then passes each frame to
 `co2_decoder::process_frame()`. Only the CO₂ protocol layer knows about address
 0x62, command 0xEC05, the Sensirion-compatible CRC or ppm values.
 
@@ -152,7 +152,7 @@ introduce an explicit ISR-safe synchronization strategy rather than assuming
 
 # RT/RH ISR
 
-Source: `bus_sniffer/rtrh_decoder.cpp`
+Source: `co2_monitor_0601/rtrh_decoder.cpp`
 
 ## Pins
 
@@ -316,7 +316,7 @@ context. It performs:
 7. temperature-compensated humidity calibration
 8. calibration extrapolation flags
 
-`BusSniffer` then adds the thermal-transient state and publishes the result to
+`CO2Monitor0601` then adds the thermal-transient state and publishes the result to
 ESPHome/BLE.
 
 That boundary should remain intact:

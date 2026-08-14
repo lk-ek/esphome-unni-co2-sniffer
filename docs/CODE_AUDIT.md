@@ -11,7 +11,7 @@ No timing thresholds, ISR logic, calibration equations, BLE protocol bytes, hist
 
 The current responsibility split is:
 
-- `bus_sniffer.cpp/.h`: orchestration and ESPHome-facing state
+- `co2_monitor_0601.cpp/.h`: orchestration and ESPHome-facing state
 - `i2c_sniffer.cpp/.h`: generic passive I²C edge capture and frame reconstruction
 - `co2_decoder.cpp/.h`: CO₂ command/response and CRC decoding over generic I²C frames
 - `rtrh_decoder.cpp/.h`: RT/RH capture, validation, quality, calibrated result
@@ -46,7 +46,7 @@ For current behavior, use:
 
 1. `README.md`
 2. `docs/ISR_ARCHITECTURE.md`
-3. the source under `bus_sniffer/`
+3. the source under `co2_monitor_0601/`
 
 `docs/history/` is rationale/history only.
 
@@ -60,4 +60,4 @@ parent when deciding whether to create a live service.
 
 The component now stores the generated BLE server pointer only. Device
 Information customization and Sensirion GATT service creation are deferred to
-`BusSniffer::setup()`, after all generated object wiring has completed.
+`CO2Monitor0601::setup()`, after all generated object wiring has completed.

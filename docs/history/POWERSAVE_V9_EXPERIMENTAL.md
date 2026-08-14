@@ -14,7 +14,7 @@ Built on v8 powersave + CSV fix. Calibration and quality logic are unchanged.
 - BLE live payload committed once per RT/RH cycle
 - BLE advertising interval 10 s
 - logger level WARN
-- web server intentionally retained because bus_sniffer capture/timing HTTP
+- web server intentionally retained because co2_monitor_0601 capture/timing HTTP
   handlers depend on ESPHome's web server infrastructure
 
 ## ESP-IDF power management
@@ -24,7 +24,7 @@ The ESP-IDF build enables:
 - `CONFIG_PM_ENABLE=y`
 - `CONFIG_FREERTOS_USE_TICKLESS_IDLE=y`
 
-`bus_sniffer` then calls:
+`co2_monitor_0601` then calls:
 
 - max CPU: 80 MHz
 - min CPU: 80 MHz
