@@ -145,10 +145,10 @@ Source: `bus_sniffer/rtrh_decoder.cpp`
 
 The RT/RH decoder observes two original Unni signals:
 
-- G10: GPIO3 / D1
-- G13: GPIO4 / D2
+- RT: GPIO3 / D1
+- RH: GPIO4 / D2
 
-Both pins use `GPIO_INTR_ANYEDGE`. The former G11 input was used during reverse engineering but is not required by the production decoder. XIAO D3/GPIO5 is now repurposed for USB/VBUS detection and is not part of the RT/RH ISR path.
+Both pins use `GPIO_INTR_ANYEDGE`. XIAO D3/GPIO5 is reserved for USB/VBUS detection and is not part of the RT/RH ISR path.
 
 The ISR receives an encoded pin index through its `void *arg`; this lets one
 handler distinguish which physical pin caused the interrupt without registering
@@ -167,11 +167,11 @@ Important members are:
 - `collecting`: currently inside a sensor measurement sequence
 - `measurement_start_us`: timestamp used to determine REF/RT/RH phase
 - `last_edge_us`: most recent observed edge, used for end-of-measurement detection
-- `gpio_state`: last combined G10/G13 state
-- `last_g10_fall_us`: previous G10 falling edge
-- `have_g10_rise`: protects against accepting an incomplete G10 period
+- `gpio_state`: last combined RT/RH state
+- `last_rt_fall_us`: previous RT falling edge
+- `have_rt_rise`: protects against accepting an incomplete RT period
 - `phase`: REF, RT or RH
-- `ref`, `rt`, `rh`: accumulated G10 period sums/counts
+- `ref`, `rt`, `rh`: accumulated RT period sums/counts
 - `rt_temperature_*`: first 880 RT periods used for temperature
 - `rh_state`: RH-state recurrence samples used for the RH median
 - `snapshot`: completed measurement handed to normal task context
@@ -191,29 +191,29 @@ This is deliberate. The measured RC periods are the values we want to measure;
 using them to identify the phase would make the classification depend on the
 measurement itself.
 
-When a phase boundary is crossed, the decoder clears `last_g10_fall_us` and
-`have_g10_rise` so a period can never straddle two phases.
+When a phase boundary is crossed, the decoder clears `last_rt_fall_us` and
+`have_rt_rise` so a period can never straddle two phases.
 
 **Changing `REF_PHASE_END_US` or `RT_PHASE_END_US` changes the meaning of every
 subsequent period accumulation. Treat these constants as critical calibration /
 protocol constants.**
 
-## Only the physical G10 IRQ measures G10 periods
+## Only the physical RT IRQ measures RT periods
 
-The ISR reads the complete two-pin G10/G13 state, but REF/RT/RH period timing is
-updated only if the interrupt was caused by physical G10:
+The ISR reads the complete two-pin RT/RH state, but REF/RT/RH period timing is
+updated only if the interrupt was caused by physical RT:
 
 ```cpp
-const bool is_g10_irq = pin_index == 0;
+const bool is_rt_irq = pin_index == 0;
 ```
 
-This is critical when multiple lines change almost simultaneously. If a G13 interrupt were allowed to infer a G10 transition from the aggregate state,
+This is critical when multiple lines change almost simultaneously. If a RH interrupt were allowed to infer a RT transition from the aggregate state,
 IRQ ordering could create a false period.
 
-A valid G10 period requires:
+A valid RT period requires:
 
-1. a G10 rising edge (`have_g10_rise = true`), then
-2. the next G10 falling edge, and
+1. a RT rising edge (`have_rt_rise = true`), then
+2. the next RT falling edge, and
 3. a period no longer than `CYCLE_MAX_US` (20000 µs).
 
 The resulting falling-edge-to-falling-edge period is accumulated into the
@@ -221,7 +221,7 @@ currently selected phase.
 
 ## Temperature period selection
 
-During RT, every valid G10 period contributes to the RT phase statistics, but
+During RT, every valid RT period contributes to the RT phase statistics, but
 only the first 880 periods contribute to the temperature calculation:
 
 ```cpp
@@ -239,7 +239,7 @@ while the other describes the subset used for temperature.
 During RH the decoder also watches for the characteristic combined state:
 
 ```text
-G10=0, G13=1
+RT=0, RH=1
 ```
 
 In bit form the test is:
@@ -248,7 +248,7 @@ In bit form the test is:
 (state & 0x09) == 0x08
 ```
 
-D3/G11 was removed after a live shadow-decoder comparison showed identical RH median, sample count, and event count for the two-pin and three-pin state definitions across the validation captures.
+Only the RT and RH signals are required by the production decoder.
 
 The time between recurrences of this state is stored in a 96-entry ring:
 
@@ -353,8 +353,8 @@ Before changing ISR-related code, check all of the following:
 2. Did any logging, allocation, BLE, web, flash or ESPHome publishing enter the
    ISR path?
 3. Are phase boundaries still elapsed-time based?
-4. Are G10 periods still measured only from a physical G10 IRQ?
-5. Can a G10 period accidentally cross a REF/RT/RH phase boundary?
+4. Are RT periods still measured only from a physical RT IRQ?
+5. Can a RT period accidentally cross a REF/RT/RH phase boundary?
 6. Is the first CO₂ bus state before the first captured edge still preserved?
 7. Is CO₂ decoding still done only after capture is stopped?
 8. Is RT/RH snapshot copying still protected by disabling/rechecking the two

@@ -12,8 +12,8 @@ namespace bus_sniffer {
 namespace power_save {
 
 static const char *TAG = "unni_power";
-static gpio_num_t pin_g10 = GPIO_NUM_3;
-static gpio_num_t pin_g13 = GPIO_NUM_4;
+static gpio_num_t pin_rt = GPIO_NUM_3;
+static gpio_num_t pin_rh = GPIO_NUM_4;
 static gpio_num_t pin_co2_sda = GPIO_NUM_6;
 static gpio_num_t pin_co2_scl = GPIO_NUM_7;
 
@@ -42,10 +42,10 @@ static void configure_wakeup_pin(gpio_num_t pin) {
   }
 }
 
-bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t g10_pin, uint8_t g13_pin,
+bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint8_t rh_pin,
            uint8_t co2_sda_pin, uint8_t co2_scl_pin) {
-  pin_g10 = static_cast<gpio_num_t>(g10_pin);
-  pin_g13 = static_cast<gpio_num_t>(g13_pin);
+  pin_rt = static_cast<gpio_num_t>(rt_pin);
+  pin_rh = static_cast<gpio_num_t>(rh_pin);
   pin_co2_sda = static_cast<gpio_num_t>(co2_sda_pin);
   pin_co2_scl = static_cast<gpio_num_t>(co2_scl_pin);
   if (!enabled_value) return true;
@@ -72,8 +72,8 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t g10_pin, uin
     return false;
   }
 
-  configure_wakeup_pin(pin_g10);
-  configure_wakeup_pin(pin_g13);
+  configure_wakeup_pin(pin_rt);
+  configure_wakeup_pin(pin_rh);
   err = esp_sleep_enable_gpio_wakeup();
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_sleep_enable_gpio_wakeup failed: %d", err);
@@ -84,7 +84,7 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t g10_pin, uin
   ESP_LOGI(TAG,
            "Auto Light-sleep enabled: CPU 40..80 MHz, forced 80 MHz while capturing; "
            "wake GPIO%d/GPIO%d; CO2 GPIO%d/GPIO%d excluded; awake timeout %lu ms",
-           static_cast<int>(pin_g10), static_cast<int>(pin_g13),
+           static_cast<int>(pin_rt), static_cast<int>(pin_rh),
            static_cast<int>(pin_co2_sda), static_cast<int>(pin_co2_scl),
            static_cast<unsigned long>(max_awake_ms));
   return true;

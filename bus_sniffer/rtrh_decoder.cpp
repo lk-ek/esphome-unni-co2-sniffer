@@ -20,8 +20,8 @@ namespace bus_sniffer {
 namespace rtrh_decoder {
 
 static const char *TAG = "rtrh_decoder";
-static gpio_num_t pin_g10 = GPIO_NUM_3;
-static gpio_num_t pin_g13 = GPIO_NUM_4;
+static gpio_num_t pin_rt = GPIO_NUM_3;
+static gpio_num_t pin_rh = GPIO_NUM_4;
 static gpio_num_t pins[] = {GPIO_NUM_3, GPIO_NUM_4};
 
 // The controller spends ~125 ms in REF and ~127 ms in RT. Phase identity is
@@ -97,8 +97,8 @@ struct DecoderState {
   volatile uint32_t measurement_start_us{0};
   volatile uint32_t last_edge_us{0};
   volatile uint8_t gpio_state{0};
-  volatile uint32_t last_g10_fall_us{0};
-  volatile bool have_g10_rise{false};
+  volatile uint32_t last_rt_fall_us{0};
+  volatile bool have_rt_rise{false};
   volatile Phase phase{Phase::WAIT_REF};
 
   Accum ref;
@@ -119,8 +119,8 @@ static DecoderState decoder;
 
 static inline uint8_t IRAM_ATTR read_state() {
   uint8_t value = 0;
-  if (gpio_get_level(pin_g10)) value |= 0x01;
-  if (gpio_get_level(pin_g13)) value |= 0x08;
+  if (gpio_get_level(pin_rt)) value |= 0x01;
+  if (gpio_get_level(pin_rh)) value |= 0x08;
   return value;
 }
 
@@ -146,8 +146,8 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.measurement_start_us = now;
   decoder.last_edge_us = now;
   decoder.gpio_state = state;
-  decoder.last_g10_fall_us = 0;
-  decoder.have_g10_rise = false;
+  decoder.last_rt_fall_us = 0;
+  decoder.have_rt_rise = false;
   decoder.phase = Phase::REF;
   clear_accum(decoder.ref);
   clear_accum(decoder.rt);
@@ -168,8 +168,8 @@ static inline void IRAM_ATTR update_phase(uint32_t now) {
                      elapsed < RT_PHASE_END_US ? Phase::RT : Phase::RH;
   if (next == decoder.phase) return;
   decoder.phase = next;
-  decoder.last_g10_fall_us = 0;  // Never let a period cross a fixed phase boundary.
-  decoder.have_g10_rise = false;
+  decoder.last_rt_fall_us = 0;  // Never let a period cross a fixed phase boundary.
+  decoder.have_rt_rise = false;
   if (next == Phase::RH) {
     decoder.rh_state.last_us = 0;
   }
@@ -190,7 +190,7 @@ static inline void IRAM_ATTR observe_rh_stats(uint32_t now, RhStateStats &stats)
 
 static inline void IRAM_ATTR observe_rh_state(uint32_t now, uint8_t state) {
   // Characteristic RH state using only the two required RT/RH lines:
-  // G10=0, G13=1. D3/G11 was verified redundant and is intentionally not read.
+  // Characteristic RH state: RT=0, RH=1.
   if (decoder.phase != Phase::RH || (state & 0x09) != 0x08) return;
   observe_rh_stats(now, decoder.rh_state);
 }
@@ -270,14 +270,14 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   else decoder.last_edge_us = now;
   update_phase(now);
 
-  // REF/RT timing comes only from the physical G10 IRQ. This avoids ordering
+  // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
   // errors when several sensor lines change almost simultaneously.
-  const bool is_g10_irq = pin_index == 0;
-  if (is_g10_irq && previous == 0 && level != 0) decoder.have_g10_rise = true;
-  if (is_g10_irq && previous != 0 && level == 0) {
-    const uint32_t previous_fall = decoder.last_g10_fall_us;
-    decoder.last_g10_fall_us = now;
-    if (previous_fall && decoder.have_g10_rise) {
+  const bool is_rt_irq = pin_index == 0;
+  if (is_rt_irq && previous == 0 && level != 0) decoder.have_rt_rise = true;
+  if (is_rt_irq && previous != 0 && level == 0) {
+    const uint32_t previous_fall = decoder.last_rt_fall_us;
+    decoder.last_rt_fall_us = now;
+    if (previous_fall && decoder.have_rt_rise) {
       const uint32_t period = static_cast<uint32_t>(now - previous_fall);
       if (period <= CYCLE_MAX_US) {
         if (decoder.phase == Phase::REF) add_period(decoder.ref, period);
@@ -292,7 +292,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
         }
       }
     }
-    decoder.have_g10_rise = false;
+    decoder.have_rt_rise = false;
   }
 
   if (state != decoder.gpio_state) {
@@ -336,17 +336,17 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 #endif
 }
 
-bool setup(uint8_t g10_pin, uint8_t g13_pin) {
-  pin_g10 = static_cast<gpio_num_t>(g10_pin);
-  pin_g13 = static_cast<gpio_num_t>(g13_pin);
-  pins[0] = pin_g10;
-  pins[1] = pin_g13;
+bool setup(uint8_t rt_pin, uint8_t rh_pin) {
+  pin_rt = static_cast<gpio_num_t>(rt_pin);
+  pin_rh = static_cast<gpio_num_t>(rh_pin);
+  pins[0] = pin_rt;
+  pins[1] = pin_rh;
   gpio_config_t io{};
   io.mode = GPIO_MODE_INPUT;
   io.pull_up_en = GPIO_PULLUP_DISABLE;
   io.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io.intr_type = GPIO_INTR_DISABLE;
-  io.pin_bit_mask = (1ULL << pin_g10) | (1ULL << pin_g13);
+  io.pin_bit_mask = (1ULL << pin_rt) | (1ULL << pin_rh);
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 

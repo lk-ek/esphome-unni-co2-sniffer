@@ -10,7 +10,7 @@ namespace power_save {
 
 // Configure ESP-IDF automatic Light-sleep. The RT/RH GPIOs are wake sources;
 // the CO2 bus GPIOs deliberately are not.
-bool setup(bool enabled, uint32_t max_awake_ms, uint8_t g10_pin, uint8_t g13_pin,
+bool setup(bool enabled, uint32_t max_awake_ms, uint8_t rt_pin, uint8_t rh_pin,
            uint8_t co2_sda_pin, uint8_t co2_scl_pin);
 
 // Called from the RT/RH GPIO ISR. esp_pm_lock_acquire() is explicitly ISR-safe.

@@ -256,14 +256,14 @@ bool BusSniffer::initialize_sniffer_io_() {
     ESP_LOGE(TAG, "CO2 decoder GPIO/ISR setup failed");
     return false;
   }
-  if (!rtrh_decoder::setup(this->rtrh_g10_pin_, this->rtrh_g13_pin_)) {
+  if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
     ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
     return false;
   }
 
   this->io_initialized_ = true;
   if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_,
-                         this->rtrh_g10_pin_, this->rtrh_g13_pin_,
+                         this->rt_pin_, this->rh_pin_,
                          this->co2_sda_pin_, this->co2_scl_pin_)) {
     ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
   } else if (power_save::enabled()) {

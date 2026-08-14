@@ -7,7 +7,7 @@ runs ESPHome networking and, in the normal build, BLE.
 ## Wake/awake sequence
 
 1. In idle periods ESP-IDF may enter automatic Light-sleep.
-2. The configured RT/RH G10 or G13 GPIO wakes the CPU on the first RT/RH transition (defaults: GPIO3/GPIO4).
+2. The configured RT/RH RT or RH GPIO wakes the CPU on the first RT/RH transition (defaults: GPIO3/GPIO4).
 3. The RT/RH ISR immediately acquires both an `ESP_PM_NO_LIGHT_SLEEP` lock and an `ESP_PM_CPU_FREQ_MAX` lock.
 4. The complete RT/RH waveform is captured without sleeping between edges and the CPU remains fixed at 80 MHz for the active capture window.
 5. The decoder finalizes after 100 ms of silence. The measured RT/RH waveform
@@ -44,8 +44,8 @@ the default:
 
 ```yaml
 bus_sniffer:
-  rtrh_g10_pin: 3
-  rtrh_g13_pin: 4
+  rt_pin: 3
+  rh_pin: 4
   co2_sda_pin: 6
   co2_scl_pin: 7
 ```

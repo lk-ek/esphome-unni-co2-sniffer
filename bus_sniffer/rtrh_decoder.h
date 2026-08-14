@@ -61,8 +61,8 @@ struct Measurement {
   bool calibration_extrapolation{false};
 };
 
-// GPIO3/D1 = G10, GPIO4/D2 = G13. D3/GPIO5 is not required.
-bool setup(uint8_t g10_pin, uint8_t g13_pin);
+// GPIO3/D1 = RT, GPIO4/D2 = RH. D3/GPIO5 is not required.
+bool setup(uint8_t rt_pin, uint8_t rh_pin);
 void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);

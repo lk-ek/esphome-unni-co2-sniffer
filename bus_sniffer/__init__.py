@@ -35,8 +35,8 @@ CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
 CONF_LIGHT_SLEEP = "light_sleep"
 CONF_LIGHT_SLEEP_MAX_AWAKE = "light_sleep_max_awake"
-CONF_RTRH_G10_PIN = "rtrh_g10_pin"
-CONF_RTRH_G13_PIN = "rtrh_g13_pin"
+CONF_RT_PIN = "rt_pin"
+CONF_RH_PIN = "rh_pin"
 CONF_CO2_SDA_PIN = "co2_sda_pin"
 CONF_CO2_SCL_PIN = "co2_scl_pin"
 CONF_BATTERY_PIN = "battery_pin"
@@ -172,7 +172,7 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
-    pins = [config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
+    pins = [config[CONF_RT_PIN], config[CONF_RH_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
     if len(set(pins)) != len(pins):
         raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
     if config[CONF_BATTERY_PIN] not in range(0, 5):
@@ -213,8 +213,8 @@ _SCHEMA = {
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_RTRH_G10_PIN, default=3): cv.int_range(min=0, max=21),
-    cv.Optional(CONF_RTRH_G13_PIN, default=4): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_RT_PIN, default=3): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_RH_PIN, default=4): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SCL_PIN, default=7): cv.int_range(min=0, max=21),
     cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
@@ -338,7 +338,7 @@ async def to_code(config):
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))
     cg.add(var.set_light_sleep_max_awake(config[CONF_LIGHT_SLEEP_MAX_AWAKE]))
-    cg.add(var.set_rtrh_pins(config[CONF_RTRH_G10_PIN], config[CONF_RTRH_G13_PIN]))
+    cg.add(var.set_rtrh_pins(config[CONF_RT_PIN], config[CONF_RH_PIN]))
     cg.add(var.set_co2_pins(config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]))
     cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))
     cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))

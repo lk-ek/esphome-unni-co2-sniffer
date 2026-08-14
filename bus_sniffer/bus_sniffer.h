@@ -34,7 +34,7 @@ class BusSniffer : public Component {
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
   void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
-  void set_rtrh_pins(uint8_t g10, uint8_t g13) { this->rtrh_g10_pin_ = g10; this->rtrh_g13_pin_ = g13; }
+  void set_rtrh_pins(uint8_t rt, uint8_t rh) { this->rt_pin_ = rt; this->rh_pin_ = rh; }
   void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
   void set_battery_pin(uint8_t pin) { this->battery_.pin = pin; }
   void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
@@ -159,8 +159,8 @@ class BusSniffer : public Component {
 #endif
   bool light_sleep_enabled_{true};
   uint32_t light_sleep_max_awake_ms_{10000};
-  uint8_t rtrh_g10_pin_{3};
-  uint8_t rtrh_g13_pin_{4};
+  uint8_t rt_pin_{3};
+  uint8_t rh_pin_{4};
   uint8_t co2_sda_pin_{6};
   uint8_t co2_scl_pin_{7};
 };
