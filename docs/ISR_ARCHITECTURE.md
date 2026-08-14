@@ -13,27 +13,21 @@ The important design rule is simple:
 > the normal ESPHome loop.**
 
 Both decoders are passive. They leave the observed GPIOs as inputs without
-internal pull-ups or pull-downs and never drive the 0601 signal lines. The
-ESP-IDF RMT RX allocator currently enables a pull-up as an implementation side
-effect; `i2c_sniffer` immediately disables that pull-up again after allocating
-the SCL RMT channel.
+internal pull-ups or pull-downs and never drive the 0601 signal lines.
 
 ## Shared GPIO ISR service
 
 `CO2Monitor0601::initialize_sniffer_io_()` installs the ESP-IDF GPIO ISR service once:
 
 ```cpp
-gpio_install_isr_service(0);
+gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
 ```
 
 `i2c_sniffer::setup()` and `rtrh_decoder::setup()` then attach their own handlers
-to that shared service.
-
-The service is installed with flags `0`, not `ESP_INTR_FLAG_IRAM`. The handlers
-are nevertheless marked `IRAM_ATTR`, as are the small RT/RH helper functions that
-are called directly from its ISR path. Do not interpret `IRAM_ATTR` alone as a
-promise that arbitrary code may safely be called from the handler: code reached
-from an ISR still needs to be short, non-blocking and ISR-safe.
+to that shared service. Installing the dispatcher itself IRAM-safe is important:
+marking only the leaf handlers `IRAM_ATTR` does not protect the shared GPIO ISR
+service from flash-cache-off latency. Code reached from either handler must still
+remain short, non-blocking and ISR-safe.
 
 ## What must never be added to an ISR
 
@@ -90,44 +84,24 @@ struct Sample {
 
 No I²C decoding occurs in the ISR.
 
-## RMT SCL hardware assist
-
-RMT is experimental and disabled by default. The production path remains the
-IRAM-safe shared GPIO ISR plus task-context decoding.
-
-When explicitly enabled, an ESP32-C3 RMT RX channel independently timestamps
-SCL pulse durations. `rmt_receive()` is pre-armed from normal task context while
-the bus is idle; ESP-IDF starts actual reception at the first input level
-change. The first GPIO edge records the matching absolute start timestamp for
-GPIO/RMT alignment. No RMT driver API is called from the GPIO ISR.
-
-The channel reserves 96 hardware symbols (two 48-symbol blocks) and uses
-interrupt priority 1. A normal EC05 command plus response therefore fits in the
-hardware buffer without the 48-symbol ping-pong copy path used by the first RMT
-experiment. Cache-safe RMT ISR and `rmt_receive()`-in-IRAM Kconfig options are
-not forced; with the whole short transaction fitting in hardware, completion
-can be deferred rather than competing with Wi-Fi/BLE during cache-off windows.
-
-RMT pulse boundaries are converted to absolute timestamps. After an early
-matching GPIO/RMT edge pair is found, RMT must remain a strict superset/match of
-the GPIO SCL timeline. Only extra RMT edges are inserted into the working copy.
-If alignment is ambiguous, RMT is truncated/full, or RX does not finish within
-a bounded wait, no RMT repair is attempted.
-
-The original GPIO waveform is preserved unchanged for `/capture`, including
-when RMT repairs the working decoder copy. The RMT channel is disabled whenever
-the battery power policy disables CO₂ capture.
-
 ## Protocol-validated GPIO missing-clock recovery
 
 The GPIO path can miss an entire SCL pulse when ISR latency spans both edges.
-For rejected captures, the generic sniffer may insert one synthetic full SCL
-pulse into an unusually long event gap and re-run framing. The generic layer
-does not decide that the result is correct: a caller-supplied validator must
-accept exactly one candidate. The CO₂ integration requires one complete
-`0x62 W EC 05` frame followed by one `0x62 R` measurement frame with the exact
-ACK/NACK pattern and valid Sensirion CRC. Zero or multiple valid candidates mean
-no repair. The raw capture is never modified for download.
+For rejected captures, the generic sniffer examines **constant-SCL level
+intervals**, not just gaps between adjacent samples. This matters because SDA
+may still change while a complete SCL high/low pulse is missed. Unusually long
+HIGH or LOW intervals generate bounded hypotheses for one missing opposite-level
+pulse, and if no one-pulse hypothesis succeeds the decoder may test two pulses
+in different intervals.
+
+The generic layer never treats timing as proof. The CO₂ integration accepts a
+reconstruction only when it yields one complete `0x62 W EC 05` frame followed
+by one `0x62 R` measurement frame with the exact ACK/NACK pattern and valid
+Sensirion CRC. Multiple timing placements are acceptable only when they decode
+to the **same** bus transaction; competing valid protocol results cause the
+recovery to be rejected. At most two missing clocks are reconstructed. The raw
+GPIO capture is restored bit-for-bit after every candidate and remains unchanged
+for `/capture`.
 
 ## Why both pins use the same handler
 

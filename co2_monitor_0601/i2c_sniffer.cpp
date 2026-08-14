@@ -4,9 +4,6 @@
 
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-#include "driver/rmt_rx.h"
-#endif
 #include "esp_timer.h"
 
 #include <cstddef>
@@ -47,117 +44,6 @@ static bool capture_enabled = true;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-// ESP32-C3 RMT hardware independently records SCL pulse durations. GPIO ISR
-// capture is still used for SDA and for the raw debug trace, but RMT gives us
-// an authoritative SCL edge count even when CPU interrupt latency collapses a
-// whole high/low pulse into no GPIO state change at all.
-static constexpr uint32_t RMT_RESOLUTION_HZ = 1000000;  // 1 us per tick
-static constexpr uint16_t RMT_BUFFER_SYMBOLS = 96;
-static constexpr uint16_t MAX_RMT_EDGES = RMT_BUFFER_SYMBOLS * 2;
-static constexpr uint32_t RMT_EDGE_MATCH_TOLERANCE_US = 15;
-static constexpr uint32_t RMT_WAIT_TIMEOUT_US = 20000;
-static constexpr uint16_t MAX_RMT_REPAIRS = 32;
-
-static rmt_channel_handle_t rmt_scl_channel = nullptr;
-static rmt_symbol_word_t rmt_scl_symbols[RMT_BUFFER_SYMBOLS];
-static volatile bool rmt_available = false;
-static volatile bool rmt_enabled = false;
-static volatile bool rmt_receive_started = false;
-static volatile bool rmt_receive_done = false;
-static volatile size_t rmt_received_symbols = 0;
-static volatile uint32_t rmt_receive_start_us = 0;
-// Static storage keeps the receive configuration valid for the armed transaction.
-static rmt_receive_config_t rmt_receive_config{};
-
-static bool IRAM_ATTR rmt_rx_done_callback(rmt_channel_handle_t,
-                                           const rmt_rx_done_event_data_t *edata,
-                                           void *) {
-  rmt_received_symbols = edata ? edata->num_symbols : 0;
-  rmt_receive_started = false;
-  rmt_receive_done = true;
-  return false;
-}
-
-static esp_err_t arm_rmt_receive() {
-  if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr ||
-      rmt_receive_started)
-    return ESP_OK;
-
-  rmt_received_symbols = 0;
-  rmt_receive_start_us = 0;
-  rmt_receive_done = false;
-  const esp_err_t err = rmt_receive(rmt_scl_channel, rmt_scl_symbols,
-                                    sizeof(rmt_scl_symbols), &rmt_receive_config);
-  if (err == ESP_OK) rmt_receive_started = true;
-  return err;
-}
-
-static bool setup_rmt_scl() {
-  rmt_rx_channel_config_t config{};
-  config.gpio_num = pin_scl;
-  config.clk_src = RMT_CLK_SRC_DEFAULT;
-  config.resolution_hz = RMT_RESOLUTION_HZ;
-  // A complete EC05 command + response is roughly 63 SCL cycles. Reserve
-  // two ESP32-C3 RMT blocks (2 x 48 symbols) so the burst fits in hardware
-  // without ping-pong threshold interrupts competing with Wi-Fi/BLE.
-  config.mem_block_symbols = 96;
-  // ESP32-C3 is single-core; keep the experimental RMT IRQ at the lowest
-  // selectable priority to reduce interference with radio work.
-  config.intr_priority = 1;
-  config.flags.invert_in = false;
-  config.flags.with_dma = false;
-  config.flags.allow_pd = false;
-
-  esp_err_t err = rmt_new_rx_channel(&config, &rmt_scl_channel);
-  if (err != ESP_OK) return false;
-
-  // ESP-IDF currently enables an internal pull-up when allocating an RMT RX
-  // channel. This sniffer must remain electrically passive; the external I2C
-  // bus already owns its pull-ups. Undo that driver side effect immediately.
-  gpio_pullup_dis(pin_scl);
-  gpio_pulldown_dis(pin_scl);
-
-  rmt_rx_event_callbacks_t callbacks{};
-  callbacks.on_recv_done = rmt_rx_done_callback;
-  err = rmt_rx_register_event_callbacks(rmt_scl_channel, &callbacks, nullptr);
-  if (err != ESP_OK) {
-    rmt_del_channel(rmt_scl_channel);
-    rmt_scl_channel = nullptr;
-    return false;
-  }
-
-  err = rmt_enable(rmt_scl_channel);
-  if (err != ESP_OK) {
-    rmt_del_channel(rmt_scl_channel);
-    rmt_scl_channel = nullptr;
-    return false;
-  }
-  rmt_receive_config.signal_range_min_ns = 1000;
-  rmt_receive_config.signal_range_max_ns = CAPTURE_TIMEOUT_US * 1000U;
-  rmt_receive_config.flags.en_partial_rx = false;
-  rmt_enabled = true;
-  rmt_available = true;
-  rmt_receive_started = false;
-  rmt_receive_done = false;
-  rmt_received_symbols = 0;
-  rmt_receive_start_us = 0;
-  // ESP-IDF starts actual reception at the first input level change even when
-  // rmt_receive() is called while the bus is idle. Pre-arm from task context
-  // instead of invoking the RMT driver from the GPIO ISR.
-  err = arm_rmt_receive();
-  if (err != ESP_OK) {
-    rmt_available = false;
-    rmt_enabled = false;
-    (void) rmt_disable(rmt_scl_channel);
-    (void) rmt_del_channel(rmt_scl_channel);
-    rmt_scl_channel = nullptr;
-    return false;
-  }
-  return true;
-}
-
-#endif
 
 static inline uint8_t IRAM_ATTR read_gpio_state() {
   uint8_t value = 0;
@@ -178,14 +64,6 @@ static void IRAM_ATTR gpio_isr(void *) {
   last_edge = now;
 
   const uint16_t index = sample_count;
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  if (index == 0 && rmt_available && rmt_enabled && rmt_receive_started &&
-      rmt_receive_start_us == 0) {
-    // RMT was already armed from task context. ESP-IDF starts actual RX on
-    // this first signal edge; use the same timestamp for timeline alignment.
-    rmt_receive_start_us = now;
-  }
-#endif
   if (index < MAX_SAMPLES) {
     samples[index].t = now;
     samples[index].value = value;
@@ -197,206 +75,6 @@ static void IRAM_ATTR gpio_isr(void *) {
   }
 }
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-struct SclEdge {
-  uint32_t t;
-  bool level;
-};
-
-// Scratch storage is static because this component is single-threaded outside
-// its ISRs and ESPHome loop-task stack space is more valuable than a few KiB
-// of fixed DRAM here.
-static SclEdge gpio_scl_edges_work[MAX_RMT_EDGES];
-static SclEdge rmt_scl_edges_work[MAX_RMT_EDGES];
-static SclEdge rmt_missing_edges_work[MAX_RMT_REPAIRS];
-
-static uint16_t collect_gpio_scl_edges(const volatile Sample *data, uint16_t count,
-                                       uint8_t initial_value, SclEdge *edges,
-                                       uint16_t max_edges) {
-  uint16_t edge_count = 0;
-  bool previous = scl_level(initial_value);
-  for (uint16_t i = 0; i < count; i++) {
-    const bool current = scl_level(data[i].value);
-    if (current != previous) {
-      if (edge_count < max_edges) {
-        edges[edge_count].t = data[i].t;
-        edges[edge_count].level = current;
-      }
-      edge_count++;
-      previous = current;
-    }
-  }
-  return edge_count;
-}
-
-static uint16_t collect_rmt_scl_edges(SclEdge *edges, uint16_t max_edges) {
-  // A completely full user buffer may have had excess symbols discarded by
-  // the driver. Do not use a potentially truncated RMT trace for repair.
-  if (!rmt_receive_done || rmt_received_symbols == 0 ||
-      rmt_received_symbols >= RMT_BUFFER_SYMBOLS)
-    return 0;
-  const size_t symbols = rmt_received_symbols;
-
-  uint16_t edge_count = 0;
-  uint32_t t = rmt_receive_start_us;
-  bool have_level = false;
-  bool level = false;
-
-  auto append_part = [&](uint16_t duration, bool part_level) {
-    if (duration == 0) return;
-    // The first RMT part describes the level that already existed when RX was
-    // armed; it is not itself an edge. Record transitions only at boundaries
-    // between pulse parts. The previous implementation emitted a synthetic
-    // edge at t=0, which made real GPIO/RMT timelines fail alignment.
-    if (!have_level) {
-      have_level = true;
-      level = part_level;
-      t += duration;
-      return;
-    }
-    if (part_level != level) {
-      if (edge_count < max_edges) {
-        edges[edge_count].t = t;
-        edges[edge_count].level = part_level;
-      }
-      edge_count++;
-      level = part_level;
-    }
-    t += duration;
-  };
-
-  for (size_t i = 0; i < symbols; i++) {
-    const rmt_symbol_word_t symbol = rmt_scl_symbols[i];
-    append_part(symbol.duration0, symbol.level0 != 0);
-    append_part(symbol.duration1, symbol.level1 != 0);
-  }
-  return edge_count;
-}
-
-static bool time_within(uint32_t a, uint32_t b, uint32_t tolerance) {
-  const int32_t delta = static_cast<int32_t>(a - b);
-  return delta >= -static_cast<int32_t>(tolerance) &&
-         delta <= static_cast<int32_t>(tolerance);
-}
-
-static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
-                                         uint8_t initial_value, Capture &capture) {
-  if (!rmt_available || !rmt_enabled || !rmt_receive_done || count == 0) return 0;
-
-  SclEdge *gpio_edges = gpio_scl_edges_work;
-  SclEdge *rmt_edges = rmt_scl_edges_work;
-  const uint16_t gpio_total = collect_gpio_scl_edges(
-      data, count, initial_value, gpio_edges, MAX_RMT_EDGES);
-  const uint16_t rmt_total = collect_rmt_scl_edges(rmt_edges, MAX_RMT_EDGES);
-  capture.gpio_scl_edges = gpio_total;
-  capture.rmt_scl_edges = rmt_total;
-
-  if (gpio_total == 0 || rmt_total == 0 ||
-      gpio_total > MAX_RMT_EDGES || rmt_total > MAX_RMT_EDGES)
-    return 0;
-
-  // RMT starts from the first GPIO state change. If that first change itself
-  // was an SCL edge, the edge can precede the point at which the RMT engine is
-  // fully armed. Find an early matching edge pair and align from there rather
-  // than requiring edge zero to match edge zero.
-  uint16_t gpio_index = 0;
-  uint16_t rmt_index = 0;
-  bool aligned = false;
-  const uint16_t gpio_search = gpio_total < 4 ? gpio_total : 4;
-  const uint16_t rmt_search = rmt_total < 4 ? rmt_total : 4;
-  for (uint16_t g = 0; g < gpio_search && !aligned; g++) {
-    for (uint16_t r = 0; r < rmt_search; r++) {
-      if (gpio_edges[g].level == rmt_edges[r].level &&
-          time_within(gpio_edges[g].t, rmt_edges[r].t, RMT_EDGE_MATCH_TOLERANCE_US)) {
-        gpio_index = g;
-        rmt_index = r;
-        aligned = true;
-        break;
-      }
-    }
-  }
-  if (!aligned) return 0;
-
-  capture.rmt_used = true;
-  SclEdge *missing = rmt_missing_edges_work;
-  uint16_t missing_count = 0;
-
-  while (rmt_index < rmt_total) {
-    const uint32_t expected = rmt_edges[rmt_index].t;
-    const bool expected_level = rmt_edges[rmt_index].level;
-
-    if (gpio_index < gpio_total &&
-        gpio_edges[gpio_index].level == expected_level &&
-        time_within(gpio_edges[gpio_index].t, expected, RMT_EDGE_MATCH_TOLERANCE_US)) {
-      gpio_index++;
-      rmt_index++;
-      continue;
-    }
-
-    if (gpio_index < gpio_total) {
-      const int32_t delta = static_cast<int32_t>(gpio_edges[gpio_index].t - expected);
-      if (delta < -static_cast<int32_t>(RMT_EDGE_MATCH_TOLERANCE_US)) {
-        // After alignment, GPIO seeing an edge which RMT did not means the two
-        // timelines are no longer trustworthy enough for synthesis.
-        capture.rmt_used = false;
-        return 0;
-      }
-      if (delta <= static_cast<int32_t>(RMT_EDGE_MATCH_TOLERANCE_US) &&
-          gpio_edges[gpio_index].level != expected_level) {
-        capture.rmt_used = false;
-        return 0;
-      }
-    }
-
-    // RMT saw an edge before the next GPIO edge: preserve the SDA state from
-    // GPIO and synthesize only the missing SCL transition.
-    const uint32_t last_sample_t = data[count - 1].t;
-    if (static_cast<int32_t>(expected - last_sample_t) >
-        static_cast<int32_t>(RMT_EDGE_MATCH_TOLERANCE_US))
-      break;
-    if (missing_count >= MAX_RMT_REPAIRS || count + missing_count >= MAX_SAMPLES) {
-      capture.rmt_used = false;
-      return 0;
-    }
-    missing[missing_count].t = expected;
-    missing[missing_count].level = expected_level;
-    missing_count++;
-    rmt_index++;
-  }
-
-  // Unmatched trailing GPIO edges after an established alignment mean RMT did
-  // not provide a strict reference timeline. Do not modify the raw capture.
-  if (gpio_index != gpio_total) {
-    capture.rmt_used = false;
-    return 0;
-  }
-
-  if (missing_count == 0) return 0;
-
-  uint16_t repaired = 0;
-  for (uint16_t m = 0; m < missing_count; m++) {
-    uint16_t pos = 0;
-    while (pos < count && static_cast<int32_t>(data[pos].t - missing[m].t) < 0) pos++;
-
-    const uint8_t before = pos == 0 ? initial_value : data[pos - 1].value;
-    if (scl_level(before) == missing[m].level) continue;
-
-    for (uint16_t j = count; j > pos; j--) {
-      data[j].t = data[j - 1].t;
-      data[j].value = data[j - 1].value;
-    }
-    data[pos].t = missing[m].t;
-    data[pos].value = static_cast<uint8_t>((before & 0x02U) |
-                                           (missing[m].level ? 0x01U : 0x00U));
-    count++;
-    repaired++;
-  }
-
-  capture.rmt_repaired_edges = repaired;
-  return repaired;
-}
-
-#endif
 
 struct RawFrame {
   uint8_t bytes[MAX_DATA_BYTES + 1]{};
@@ -544,121 +222,404 @@ static void decode_capture(const volatile Sample *data, uint16_t count,
     finish_active_frame(raw, EndCondition::CaptureEnd, bit_count, capture);
 }
 
-// Estimate the normal SCL period from rising-edge spacing. This is used only
-// to propose recovery candidates; a candidate is never accepted on timing
-// alone. The caller's protocol validator must accept exactly one result.
-static uint32_t estimate_scl_period_us(const volatile Sample *data, uint16_t count,
-                                       uint8_t initial_value) {
-  static uint32_t periods[128];
-  uint16_t period_count = 0;
-  uint32_t last_rise = 0;
+// Missing-clock recovery is based on unusually long intervals during which
+// the captured SCL level never changes. SDA-only samples inside such an
+// interval must not split the timing gap: the shared GPIO ISR can miss a full
+// SCL pulse while still observing one or more SDA transitions.
+//
+// Timing only proposes candidates. A reconstructed capture is accepted solely
+// when the caller-supplied protocol validator accepts it. Up to two complete
+// SCL pulses are considered because real field captures have shown both one-
+// and two-pulse losses on the single-core ESP32-C3.
+static constexpr uint8_t MAX_RECOVERY_PULSE_CANDIDATES = 32;
+static constexpr uint8_t MAX_RECOVERY_SDA_EVENTS = 4;
+static constexpr uint32_t RECOVERY_MIN_LEVEL_US = 55;
+static constexpr uint32_t RECOVERY_MAX_LEVEL_US = 300;
+
+struct LevelTiming {
+  uint32_t low_us{0};
+  uint32_t high_us{0};
+};
+
+struct PulseCandidate {
+  uint32_t t1{0};
+  uint32_t t2{0};
+  uint32_t interval_us{0};
+  uint8_t interval_id{0};
+};
+
+static uint32_t median_duration(uint32_t *values, uint8_t count) {
+  if (count == 0) return 0;
+  for (uint8_t i = 1; i < count; i++) {
+    const uint32_t value = values[i];
+    uint8_t j = i;
+    while (j > 0 && values[j - 1] > value) {
+      values[j] = values[j - 1];
+      j--;
+    }
+    values[j] = value;
+  }
+  return values[count / 2];
+}
+
+// Estimate normal HIGH and LOW pulse widths independently. Durations above
+// 60 us are deliberately excluded from the baseline because those are the
+// intervals we may later investigate for a completely missed opposite pulse.
+static bool estimate_scl_level_timing(const volatile Sample *data, uint16_t count,
+                                      uint8_t initial_value, LevelTiming &timing) {
+  uint32_t low[96]{};
+  uint32_t high[96]{};
+  uint8_t low_count = 0;
+  uint8_t high_count = 0;
+  bool level = scl_level(initial_value);
+  uint32_t interval_start = count ? data[0].t : 0;
+
+  for (uint16_t i = 0; i < count; i++) {
+    const bool next_level = scl_level(data[i].value);
+    if (next_level == level) continue;
+
+    const uint32_t duration = static_cast<uint32_t>(data[i].t - interval_start);
+    if (duration >= 10 && duration <= 60) {
+      if (level) {
+        if (high_count < 96) high[high_count++] = duration;
+      } else {
+        if (low_count < 96) low[low_count++] = duration;
+      }
+    }
+    interval_start = data[i].t;
+    level = next_level;
+  }
+
+  if (low_count < 8 || high_count < 8) return false;
+  timing.low_us = median_duration(low, low_count);
+  timing.high_us = median_duration(high, high_count);
+  return timing.low_us != 0 && timing.high_us != 0;
+}
+
+static bool add_pulse_candidate(PulseCandidate *out, uint8_t &count,
+                                uint8_t interval_id, uint32_t interval_us,
+                                uint32_t t1, uint32_t t2,
+                                uint32_t opposite_level_us) {
+  if (t2 <= t1) return true;
+  const uint32_t pulse_us = static_cast<uint32_t>(t2 - t1);
+  const uint32_t min_pulse = opposite_level_us / 2U > 4U
+                                 ? opposite_level_us / 2U : 4U;
+  const uint32_t max_pulse = opposite_level_us * 2U + 5U;
+  if (pulse_us < min_pulse || pulse_us > max_pulse) return true;
+  if (count >= MAX_RECOVERY_PULSE_CANDIDATES) return false;
+
+  out[count].t1 = t1;
+  out[count].t2 = t2;
+  out[count].interval_us = interval_us;
+  out[count].interval_id = interval_id;
+  count++;
+  return true;
+}
+
+// Generate representative pulse placements based on ordering relative to SDA
+// changes inside one constant-SCL interval. Exact microsecond placement is not
+// used as evidence; placements that produce the same decoded protocol result
+// are considered equivalent later.
+static bool add_interval_candidates(PulseCandidate *out, uint8_t &count,
+                                    uint8_t interval_id,
+                                    uint32_t start_t, uint32_t end_t,
+                                    const uint32_t *sda_times, uint8_t sda_count,
+                                    uint32_t opposite_level_us) {
+  uint32_t bounds[MAX_RECOVERY_SDA_EVENTS + 2]{};
+  bounds[0] = start_t;
+  for (uint8_t i = 0; i < sda_count; i++) bounds[i + 1] = sda_times[i];
+  bounds[sda_count + 1] = end_t;
+  const uint8_t gap_count = static_cast<uint8_t>(sda_count + 1);
+  const uint32_t interval_us = static_cast<uint32_t>(end_t - start_t);
+
+  for (uint8_t first = 0; first < gap_count; first++) {
+    const uint32_t a1 = bounds[first];
+    const uint32_t b1 = bounds[first + 1];
+    const uint32_t width1 = static_cast<uint32_t>(b1 - a1);
+    if (width1 < 9) continue;
+
+    // Both synthetic transitions in the same SDA-stable slot.
+    const uint32_t same_t1 = a1 + width1 / 3U;
+    const uint32_t same_t2 = a1 + (width1 * 2U) / 3U;
+    if (!add_pulse_candidate(out, count, interval_id, interval_us,
+                             same_t1, same_t2, opposite_level_us))
+      return false;
+
+    // Or let one or more observed SDA changes happen while the missing pulse
+    // is at the opposite SCL level. One midpoint per ordering is sufficient.
+    for (uint8_t second = static_cast<uint8_t>(first + 1);
+         second < gap_count; second++) {
+      const uint32_t a2 = bounds[second];
+      const uint32_t b2 = bounds[second + 1];
+      if (b2 - a2 < 5) continue;
+      const uint32_t t1 = a1 + width1 / 2U;
+      const uint32_t t2 = a2 + (b2 - a2) / 2U;
+      if (!add_pulse_candidate(out, count, interval_id, interval_us,
+                               t1, t2, opposite_level_us))
+        return false;
+    }
+  }
+  return true;
+}
+
+static bool collect_pulse_candidates(const volatile Sample *data, uint16_t count,
+                                     uint8_t initial_value,
+                                     const LevelTiming &timing,
+                                     PulseCandidate *out, uint8_t &out_count) {
+  out_count = 0;
+  if (count < 2) return true;
+
+  bool level = scl_level(initial_value);
+  uint32_t interval_start = data[0].t;
+  uint32_t sda_times[MAX_RECOVERY_SDA_EVENTS]{};
+  uint8_t sda_count = 0;
+  uint8_t interval_id = 0;
   uint8_t previous = initial_value;
 
   for (uint16_t i = 0; i < count; i++) {
     const uint8_t current = data[i].value;
-    if (!scl_level(previous) && scl_level(current)) {
-      const uint32_t now = data[i].t;
-      if (last_rise != 0) {
-        const uint32_t delta = static_cast<uint32_t>(now - last_rise);
-        // Exclude the millisecond command/response gap and obvious missing-
-        // clock gaps. The observed bus period is around 50..70 us, but keep
-        // this broad enough that the helper remains timing-derived.
-        if (delta >= 20 && delta <= 250 && period_count < 128)
-          periods[period_count++] = delta;
+    const bool next_level = scl_level(current);
+    const bool scl_changed = next_level != level;
+    const bool sda_changed = sda_level(current) != sda_level(previous);
+
+    if (scl_changed) {
+      const uint32_t end_t = data[i].t;
+      const uint32_t duration = static_cast<uint32_t>(end_t - interval_start);
+      const uint32_t same_level_us = level ? timing.high_us : timing.low_us;
+      const uint32_t opposite_level_us = level ? timing.low_us : timing.high_us;
+      const uint32_t timing_threshold = same_level_us * 2U > 5U
+                                            ? same_level_us * 2U - 5U : 0U;
+      const uint32_t min_interval = timing_threshold > RECOVERY_MIN_LEVEL_US
+                                        ? timing_threshold : RECOVERY_MIN_LEVEL_US;
+
+      if (duration >= min_interval && duration <= RECOVERY_MAX_LEVEL_US) {
+        if (!add_interval_candidates(out, out_count, interval_id, interval_start,
+                                     end_t, sda_times, sda_count,
+                                     opposite_level_us))
+          return false;  // Candidate truncation would make ambiguity unknowable.
+        interval_id++;
       }
-      last_rise = now;
+
+      interval_start = end_t;
+      level = next_level;
+      sda_count = 0;
+    } else if (sda_changed && sda_count < MAX_RECOVERY_SDA_EVENTS) {
+      sda_times[sda_count++] = data[i].t;
+    } else if (sda_changed) {
+      // More SDA transitions than the bounded candidate model can represent.
+      // Skip recovery rather than silently omit possible orderings.
+      return false;
     }
     previous = current;
   }
-  if (period_count < 8) return 0;
+  return true;
+}
 
-  // Tiny fixed-size insertion sort; runs once per suspicious ~6 s capture and
-  // avoids dynamic allocation in this timing-sensitive component.
-  for (uint16_t i = 1; i < period_count; i++) {
-    const uint32_t value = periods[i];
-    uint16_t j = i;
-    while (j > 0 && periods[j - 1] > value) {
-      periods[j] = periods[j - 1];
-      j--;
-    }
-    periods[j] = value;
+static bool remove_sample_at(volatile Sample *data, uint16_t &count,
+                             uint16_t index) {
+  if (index >= count) return false;
+  for (uint16_t i = index; i + 1 < count; i++) {
+    data[i].t = data[i + 1].t;
+    data[i].value = data[i + 1].value;
   }
-  return periods[period_count / 2];
+  count--;
+  return true;
 }
 
-static void copy_sample(volatile Sample &dst, const volatile Sample &src) {
-  dst.t = src.t;
-  dst.value = src.value;
+static uint16_t find_insert_position(const volatile Sample *data, uint16_t count,
+                                     uint32_t t) {
+  uint16_t pos = 0;
+  while (pos < count && static_cast<int32_t>(data[pos].t - t) < 0) pos++;
+  return pos;
 }
 
-// Try inserting exactly one complete SCL pulse into an abnormally long gap.
-// This is deliberately protocol-agnostic: the generic sniffer only proposes
-// candidates. A higher layer decides whether a reconstruction is trustworthy.
-// Recovery succeeds only when exactly one insertion produces a capture that
-// passes the supplied validator.
-static bool try_single_missing_clock_recovery(volatile Sample *data, uint16_t count,
-                                              uint8_t initial_value,
-                                              CaptureValidator validator,
-                                              Capture &accepted) {
-  if (!validator || count < 4 || count > MAX_SAMPLES - 2) return false;
+// Apply one synthetic opposite-level SCL pulse in-place. Existing SDA-only
+// samples between t1/t2 keep their SDA value but inherit the synthetic SCL
+// level. poll() has paused ISR writes, so this scratch transformation is safe.
+static bool apply_pulse(volatile Sample *data, uint16_t &count,
+                        uint8_t initial_value, const PulseCandidate &pulse) {
+  if (count > MAX_SAMPLES - 2 || pulse.t2 <= pulse.t1) return false;
+  uint16_t pos1 = find_insert_position(data, count, pulse.t1);
+  uint16_t pos2 = find_insert_position(data, count, pulse.t2);
+  if ((pos1 < count && data[pos1].t == pulse.t1) ||
+      (pos2 < count && data[pos2].t == pulse.t2))
+    return false;
 
-  const uint32_t period = estimate_scl_period_us(data, count, initial_value);
-  if (period == 0) return false;
+  const uint8_t before1 = pos1 == 0 ? initial_value : data[pos1 - 1].value;
+
+  // Flip SCL on all already-captured SDA transitions that occurred while the
+  // missing opposite-level pulse should have been active.
+  for (uint16_t i = pos1; i < count && data[i].t < pulse.t2; i++)
+    data[i].value ^= 0x01U;
+
+  // Insert first edge.
+  for (uint16_t i = count; i > pos1; i--) {
+    data[i].t = data[i - 1].t;
+    data[i].value = data[i - 1].value;
+  }
+  data[pos1].t = pulse.t1;
+  data[pos1].value = static_cast<uint8_t>(before1 ^ 0x01U);
+  count++;
+
+  // Insert return edge using the current SDA state immediately before t2.
+  pos2 = find_insert_position(data, count, pulse.t2);
+  const uint8_t before2 = pos2 == 0 ? initial_value : data[pos2 - 1].value;
+  for (uint16_t i = count; i > pos2; i--) {
+    data[i].t = data[i - 1].t;
+    data[i].value = data[i - 1].value;
+  }
+  data[pos2].t = pulse.t2;
+  data[pos2].value = static_cast<uint8_t>(before2 ^ 0x01U);
+  count++;
+  return true;
+}
+
+static bool undo_pulse(volatile Sample *data, uint16_t &count,
+                       const PulseCandidate &pulse) {
+  uint16_t p1 = count;
+  uint16_t p2 = count;
+  for (uint16_t i = 0; i < count; i++) {
+    if (data[i].t == pulse.t1) p1 = i;
+    if (data[i].t == pulse.t2) p2 = i;
+  }
+  if (p1 == count || p2 == count) return false;
+  if (p2 < p1) {
+    const uint16_t tmp = p1;
+    p1 = p2;
+    p2 = tmp;
+  }
+  if (!remove_sample_at(data, count, p2)) return false;
+  if (!remove_sample_at(data, count, p1)) return false;
+
+  // Restore the original SCL bit on SDA-only samples inside the interval.
+  for (uint16_t i = 0; i < count; i++) {
+    if (data[i].t > pulse.t1 && data[i].t < pulse.t2)
+      data[i].value ^= 0x01U;
+  }
+  return true;
+}
+
+static bool same_frame(const Frame &a, const Frame &b) {
+  if (a.address != b.address || a.direction != b.direction ||
+      a.address_ack != b.address_ack || a.length != b.length ||
+      a.end_condition != b.end_condition || a.status != b.status ||
+      a.partial_bits != b.partial_bits)
+    return false;
+  for (uint8_t i = 0; i < a.length; i++) {
+    if (a.data[i] != b.data[i] || a.ack[i] != b.ack[i]) return false;
+  }
+  return true;
+}
+
+static bool same_decoded_capture(const Capture &a, const Capture &b) {
+  if (a.frame_errors != b.frame_errors || a.frame_count != b.frame_count)
+    return false;
+  for (uint8_t i = 0; i < a.frame_count; i++)
+    if (!same_frame(a.frames[i], b.frames[i])) return false;
+  return true;
+}
+
+static bool remember_valid_recovery(const Capture &candidate,
+                                    const PulseCandidate *pulses,
+                                    uint8_t pulse_count,
+                                    bool &have_accepted, bool &ambiguous,
+                                    Capture &accepted) {
+  if (!have_accepted) {
+    accepted = candidate;
+    accepted.recovered_missing_clocks = pulse_count;
+    for (uint8_t i = 0; i < pulse_count && i < 2; i++)
+      accepted.recovered_gap_us[i] = pulses[i].interval_us;
+    have_accepted = true;
+    return true;
+  }
+
+  // Different timing placements are harmless when they decode to the exact
+  // same bus transaction. Only competing protocol results make recovery
+  // ambiguous and therefore unacceptable.
+  if (!same_decoded_capture(accepted, candidate)) {
+    ambiguous = true;
+    return false;
+  }
+  return true;
+}
+
+static bool try_missing_clock_recovery(volatile Sample *data, uint16_t count,
+                                       uint8_t initial_value,
+                                       CaptureValidator validator,
+                                       Capture &accepted) {
+  if (!validator || count < 4 || count > MAX_SAMPLES - 4) return false;
+
+  LevelTiming timing{};
+  if (!estimate_scl_level_timing(data, count, initial_value, timing)) return false;
+
+  PulseCandidate candidates[MAX_RECOVERY_PULSE_CANDIDATES]{};
+  uint8_t candidate_count = 0;
+  if (!collect_pulse_candidates(data, count, initial_value, timing,
+                                candidates, candidate_count) ||
+      candidate_count == 0)
+    return false;
 
   bool have_accepted = false;
-  uint32_t accepted_gap = 0;
-  uint8_t candidates_checked = 0;
+  bool ambiguous = false;
 
-  for (uint16_t i = 1; i < count && candidates_checked < 24; i++) {
-    const uint32_t prev_t = data[i - 1].t;
-    const uint32_t cur_t = data[i].t;
-    const uint32_t gap = static_cast<uint32_t>(cur_t - prev_t);
-
-    // A completely missed high+low (or low+high) pulse leaves a gap close to
-    // two normal periods in our GPIO event stream. Keep bounds broad, then let
-    // address/ACK/CRC validation provide the actual safety gate.
-    if (gap < (period * 3U) / 2U || gap > period * 4U) continue;
-
-    const uint32_t pulse_first_t = static_cast<uint32_t>(cur_t - period);
-    const uint32_t pulse_second_t = pulse_first_t + period / 2U;
-    if (pulse_first_t <= prev_t + 2U || pulse_second_t + 2U >= cur_t) continue;
-
-    const uint8_t before = data[i - 1].value;
-    const uint8_t toggled = static_cast<uint8_t>(before ^ 0x01U);
-
-    // Make room for two synthetic SCL transitions. Capture is paused while
-    // poll() runs, so this in-place scratch transformation cannot race the ISR.
-    for (uint16_t j = count; j > i; j--) {
-      copy_sample(data[j + 1], data[j - 1]);
-    }
-    data[i].t = pulse_first_t;
-    data[i].value = toggled;
-    data[i + 1].t = pulse_second_t;
-    data[i + 1].value = before;
-
+  // Prefer the minimum edit distance. If one missing pulse can reconstruct a
+  // unique valid transaction, do not consider any two-pulse hypotheses.
+  for (uint8_t i = 0; i < candidate_count; i++) {
+    uint16_t work_count = count;
+    if (!apply_pulse(data, work_count, initial_value, candidates[i])) continue;
     Capture candidate{};
-    decode_capture(data, static_cast<uint16_t>(count + 2), initial_value, candidate);
-    candidates_checked++;
+    decode_capture(data, work_count, initial_value, candidate);
     const bool valid = validator(candidate);
-
-    // Restore the original raw capture before trying another location.
-    for (uint16_t j = i; j < count; j++) copy_sample(data[j], data[j + 2]);
-
+    const bool restored = undo_pulse(data, work_count, candidates[i]);
+    if (!restored || work_count != count) return false;
     if (!valid) continue;
-    if (have_accepted) {
-      // More than one protocol-valid insertion would be ambiguous. Refuse to
-      // guess and keep the original capture/error instead.
-      return false;
+    if (!remember_valid_recovery(candidate, &candidates[i], 1,
+                                 have_accepted, ambiguous, accepted))
+      break;
+  }
+  if (ambiguous) return false;
+  if (have_accepted) return true;
+
+  // Real captures have also shown two independently lost SCL pulses. Search
+  // pairs from different constant-SCL intervals only; this bounds work and
+  // avoids inventing multiple pulses inside one already-ambiguous interval.
+  for (uint8_t i = 0; i < candidate_count; i++) {
+    for (uint8_t j = static_cast<uint8_t>(i + 1); j < candidate_count; j++) {
+      if (candidates[i].interval_id == candidates[j].interval_id) continue;
+
+      const PulseCandidate *first = &candidates[i];
+      const PulseCandidate *second = &candidates[j];
+      if (second->t1 < first->t1) {
+        const PulseCandidate *tmp = first;
+        first = second;
+        second = tmp;
+      }
+      if (first->t2 >= second->t1) continue;
+
+      uint16_t work_count = count;
+      if (!apply_pulse(data, work_count, initial_value, *first)) continue;
+      if (!apply_pulse(data, work_count, initial_value, *second)) {
+        (void) undo_pulse(data, work_count, *first);
+        continue;
+      }
+
+      Capture candidate{};
+      decode_capture(data, work_count, initial_value, candidate);
+      const bool valid = validator(candidate);
+      const bool restored_second = undo_pulse(data, work_count, *second);
+      const bool restored_first = undo_pulse(data, work_count, *first);
+      if (!restored_second || !restored_first || work_count != count) return false;
+      if (!valid) continue;
+
+      PulseCandidate used[2] = {*first, *second};
+      if (!remember_valid_recovery(candidate, used, 2,
+                                   have_accepted, ambiguous, accepted))
+        break;
     }
-    accepted = candidate;
-    accepted_gap = gap;
-    have_accepted = true;
+    if (ambiguous) break;
   }
 
-  if (!have_accepted) return false;
-  accepted.recovered_missing_clocks = 1;
-  accepted.recovered_gap_us = accepted_gap;
-  return true;
+  return have_accepted && !ambiguous;
 }
 
 #if RTRH_DEBUG_CAPTURE
@@ -878,69 +839,17 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin) {
   err = gpio_isr_handler_add(pin_sda, gpio_isr, nullptr);
   if (err != ESP_OK) return false;
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  if (setup_rmt_scl()) {
-    ESP_LOGW(TAG,
-             "Experimental RMT SCL assist enabled: 1 us, 96 symbols, IRQ priority 1, "
-             "task-prearmed; GPIO fallback retained");
-  } else {
-    ESP_LOGW(TAG, "RMT SCL assist unavailable; continuing with GPIO-only I2C capture");
-  }
-#else
-  ESP_LOGI(TAG, "GPIO-only I2C capture active (RMT SCL assist disabled)");
-#endif
   return true;
 }
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-static void disable_rmt_capture() {
-  if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr) return;
-  // Block new task-context RX arming while the channel is being disabled.
-  rmt_enabled = false;
-  const esp_err_t err = rmt_disable(rmt_scl_channel);
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "rmt_disable(SCL) failed: %d", static_cast<int>(err));
-  }
-  rmt_receive_started = false;
-  rmt_receive_done = false;
-  rmt_received_symbols = 0;
-  rmt_receive_start_us = 0;
-}
-
-static void enable_rmt_capture() {
-  if (!rmt_available || rmt_enabled || rmt_scl_channel == nullptr) return;
-  const esp_err_t err = rmt_enable(rmt_scl_channel);
-  if (err == ESP_OK) {
-    rmt_enabled = true;
-    rmt_receive_started = false;
-    rmt_receive_done = false;
-    rmt_received_symbols = 0;
-    rmt_receive_start_us = 0;
-    const esp_err_t arm_err = arm_rmt_receive();
-    if (arm_err != ESP_OK) {
-      ESP_LOGW(TAG, "RMT SCL pre-arm failed after enable: %d", static_cast<int>(arm_err));
-    }
-    return;
-  }
-  ESP_LOGW(TAG, "RMT SCL capture restart failed (%d); falling back to GPIO",
-           static_cast<int>(err));
-  rmt_enabled = false;
-  rmt_available = false;
-}
-
-#endif
 
 void set_capture_enabled(bool enabled) {
   if (capture_enabled == enabled) return;
 
   // Stop GPIO edge capture while resetting shared ISR state so no half-frame
-  // can leak across a sleep/awake boundary. The optional experimental RMT
-  // helper follows the same policy when compiled in.
+  // can leak across a sleep/awake boundary.
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  if (!enabled) disable_rmt_capture();
-#endif
   capture_enabled = enabled;
   capturing = false;
   sample_count = 0;
@@ -949,9 +858,6 @@ void set_capture_enabled(bool enabled) {
   last_value = read_gpio_state();
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  if (enabled) enable_rmt_capture();
-#endif
   capturing = enabled;
   if (enabled) {
     gpio_intr_enable(pin_scl);
@@ -969,30 +875,6 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
     capture_finished = true;
   }
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  // RMT is pre-armed while idle. After the first bus edge, wait briefly for
-  // its idle detector to close the same transaction. Never wait indefinitely: a
-  // failed hardware arm must degrade to the original GPIO-only decoder.
-  if (rmt_available && rmt_enabled && rmt_receive_started && !rmt_receive_done) {
-    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
-    if (static_cast<uint32_t>(now - last_edge) < RMT_WAIT_TIMEOUT_US) return false;
-    ESP_LOGW(TAG, "RMT SCL receive did not finish after bus idle; resetting assist");
-    rmt_enabled = false;
-    (void) rmt_disable(rmt_scl_channel);
-    const esp_err_t reenable_err = rmt_enable(rmt_scl_channel);
-    if (reenable_err == ESP_OK) {
-      rmt_enabled = true;
-    } else {
-      rmt_available = false;
-      ESP_LOGW(TAG, "RMT SCL re-enable failed (%d); falling back to GPIO",
-               static_cast<int>(reenable_err));
-    }
-    rmt_receive_started = false;
-    rmt_receive_done = false;
-    rmt_received_symbols = 0;
-  }
-
-#endif
 
   uint16_t count = sample_count;
   if (count > MAX_SAMPLES) count = MAX_SAMPLES;
@@ -1002,33 +884,26 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
 
   if (count) {
 #if RTRH_DEBUG_CAPTURE
-    // Preserve the unmodified GPIO waveform. If RMT later repairs SCL edges, a
-    // frozen /capture still shows the original failure rather than hiding it.
+    // Preserve the unmodified GPIO waveform. Decoder-side recovery operates on
+    // a temporary in-place transformation and never rewrites the frozen trace.
     capture.debug_raw_sequence = store_raw_capture(samples, count, initial_value, overflow);
 #endif
     if (overflow) {
       capture.frame_errors++;
     } else {
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-      repair_missing_scl_edges(samples, count, initial_value, capture);
-#endif
       decode_capture(samples, count, initial_value, capture);
 
-      // The generic GPIO sniffer may occasionally miss one complete SCL pulse
-      // on the single-core ESP32-C3. Only attempt a reconstruction when the
-      // caller rejects the original capture, and only accept a unique candidate
-      // that independently satisfies the caller's strict protocol validator.
+      // The shared GPIO ISR may occasionally miss one or two complete SCL
+      // pulses on the single-core ESP32-C3. Only attempt reconstruction when
+      // the caller rejects the original capture, and accept it only when all
+      // protocol-valid candidates decode to the exact same transaction.
       if (recovery_validator && !recovery_validator(capture)) {
         Capture recovered{};
-        if (try_single_missing_clock_recovery(samples, count, initial_value,
-                                              recovery_validator, recovered)) {
+        if (try_missing_clock_recovery(samples, count, initial_value,
+                                       recovery_validator, recovered)) {
 #if RTRH_DEBUG_CAPTURE
           recovered.debug_raw_sequence = capture.debug_raw_sequence;
 #endif
-          recovered.rmt_used = capture.rmt_used;
-          recovered.gpio_scl_edges = capture.gpio_scl_edges;
-          recovered.rmt_scl_edges = capture.rmt_scl_edges;
-          recovered.rmt_repaired_edges = capture.rmt_repaired_edges;
           capture = recovered;
         }
       }
@@ -1042,17 +917,6 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
-#if CO2_MONITOR_0601_RMT_SCL_ASSIST
-  rmt_receive_started = false;
-  rmt_receive_done = false;
-  rmt_received_symbols = 0;
-  rmt_receive_start_us = 0;
-  const esp_err_t arm_err = arm_rmt_receive();
-  if (arm_err != ESP_OK) {
-    ESP_LOGW(TAG, "RMT SCL pre-arm failed (%d); GPIO-only capture used",
-             static_cast<int>(arm_err));
-  }
-#endif
   capturing = true;
   return true;
 }

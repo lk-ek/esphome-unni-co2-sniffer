@@ -548,19 +548,17 @@ void CO2Monitor0601::process_co2_() {
   result.frame_errors = capture.frame_errors;
 #if RTRH_DEBUG_CAPTURE
   const char *freeze_reason = capture.frame_errors ? "I2C framing/capture error" : nullptr;
-  if (capture.rmt_repaired_edges != 0) {
-    ESP_LOGD(TAG,
-             "RMT recovered %u missing SCL edge(s): GPIO=%u, RMT=%u",
-             static_cast<unsigned>(capture.rmt_repaired_edges),
-             static_cast<unsigned>(capture.gpio_scl_edges),
-             static_cast<unsigned>(capture.rmt_scl_edges));
-    if (!freeze_reason) freeze_reason = "RMT recovered missing SCL edge(s)";
-  }
   if (capture.recovered_missing_clocks != 0) {
-    ESP_LOGD(TAG,
-             "Recovered %u missing SCL clock(s) after strict CO2 protocol/CRC validation (gap=%lu us)",
-             static_cast<unsigned>(capture.recovered_missing_clocks),
-             static_cast<unsigned long>(capture.recovered_gap_us));
+    if (capture.recovered_missing_clocks == 1) {
+      ESP_LOGD(TAG,
+               "Recovered 1 missing SCL clock after strict CO2 protocol/CRC validation (candidate interval=%lu us)",
+               static_cast<unsigned long>(capture.recovered_gap_us[0]));
+    } else {
+      ESP_LOGD(TAG,
+               "Recovered 2 missing SCL clocks after strict CO2 protocol/CRC validation (candidate intervals=%lu/%lu us)",
+               static_cast<unsigned long>(capture.recovered_gap_us[0]),
+               static_cast<unsigned long>(capture.recovered_gap_us[1]));
+    }
     if (!freeze_reason) freeze_reason = "software-recovered missing SCL clock";
   }
   if (capture.coalesced_edges_resolved != 0) {

@@ -130,8 +130,6 @@ co2_monitor_0601:
   # Debugging
   debug_metrics: false
   debug_capture: false
-  # Experimental: independent RMT SCL timing assist. Disabled by default.
-  rmt_scl_assist: false
 ```
 
 The component automatically configures the required ESP-IDF power-management options, BLE server, 80 MHz maximum CPU frequency and BLE-history partition. These do not need to be repeated in user YAML.
@@ -163,9 +161,9 @@ With `debug_metrics: true`, the component additionally creates decoder-quality, 
 
 In the debug build (`debug_capture: true`, logger level `DEBUG`), structurally valid I²C frames that are not claimed by the CO₂ protocol decoder are logged as `Unhandled I2C frame`. Framing failures are logged separately as `Malformed I2C frame` with a status such as `INCOMPLETE_BYTE`, `CAPTURE_END_IN_FRAME`, or `TRUNCATED`. Malformed frames are never passed to the CO₂ decoder.
 
-The normal GPIO-only path includes two conservative safeguards derived from real VCD captures. First, a combined SDA-setup/SCL-rise sample can be resolved contextually when it occurs inside a byte. Second, when a capture is rejected by the CO₂ protocol decoder, the sniffer may propose insertion of exactly one missing SCL pulse into a suspicious timing gap. That repair is accepted only if exactly one candidate reconstructs a complete `0x62` / `0xEC05` command plus response with the expected ACK/NACK pattern and a valid Sensirion CRC. Timing alone can never make a repair valid.
+The GPIO path includes two conservative safeguards derived from real VCD captures. First, a combined SDA-setup/SCL-rise sample can be resolved contextually when it occurs inside a byte. Second, when a capture is rejected by the CO₂ protocol decoder, the sniffer can reconstruct up to two completely missed SCL pulses. Candidate locations are derived from unusually long intervals during which the captured SCL level never changes; SDA-only transitions inside such an interval do not hide the timing anomaly. Timing is only used to generate hypotheses. A repair is accepted only when all protocol-valid hypotheses decode to the **same** complete `0x62` / `0xEC05` command plus response with the expected ACK/NACK pattern and a valid Sensirion CRC. Competing decoded results, insufficient data, or timing plausibility alone never produce a repair.
 
-The first malformed, otherwise unhandled, protocol-invalid, software-recovered, or RMT-repaired CO₂ transaction freezes its **original GPIO** raw edge capture so that later normal traffic cannot overwrite the interesting waveform. A coalesced SDA/SCL sample that is resolved successfully is logged but does not occupy the single freeze slot by itself. Download `/capture` to retrieve the frozen trace; only a successful HTTP transfer releases the freeze, so a failed client can retry. I²C captures observed in practice are small (typically well below 1 KiB) and are sent synchronously by the ESP-IDF HTTP server rather than through a separate FreeRTOS sender task. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
+The first malformed, otherwise unhandled, protocol-invalid, or software-recovered CO₂ transaction freezes its **original GPIO** raw edge capture so that later normal traffic cannot overwrite the interesting waveform. A coalesced SDA/SCL sample that is resolved successfully is logged but does not occupy the single freeze slot by itself. Download `/capture` to retrieve the frozen trace; only a successful HTTP transfer releases the freeze, so a failed client can retry. I²C captures observed in practice are small (typically well below 1 KiB) and are sent synchronously by the ESP-IDF HTTP server rather than through a separate FreeRTOS sender task. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
 
 ## Automatic USB / battery power policy
 
@@ -256,20 +254,3 @@ Verify polarity, signal levels and wiring on the actual hardware before connecti
 Project-authored code and documentation are distributed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
 The Sensirion-derived/referenced BLE compatibility portions retain the applicable upstream BSD-3-Clause notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the complete upstream license texts in `LICENSES/`.
-
-
-## Experimental RMT SCL assist
-
-The normal build uses the GPIO-only I2C capture path. `rmt_scl_assist: false` is
-the default and does not link or configure the ESP-IDF RMT driver. This is the
-recommended setting after field testing showed Wi-Fi/API instability when RMT
-SCL assistance was enabled on the ESP32-C3.
-
-For targeted capture experiments it can be enabled explicitly:
-
-```yaml
-co2_monitor_0601:
-  rmt_scl_assist: true
-```
-
-RMT assistance remains experimental and should be used only for diagnostics. The current experimental implementation reserves 96 RMT symbols so a normal command/response burst fits without the 48-symbol ping-pong copy path, uses interrupt priority 1, and pre-arms `rmt_receive()` from task context. The cache-safe RMT ISR options used by the first experiment are no longer forced. The GPIO decoder and protocol-validated single-clock recovery remain available without RMT.

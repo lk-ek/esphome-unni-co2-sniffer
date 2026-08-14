@@ -367,3 +367,27 @@ useful throughput benefit. Frozen captures are still released only after a
 successful transfer. Shipped Wi-Fi examples disable post-connect roaming for
 this stationary device to avoid deliberate BSSID switches during diagnostics.
 
+## 2026-08-14 — RMT retired; bounded two-clock GPIO recovery
+
+Further field testing showed that RMT-enabled ESP32-C3 builds repeatedly degraded
+Wi-Fi/API responsiveness, made small `/capture` sends block or time out, and in
+one run ended with BLE `Malloc failed` / `Memory Full`. A previous RMT build also
+aborted. In contrast, GPIO-only builds with the shared ISR service installed via
+`ESP_INTR_FLAG_IRAM` kept networking stable and downloaded the same sub-kilobyte
+captures synchronously. The RMT option, driver dependency, runtime path, and YAML
+configuration have therefore been removed rather than retained as an experimental
+feature. Historical entries above document the experiment but no longer describe
+a supported configuration. Later driver inspection also showed that reserving 96
+non-DMA RMT symbols did not eliminate the driver's RX ping-pong threshold path as
+previously assumed.
+
+A batch of frozen GPIO VCDs exposed why the first software recovery missed many
+valid cases: it measured adjacent sample gaps, so an SDA transition could split an
+otherwise obvious long constant-SCL interval. Recovery now measures HIGH/LOW SCL
+level durations independently, preserves SDA transitions inside a hypothesized
+missing pulse, and can test at most two missing pulses in different intervals.
+Timing only proposes bounded candidates. Recovery is accepted only when every
+protocol-valid candidate decodes to the same `0x62 W EC05` plus CRC-valid read
+transaction; ambiguous results remain errors. Captures requiring one and two
+missing clocks are covered by the field VCD regression set, while a trace that
+ends after the command without any read edges remains intentionally unrecoverable.

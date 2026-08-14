@@ -10,9 +10,6 @@
 #define RTRH_DEBUG_CAPTURE 0
 #endif
 
-#ifndef CO2_MONITOR_0601_RMT_SCL_ASSIST
-#define CO2_MONITOR_0601_RMT_SCL_ASSIST 0
-#endif
 
 namespace esphome {
 namespace co2_monitor_0601 {
@@ -71,19 +68,16 @@ struct Capture {
   // diagnostics without the I2C layer knowing anything about the protocol.
   uint32_t frame_errors{0};
 
-  // Optional experimental hardware-assisted SCL diagnostics. These remain
-  // zero in the default GPIO-only build.
-  bool rmt_used{false};
-  uint16_t gpio_scl_edges{0};
-  uint16_t rmt_scl_edges{0};
-  uint16_t rmt_repaired_edges{0};
+  // Shared-GPIO ISR latency can collapse closely spaced SDA/SCL changes.
+  // These diagnostics describe conservative decoder-side recovery only.
   uint16_t coalesced_edges_resolved{0};
 
-  // Conservative software recovery: one complete SCL pulse may be inserted
-  // into a suspicious timing gap, but only when a caller-supplied protocol
-  // validator accepts exactly one reconstructed capture. Zero in normal use.
+  // Conservative software recovery: up to two complete SCL pulses may be
+  // reconstructed from unusually long constant-SCL intervals, but only when
+  // a caller-supplied protocol validator accepts one unique decoded result.
+  // Timing alone can never make a repair valid.
   uint8_t recovered_missing_clocks{0};
-  uint32_t recovered_gap_us{0};
+  uint32_t recovered_gap_us[2]{};
 #if RTRH_DEBUG_CAPTURE
   // Sequence of the raw /capture snapshot corresponding to this decoded
   // capture. Zero means it was not stored (for example because an earlier

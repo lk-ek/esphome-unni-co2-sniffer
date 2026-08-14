@@ -51,5 +51,3 @@ co2_monitor_0601:
   sniffer_start_delay: 10s
   debug_metrics: true
   debug_capture: true
-  # Experimental; disabled after Wi-Fi/API instability in field A/B tests.
-  rmt_scl_assist: false

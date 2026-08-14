@@ -17,7 +17,7 @@ struct Result {
   uint32_t frame_errors{0};
 };
 
-// Strict validator used by the generic I2C layer for conservative single-clock
+// Strict validator used by the generic I2C layer for conservative missing-clock
 // recovery. It accepts only one complete EC05 command + CRC-valid response.
 bool validate_measurement_capture(const i2c_sniffer::Capture &capture);
 

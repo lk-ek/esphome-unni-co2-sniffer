@@ -7,7 +7,6 @@ from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, senso
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
-    include_builtin_idf_component,
 )
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
 from esphome.core import TimePeriod
@@ -39,7 +38,6 @@ CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
-CONF_RMT_SCL_ASSIST = "rmt_scl_assist"
 CONF_LIGHT_SLEEP = "light_sleep"
 CONF_LIGHT_SLEEP_MAX_AWAKE = "light_sleep_max_awake"
 CONF_RT_PIN = "rt_pin"
@@ -222,7 +220,6 @@ _SCHEMA = {
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
-    cv.Optional(CONF_RMT_SCL_ASSIST, default=False): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_RT_PIN, default=3): cv.int_range(min=0, max=21),
@@ -295,14 +292,6 @@ async def _configure_outputs(var, config):
 
 
 async def to_code(config):
-    rmt_scl_assist = config[CONF_RMT_SCL_ASSIST]
-    if rmt_scl_assist:
-        # Experimental hardware-assist path. Keep the RMT component completely
-        # out of normal builds unless explicitly requested. The RX transaction
-        # is pre-armed from task context and sized to avoid ping-pong interrupts,
-        # so cache-safe/receive-in-IRAM options are intentionally unnecessary.
-        include_builtin_idf_component("esp_driver_rmt")
-
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
@@ -339,7 +328,6 @@ async def to_code(config):
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
-    cg.add_define("CO2_MONITOR_0601_RMT_SCL_ASSIST", int(rmt_scl_assist))
 
     if ble_enabled:
         ble = await cg.get_variable(config[CONF_BLE_ID])
