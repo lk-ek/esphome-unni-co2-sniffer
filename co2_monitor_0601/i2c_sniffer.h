@@ -18,6 +18,9 @@ namespace esphome {
 namespace co2_monitor_0601 {
 namespace i2c_sniffer {
 
+struct Capture;
+using CaptureValidator = bool (*)(const Capture &capture);
+
 static constexpr uint8_t MAX_DATA_BYTES = 32;
 static constexpr uint8_t MAX_FRAMES = 32;
 
@@ -75,6 +78,12 @@ struct Capture {
   uint16_t rmt_scl_edges{0};
   uint16_t rmt_repaired_edges{0};
   uint16_t coalesced_edges_resolved{0};
+
+  // Conservative software recovery: one complete SCL pulse may be inserted
+  // into a suspicious timing gap, but only when a caller-supplied protocol
+  // validator accepts exactly one reconstructed capture. Zero in normal use.
+  uint8_t recovered_missing_clocks{0};
+  uint32_t recovered_gap_us{0};
 #if RTRH_DEBUG_CAPTURE
   // Sequence of the raw /capture snapshot corresponding to this decoded
   // capture. Zero means it was not stored (for example because an earlier
@@ -92,7 +101,7 @@ void set_capture_enabled(bool enabled);
 
 // Returns true when one quiet-period-delimited edge capture was consumed.
 // A capture may contain multiple frames (for example across repeated STARTs).
-bool poll(Capture &capture);
+bool poll(Capture &capture, CaptureValidator recovery_validator = nullptr);
 
 #if RTRH_DEBUG_CAPTURE
 // Registers the raw logic-analyzer download endpoint (/capture).

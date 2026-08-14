@@ -17,6 +17,10 @@ struct Result {
   uint32_t frame_errors{0};
 };
 
+// Strict validator used by the generic I2C layer for conservative single-clock
+// recovery. It accepts only one complete EC05 command + CRC-valid response.
+bool validate_measurement_capture(const i2c_sniffer::Capture &capture);
+
 // Consume one generic I2C frame. Returns true if the frame belongs to the
 // observed CO2 protocol, even when it is malformed and only updates diagnostics.
 bool process_frame(const i2c_sniffer::Frame &frame, Result &result);

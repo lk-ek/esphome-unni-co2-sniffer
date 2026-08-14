@@ -31,6 +31,8 @@ wifi:
   # Skip the normal active channel scan on reconnect/boot. ESPHome falls back
   # to scanning automatically if the remembered AP cannot be reached.
   fast_connect: true
+  # Stationary device with multiple APs: avoid disruptive BSSID roaming.
+  post_connect_roaming: false
   ap:
     ssid: "I2CSniffer Fallback Hotspot"
     password: !secret i2csniffer__ap_password

@@ -92,34 +92,42 @@ No I²C decoding occurs in the ISR.
 
 ## RMT SCL hardware assist
 
-The GPIO ISR remains the primary capture path because it records both SDA and
-SCL states. An ESP32-C3 RMT RX channel independently timestamps SCL pulse
-durations at 1 MHz resolution so a complete SCL pulse missed by the shared GPIO
-ISR can still be reconstructed.
+RMT is experimental and disabled by default. The production path remains the
+IRAM-safe shared GPIO ISR plus task-context decoding.
 
-The RMT channel is allocated and enabled with capture policy, but an RX job is
-**not** left running across the long idle interval between CO₂ transactions.
-`signal_range_max_ns` is an idle/end-of-frame threshold; an RX job started on an
-already-idle bus would finish after 5 ms, long before the next ~6 s transaction.
-Instead, the first GPIO edge of each new capture calls `rmt_receive()` from ISR
-context and starts the RMT timeline for that same bus burst. ESP-IDF documents
-`rmt_receive()` as ISR-callable; `CONFIG_RMT_RECV_FUNC_IN_IRAM` and
-`CONFIG_RMT_RX_ISR_CACHE_SAFE` keep this path available during cache-off
-windows.
+When explicitly enabled, an ESP32-C3 RMT RX channel independently timestamps
+SCL pulse durations. `rmt_receive()` is pre-armed from normal task context while
+the bus is idle; ESP-IDF starts actual reception at the first input level
+change. The first GPIO edge records the matching absolute start timestamp for
+GPIO/RMT alignment. No RMT driver API is called from the GPIO ISR.
 
-RMT pulse boundaries are converted to absolute timestamps using the GPIO-edge
-time at which RX was armed. The initial RMT pulse level is not emitted as a
-synthetic edge. After an early matching GPIO/RMT edge pair is found, RMT must
-remain a strict superset/match of the GPIO SCL timeline. Only extra RMT edges are
-inserted into the working copy of the GPIO capture. If alignment becomes
-ambiguous, a GPIO edge is missing from RMT, the RMT user buffer is full, or RX
-does not finish within a bounded wait, no repair is attempted.
+The channel reserves 96 hardware symbols (two 48-symbol blocks) and uses
+interrupt priority 1. A normal EC05 command plus response therefore fits in the
+hardware buffer without the 48-symbol ping-pong copy path used by the first RMT
+experiment. Cache-safe RMT ISR and `rmt_receive()`-in-IRAM Kconfig options are
+not forced; with the whole short transaction fitting in hardware, completion
+can be deferred rather than competing with Wi-Fi/BLE during cache-off windows.
 
-The raw GPIO waveform is preserved unchanged for `/capture`, including when RMT
-repairs the working decoder copy. ESP-IDF's RMT RX allocation currently enables
-an internal GPIO pull-up; setup immediately disables it again so the passive
-sniffer does not change bus loading. The RMT channel is disabled whenever the
-existing battery power policy disables CO₂ capture.
+RMT pulse boundaries are converted to absolute timestamps. After an early
+matching GPIO/RMT edge pair is found, RMT must remain a strict superset/match of
+the GPIO SCL timeline. Only extra RMT edges are inserted into the working copy.
+If alignment is ambiguous, RMT is truncated/full, or RX does not finish within
+a bounded wait, no RMT repair is attempted.
+
+The original GPIO waveform is preserved unchanged for `/capture`, including
+when RMT repairs the working decoder copy. The RMT channel is disabled whenever
+the battery power policy disables CO₂ capture.
+
+## Protocol-validated GPIO missing-clock recovery
+
+The GPIO path can miss an entire SCL pulse when ISR latency spans both edges.
+For rejected captures, the generic sniffer may insert one synthetic full SCL
+pulse into an unusually long event gap and re-run framing. The generic layer
+does not decide that the result is correct: a caller-supplied validator must
+accept exactly one candidate. The CO₂ integration requires one complete
+`0x62 W EC 05` frame followed by one `0x62 R` measurement frame with the exact
+ACK/NACK pattern and valid Sensirion CRC. Zero or multiple valid candidates mean
+no repair. The raw capture is never modified for download.
 
 ## Why both pins use the same handler
 

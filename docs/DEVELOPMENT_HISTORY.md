@@ -340,3 +340,30 @@ with RMT-enabled builds. RMT SCL assistance is therefore experimental opt-in and
 disabled by default; normal builds do not link/configure RMT. The shared GPIO ISR
 service is now installed early with `ESP_INTR_FLAG_IRAM` while preserving the
 configured signal-pin isolation delay.
+
+## 2026-08-14 — Protocol-validated missing-clock recovery and RMT/Wi-Fi follow-up
+
+Further GPIO-only VCD captures showed a repeatable one-clock slip: a complete
+SCL pulse can disappear from the GPIO trace while the real CO₂ sensor still
+receives the transaction. The generic I²C layer now proposes single-clock
+reconstructions only in suspicious timing gaps. A reconstruction is accepted
+only when exactly one candidate passes a strict CO₂ transaction validator
+(`0x62`, `EC05`, ACK/NACK pattern and Sensirion CRC); ambiguous or merely
+plausible timing is never enough.
+
+The earlier RMT diagnosis was corrected after checking ESP-IDF behavior: an RX
+job may be armed while the line is idle because actual reception starts at the
+first level change. The experimental RMT path therefore returns to task-context
+pre-arming, reserves 96 symbols instead of the minimum 48 to avoid ping-pong
+copy interrupts for the ~63-clock CO₂ burst, fixes interrupt priority at 1, and
+no longer forces cache-safe RMT ISR / receive-in-IRAM options. RMT remains
+disabled by default because field A/B tests associated it with Wi-Fi/API
+instability on the single-core ESP32-C3.
+
+The I²C `/capture` endpoint was also simplified back to a synchronous HTTPD
+response. Real captures are typically under 1 KiB, so the separate asynchronous
+FreeRTOS sender task added scheduling and request-lifetime complexity without a
+useful throughput benefit. Frozen captures are still released only after a
+successful transfer. Shipped Wi-Fi examples disable post-connect roaming for
+this stationary device to avoid deliberate BSSID switches during diagnostics.
+

@@ -297,11 +297,11 @@ async def _configure_outputs(var, config):
 async def to_code(config):
     rmt_scl_assist = config[CONF_RMT_SCL_ASSIST]
     if rmt_scl_assist:
-        # Experimental hardware-assist path. Keep the RMT component and its ISR
-        # options completely out of normal builds unless explicitly requested.
+        # Experimental hardware-assist path. Keep the RMT component completely
+        # out of normal builds unless explicitly requested. The RX transaction
+        # is pre-armed from task context and sized to avoid ping-pong interrupts,
+        # so cache-safe/receive-in-IRAM options are intentionally unnecessary.
         include_builtin_idf_component("esp_driver_rmt")
-        add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
-        add_idf_sdkconfig_option("CONFIG_RMT_RECV_FUNC_IN_IRAM", True)
 
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

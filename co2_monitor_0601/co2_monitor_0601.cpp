@@ -542,7 +542,7 @@ void CO2Monitor0601::process_rtrh_() {
 
 void CO2Monitor0601::process_co2_() {
   static i2c_sniffer::Capture capture;
-  if (!i2c_sniffer::poll(capture)) return;
+  if (!i2c_sniffer::poll(capture, co2_decoder::validate_measurement_capture)) return;
 
   co2_decoder::Result result;
   result.frame_errors = capture.frame_errors;
@@ -555,6 +555,13 @@ void CO2Monitor0601::process_co2_() {
              static_cast<unsigned>(capture.gpio_scl_edges),
              static_cast<unsigned>(capture.rmt_scl_edges));
     if (!freeze_reason) freeze_reason = "RMT recovered missing SCL edge(s)";
+  }
+  if (capture.recovered_missing_clocks != 0) {
+    ESP_LOGD(TAG,
+             "Recovered %u missing SCL clock(s) after strict CO2 protocol/CRC validation (gap=%lu us)",
+             static_cast<unsigned>(capture.recovered_missing_clocks),
+             static_cast<unsigned long>(capture.recovered_gap_us));
+    if (!freeze_reason) freeze_reason = "software-recovered missing SCL clock";
   }
   if (capture.coalesced_edges_resolved != 0) {
     ESP_LOGD(TAG, "Resolved %u coalesced SDA/SCL edge sample(s)",
