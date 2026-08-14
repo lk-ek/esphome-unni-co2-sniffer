@@ -16,6 +16,7 @@
 #endif
 
 #include "driver/gpio.h"
+#include "esp_intr_alloc.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esphome/core/log.h"
 
@@ -271,13 +272,6 @@ void CO2Monitor0601::process_battery_() {
 bool CO2Monitor0601::initialize_sniffer_io_() {
   if (this->io_initialized_) return true;
 
-  // Both decoder modules use the same ESP-IDF GPIO ISR service.
-  const esp_err_t err = gpio_install_isr_service(0);
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-    ESP_LOGE(TAG, "gpio_install_isr_service failed: %d", err);
-    return false;
-  }
-
   if (!i2c_sniffer::setup(this->co2_sda_pin_, this->co2_scl_pin_)) {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
@@ -305,6 +299,19 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 }
 
 void CO2Monitor0601::setup() {
+  // Claim the shared GPIO ISR service before Wi-Fi/BLE setup reaches steady
+  // state, but without touching any sniffer signal pin. ESP_INTR_FLAG_IRAM
+  // keeps the dispatcher and our IRAM_ATTR pin handlers callable while flash
+  // cache is disabled. This preserves the configured GPIO isolation delay.
+  const esp_err_t gpio_isr_err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+  if (gpio_isr_err == ESP_OK) {
+    ESP_LOGI(TAG, "GPIO ISR service installed IRAM-safe");
+  } else if (gpio_isr_err == ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "GPIO ISR service was already installed; IRAM allocation flag cannot be verified");
+  } else {
+    ESP_LOGE(TAG, "gpio_install_isr_service(IRAM) failed: %d", gpio_isr_err);
+  }
+
 #if UNNI_BLE_ENABLED
   sensirion_ble_setup();
 

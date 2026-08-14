@@ -10,6 +10,10 @@
 #define RTRH_DEBUG_CAPTURE 0
 #endif
 
+#ifndef CO2_MONITOR_0601_RMT_SCL_ASSIST
+#define CO2_MONITOR_0601_RMT_SCL_ASSIST 0
+#endif
+
 namespace esphome {
 namespace co2_monitor_0601 {
 namespace i2c_sniffer {
@@ -64,10 +68,8 @@ struct Capture {
   // diagnostics without the I2C layer knowing anything about the protocol.
   uint32_t frame_errors{0};
 
-  // Hardware-assisted SCL capture diagnostics. The GPIO ISR remains the
-  // source of SDA transitions, while ESP32-C3 RMT provides an independent
-  // hardware timeline for SCL. Missing GPIO SCL edges can be reconstructed
-  // from that timeline before framing.
+  // Optional experimental hardware-assisted SCL diagnostics. These remain
+  // zero in the default GPIO-only build.
   bool rmt_used{false};
   uint16_t gpio_scl_edges{0};
   uint16_t rmt_scl_edges{0};

@@ -130,6 +130,8 @@ co2_monitor_0601:
   # Debugging
   debug_metrics: false
   debug_capture: false
+  # Experimental: independent RMT SCL timing assist. Disabled by default.
+  rmt_scl_assist: false
 ```
 
 The component automatically configures the required ESP-IDF power-management options, BLE server, 80 MHz maximum CPU frequency and BLE-history partition. These do not need to be repeated in user YAML.
@@ -254,3 +256,21 @@ Verify polarity, signal levels and wiring on the actual hardware before connecti
 Project-authored code and documentation are distributed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
 The Sensirion-derived/referenced BLE compatibility portions retain the applicable upstream BSD-3-Clause notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the complete upstream license texts in `LICENSES/`.
+
+
+## Experimental RMT SCL assist
+
+The normal build uses the GPIO-only I2C capture path. `rmt_scl_assist: false` is
+the default and does not link or configure the ESP-IDF RMT driver. This is the
+recommended setting after field testing showed Wi-Fi/API instability when RMT
+SCL assistance was enabled on the ESP32-C3.
+
+For targeted capture experiments it can be enabled explicitly:
+
+```yaml
+co2_monitor_0601:
+  rmt_scl_assist: true
+```
+
+RMT assistance remains experimental and should be used only for diagnostics.
+The GPIO decoder still includes the coalesced SDA/SCL edge correction.

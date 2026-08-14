@@ -4,7 +4,9 @@
 
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
 #include "driver/rmt_rx.h"
+#endif
 #include "esp_timer.h"
 
 #include <cstddef>
@@ -47,6 +49,7 @@ static bool capture_enabled = true;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
 // ESP32-C3 RMT hardware independently records SCL pulse durations. GPIO ISR
 // capture is still used for SDA and for the raw debug trace, but RMT gives us
 // an authoritative SCL edge count even when CPU interrupt latency collapses a
@@ -150,6 +153,8 @@ static bool setup_rmt_scl() {
   return true;
 }
 
+#endif
+
 static inline uint8_t IRAM_ATTR read_gpio_state() {
   uint8_t value = 0;
   if (gpio_get_level(pin_scl)) value |= 0x01;
@@ -169,6 +174,7 @@ static void IRAM_ATTR gpio_isr(void *) {
   last_edge = now;
 
   const uint16_t index = sample_count;
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   if (index == 0 && rmt_available && rmt_enabled && !rmt_receive_started &&
       !rmt_receive_done) {
     // Start hardware SCL timing at the beginning of the same GPIO burst.
@@ -177,6 +183,7 @@ static void IRAM_ATTR gpio_isr(void *) {
     // idle interval between CO2 transactions.
     (void) arm_rmt_receive_from_isr(now);
   }
+#endif
   if (index < MAX_SAMPLES) {
     samples[index].t = now;
     samples[index].value = value;
@@ -188,6 +195,7 @@ static void IRAM_ATTR gpio_isr(void *) {
   }
 }
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
 struct SclEdge {
   uint32_t t;
   bool level;
@@ -385,6 +393,8 @@ static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
   capture.rmt_repaired_edges = repaired;
   return repaired;
 }
+
+#endif
 
 struct RawFrame {
   uint8_t bytes[MAX_DATA_BYTES + 1]{};
@@ -793,14 +803,19 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin) {
   err = gpio_isr_handler_add(pin_sda, gpio_isr, nullptr);
   if (err != ESP_OK) return false;
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   if (setup_rmt_scl()) {
-    ESP_LOGI(TAG, "RMT SCL assist enabled: 1 us resolution, GPIO fallback retained");
+    ESP_LOGW(TAG, "Experimental RMT SCL assist enabled: 1 us resolution, GPIO fallback retained");
   } else {
     ESP_LOGW(TAG, "RMT SCL assist unavailable; continuing with GPIO-only I2C capture");
   }
+#else
+  ESP_LOGI(TAG, "GPIO-only I2C capture active (RMT SCL assist disabled)");
+#endif
   return true;
 }
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
 static void disable_rmt_capture() {
   if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr) return;
   // Prevent any ISR-side arm while the channel is being disabled.
@@ -833,17 +848,19 @@ static void enable_rmt_capture() {
   rmt_available = false;
 }
 
+#endif
+
 void set_capture_enabled(bool enabled) {
   if (capture_enabled == enabled) return;
 
-  // Stop both edge sources while resetting shared ISR state so no half-frame
-  // can leak across a sleep/awake boundary. RMT is disabled in battery idle
-  // periods as well. The RMT driver holds a power-management lock while the
-  // channel is enabled, so there is no reason to retain that lock while the
-  // application has deliberately disabled bus capture.
+  // Stop GPIO edge capture while resetting shared ISR state so no half-frame
+  // can leak across a sleep/awake boundary. The optional experimental RMT
+  // helper follows the same policy when compiled in.
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   if (!enabled) disable_rmt_capture();
+#endif
   capture_enabled = enabled;
   capturing = false;
   sample_count = 0;
@@ -852,7 +869,9 @@ void set_capture_enabled(bool enabled) {
   last_value = read_gpio_state();
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   if (enabled) enable_rmt_capture();
+#endif
   capturing = enabled;
   if (enabled) {
     gpio_intr_enable(pin_scl);
@@ -870,6 +889,7 @@ bool poll(Capture &capture) {
     capture_finished = true;
   }
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   // When RMT was armed by the first GPIO edge, wait briefly for its own 5 ms
   // idle detector to close the same transaction. Never wait indefinitely: a
   // failed hardware arm must degrade to the original GPIO-only decoder.
@@ -892,6 +912,8 @@ bool poll(Capture &capture) {
     rmt_received_symbols = 0;
   }
 
+#endif
+
   uint16_t count = sample_count;
   if (count > MAX_SAMPLES) count = MAX_SAMPLES;
   const bool overflow = capture_overflow;
@@ -907,7 +929,9 @@ bool poll(Capture &capture) {
     if (overflow) {
       capture.frame_errors++;
     } else {
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
       repair_missing_scl_edges(samples, count, initial_value, capture);
+#endif
       decode_capture(samples, count, initial_value, capture);
     }
   }
@@ -919,6 +943,7 @@ bool poll(Capture &capture) {
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
+#if CO2_MONITOR_0601_RMT_SCL_ASSIST
   if (rmt_arm_error != ESP_OK) {
     ESP_LOGW(TAG, "RMT SCL arm failed (%d); GPIO-only capture used",
              static_cast<int>(rmt_arm_error));
@@ -930,6 +955,7 @@ bool poll(Capture &capture) {
   rmt_received_symbols = 0;
   rmt_receive_start_us = 0;
   rmt_arm_error = ESP_OK;
+#endif
   capturing = true;
   return true;
 }

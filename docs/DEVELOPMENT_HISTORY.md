@@ -331,3 +331,12 @@ removed. Coalesced-edge-only captures no longer consume the frozen debug slot.
 The `/capture` endpoint now uses ESP-IDF asynchronous-request handling so a slow
 or stalled download cannot occupy the main HTTP server task; failed transfers
 still preserve the frozen capture for retry.
+
+
+## 2026-08-14 — RMT isolated after Wi-Fi regression
+
+Field A/B testing showed stable Wi-Fi with the pre-RMT firmware and flaky Wi-Fi/API
+with RMT-enabled builds. RMT SCL assistance is therefore experimental opt-in and
+disabled by default; normal builds do not link/configure RMT. The shared GPIO ISR
+service is now installed early with `ESP_INTR_FLAG_IRAM` while preserving the
+configured signal-pin isolation delay.
