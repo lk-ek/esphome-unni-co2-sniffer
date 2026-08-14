@@ -539,13 +539,44 @@ void CO2Monitor0601::process_co2_() {
 
   co2_decoder::Result result;
   result.frame_errors = capture.frame_errors;
+#if RTRH_DEBUG_CAPTURE
+  const char *freeze_reason = capture.frame_errors ? "I2C framing/capture error" : nullptr;
+#endif
   for (uint8_t i = 0; i < capture.frame_count; i++) {
     const auto &frame = capture.frames[i];
-    if (co2_decoder::process_frame(frame, result)) continue;
+    if (!i2c_sniffer::frame_valid(frame)) {
+#if RTRH_DEBUG_CAPTURE
+      i2c_sniffer::log_frame(frame, "Malformed I2C frame");
+      if (!freeze_reason) freeze_reason = "malformed I2C frame";
+#endif
+      continue;
+    }
+
+#if RTRH_DEBUG_CAPTURE
+    const uint32_t crc_errors_before = result.crc_errors;
+    const uint32_t frame_errors_before = result.frame_errors;
+#endif
+    if (co2_decoder::process_frame(frame, result)) {
+#if RTRH_DEBUG_CAPTURE
+      if (result.crc_errors != crc_errors_before) {
+        i2c_sniffer::log_frame(frame, "CO2 CRC error frame");
+        if (!freeze_reason) freeze_reason = "CO2 CRC error";
+      } else if (result.frame_errors != frame_errors_before) {
+        i2c_sniffer::log_frame(frame, "Invalid CO2 frame");
+        if (!freeze_reason) freeze_reason = "invalid CO2 protocol frame";
+      }
+#endif
+      continue;
+    }
 #if RTRH_DEBUG_CAPTURE
     i2c_sniffer::log_frame(frame, "Unhandled I2C frame");
+    if (!freeze_reason) freeze_reason = "unhandled I2C frame";
 #endif
   }
+#if RTRH_DEBUG_CAPTURE
+  if (freeze_reason)
+    i2c_sniffer::freeze_last_capture(capture.debug_raw_sequence, freeze_reason);
+#endif
 
   if (result.crc_errors) {
     this->co2_.crc_errors += result.crc_errors;

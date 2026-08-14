@@ -122,14 +122,27 @@ context, resets the capture state, and enables capture again.
 The generic I²C layer reconstructs START, repeated START, STOP, rising-clock
 data bits, 7-bit address/direction and ACK/NACK bits into fixed-size
 `i2c_sniffer::Frame` objects. Frames use 7-bit addressing and retain up to 32
-data bytes in fixed storage; longer frames are marked truncated rather than
-allocating dynamically. `CO2Monitor0601` then passes each frame to
-`co2_decoder::process_frame()`. Only the CO₂ protocol layer knows about address
-0x62, command 0xEC05, the Sensirion-compatible CRC or ppm values.
+data bytes in fixed storage. Each frame also carries a structural `FrameStatus`;
+incomplete bytes, captures ending inside a frame and overlong/truncated frames
+are classified as malformed and counted once at the generic I²C layer. They are
+not passed to `co2_decoder::process_frame()`. Only structurally valid frames can
+reach the CO₂ protocol layer, which alone knows about address 0x62, command
+0xEC05, the Sensirion-compatible CRC or ppm values.
 
-In debug-capture builds, frames not claimed by `co2_decoder` are logged from
-normal task context. Raw edge serialization for `/capture` also belongs to the
-generic I²C layer; neither operation runs in the ISR.
+The SCL rise immediately before STOP or repeated START is initially
+indistinguishable from the first data bit of a following byte. The decoder
+therefore rolls back that single speculative bit when the subsequent SDA edge
+confirms the bus boundary. Do not remove this handling when tightening frame
+validity checks.
+
+In debug-capture builds, malformed frames, valid frames not claimed by
+`co2_decoder`, and structurally valid CO₂ frames rejected by CRC/ACK/length
+checks are logged separately from normal task context. The first suspicious
+transaction freezes the corresponding raw edge buffer; later
+captures cannot overwrite it until `/capture` is downloaded. Raw captures use
+`LA02`, which includes the bus state before the first edge so the first
+START/STOP transition can be reconstructed exactly. None of this processing
+runs in the ISR.
 
 ### Critical point
 

@@ -28,8 +28,17 @@ enum class EndCondition : uint8_t {
   CaptureEnd,
 };
 
+enum class FrameStatus : uint8_t {
+  Valid = 0,
+  IncompleteByte,
+  CaptureEndedInFrame,
+  Truncated,
+};
+
 // One passively observed 7-bit I2C frame/segment. ACK entries describe the
-// receiver response after the corresponding address/data byte.
+// receiver response after the corresponding address/data byte. Structural
+// capture/framing failures are carried in status and must not be passed to a
+// protocol decoder.
 struct Frame {
   uint8_t address{0};
   Direction direction{Direction::Write};
@@ -37,9 +46,15 @@ struct Frame {
   uint8_t data[MAX_DATA_BYTES]{};
   bool ack[MAX_DATA_BYTES]{};
   uint8_t length{0};
-  bool truncated{false};
   EndCondition end_condition{EndCondition::CaptureEnd};
+  FrameStatus status{FrameStatus::Valid};
+  // Number of bits already sampled for an unfinished byte (0 when aligned).
+  uint8_t partial_bits{0};
 };
+
+inline bool frame_valid(const Frame &frame) {
+  return frame.status == FrameStatus::Valid;
+}
 
 struct Capture {
   Frame frames[MAX_FRAMES]{};
@@ -48,6 +63,12 @@ struct Capture {
   // Generic framing/capture failures. Consumers can fold these into their own
   // diagnostics without the I2C layer knowing anything about the protocol.
   uint32_t frame_errors{0};
+#if RTRH_DEBUG_CAPTURE
+  // Sequence of the raw /capture snapshot corresponding to this decoded
+  // capture. Zero means it was not stored (for example because an earlier
+  // suspicious capture is still frozen).
+  uint32_t debug_raw_sequence{0};
+#endif
 };
 
 // Passive GPIO capture. The sniffer never enables pulls and never drives SDA/SCL.
@@ -66,8 +87,14 @@ bool poll(Capture &capture);
 void register_debug_handler();
 
 // Compact log representation intended for frames not claimed by a protocol
-// consumer. Called only from normal task context.
+// consumer or structurally malformed frames. Called only from normal task
+// context.
 void log_frame(const Frame &frame, const char *label = "I2C frame");
+
+// Freeze the raw capture most recently returned by poll(). While frozen, later
+// captures cannot overwrite /capture. The first successful GET of /capture
+// releases the freeze again. Returns true when a new freeze was established.
+bool freeze_last_capture(uint32_t sequence, const char *reason);
 #endif
 
 }  // namespace i2c_sniffer

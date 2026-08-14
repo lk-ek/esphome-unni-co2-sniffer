@@ -291,3 +291,8 @@ claimed by the CO₂ decoder.
 ## 2026-08-14: Component renamed for device identity
 
 The top-level ESPHome integration was renamed from the generic historical `bus_sniffer` name to `co2_monitor_0601`, matching the tested device designation **CO2 Monitor Carbon Dioxide Detector 0601**. The C++ namespace and orchestrator class are now `co2_monitor_0601` and `CO2Monitor0601`; the component source files were renamed accordingly. This is intentionally a breaking configuration rename: YAML now uses `co2_monitor_0601:` rather than keeping a legacy alias. Internal protocol modules such as `i2c_sniffer`, `co2_decoder`, and `rtrh_decoder` retain their descriptive names.
+
+
+## 2026-08-14: I²C frame validity and suspicious-capture freeze
+
+Debug logging of newly generalized I²C traffic exposed occasional reconstructed frames that looked like unrelated slave addresses or one-byte commands. Correlation with the decoded CO₂ values showed that some were fragments of normal 0x62 traffic after missed or ambiguously segmented edges. The generic framer now assigns a structural `FrameStatus` and separates malformed captures from valid-but-unhandled I²C frames. Malformed frames are counted once and are never offered to the CO₂ protocol decoder. Structurally valid CO₂ frames that fail CRC, ACK, or length checks are also treated as suspicious for debug capture purposes. Debug builds freeze the first suspicious raw I²C capture until `/capture` is downloaded, making the actual edge sequence available before later normal traffic can overwrite it. The raw format was advanced to `LA02` to preserve the pre-first-edge bus state, and `capture2vcd.py` was updated to read both `LA02` and historical `LA01` captures.

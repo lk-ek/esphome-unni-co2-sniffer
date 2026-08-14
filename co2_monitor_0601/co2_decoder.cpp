@@ -24,6 +24,9 @@ static uint8_t sensirion_crc(uint8_t byte0, uint8_t byte1) {
 }
 
 bool process_frame(const i2c_sniffer::Frame &frame, Result &result) {
+  // Structural capture/framing failures belong to the generic I2C layer and
+  // must never be interpreted as protocol data.
+  if (!i2c_sniffer::frame_valid(frame)) return false;
   if (frame.address != CO2_I2C_ADDRESS) return false;
 
   if (frame.direction == i2c_sniffer::Direction::Write) {
