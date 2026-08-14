@@ -209,9 +209,10 @@ bus_sniffer/          ESPHome external component
   sensirion_ble.*     BLE live advertising
   sensirion_history.* persistent BLE history / GATT
 docs/
-  ISR_ARCHITECTURE.md timing-critical ISR design
-  LIGHT_SLEEP.md      power-management design
-  history/            superseded engineering notes
+  DEVELOPMENT_HISTORY.md development process and design rationale
+  ISR_ARCHITECTURE.md    timing-critical ISR design
+  LIGHT_SLEEP.md         power-management design
+  history/               detailed superseded engineering notes
 tools/                reverse-engineering utilities
 ```
 
