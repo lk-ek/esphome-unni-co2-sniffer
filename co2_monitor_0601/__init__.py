@@ -301,6 +301,7 @@ async def to_code(config):
     # hardware-assist path remains useful under the very latency that can make
     # GPIO edge capture lose a pulse.
     add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
+    add_idf_sdkconfig_option("CONFIG_RMT_RECV_FUNC_IN_IRAM", True)
 
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

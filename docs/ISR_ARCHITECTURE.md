@@ -92,29 +92,34 @@ No I²C decoding occurs in the ISR.
 
 ## RMT SCL hardware assist
 
-The shared GPIO ISR can occasionally be delayed long enough that two nearby
-SCL transitions collapse into no observable GPIO state change. To make SCL
-capture independent of that CPU latency, `i2c_sniffer` also configures one
-ESP32-C3 RMT RX channel on SCL at 1 MHz resolution. RMT stores pulse levels and
-durations in hardware and the normal loop aligns that timeline with the GPIO
-SCL edges after the 5 ms bus-idle boundary.
+The GPIO ISR remains the primary capture path because it records both SDA and
+SCL states. An ESP32-C3 RMT RX channel independently timestamps SCL pulse
+durations at 1 MHz resolution so a complete SCL pulse missed by the shared GPIO
+ISR can still be reconstructed.
 
-The GPIO buffer remains the source of SDA and remains the raw waveform exposed
-through `/capture`. RMT is only an assist layer: if its timeline is a strict
-match/superset of the GPIO SCL timeline, missing SCL edges may be inserted into
-the in-memory copy before framing. If alignment, levels, capacity, or ordering
-do not agree, no repair is attempted. A completely full RMT user buffer is also
-rejected for repair because excess symbols may have been truncated.
+The RMT channel is allocated and enabled with capture policy, but an RX job is
+**not** left running across the long idle interval between CO₂ transactions.
+`signal_range_max_ns` is an idle/end-of-frame threshold; an RX job started on an
+already-idle bus would finish after 5 ms, long before the next ~6 s transaction.
+Instead, the first GPIO edge of each new capture calls `rmt_receive()` from ISR
+context and starts the RMT timeline for that same bus burst. ESP-IDF documents
+`rmt_receive()` as ISR-callable; `CONFIG_RMT_RECV_FUNC_IN_IRAM` and
+`CONFIG_RMT_RX_ISR_CACHE_SAFE` keep this path available during cache-off
+windows.
 
-The RMT RX interrupt is configured cache-safe because the ESP-IDF non-DMA RX
-path uses interrupt-driven ping-pong copies from the peripheral memory. The RMT
-channel follows the same capture-enable policy as the GPIO sniffer and is
-disabled during battery idle periods rather than retaining its power-management
-lock unnecessarily.
+RMT pulse boundaries are converted to absolute timestamps using the GPIO-edge
+time at which RX was armed. The initial RMT pulse level is not emitted as a
+synthetic edge. After an early matching GPIO/RMT edge pair is found, RMT must
+remain a strict superset/match of the GPIO SCL timeline. Only extra RMT edges are
+inserted into the working copy of the GPIO capture. If alignment becomes
+ambiguous, a GPIO edge is missing from RMT, the RMT user buffer is full, or RX
+does not finish within a bounded wait, no repair is attempted.
 
-ESP-IDF's RMT RX allocation currently enables an internal GPIO pull-up; setup
-immediately disables both internal pulls again to preserve the passive bus
-interface.
+The raw GPIO waveform is preserved unchanged for `/capture`, including when RMT
+repairs the working decoder copy. ESP-IDF's RMT RX allocation currently enables
+an internal GPIO pull-up; setup immediately disables it again so the passive
+sniffer does not change bus loading. The RMT channel is disabled whenever the
+existing battery power policy disables CO₂ capture.
 
 ## Why both pins use the same handler
 

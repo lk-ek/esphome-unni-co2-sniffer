@@ -318,3 +318,16 @@ for debug download whenever a repair is used. RMT RX ISR handling is made
 cache-safe, internal pulls are restored to disabled after RMT allocation, and
 the RMT channel follows the existing USB/battery capture policy.
 
+
+## 2026-08-14 — RMT transaction arming and async capture download
+
+Field logs showed that the first RMT-assisted build never reported an actual
+RMT recovery. The RX job had been armed while SCL was already idle; its 5 ms
+RMT idle threshold therefore completed the job long before the next ~6 s CO₂
+transaction. RMT RX is now armed from the first GPIO edge of each capture, with
+`rmt_receive()` placed in IRAM as required for ISR use. RMT timestamps are
+aligned absolutely and the artificial t=0 edge from the first RMT pulse was
+removed. Coalesced-edge-only captures no longer consume the frozen debug slot.
+The `/capture` endpoint now uses ESP-IDF asynchronous-request handling so a slow
+or stalled download cannot occupy the main HTTP server task; failed transfers
+still preserve the frozen capture for retry.

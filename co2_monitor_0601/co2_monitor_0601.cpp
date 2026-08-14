@@ -552,7 +552,10 @@ void CO2Monitor0601::process_co2_() {
   if (capture.coalesced_edges_resolved != 0) {
     ESP_LOGD(TAG, "Resolved %u coalesced SDA/SCL edge sample(s)",
              static_cast<unsigned>(capture.coalesced_edges_resolved));
-    if (!freeze_reason) freeze_reason = "coalesced SDA/SCL GPIO edge(s)";
+    // A coalesced GPIO sample is expected when ISR latency merges SDA setup
+    // with an SCL edge. If framing and protocol decoding remain valid, there
+    // is no reason to occupy the single frozen-capture slot with it. Genuine
+    // malformed/unhandled frames below still freeze the original waveform.
   }
 #endif
   for (uint8_t i = 0; i < capture.frame_count; i++) {

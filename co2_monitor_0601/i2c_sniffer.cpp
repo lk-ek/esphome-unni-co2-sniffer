@@ -16,6 +16,8 @@
 #include "esp_http_server.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "freertos/task.h"
+#include <new>
 #include <string>
 #include <utility>
 #endif
@@ -53,32 +55,45 @@ static constexpr uint32_t RMT_RESOLUTION_HZ = 1000000;  // 1 us per tick
 static constexpr uint16_t RMT_BUFFER_SYMBOLS = 128;
 static constexpr uint16_t MAX_RMT_EDGES = RMT_BUFFER_SYMBOLS * 2;
 static constexpr uint32_t RMT_EDGE_MATCH_TOLERANCE_US = 15;
+static constexpr uint32_t RMT_WAIT_TIMEOUT_US = 20000;
 static constexpr uint16_t MAX_RMT_REPAIRS = 32;
 
 static rmt_channel_handle_t rmt_scl_channel = nullptr;
 static rmt_symbol_word_t rmt_scl_symbols[RMT_BUFFER_SYMBOLS];
 static volatile bool rmt_available = false;
 static volatile bool rmt_enabled = false;
+static volatile bool rmt_receive_started = false;
 static volatile bool rmt_receive_done = false;
 static volatile size_t rmt_received_symbols = 0;
+static volatile uint32_t rmt_receive_start_us = 0;
+static volatile esp_err_t rmt_arm_error = ESP_OK;
+// Must live in internal RAM because rmt_receive() is started from the GPIO ISR.
+static rmt_receive_config_t rmt_receive_config{};
 
 static bool IRAM_ATTR rmt_rx_done_callback(rmt_channel_handle_t,
                                            const rmt_rx_done_event_data_t *edata,
                                            void *) {
   rmt_received_symbols = edata ? edata->num_symbols : 0;
+  rmt_receive_started = false;
   rmt_receive_done = true;
   return false;
 }
 
-static esp_err_t arm_rmt_receive() {
-  if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr) return ESP_OK;
-  rmt_receive_done = false;
+static esp_err_t IRAM_ATTR arm_rmt_receive_from_isr(uint32_t start_us) {
+  if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr ||
+      rmt_receive_started || rmt_receive_done)
+    return ESP_OK;
+
   rmt_received_symbols = 0;
-  rmt_receive_config_t config{};
-  config.signal_range_min_ns = 1000;
-  config.signal_range_max_ns = CAPTURE_TIMEOUT_US * 1000U;
-  config.flags.en_partial_rx = false;
-  return rmt_receive(rmt_scl_channel, rmt_scl_symbols, sizeof(rmt_scl_symbols), &config);
+  rmt_receive_start_us = start_us;
+  const esp_err_t err = rmt_receive(rmt_scl_channel, rmt_scl_symbols,
+                                    sizeof(rmt_scl_symbols), &rmt_receive_config);
+  if (err == ESP_OK) {
+    rmt_receive_started = true;
+  } else {
+    rmt_arm_error = err;
+  }
+  return err;
 }
 
 static bool setup_rmt_scl() {
@@ -119,17 +134,19 @@ static bool setup_rmt_scl() {
     rmt_scl_channel = nullptr;
     return false;
   }
+  rmt_receive_config.signal_range_min_ns = 1000;
+  rmt_receive_config.signal_range_max_ns = CAPTURE_TIMEOUT_US * 1000U;
+  rmt_receive_config.flags.en_partial_rx = false;
   rmt_enabled = true;
   rmt_available = true;
-  err = arm_rmt_receive();
-  if (err != ESP_OK) {
-    rmt_disable(rmt_scl_channel);
-    rmt_enabled = false;
-    rmt_available = false;
-    rmt_del_channel(rmt_scl_channel);
-    rmt_scl_channel = nullptr;
-    return false;
-  }
+  rmt_receive_started = false;
+  rmt_receive_done = false;
+  rmt_received_symbols = 0;
+  rmt_receive_start_us = 0;
+  rmt_arm_error = ESP_OK;
+  // Do not start RX while the bus is idle: the hardware idle threshold would
+  // finish that job long before the next ~6 s CO2 transaction. The first GPIO
+  // edge of each capture arms RMT instead.
   return true;
 }
 
@@ -152,6 +169,14 @@ static void IRAM_ATTR gpio_isr(void *) {
   last_edge = now;
 
   const uint16_t index = sample_count;
+  if (index == 0 && rmt_available && rmt_enabled && !rmt_receive_started &&
+      !rmt_receive_done) {
+    // Start hardware SCL timing at the beginning of the same GPIO burst.
+    // rmt_receive() is explicitly ISR-safe when CONFIG_RMT_RECV_FUNC_IN_IRAM
+    // is enabled. Starting here avoids an RMT job expiring during the long
+    // idle interval between CO2 transactions.
+    (void) arm_rmt_receive_from_isr(now);
+  }
   if (index < MAX_SAMPLES) {
     samples[index].t = now;
     samples[index].value = value;
@@ -197,25 +222,29 @@ static uint16_t collect_gpio_scl_edges(const volatile Sample *data, uint16_t cou
 static uint16_t collect_rmt_scl_edges(SclEdge *edges, uint16_t max_edges) {
   // A completely full user buffer may have had excess symbols discarded by
   // the driver. Do not use a potentially truncated RMT trace for repair.
-  if (rmt_received_symbols == 0 || rmt_received_symbols >= RMT_BUFFER_SYMBOLS) return 0;
+  if (!rmt_receive_done || rmt_received_symbols == 0 ||
+      rmt_received_symbols >= RMT_BUFFER_SYMBOLS)
+    return 0;
   const size_t symbols = rmt_received_symbols;
 
   uint16_t edge_count = 0;
-  uint32_t t = 0;
+  uint32_t t = rmt_receive_start_us;
   bool have_level = false;
   bool level = false;
 
   auto append_part = [&](uint16_t duration, bool part_level) {
     if (duration == 0) return;
+    // The first RMT part describes the level that already existed when RX was
+    // armed; it is not itself an edge. Record transitions only at boundaries
+    // between pulse parts. The previous implementation emitted a synthetic
+    // edge at t=0, which made real GPIO/RMT timelines fail alignment.
     if (!have_level) {
-      if (edge_count < max_edges) {
-        edges[edge_count].t = 0;
-        edges[edge_count].level = part_level;
-      }
-      edge_count++;
       have_level = true;
       level = part_level;
-    } else if (part_level != level) {
+      t += duration;
+      return;
+    }
+    if (part_level != level) {
       if (edge_count < max_edges) {
         edges[edge_count].t = t;
         edges[edge_count].level = part_level;
@@ -255,30 +284,50 @@ static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
   if (gpio_total == 0 || rmt_total == 0 ||
       gpio_total > MAX_RMT_EDGES || rmt_total > MAX_RMT_EDGES)
     return 0;
-  if (gpio_edges[0].level != rmt_edges[0].level) return 0;
+
+  // RMT starts from the first GPIO state change. If that first change itself
+  // was an SCL edge, the edge can precede the point at which the RMT engine is
+  // fully armed. Find an early matching edge pair and align from there rather
+  // than requiring edge zero to match edge zero.
+  uint16_t gpio_index = 0;
+  uint16_t rmt_index = 0;
+  bool aligned = false;
+  const uint16_t gpio_search = gpio_total < 4 ? gpio_total : 4;
+  const uint16_t rmt_search = rmt_total < 4 ? rmt_total : 4;
+  for (uint16_t g = 0; g < gpio_search && !aligned; g++) {
+    for (uint16_t r = 0; r < rmt_search; r++) {
+      if (gpio_edges[g].level == rmt_edges[r].level &&
+          time_within(gpio_edges[g].t, rmt_edges[r].t, RMT_EDGE_MATCH_TOLERANCE_US)) {
+        gpio_index = g;
+        rmt_index = r;
+        aligned = true;
+        break;
+      }
+    }
+  }
+  if (!aligned) return 0;
 
   capture.rmt_used = true;
-  const uint32_t base = gpio_edges[0].t;
   SclEdge *missing = rmt_missing_edges_work;
   uint16_t missing_count = 0;
-  uint16_t gpio_index = 0;
 
-  for (uint16_t rmt_index = 0; rmt_index < rmt_total; rmt_index++) {
-    const uint32_t expected = base + rmt_edges[rmt_index].t;
+  while (rmt_index < rmt_total) {
+    const uint32_t expected = rmt_edges[rmt_index].t;
     const bool expected_level = rmt_edges[rmt_index].level;
 
     if (gpio_index < gpio_total &&
         gpio_edges[gpio_index].level == expected_level &&
         time_within(gpio_edges[gpio_index].t, expected, RMT_EDGE_MATCH_TOLERANCE_US)) {
       gpio_index++;
+      rmt_index++;
       continue;
     }
 
     if (gpio_index < gpio_total) {
       const int32_t delta = static_cast<int32_t>(gpio_edges[gpio_index].t - expected);
       if (delta < -static_cast<int32_t>(RMT_EDGE_MATCH_TOLERANCE_US)) {
-        // GPIO observed an SCL edge that RMT did not. Do not try to repair an
-        // alignment we no longer trust; fall back to the raw GPIO capture.
+        // After alignment, GPIO seeing an edge which RMT did not means the two
+        // timelines are no longer trustworthy enough for synthesis.
         capture.rmt_used = false;
         return 0;
       }
@@ -289,9 +338,8 @@ static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
       }
     }
 
-    // RMT saw an edge before the next GPIO edge. This is exactly the failure
-    // mode observed in capture2.vcd: a complete SCL high/low pulse can occur
-    // while the shared GPIO ISR is delayed, leaving no GPIO state change.
+    // RMT saw an edge before the next GPIO edge: preserve the SDA state from
+    // GPIO and synthesize only the missing SCL transition.
     const uint32_t last_sample_t = data[count - 1].t;
     if (static_cast<int32_t>(expected - last_sample_t) >
         static_cast<int32_t>(RMT_EDGE_MATCH_TOLERANCE_US))
@@ -303,11 +351,11 @@ static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
     missing[missing_count].t = expected;
     missing[missing_count].level = expected_level;
     missing_count++;
+    rmt_index++;
   }
 
-  // RMT must be a strict superset/match of the GPIO SCL timeline. If GPIO
-  // contains any unmatched trailing edge, alignment is not trustworthy enough
-  // to synthesize transitions.
+  // Unmatched trailing GPIO edges after an established alignment mean RMT did
+  // not provide a strict reference timeline. Do not modify the raw capture.
   if (gpio_index != gpio_total) {
     capture.rmt_used = false;
     return 0;
@@ -328,7 +376,8 @@ static uint16_t repair_missing_scl_edges(volatile Sample *data, uint16_t &count,
       data[j].value = data[j - 1].value;
     }
     data[pos].t = missing[m].t;
-    data[pos].value = static_cast<uint8_t>((before & 0x02U) | (missing[m].level ? 0x01U : 0x00U));
+    data[pos].value = static_cast<uint8_t>((before & 0x02U) |
+                                           (missing[m].level ? 0x01U : 0x00U));
     count++;
     repaired++;
   }
@@ -530,21 +579,54 @@ static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
   return sequence;
 }
 
-static esp_err_t send_binary_capture(httpd_req_t *req, const std::string &output) {
-  // ESPHome's ESP-IDF AsyncWebServer response wrapper sends an in-memory
-  // response with one httpd_resp_send() call. Use moderate HTTP chunks here
-  // instead so a ~20 KiB logic capture does not have to fit into one socket
-  // send window and can make forward progress on a busy Wi-Fi connection.
-  static constexpr size_t HTTP_CHUNK_BYTES = 1024;
-  size_t offset = 0;
-  while (offset < output.size()) {
-    const size_t remaining = output.size() - offset;
-    const size_t chunk_size = remaining < HTTP_CHUNK_BYTES ? remaining : HTTP_CHUNK_BYTES;
-    const esp_err_t err = httpd_resp_send_chunk(req, output.data() + offset, chunk_size);
-    if (err != ESP_OK) return err;
-    offset += chunk_size;
+static void release_frozen_capture_after_success(uint32_t sequence, bool was_frozen) {
+  if (!was_frozen || !last_capture_mutex) return;
+  bool released = false;
+  if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (last_capture_frozen && last_capture_sequence == sequence) {
+      last_capture_frozen = false;
+      released = true;
+    }
+    xSemaphoreGive(last_capture_mutex);
   }
-  return httpd_resp_send_chunk(req, nullptr, 0);
+  if (released) {
+    ESP_LOGD(TAG, "Released frozen raw I2C capture #%lu after successful /capture download",
+             static_cast<unsigned long>(sequence));
+  }
+}
+
+struct CaptureSendContext {
+  httpd_req_t *request{nullptr};
+  std::string output;
+  uint32_t sequence{0};
+  bool was_frozen{false};
+};
+
+static void capture_send_task(void *arg) {
+  auto *ctx = static_cast<CaptureSendContext *>(arg);
+  httpd_req_t *req = ctx->request;
+
+  httpd_resp_set_status(req, "200 OK");
+  httpd_resp_set_type(req, "application/octet-stream");
+  httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"capture.la\"");
+  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+  httpd_resp_set_hdr(req, "Connection", "close");
+
+  // httpd_resp_send() already loops over partial socket writes internally. Run
+  // it from an asynchronous request task so a slow or stalled client can never
+  // occupy ESP-IDF's main HTTP server task.
+  const esp_err_t err = httpd_resp_send(req, ctx->output.data(), ctx->output.size());
+  if (err == ESP_OK) {
+    release_frozen_capture_after_success(ctx->sequence, ctx->was_frozen);
+  } else {
+    ESP_LOGW(TAG, "/capture send failed (%d/0x%04X); raw I2C capture #%lu preserved for retry",
+             static_cast<int>(err), static_cast<unsigned>(err),
+             static_cast<unsigned long>(ctx->sequence));
+  }
+
+  httpd_req_async_handler_complete(req);
+  delete ctx;
+  vTaskDelete(nullptr);
 }
 
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
@@ -571,35 +653,37 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
       return;
     }
 
-    httpd_req_t *req = *request;
-    httpd_resp_set_status(req, "200 OK");
-    httpd_resp_set_type(req, "application/octet-stream");
-    httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"capture.la\"");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    const esp_err_t err = send_binary_capture(req, output);
-
-    if (err != ESP_OK) {
-      ESP_LOGW(TAG, "/capture send failed (%d/0x%04X); raw I2C capture #%lu preserved for retry",
-               static_cast<int>(err), static_cast<unsigned>(err),
-               static_cast<unsigned long>(sequence));
+    auto *ctx = new (std::nothrow) CaptureSendContext;
+    if (ctx == nullptr) {
+      request->send(503, "text/plain", "capture sender allocation failed");
       return;
     }
+    ctx->output = std::move(output);
+    ctx->sequence = sequence;
+    ctx->was_frozen = was_frozen;
 
-    // A failed or disconnected transfer must never destroy the one trace we
-    // froze specifically to diagnose an intermittent framing error. Release it
-    // only after the terminating HTTP chunk was sent successfully.
-    bool released_freeze = false;
-    if (was_frozen && last_capture_mutex &&
-        xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-      if (last_capture_frozen && last_capture_sequence == sequence) {
-        last_capture_frozen = false;
-        released_freeze = true;
-      }
-      xSemaphoreGive(last_capture_mutex);
+    httpd_req_t *req = *request;
+    httpd_req_t *async_req = nullptr;
+    const esp_err_t async_err = httpd_req_async_handler_begin(req, &async_req);
+    if (async_err != ESP_OK) {
+      ESP_LOGW(TAG, "/capture async begin failed (%d/0x%04X)",
+               static_cast<int>(async_err), static_cast<unsigned>(async_err));
+      delete ctx;
+      request->send(503, "text/plain", "capture sender busy");
+      return;
     }
-    if (released_freeze) {
-      ESP_LOGD(TAG, "Released frozen raw I2C capture #%lu after successful /capture download",
+    ctx->request = async_req;
+
+    ESP_LOGD(TAG, "Starting async /capture download #%lu (%u bytes)",
+             static_cast<unsigned long>(sequence),
+             static_cast<unsigned>(ctx->output.size()));
+    if (xTaskCreate(capture_send_task, "i2c_capture_http", 4096, ctx, 2, nullptr) != pdPASS) {
+      ESP_LOGW(TAG, "/capture sender task creation failed; capture #%lu preserved",
                static_cast<unsigned long>(sequence));
+      httpd_resp_send_err(async_req, HTTPD_500_INTERNAL_SERVER_ERROR,
+                          "capture sender task creation failed");
+      httpd_req_async_handler_complete(async_req);
+      delete ctx;
     }
   }
 };
@@ -719,30 +803,34 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin) {
 
 static void disable_rmt_capture() {
   if (!rmt_available || !rmt_enabled || rmt_scl_channel == nullptr) return;
+  // Prevent any ISR-side arm while the channel is being disabled.
+  rmt_enabled = false;
   const esp_err_t err = rmt_disable(rmt_scl_channel);
   if (err != ESP_OK)
     ESP_LOGW(TAG, "rmt_disable(SCL) failed: %d", static_cast<int>(err));
-  rmt_enabled = false;
+  rmt_receive_started = false;
   rmt_receive_done = false;
   rmt_received_symbols = 0;
+  rmt_receive_start_us = 0;
+  rmt_arm_error = ESP_OK;
 }
 
 static void enable_rmt_capture() {
   if (!rmt_available || rmt_enabled || rmt_scl_channel == nullptr) return;
-  esp_err_t err = rmt_enable(rmt_scl_channel);
+  const esp_err_t err = rmt_enable(rmt_scl_channel);
   if (err == ESP_OK) {
     rmt_enabled = true;
-    err = arm_rmt_receive();
-  }
-  if (err != ESP_OK) {
-    ESP_LOGW(TAG, "RMT SCL capture restart failed (%d); falling back to GPIO",
-             static_cast<int>(err));
-    if (rmt_enabled) rmt_disable(rmt_scl_channel);
-    rmt_enabled = false;
-    rmt_available = false;
+    rmt_receive_started = false;
     rmt_receive_done = false;
     rmt_received_symbols = 0;
+    rmt_receive_start_us = 0;
+    rmt_arm_error = ESP_OK;
+    return;
   }
+  ESP_LOGW(TAG, "RMT SCL capture restart failed (%d); falling back to GPIO",
+           static_cast<int>(err));
+  rmt_enabled = false;
+  rmt_available = false;
 }
 
 void set_capture_enabled(bool enabled) {
@@ -782,9 +870,27 @@ bool poll(Capture &capture) {
     capture_finished = true;
   }
 
-  // RMT uses the same 5 ms idle threshold in hardware. Wait for its done
-  // callback so SCL reconstruction is based on the exact same bus burst.
-  if (rmt_available && rmt_enabled && !rmt_receive_done) return false;
+  // When RMT was armed by the first GPIO edge, wait briefly for its own 5 ms
+  // idle detector to close the same transaction. Never wait indefinitely: a
+  // failed hardware arm must degrade to the original GPIO-only decoder.
+  if (rmt_available && rmt_enabled && rmt_receive_started && !rmt_receive_done) {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+    if (static_cast<uint32_t>(now - last_edge) < RMT_WAIT_TIMEOUT_US) return false;
+    ESP_LOGW(TAG, "RMT SCL receive did not finish after bus idle; resetting assist");
+    rmt_enabled = false;
+    (void) rmt_disable(rmt_scl_channel);
+    const esp_err_t reenable_err = rmt_enable(rmt_scl_channel);
+    if (reenable_err == ESP_OK) {
+      rmt_enabled = true;
+    } else {
+      rmt_available = false;
+      ESP_LOGW(TAG, "RMT SCL re-enable failed (%d); falling back to GPIO",
+               static_cast<int>(reenable_err));
+    }
+    rmt_receive_started = false;
+    rmt_receive_done = false;
+    rmt_received_symbols = 0;
+  }
 
   uint16_t count = sample_count;
   if (count > MAX_SAMPLES) count = MAX_SAMPLES;
@@ -813,16 +919,17 @@ bool poll(Capture &capture) {
   capture_initial_value = last_value;
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
-  if (rmt_available && rmt_enabled) {
-    const esp_err_t err = arm_rmt_receive();
-    if (err != ESP_OK) {
-      ESP_LOGW(TAG, "RMT SCL rearm failed (%d); falling back to GPIO",
-               static_cast<int>(err));
-      rmt_disable(rmt_scl_channel);
-      rmt_enabled = false;
-      rmt_available = false;
-    }
+  if (rmt_arm_error != ESP_OK) {
+    ESP_LOGW(TAG, "RMT SCL arm failed (%d); GPIO-only capture used",
+             static_cast<int>(rmt_arm_error));
   }
+  // Leave the enabled RMT channel idle. The next GPIO capture's first edge
+  // starts the next RX job, keeping RMT synchronized with the actual bus burst.
+  rmt_receive_started = false;
+  rmt_receive_done = false;
+  rmt_received_symbols = 0;
+  rmt_receive_start_us = 0;
+  rmt_arm_error = ESP_OK;
   capturing = true;
   return true;
 }
