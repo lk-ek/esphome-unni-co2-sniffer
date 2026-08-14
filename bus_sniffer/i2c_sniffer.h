@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "esphome/core/defines.h"
+
 #include <cstdint>
 
 #ifndef RTRH_DEBUG_CAPTURE
