@@ -9,7 +9,7 @@ This project adds a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor as a **p
 - optional persistent BLE history with GATT download
 - battery voltage and estimated battery level
 - USB/VBUS presence detection
-- automatic ESP32-C3 power saving with Light Sleep and BLE modem sleep
+- automatic USB/battery power policy with Light Sleep and BLE modem sleep
 - optional diagnostic metrics and raw capture support
 
 The signal decoding and calibration were derived from the tested Unni hardware revision. Other revisions may need verification.
@@ -93,7 +93,6 @@ The component intentionally owns most platform details. A normal configuration o
 
 ```yaml
 bus_sniffer:
-  ha_publish_interval: 30s
   sniffer_start_delay: 10s
 ```
 
@@ -105,11 +104,13 @@ bus_sniffer:
   ble: true
   ble_live: true
   ble_history: true
-  ble_advertising_interval: 2s
+  ble_advertising_interval: 2s          # USB/VBUS power
+  ble_battery_advertising_interval: 5s  # battery power
 
   # Power saving
   light_sleep: true
   light_sleep_max_awake: 10s
+  ha_publish_interval: 60s  # battery-mode HA throttle
 
   # Hardware
   rt_pin: 3
@@ -153,18 +154,30 @@ bus_sniffer:
 
 With `debug_metrics: true`, the component additionally creates decoder-quality, timing, frame-error and calibration diagnostic entities automatically.
 
-## Power saving
+## Automatic USB / battery power policy
 
-Automatic Light Sleep is enabled by default.
+The VBUS detector automatically selects one of two runtime policies. No Home Assistant automation is required.
 
-The RT and RH GPIOs are Light-Sleep wake sources. On the first RT/RH transition, the component keeps the ESP awake and forces the CPU to 80 MHz until:
+**USB/VBUS power:**
 
-1. the RT/RH measurement is complete, and
-2. one valid CO₂ frame has been received.
+- automatic Light Sleep is held off
+- CPU frequency is held at 80 MHz
+- the CO₂ bus is captured continuously
+- every valid CO₂ frame is published to Home Assistant immediately
+- every valid RT/RH measurement is published immediately
+- BLE advertises every 2 seconds by default
 
-The CO₂ bus itself is not a wake source. Outside an active capture window, partial CO₂ traffic is ignored.
+**Battery power:**
 
-BLE builds also enable ESP32-C3 Bluetooth modem sleep and PHY/MAC/baseband power-down. The default BLE advertising interval is 2 seconds.
+- the existing RT/RH-triggered automatic Light-Sleep scheme is used
+- RT/RH wakes the ESP and opens a short 80 MHz capture window
+- CO₂ capture is enabled only until one valid frame has been received after RT/RH
+- Home Assistant receives the latest CO₂/T/RH values at most once per 60 seconds
+- BLE advertises every 5 seconds by default
+
+The battery HA interval is configured with `ha_publish_interval` (default `60s`). The two BLE intervals are independently configurable with `ble_advertising_interval` (USB, default `2s`) and `ble_battery_advertising_interval` (battery, default `5s`). `light_sleep: false` disables the battery Light-Sleep policy as before.
+
+BLE builds also enable ESP32-C3 Bluetooth modem sleep and PHY/MAC/baseband power-down.
 
 ## BLE / MyAmbience
 

@@ -44,7 +44,6 @@ bus_sniffer:
   ble: false
   ble_live: false
   ble_history: false
-  ha_publish_interval: 30s
   sniffer_start_delay: 10s
   debug_metrics: false
   debug_capture: false

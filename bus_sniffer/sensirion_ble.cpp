@@ -85,10 +85,17 @@ void sensirion_ble_set_advertising_interval(uint32_t interval_ms) {
   if (interval_ms < 20) interval_ms = 20;
   if (interval_ms > 10240) interval_ms = 10240;
 
+  if (advertising_interval_ms == interval_ms && adv_params.adv_int_min != 0)
+    return;
   advertising_interval_ms = interval_ms;
   const uint16_t units = static_cast<uint16_t>((interval_ms * 1000ULL + 624) / 625);
   adv_params.adv_int_min = units;
   adv_params.adv_int_max = units;
+
+  // Advertising parameters are copied by esp_ble_gap_start_advertising().
+  // Restart an active advertisement so USB/battery policy changes take effect
+  // immediately. While connected, the new interval is used after disconnect.
+  request_refresh();
 }
 
 void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param) {

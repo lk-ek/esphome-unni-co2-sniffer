@@ -47,6 +47,7 @@ inline void publish_finite(sensor::Sensor *sensor, float value) {
 
 #if UNNI_BLE_ENABLED
 void BusSniffer::set_ble_advertising_interval(uint32_t interval_ms) {
+  this->ble_usb_advertising_interval_ms_ = interval_ms;
   sensirion_ble_set_advertising_interval(interval_ms);
 }
 
@@ -133,6 +134,29 @@ void BusSniffer::process_usb_power_() {
   this->usb_power_.have_state = true;
   publish(this->out_.usb_power, raw);
   ESP_LOGI(TAG, "USB Power: %s", raw ? "ON" : "OFF");
+
+  // Power policy follows VBUS automatically. On USB, keep the MCU fully awake
+  // at 80 MHz and sniff CO2 continuously. On battery, restore the RT/RH-triggered
+  // Light-sleep window and only capture CO2 while that window is active.
+  power_save::set_external_power(raw);
+  if (this->io_initialized_ && power_save::enabled())
+    co2_decoder::set_capture_enabled(raw || power_save::awake_window_active());
+
+#if UNNI_BLE_ENABLED
+  const uint32_t adv_ms = raw ? this->ble_usb_advertising_interval_ms_
+                              : this->ble_battery_advertising_interval_ms_;
+  sensirion_ble_set_advertising_interval(adv_ms);
+  ESP_LOGI(TAG, "BLE advertising interval: %lu ms (%s power)",
+           static_cast<unsigned long>(adv_ms), raw ? "USB" : "battery");
+#endif
+
+  if (raw) {
+    // Expose the freshest cached sensor set immediately when mains power arrives.
+    this->publish_cached_ha_now_();
+  } else {
+    // Start the one-minute battery publication window at the source transition.
+    this->ha_.last_publish_ms = now;
+  }
 
   // Cell voltage is not a useful open-circuit SOC estimate while USB is
   // present and the battery node may be driven by the charger. Mark Battery
@@ -267,9 +291,11 @@ bool BusSniffer::initialize_sniffer_io_() {
                          this->co2_sda_pin_, this->co2_scl_pin_)) {
     ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
   } else if (power_save::enabled()) {
-    // CO2 traffic must not wake the chip or leave partial I2C transactions
-    // behind while the CPU is sleeping. It is enabled only in an RT/RH window.
-    co2_decoder::set_capture_enabled(false);
+    // If VBUS was already debounced before delayed sniffer initialization,
+    // immediately apply the matching USB/battery power policy.
+    const bool usb = this->usb_powered_();
+    power_save::set_external_power(usb);
+    co2_decoder::set_capture_enabled(usb);
   }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
@@ -329,7 +355,31 @@ void BusSniffer::setup() {
   ESP_LOGI(TAG, "Passive CO2 + RT/RH sniffer ready");
 }
 
+void BusSniffer::publish_cached_ha_now_() {
+  bool published = false;
+  if (this->ha_.have_co2 && this->out_.co2) {
+    this->out_.co2->publish_state(this->ha_.co2);
+    this->ha_.initial_co2_published = true;
+    published = true;
+  }
+  if (this->ha_.have_temperature && this->out_.temperature) {
+    this->out_.temperature->publish_state(this->ha_.temperature);
+    this->ha_.initial_temperature_published = true;
+    published = true;
+  }
+  if (this->ha_.have_humidity && this->out_.humidity) {
+    this->out_.humidity->publish_state(this->ha_.humidity);
+    this->ha_.initial_humidity_published = true;
+    published = true;
+  }
+  if (published) this->ha_.last_publish_ms = millis();
+}
+
 void BusSniffer::maybe_publish_ha_() {
+  // On USB power every fresh measurement is published directly from its
+  // decoder. The interval below is deliberately a battery-mode throttle.
+  if (this->usb_powered_()) return;
+
   const uint32_t now = millis();
   if (this->ha_.last_publish_ms &&
       static_cast<uint32_t>(now - this->ha_.last_publish_ms) < this->ha_.interval_ms)
@@ -457,15 +507,25 @@ void BusSniffer::process_rtrh_() {
   this->ha_.have_temperature = true;
   this->ha_.have_humidity = true;
 
-  if (!this->ha_.initial_temperature_published && this->out_.temperature) {
-    this->out_.temperature->publish_state(m.temperature_c);
-    this->ha_.initial_temperature_published = true;
+  if (this->usb_powered_()) {
+    // Mains power: publish every fresh RT/RH measurement (the Unni cycle is
+    // roughly 30 s), rather than repeating cached values on a timer.
+    if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
+    if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
+    this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
+    this->ha_.initial_humidity_published = this->out_.humidity != nullptr;
     this->ha_.last_publish_ms = millis();
-  }
-  if (!this->ha_.initial_humidity_published && this->out_.humidity) {
-    this->out_.humidity->publish_state(m.humidity_percent);
-    this->ha_.initial_humidity_published = true;
-    this->ha_.last_publish_ms = millis();
+  } else {
+    if (!this->ha_.initial_temperature_published && this->out_.temperature) {
+      this->out_.temperature->publish_state(m.temperature_c);
+      this->ha_.initial_temperature_published = true;
+      this->ha_.last_publish_ms = millis();
+    }
+    if (!this->ha_.initial_humidity_published && this->out_.humidity) {
+      this->out_.humidity->publish_state(m.humidity_percent);
+      this->ha_.initial_humidity_published = true;
+      this->ha_.last_publish_ms = millis();
+    }
   }
 
   rtrh_decoder::update_latest(m);
@@ -494,6 +554,14 @@ void BusSniffer::process_co2_() {
   this->ha_.co2 = static_cast<float>(ppm);
   this->ha_.have_co2 = true;
 
+  if (this->usb_powered_() && this->out_.co2) {
+    // Mains power: every valid CO2 frame is a useful fresh measurement, even
+    // when the integer ppm value happens to be unchanged.
+    this->out_.co2->publish_state(this->ha_.co2);
+    this->ha_.initial_co2_published = true;
+    this->ha_.last_publish_ms = millis();
+  }
+
   if (this->co2_.have_last_ppm && ppm == this->co2_.last_ppm) {
     ESP_LOGV(TAG, "CO2 unchanged: %u ppm", ppm);
     return;
@@ -503,7 +571,7 @@ void BusSniffer::process_co2_() {
   this->co2_.last_ppm = ppm;
   ESP_LOGI(TAG, "CO2: %u ppm", ppm);
 
-  if (!this->ha_.initial_co2_published && this->out_.co2) {
+  if (!this->usb_powered_() && !this->ha_.initial_co2_published && this->out_.co2) {
     this->out_.co2->publish_state(this->ha_.co2);
     this->ha_.initial_co2_published = true;
     this->ha_.last_publish_ms = millis();
@@ -518,14 +586,14 @@ void BusSniffer::loop() {
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
 #endif
-  this->maybe_publish_ha_();
   this->process_usb_power_();
+  this->maybe_publish_ha_();
   this->process_battery_();
 
   if (!this->io_initialized_) return;
 
   if (power_save::enabled())
-    co2_decoder::set_capture_enabled(power_save::awake_window_active());
+    co2_decoder::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
 
   this->process_rtrh_();
   this->process_co2_();
@@ -534,7 +602,7 @@ void BusSniffer::loop() {
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
   if (power_save::enabled())
-    co2_decoder::set_capture_enabled(power_save::awake_window_active());
+    co2_decoder::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
 }
 
 }  // namespace bus_sniffer

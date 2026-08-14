@@ -1,10 +1,12 @@
-# Automatic Light-sleep experiment
+# Automatic USB / battery power policy
 
-The ESP32-C3 build uses ESP-IDF automatic Light-sleep rather than calling
-`esp_light_sleep_start()` directly. This is important because the node still
-runs ESPHome networking and, in the normal build, BLE.
+The ESP32-C3 uses two runtime policies selected automatically from the VBUS detector. USB power favors measurement responsiveness; battery power favors energy efficiency. ESP-IDF automatic Light-sleep is used only as the battery idle mechanism rather than calling `esp_light_sleep_start()` directly.
 
-## Wake/awake sequence
+## USB power mode
+
+While VBUS is present, the component holds persistent `ESP_PM_NO_LIGHT_SLEEP` and `ESP_PM_CPU_FREQ_MAX` locks. The CPU therefore stays awake at 80 MHz, the CO2 decoder captures continuously, and fresh measurements can be forwarded immediately. Removing USB releases those persistent locks and restores the battery policy.
+
+## Battery wake/awake sequence
 
 1. In idle periods ESP-IDF may enter automatic Light-sleep.
 2. The configured RT/RH RT or RH GPIO wakes the CPU on the first RT/RH transition (defaults: GPIO3/GPIO4).
@@ -36,7 +38,9 @@ All power-saving defaults remain overrideable from `bus_sniffer:` when needed:
 bus_sniffer:
   light_sleep: true             # default
   light_sleep_max_awake: 10s    # default
-  ble_advertising_interval: 2s  # default
+  ha_publish_interval: 60s              # battery HA throttle, default
+  ble_advertising_interval: 2s           # USB default
+  ble_battery_advertising_interval: 5s   # battery default
 ```
 
 The signal GPIOs are also configurable. The tested XIAO ESP32-C3 wiring remains
@@ -65,3 +69,9 @@ baseline when measuring the residual BLE cost.
 
 The wake source is level-triggered, not true edge-triggered. The implementation
 chooses the wake level opposite the observed idle level of each RT/RH line.
+
+## Publication policy
+
+On USB power, valid CO2 frames are published as they arrive and valid RT/RH measurements are published when each approximately 30-second Unni measurement completes. On battery power, the decoder continues to collect the required measurements but Home Assistant publication is throttled to the latest cached values once per `ha_publish_interval` (60 seconds by default).
+
+BLE advertising switches dynamically between the USB and battery intervals when VBUS changes. The advertising stack is restarted when necessary so the new interval takes effect without rebooting.

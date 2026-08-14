@@ -27,6 +27,7 @@ class BusSniffer : public Component {
   void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
                            esp_ble_gatts_cb_param_t *param);
   void set_ble_advertising_interval(uint32_t interval_ms);
+  void set_ble_battery_advertising_interval(uint32_t interval_ms) { this->ble_battery_advertising_interval_ms_ = interval_ms; }
 #endif
 
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
@@ -89,7 +90,7 @@ class BusSniffer : public Component {
   } out_;
 
   struct HaState {
-    uint32_t interval_ms{30000};
+    uint32_t interval_ms{60000};
     uint32_t last_publish_ms{0};
     bool have_co2{false};
     bool have_temperature{false};
@@ -140,6 +141,8 @@ class BusSniffer : public Component {
   } usb_power_;
 
   void maybe_publish_ha_();
+  void publish_cached_ha_now_();
+  bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
   void process_rtrh_();
   void process_co2_();
   bool setup_battery_adc_();
@@ -156,6 +159,8 @@ class BusSniffer : public Component {
   bool debug_metrics_{false};
 #if UNNI_BLE_ENABLED
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
+  uint32_t ble_usb_advertising_interval_ms_{2000};
+  uint32_t ble_battery_advertising_interval_ms_{5000};
 #endif
   bool light_sleep_enabled_{true};
   uint32_t light_sleep_max_awake_ms_{10000};

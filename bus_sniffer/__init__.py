@@ -29,6 +29,7 @@ CONF_BLE_HISTORY = "ble_history"
 CONF_BLE_ID = "ble_id"
 CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
+CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
@@ -207,7 +208,11 @@ _SCHEMA = {
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
-    cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="30s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_BLE_BATTERY_ADVERTISING_INTERVAL, default="5s"): cv.All(
+        cv.positive_time_period_milliseconds,
+        cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
+    ),
+    cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
@@ -332,6 +337,7 @@ async def to_code(config):
         server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
         cg.add(var.set_gatt_server(server))
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
+        cg.add(var.set_ble_battery_advertising_interval(config[CONF_BLE_BATTERY_ADVERTISING_INTERVAL]))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
     cg.add(var.set_sniffer_start_delay(config[CONF_SNIFFER_START_DELAY]))

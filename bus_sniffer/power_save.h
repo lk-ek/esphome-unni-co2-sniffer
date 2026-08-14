@@ -20,6 +20,11 @@ void on_rtrh_edge_from_isr();
 void on_rtrh_complete(bool valid);
 void on_valid_co2();
 
+// Keep the ESP fully awake at 80 MHz while external USB/VBUS power is present.
+// Battery mode releases these persistent locks and falls back to the RT/RH wake window.
+void set_external_power(bool present);
+bool external_power_present();
+
 // Releases the no-Light-sleep lock when the wake cycle is complete or a
 // failsafe timeout expires.
 void loop();

@@ -20,6 +20,10 @@ static gpio_num_t pin_co2_scl = GPIO_NUM_7;
 static bool configured = false;
 static esp_pm_lock_handle_t awake_lock = nullptr;
 static esp_pm_lock_handle_t cpu_lock = nullptr;
+static esp_pm_lock_handle_t external_awake_lock = nullptr;
+static esp_pm_lock_handle_t external_cpu_lock = nullptr;
+static volatile bool external_power = false;
+static bool external_locks_held = false;
 static volatile bool lock_held = false;
 static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
@@ -71,6 +75,16 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
     ESP_LOGE(TAG, "esp_pm_lock_create(CPU_FREQ_MAX) failed: %d", err);
     return false;
   }
+  err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_usb_awake", &external_awake_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(USB NO_LIGHT_SLEEP) failed: %d", err);
+    return false;
+  }
+  err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_usb_cpu", &external_cpu_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(USB CPU_FREQ_MAX) failed: %d", err);
+    return false;
+  }
 
   configure_wakeup_pin(pin_rt);
   configure_wakeup_pin(pin_rh);
@@ -90,8 +104,41 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   return true;
 }
 
+void set_external_power(bool present) {
+  external_power = present;
+  if (!configured || external_awake_lock == nullptr || external_cpu_lock == nullptr) return;
+  if (present == external_locks_held) return;
+
+  if (present) {
+    const esp_err_t sleep_err = esp_pm_lock_acquire(external_awake_lock);
+    if (sleep_err != ESP_OK) {
+      ESP_LOGE(TAG, "USB NO_LIGHT_SLEEP lock acquire failed: %d", sleep_err);
+      return;
+    }
+    const esp_err_t cpu_err = esp_pm_lock_acquire(external_cpu_lock);
+    if (cpu_err != ESP_OK) {
+      esp_pm_lock_release(external_awake_lock);
+      ESP_LOGE(TAG, "USB CPU_FREQ_MAX lock acquire failed: %d", cpu_err);
+      return;
+    }
+    external_locks_held = true;
+    ESP_LOGI(TAG, "USB power mode: Light-sleep disabled, CPU locked at 80 MHz");
+  } else {
+    const esp_err_t cpu_err = esp_pm_lock_release(external_cpu_lock);
+    const esp_err_t sleep_err = esp_pm_lock_release(external_awake_lock);
+    if (cpu_err != ESP_OK || sleep_err != ESP_OK) {
+      ESP_LOGE(TAG, "USB power lock release failed: CPU=%d sleep=%d", cpu_err, sleep_err);
+      return;
+    }
+    external_locks_held = false;
+    ESP_LOGI(TAG, "Battery mode: automatic Light-sleep restored");
+  }
+}
+
+bool external_power_present() { return external_power; }
+
 void IRAM_ATTR on_rtrh_edge_from_isr() {
-  if (!configured || awake_lock == nullptr || cpu_lock == nullptr || lock_held) return;
+  if (!configured || external_power || awake_lock == nullptr || cpu_lock == nullptr || lock_held) return;
   if (esp_pm_lock_acquire(awake_lock) != ESP_OK) return;
   if (esp_pm_lock_acquire(cpu_lock) != ESP_OK) {
     esp_pm_lock_release(awake_lock);

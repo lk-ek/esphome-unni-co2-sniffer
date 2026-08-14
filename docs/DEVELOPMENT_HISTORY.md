@@ -269,3 +269,8 @@ The development process converged on a few principles that are useful when chang
 6. **Treat voltage-derived battery percentage as an estimate.** Charging state and load materially affect cell voltage.
 7. **Keep detailed failed experiments.** They prevent future work from repeating already-tested approaches.
 
+
+
+## 2026-08-14: VBUS-aware runtime power policy
+
+After battery and VBUS sensing were available, the power strategy was split by power source rather than applying the same low-power behavior all the time. USB operation now keeps the ESP32-C3 awake at 80 MHz and captures the CO2 bus continuously, while battery operation retains the RT/RH-triggered Light-Sleep capture window. Home Assistant receives fresh measurements immediately on USB but only the latest cached sensor set once per minute on battery. Sensirion-compatible BLE advertising also changes dynamically from 2 seconds on USB to 5 seconds on battery. This preserves responsiveness when external power is available without giving up the measured battery savings.

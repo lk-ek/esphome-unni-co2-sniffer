@@ -43,7 +43,6 @@ esp32:
     type: esp-idf
 
 bus_sniffer:
-  ha_publish_interval: 30s
   sniffer_start_delay: 10s
   debug_metrics: true
   debug_capture: true
