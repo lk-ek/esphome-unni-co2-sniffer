@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # v8 power-save profile
 
 Built on v7 buildfix2. Calibration and measurement-quality logic are unchanged.

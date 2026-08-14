@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # ISR architecture and critical decoder code
 
 This document describes the interrupt-driven parts of the Unni sniffer. It is

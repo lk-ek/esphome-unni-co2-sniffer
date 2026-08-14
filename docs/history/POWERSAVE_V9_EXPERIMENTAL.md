@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # v9 experimental power save / Automatic Light Sleep
 
 Built on v8 powersave + CSV fix. Calibration and quality logic are unchanged.

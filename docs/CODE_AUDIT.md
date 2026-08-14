@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Final code/config audit
 
 This audit was performed after the decoder/BLE/history refactors. Its purpose is to document what was intentionally left alone and which clearly stale pieces were removed.

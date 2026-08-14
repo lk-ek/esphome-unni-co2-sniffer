@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # RT/RH calibration refit — 2026-08-11
 
 Basis: synchronized `rt_rh_timing40-*.csv` captures whose filenames encode the original display value.

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Automatic USB / battery power policy
 
 The ESP32-C3 uses two runtime policies selected automatically from the VBUS detector. USB power favors measurement responsiveness; battery power favors energy efficiency. ESP-IDF automatic Light-sleep is used only as the battery idle mechanism rather than calling `esp_light_sleep_start()` directly.

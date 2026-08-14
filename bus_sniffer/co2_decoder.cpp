@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "co2_decoder.h"
 
@@ -72,6 +73,9 @@ static void IRAM_ATTR gpio_isr(void *) {
   }
 }
 
+// Protocol provenance: this CRC uses the Sensirion/SCD4x-compatible wire
+// parameters observed by the passive decoder (initial value 0xFF, polynomial
+// 0x31). It is local protocol code, not a vendored Sensirion driver.
 static uint8_t sensirion_crc(uint8_t byte0, uint8_t byte1) {
   uint8_t crc = 0xff;
   const uint8_t data[2] = {byte0, byte1};

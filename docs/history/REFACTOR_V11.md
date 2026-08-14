@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Refactor v11 — shared Sensirion sample + smaller BLE live layer
 
 This revision keeps the working ESP-IDF/ESPHome BLE implementation and reduces

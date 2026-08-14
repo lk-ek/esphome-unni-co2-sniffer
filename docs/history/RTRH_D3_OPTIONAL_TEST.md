@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # RESOLVED: D3/G11 is not required
 
 The shadow test documented below was completed successfully. The production decoder now uses only G10/D1 and G13/D2; D3/GPIO5 became free for other uses and is now used for USB/VBUS detection. This file is retained as historical validation context.

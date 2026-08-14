@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Compile-time debug capture option
 
 The hard-coded `RTRH_DEBUG_CAPTURE` switch is now exposed as an ESPHome option:

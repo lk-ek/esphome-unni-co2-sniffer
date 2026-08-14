@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "bus_sniffer.h"
 
@@ -315,7 +316,7 @@ void BusSniffer::setup() {
     auto *info = this->gatt_server_->get_service(esp32_ble::ESPBTUUID::from_uint16(0x180A));
     if (info != nullptr) {
       if (auto *manufacturer = info->get_characteristic(0x2A29))
-        manufacturer->set_value(std::string("Sensirion"));
+        manufacturer->set_value(std::string("Gadget"));
       if (auto *model = info->get_characteristic(0x2A24))
         model->set_value(std::string("MyCO2 Gadget"));
       if (auto *firmware = info->get_characteristic(0x2A26))

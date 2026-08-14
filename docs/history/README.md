@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Historical engineering notes
 
 This directory contains dated notes from reverse engineering, calibration, BLE experiments, power-saving work, and earlier refactors.

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Unni CO₂ Sensor Smartification
 
 This project adds a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor as a **passive sniffer**. The original Unni electronics remain in control; the ESP only observes existing signals and publishes the decoded measurements.
@@ -181,9 +184,11 @@ BLE builds also enable ESP32-C3 Bluetooth modem sleep and PHY/MAC/baseband power
 
 ## BLE / MyAmbience
 
-BLE is enabled by default. The component advertises a Sensirion-compatible temperature/RH/CO₂ payload and uses the GAP name `S` for MyAmbience compatibility.
+BLE is enabled by default. The component advertises a Sensirion Gadget/MyAmbience-compatible temperature/RH/CO₂ payload and uses the GAP name `S` for protocol compatibility. The BLE Device Information Service identifies the manufacturer as `Gadget`; the firmware does not claim that the device was manufactured by Sensirion.
 
-With `ble_history: true`, a persistent history ring is stored in the automatically created `senshist` partition and can be downloaded through MyAmbience.
+The production firmware does **not** vendor or directly link the Sensirion Gadget BLE Arduino Library or Sensirion UPT Core. The compatible advertisement, sample encoding, GATT topology and history-download wire format are implemented locally using ESPHome/ESP-IDF BLE APIs. Parts of that compatibility layer were developed with reference to Sensirion Gadget BLE 1.5.0 and Sensirion UPT Core 0.5.1; their BSD-3-Clause notices and detailed provenance are preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `LICENSES/`.
+
+With `ble_history: true`, a project-specific persistent history ring is stored in the automatically created `senshist` partition and can be downloaded through MyAmbience using the compatible Gadget history protocol.
 
 To build without BLE:
 
@@ -237,4 +242,6 @@ Verify polarity, signal levels and wiring on the actual hardware before connecti
 
 ## License
 
-GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
+Project-authored code and documentation are distributed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
+
+The Sensirion-derived/referenced BLE compatibility portions retain the applicable upstream BSD-3-Clause notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the complete upstream license texts in `LICENSES/`.

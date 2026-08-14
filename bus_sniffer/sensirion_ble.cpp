@@ -1,4 +1,12 @@
+// SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The Gadget/MyAmbience-compatible advertising wire format and identity
+// behavior are implemented with reference to Sensirion Gadget BLE 1.5.0
+// and Sensirion UPT Core 0.5.1 (BSD-3-Clause).
+// Upstream copyright notices: Copyright (c) 2020, Sensirion AG;
+// Copyright 2024 Sensirion AG.
+// See THIRD_PARTY_NOTICES.md and LICENSES/.
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"

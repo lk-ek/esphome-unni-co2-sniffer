@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Development process and history
 
 This document summarizes how the Unni CO₂ Sensor Smartification project evolved and why the current architecture looks the way it does. It is intentionally historical: for current wiring and configuration, use the project [`README.md`](../README.md), [`ISR_ARCHITECTURE.md`](ISR_ARCHITECTURE.md), and [`LIGHT_SLEEP.md`](LIGHT_SLEEP.md).

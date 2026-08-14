@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Refactor V10 — RT/RH decoder owns complete measurements
 
 The RT/RH component boundary now follows the data flow rather than the historical reverse-engineering steps.

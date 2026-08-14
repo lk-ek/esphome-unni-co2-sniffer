@@ -1,4 +1,11 @@
+// SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
+//
+// The Gadget/MyAmbience-compatible GATT UUID topology and history-download
+// wire format are implemented with reference to Sensirion Gadget BLE 1.5.0
+// (BSD-3-Clause). The local RAM/flash persistence layer is project-specific.
+// Upstream copyright notice: Copyright (c) 2020, Sensirion AG.
+// See THIRD_PARTY_NOTICES.md and LICENSES/.
 #include "ble_options.h"
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"

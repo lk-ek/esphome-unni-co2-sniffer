@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # RT/RH decoder v5 — diagnostics and quality
 
 Built on the temperature-compensated v4 calibration. The calibration
