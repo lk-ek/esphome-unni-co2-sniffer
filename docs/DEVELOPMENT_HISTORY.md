@@ -424,3 +424,17 @@ The diagnostic builds therefore use targeted `VERBOSE` logging for `api` and
 connection limit is left at ESPHome's default. Production and power-measurement
 builds retain their lower logging levels. No Home Assistant codegen, BLE identity,
 or power-policy behavior was changed as part of this stabilization.
+
+## 2026-08-15: SHT43 Home Assistant ListEntities A/B test
+
+Home Assistant could complete the encrypted native-API handshake and receive
+`DeviceInfoResponse`, but the SHT43 probe intermittently stopped responding as
+soon as Home Assistant sent `ListEntitiesRequest`. The device still had all
+entities registered locally.
+
+For isolation, the SHT43 probe now keeps the complete SHT43 identity, Device
+Settings GATT table, security configuration and BLE advertising behavior but
+does **not** register the experimental `BLE Pairing Mode` ESPHome switch. The
+normal/debug builds retain that switch. A SHT43 probe boot should therefore
+report one ESPHome switch instead of two. This is intentionally an A/B
+diagnostic, not a final pairing UX decision.
