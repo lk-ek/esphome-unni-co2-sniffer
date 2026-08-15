@@ -39,6 +39,14 @@ wifi:
 
 captive_portal:
 
+# Match the SHT43 DemoBoard security model closely enough to probe
+# MyAmbience pairing and Device Settings behavior.
+esp32_ble:
+  io_capability: display_yes_no
+  auth_req_mode: sc_mitm_bond
+  min_key_size: 10
+  max_key_size: 16
+
 esp32:
   board: seeed_xiao_esp32c3
   framework:

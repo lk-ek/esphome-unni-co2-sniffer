@@ -10,6 +10,7 @@
 
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
+#include "sensirion_settings.h"
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
@@ -57,12 +58,45 @@ void CO2Monitor0601::set_ble_advertising_interval(uint32_t interval_ms) {
 void CO2Monitor0601::gap_event_handler(esp_gap_ble_cb_event_t event,
                                    esp_ble_gap_cb_param_t *param) {
   sensirion_ble_gap_event_handler(event, param);
+  if (param == nullptr) return;
+
+  switch (event) {
+    case ESP_GAP_BLE_SEC_REQ_EVT:
+      // Existing bonds may request encryption outside the pairing window.
+      // Accept the security procedure; a new MITM pairing still needs the
+      // Numeric Comparison confirmation below.
+      esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+      break;
+    case ESP_GAP_BLE_NC_REQ_EVT: {
+      const uint32_t passkey = param->ble_security.key_notif.passkey;
+      const bool accept = this->ble_pairing_mode_;
+      ESP_LOGW(TAG, "BLE Numeric Comparison %06lu: %s",
+               static_cast<unsigned long>(passkey),
+               accept ? "accepted by active HA pairing window" : "rejected; pairing window is closed");
+      esp_ble_confirm_reply(param->ble_security.key_notif.bd_addr, accept);
+      break;
+    }
+    case ESP_GAP_BLE_AUTH_CMPL_EVT:
+      if (param->ble_security.auth_cmpl.success) {
+        ESP_LOGW(TAG, "BLE pairing/authentication complete");
+        if (this->ble_pairing_mode_) this->set_ble_pairing_mode(false);
+      } else {
+        ESP_LOGW(TAG, "BLE pairing/authentication failed, reason=0x%02X",
+                 static_cast<unsigned>(param->ble_security.auth_cmpl.fail_reason));
+      }
+      break;
+    default:
+      break;
+  }
 }
 
 void CO2Monitor0601::gatts_event_handler(esp_gatts_cb_event_t event,
                                      esp_gatt_if_t gatts_if,
                                      esp_ble_gatts_cb_param_t *param) {
   sensirion_ble_gatts_event_handler(event, param);
+  sensirion_settings_gatts_event_handler(event, gatts_if, param);
+  if (event == ESP_GATTS_CONNECT_EVT && param != nullptr && this->ble_pairing_mode_)
+    this->begin_ble_security_(param->connect.remote_bda);
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_gatts_event_handler(event, gatts_if, param);
 #else
@@ -95,6 +129,43 @@ float CO2Monitor0601::battery_percent_from_voltage_(float voltage) {
   return 0.0f;
 }
 
+
+
+#if UNNI_BLE_ENABLED
+void BlePairingModeSwitch::write_state(bool state) {
+  if (this->parent_ != nullptr)
+    this->parent_->set_ble_pairing_mode(state);
+  else
+    this->publish_state(state);
+}
+
+void CO2Monitor0601::begin_ble_security_(esp_bd_addr_t remote_bda) {
+  const esp_err_t err = esp_ble_set_encryption(remote_bda, ESP_BLE_SEC_ENCRYPT_MITM);
+  if (err != ESP_OK)
+    ESP_LOGW(TAG, "BLE pairing: esp_ble_set_encryption failed: %s", esp_err_to_name(err));
+  else
+    ESP_LOGW(TAG, "BLE pairing: requested authenticated encryption");
+}
+
+void CO2Monitor0601::set_ble_pairing_mode(bool enabled) {
+  this->ble_pairing_mode_ = enabled;
+  this->ble_pairing_started_ms_ = enabled ? millis() : 0;
+  if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(enabled);
+  if (enabled)
+    ESP_LOGW(TAG, "BLE Pairing Mode: ON (%lu ms authorization window; connect with MyAmbience now)",
+             static_cast<unsigned long>(this->ble_pairing_window_ms_));
+  else
+    ESP_LOGW(TAG, "BLE Pairing Mode: OFF");
+}
+
+void CO2Monitor0601::process_ble_pairing_window_() {
+  if (!this->ble_pairing_mode_) return;
+  if (static_cast<uint32_t>(millis() - this->ble_pairing_started_ms_) < this->ble_pairing_window_ms_) return;
+  ESP_LOGW(TAG, "BLE Pairing Mode expired");
+  this->set_ble_pairing_mode(false);
+}
+
+#endif
 
 void EnergySaveModeSwitch::write_state(bool state) {
   if (this->parent_ != nullptr)
@@ -380,6 +451,9 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 
 void CO2Monitor0601::setup() {
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
+#if UNNI_BLE_ENABLED
+  if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(false);
+#endif
 
   // Claim the shared GPIO ISR service before Wi-Fi/BLE setup reaches steady
   // state, but without touching any sniffer signal pin. ESP_INTR_FLAG_IRAM
@@ -415,6 +489,7 @@ void CO2Monitor0601::setup() {
 #if UNNI_BLE_HISTORY_ENABLED
     sensirion_history_configure_gatt(this->gatt_server_);
 #endif
+    sensirion_settings_configure_gatt(this->gatt_server_);
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }
@@ -741,6 +816,9 @@ void CO2Monitor0601::loop() {
 #endif
   this->process_usb_power_();
   this->process_energy_save_grace_();
+#if UNNI_BLE_ENABLED
+  this->process_ble_pairing_window_();
+#endif
   this->maybe_publish_ha_();
   this->process_battery_();
 

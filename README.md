@@ -296,3 +296,32 @@ Verify polarity, signal levels and wiring on the actual hardware before connecti
 Project-authored code and documentation are distributed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
 
 The Sensirion-derived/referenced BLE compatibility portions retain the applicable upstream BSD-3-Clause notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the complete upstream license texts in `LICENSES/`.
+
+### Experimental MyAmbience pairing / Device Settings probe
+
+The normal BLE builds expose an experimental SHT43-compatible Device Settings
+service (`0x8100`) to determine how MyAmbience discovers secure runtime settings.
+The probe mirrors the Settings Version (`0x81FF`), IsLogEnabled (`0x81FE`),
+IsAdvertiseDataEnabled (`0x8130`) and AlternativeDeviceName (`0x8120`)
+characteristic UUIDs. Writes are deliberately non-destructive for this test:
+changing the MyAmbience privacy/log/name controls only updates the probe value
+and logs the write; it does **not** yet disable Wi-Fi, Home Assistant or BLE live
+advertising.
+
+Normal/debug YAML builds configure ESPHome BLE for Secure Connections + bonding
++ MITM-capable Numeric Comparison. Home Assistant exposes `BLE Pairing Mode`.
+Enable it immediately before connecting/pairing from MyAmbience. The authorization
+window defaults to 60 seconds (`ble_pairing_window: 60s`). Numeric Comparison is
+accepted only while that window is open, and the window closes automatically
+after successful authentication or timeout. This is an experimental ownership
+gate: because the ESP has no local display/button, the ESP side automatically
+confirms the numeric comparison while the HA-authorized window is open rather
+than independently displaying and comparing the six-digit value.
+
+The SHT43 reference firmware marks Device Settings characteristics as encrypted
+and authenticated at the ATT attribute-permission level. ESPHome's current
+`BLECharacteristic` wrapper does not expose custom attribute permissions, so this
+probe initiates authenticated link encryption explicitly but cannot yet reproduce
+those per-characteristic permissions exactly. If MyAmbience requires the ATT
+permission failure itself to trigger/discover pairing, the next step is a small
+raw ESP-IDF GATT service or an ESPHome permission-setter extension.

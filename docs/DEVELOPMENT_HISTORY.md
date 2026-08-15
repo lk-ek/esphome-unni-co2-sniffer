@@ -410,3 +410,17 @@ framework available but intentionally registers zero ESPHome entities. ESPHome
 component now emits explicit zero counts when `home_assistant: false`. This does
 not instantiate entities or enable Wi-Fi/API; it only makes the zero-entity
 framework state explicit to core code generation.
+
+### 2026-08-15 — MyAmbience secure Device Settings pairing probe
+
+Added an experimental SHT43-compatible Device Settings service and a Home
+Assistant `BLE Pairing Mode` authorization window. Normal BLE builds request LE
+Secure Connections with bonding and MITM-capable Numeric Comparison. A new
+pairing attempt is confirmed on the ESP side only while the 60-second HA window
+is active; the window closes after successful authentication or timeout. The
+Device Settings UUIDs for version, logging, live-advertising/privacy and
+alternative name are present, but writes are intentionally non-destructive until
+MyAmbience behavior is verified. ESPHome's BLECharacteristic wrapper currently
+uses its default ATT permissions, so the probe does not yet duplicate the SHT43's
+per-characteristic encrypted/authenticated permissions; authenticated link
+security is requested proactively instead.

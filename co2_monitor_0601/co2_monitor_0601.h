@@ -20,6 +20,17 @@ namespace co2_monitor_0601 {
 
 class CO2Monitor0601;
 
+#if UNNI_BLE_ENABLED
+class BlePairingModeSwitch : public switch_::Switch {
+ public:
+  void set_parent(CO2Monitor0601 *parent) { this->parent_ = parent; }
+
+ protected:
+  void write_state(bool state) override;
+  CO2Monitor0601 *parent_{nullptr};
+};
+#endif
+
 class EnergySaveModeSwitch : public switch_::Switch {
  public:
   void set_parent(CO2Monitor0601 *parent) { this->parent_ = parent; }
@@ -60,6 +71,11 @@ class CO2Monitor0601 : public Component {
   }
   void set_energy_save_grace(uint32_t value) { this->energy_save_grace_ms_ = value; }
   void set_energy_save_mode_switch(EnergySaveModeSwitch *s) { this->energy_save_switch_ = s; }
+#if UNNI_BLE_ENABLED
+  void set_ble_pairing_mode_switch(BlePairingModeSwitch *s) { this->ble_pairing_switch_ = s; }
+  void set_ble_pairing_window(uint32_t value) { this->ble_pairing_window_ms_ = value; }
+  void set_ble_pairing_mode(bool enabled);
+#endif
   void set_energy_save_mode(bool enabled);
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
@@ -165,6 +181,10 @@ class CO2Monitor0601 : public Component {
   bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
   bool external_powered_() const { return this->usb_powered_() && !this->energy_save_policy_active_; }
   void process_energy_save_grace_();
+#if UNNI_BLE_ENABLED
+  void process_ble_pairing_window_();
+  void begin_ble_security_(esp_bd_addr_t remote_bda);
+#endif
   void apply_power_policy_(bool force = false);
   void process_rtrh_();
   void process_co2_();
@@ -194,6 +214,12 @@ class CO2Monitor0601 : public Component {
   bool power_policy_have_state_{false};
   bool power_policy_external_power_{false};
   EnergySaveModeSwitch *energy_save_switch_{nullptr};
+#if UNNI_BLE_ENABLED
+  BlePairingModeSwitch *ble_pairing_switch_{nullptr};
+  bool ble_pairing_mode_{false};
+  uint32_t ble_pairing_started_ms_{0};
+  uint32_t ble_pairing_window_ms_{60000};
+#endif
   uint32_t light_sleep_max_awake_ms_{10000};
   uint8_t rt_pin_{3};
   uint8_t rh_pin_{4};

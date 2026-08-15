@@ -25,6 +25,7 @@ Relevant local code:
 
 - `co2_monitor_0601/sensirion_ble.cpp`: Gadget/MyAmbience-compatible advertising layout and device-identity behavior are implemented with reference to the upstream Gadget BLE behavior.
 - `co2_monitor_0601/sensirion_history.cpp`: Gadget/MyAmbience-compatible GATT UUID topology and history-download wire format are implemented with reference to the upstream Gadget BLE implementation.
+- `co2_monitor_0601/sensirion_settings.cpp`: the experimental MyAmbience compatibility probe reproduces the public SHT43 DemoBoard Device Settings UUID topology and one-byte setting semantics observed in Sensirion's `sht43-demoboard-ble-firmware`; the implementation itself is project-specific and uses ESPHome/ESP-IDF APIs.
 
 The local RAM/flash history ring, persistence/journaling, power policy, passive sensor decoders, ESPHome integration, and orchestration are project-specific implementations and are not claimed to originate from Sensirion Gadget BLE.
 

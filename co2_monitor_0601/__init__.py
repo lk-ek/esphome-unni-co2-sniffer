@@ -53,6 +53,8 @@ CONF_BATTERY_LEVEL = "battery_level"
 CONF_USB_POWER_PIN = "usb_power_pin"
 CONF_USB_POWER = "usb_power"
 CONF_ENERGY_SAVE_MODE = "energy_save_mode"
+CONF_BLE_PAIRING_MODE = "ble_pairing_mode"
+CONF_BLE_PAIRING_WINDOW = "ble_pairing_window"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
@@ -73,6 +75,7 @@ CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 co2_monitor_0601_ns = cg.esphome_ns.namespace("co2_monitor_0601")
 CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
 EnergySaveModeSwitch = co2_monitor_0601_ns.class_("EnergySaveModeSwitch", switch.Switch)
+BlePairingModeSwitch = co2_monitor_0601_ns.class_("BlePairingModeSwitch", switch.Switch)
 
 
 def _sensor_schema(**kwargs):
@@ -196,6 +199,7 @@ def _validate_features(config):
     if not config[CONF_BLE]:
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
+        config.pop(CONF_BLE_PAIRING_MODE, None)
 
     if not config[CONF_HOME_ASSISTANT]:
         for key in SENSOR_OUTPUTS:
@@ -203,6 +207,7 @@ def _validate_features(config):
         for key in BINARY_OUTPUTS:
             config.pop(key, None)
         config.pop(CONF_ENERGY_SAVE_MODE, None)
+        config.pop(CONF_BLE_PAIRING_MODE, None)
 
     if not config[CONF_DEBUG_METRICS]:
         for key in DEBUG_SENSOR_DEFAULTS:
@@ -246,6 +251,8 @@ _SCHEMA = {
     cv.Optional(CONF_ENERGY_SAVE_MODE_DEFAULT, default=False): cv.boolean,
     cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
+    cv.Optional(CONF_BLE_PAIRING_MODE, default={"name": "BLE Pairing Mode", "icon": "mdi:bluetooth-connect"}): switch.switch_schema(BlePairingModeSwitch),
+    cv.Optional(CONF_BLE_PAIRING_WINDOW, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -393,6 +400,11 @@ async def to_code(config):
         energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
         cg.add(energy_save.set_parent(var))
         cg.add(var.set_energy_save_mode_switch(energy_save))
+        if ble_enabled:
+            pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
+            cg.add(pairing.set_parent(var))
+            cg.add(var.set_ble_pairing_mode_switch(pairing))
+            cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 

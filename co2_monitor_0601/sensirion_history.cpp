@@ -524,13 +524,6 @@ void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
   sync_gatt();
   server->enqueue_start_service(service);
 
-  const auto settings_uuid = ESPBTUUID::from_raw("00008100-B38D-4985-720E-0F993A68EE41");
-  auto *settings = server->get_service(settings_uuid);
-  if (settings == nullptr)
-    settings = server->create_service(settings_uuid, false, 1);
-  if (settings != nullptr)
-    server->enqueue_start_service(settings);
-
   gatt.bound = true;
   ESP_LOGI(TAG, "Sensirion GATT configured in component: %u sample(s), interval=%u ms",
            static_cast<unsigned>(history.count), static_cast<unsigned>(history.interval_ms));
