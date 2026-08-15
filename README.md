@@ -785,3 +785,9 @@ See:
 ### SHT43 sniffer-off A/B diagnostic
 
 The `i2c-sniffer-sht43-probe.yaml` variant in this diagnostic build sets `sniffer_enabled: false`. This keeps Wi-Fi, Home Assistant, BLE advertising, Sensirion history, and the SHT43 serial/T/RH GATT services active while completely skipping installation of the shared GPIO ISR service and all CO2/RT/RH capture/decoder GPIO setup. It is intended only to isolate BLE/GATT behavior from the passive sniffer ISR path.
+
+
+### RT/RH GPIO-without-ISR diagnostic
+
+The `rtrh_gpio_setup` option is a diagnostic A/B switch. When enabled with `rtrh_enabled: false`, the RT/RH pins and power-save wake configuration are initialized while the RT/RH edge ISR and decoder remain disabled. It is intended only for isolating ESP32-C3 radio/capture scheduling conflicts.
+

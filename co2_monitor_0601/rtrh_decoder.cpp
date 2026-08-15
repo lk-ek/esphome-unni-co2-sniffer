@@ -338,7 +338,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 #endif
 }
 
-bool setup(uint8_t rt_pin, uint8_t rh_pin) {
+bool setup(uint8_t rt_pin, uint8_t rh_pin, bool enable_edge_isr) {
   pin_rt = static_cast<gpio_num_t>(rt_pin);
   pin_rh = static_cast<gpio_num_t>(rh_pin);
   pins[0] = pin_rt;
@@ -352,13 +352,18 @@ bool setup(uint8_t rt_pin, uint8_t rh_pin) {
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 
-  for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   decoder.gpio_state = read_state();
   for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
 #if RTRH_DEBUG_CAPTURE
   debug.last_value = read_state();
 #endif
 
+  if (!enable_edge_isr) {
+    ESP_LOGW(TAG, "RT/RH GPIOs configured as inputs; edge interrupts intentionally disabled for A/B test");
+    return true;
+  }
+
+  for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   for (uint8_t i = 0; i < 2; i++) {
     err = gpio_isr_handler_add(pins[i], gpio_isr,
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));

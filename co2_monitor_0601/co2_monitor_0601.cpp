@@ -444,17 +444,20 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
   }
-  if (this->rtrh_enabled_) {
-    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
-      ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
+  const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_;
+  if (setup_rtrh_gpio) {
+    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_, this->rtrh_enabled_)) {
+      ESP_LOGE(TAG, "RT/RH GPIO setup failed");
       return false;
     }
+    if (!this->rtrh_enabled_)
+      ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO/power-save setup enabled; RT/RH edge ISR disabled");
   } else {
     ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO setup and edge ISR disabled; CO2 I2C sniffer only");
   }
 
   this->io_initialized_ = true;
-  if (this->rtrh_enabled_) {
+  if (setup_rtrh_gpio) {
     if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_,
                            this->rt_pin_, this->rh_pin_,
                            this->co2_sda_pin_, this->co2_scl_pin_)) {
@@ -890,16 +893,17 @@ void CO2Monitor0601::loop() {
 
   if (!this->io_initialized_) return;
 
-  if (this->rtrh_enabled_ && power_save::enabled())
+  const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_;
+  if (rtrh_power_path && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 
   if (this->rtrh_enabled_) this->process_rtrh_();
   this->process_co2_();
-  if (this->rtrh_enabled_) power_save::loop();
+  if (rtrh_power_path) power_save::loop();
 
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
-  if (this->rtrh_enabled_ && power_save::enabled())
+  if (rtrh_power_path && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 }
 

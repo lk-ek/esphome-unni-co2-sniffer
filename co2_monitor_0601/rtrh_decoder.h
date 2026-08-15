@@ -63,7 +63,7 @@ struct Measurement {
 };
 
 // GPIO3/D1 = RT, GPIO4/D2 = RH. D3/GPIO5 is not required.
-bool setup(uint8_t rt_pin, uint8_t rh_pin);
+bool setup(uint8_t rt_pin, uint8_t rh_pin, bool enable_edge_isr = true);
 void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);
