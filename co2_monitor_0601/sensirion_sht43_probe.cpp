@@ -75,8 +75,11 @@ void sensirion_sht43_probe_configure_serial_gatt(esp32_ble_server::BLEServer *se
 void sensirion_sht43_probe_configure_serial_temperature_gatt(esp32_ble_server::BLEServer *server) {
   if (gatt.bound || server == nullptr) return;
 
-  auto *sht = get_or_create_service(server, "00006000-B38D-4985-720E-0F993A68EE41", 4);
-  auto *temperature = get_or_create_service(server, "00002234-B38D-4985-720E-0F993A68EE41", 5);
+  // Minimal valid ATT reserves for this A/B build:
+  // - serial READ-only characteristic: service + declaration + value = 3 handles
+  // - temperature READ|NOTIFY characteristic: service + declaration + value + CCCD = 4 handles
+  auto *sht = get_or_create_service(server, "00006000-B38D-4985-720E-0F993A68EE41", 3);
+  auto *temperature = get_or_create_service(server, "00002234-B38D-4985-720E-0F993A68EE41", 4);
   if (sht == nullptr || temperature == nullptr) {
     ESP_LOGE(TAG, "failed to create SHT43 serial/temperature services");
     return;
@@ -98,7 +101,7 @@ void sensirion_sht43_probe_configure_serial_temperature_gatt(esp32_ble_server::B
   server->enqueue_start_service(sht);
   server->enqueue_start_service(temperature);
   gatt.bound = true;
-  ESP_LOGI(TAG, "SHT43 serial + temperature GATT configured (0x6000/0x6001 + 0x2234/0x2235)");
+  ESP_LOGI(TAG, "SHT43 serial + temperature GATT configured with minimal handle reserves (serial=3, temperature=4)");
 }
 
 void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
