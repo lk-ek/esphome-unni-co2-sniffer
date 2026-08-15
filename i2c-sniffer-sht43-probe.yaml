@@ -11,7 +11,11 @@ external_components:
       path: .
 
 logger:
-  level: DEBUG
+  level: VERBOSE
+  initial_level: DEBUG
+  logs:
+    api: VERBOSE
+    api.connection: VERBOSE
 
 api:
   encryption:

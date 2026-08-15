@@ -410,3 +410,17 @@ framework available but intentionally registers zero ESPHome entities. ESPHome
 component now emits explicit zero counts when `home_assistant: false`. This does
 not instantiate entities or enable Wi-Fi/API; it only makes the zero-entity
 framework state explicit to core code generation.
+
+### 2026-08-15 — Native API diagnostics stabilized
+
+After restoring the known-good Home Assistant entity-registration path, both the
+normal debug build and the SHT43 identity probe again exposed their entities to
+Home Assistant. A subsequent API-isolation test showed that `VERY_VERBOSE`
+logging together with an artificially reduced API connection limit could itself
+make the ESP32-C3 less stable.
+
+The diagnostic builds therefore use targeted `VERBOSE` logging for `api` and
+`api.connection`, while keeping the initial logger level at `DEBUG`. The API
+connection limit is left at ESPHome's default. Production and power-measurement
+builds retain their lower logging levels. No Home Assistant codegen, BLE identity,
+or power-policy behavior was changed as part of this stabilization.
