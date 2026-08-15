@@ -35,6 +35,7 @@ CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
+CONF_HOME_ASSISTANT = "home_assistant"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
@@ -196,6 +197,13 @@ def _validate_features(config):
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
 
+    if not config[CONF_HOME_ASSISTANT]:
+        for key in SENSOR_OUTPUTS:
+            config.pop(key, None)
+        for key in BINARY_OUTPUTS:
+            config.pop(key, None)
+        config.pop(CONF_ENERGY_SAVE_MODE, None)
+
     if not config[CONF_DEBUG_METRICS]:
         for key in DEBUG_SENSOR_DEFAULTS:
             config.pop(key, None)
@@ -221,6 +229,7 @@ _SCHEMA = {
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
     cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
@@ -303,6 +312,7 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     ble_enabled = config[CONF_BLE]
+    home_assistant_enabled = config[CONF_HOME_ASSISTANT]
 
     # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
     # Keep that platform detail out of user YAML.
@@ -326,12 +336,15 @@ async def to_code(config):
     # Child sensor entities are created from this component schema rather than
     # from a top-level `sensor:` platform entry. Ensure the core/API/web-server
     # sensor domain is compiled in so App-registered child sensors are exposed.
+    # The sensor/switch framework remains linked because the runtime source is
+    # shared between normal and BLE-only builds. In BLE-only mode no entities
+    # are instantiated and no API/Wi-Fi components are present in the shipped
+    # build YAML.
     cg.add_define("USE_SENSOR")
-    # USB Power is a primary binary sensor; diagnostic binary sensors are
-    # additionally instantiated when debug_metrics is enabled.
     cg.add_define("USE_BINARY_SENSOR")
     cg.add_define("USE_SWITCH")
 
+    cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
@@ -365,10 +378,12 @@ async def to_code(config):
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
     cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
 
-    energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
-    cg.add(energy_save.set_parent(var))
-    cg.add(var.set_energy_save_mode_switch(energy_save))
+    if home_assistant_enabled:
+        energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
+        cg.add(energy_save.set_parent(var))
+        cg.add(var.set_energy_save_mode_switch(energy_save))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 
-    await _configure_outputs(var, config)
+    if home_assistant_enabled:
+        await _configure_outputs(var, config)

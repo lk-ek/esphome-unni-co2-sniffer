@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Measurement build: sensor decoding + Sensirion-compatible BLE only.
+# No Wi-Fi, ESPHome API, Home Assistant entities, captive portal or OTA are
+# compiled/configured by this YAML. Flash over USB.
+
+esphome:
+  name: i2csniffer-ble-only
+  friendly_name: I2C-Sniffer BLE Only
+
+external_components:
+  - source:
+      type: local
+      path: .
+
+logger:
+  level: WARN
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: esp-idf
+
+co2_monitor_0601:
+  home_assistant: false
+  ble: true
+  ble_live: true
+  ble_history: true
+
+  # Use true to measure the same low-power policy as battery operation while
+  # the device is physically supplied through a USB power meter.
+  energy_save_mode_default: true
+  energy_save_grace: 0s
+
+  sniffer_start_delay: 10s
+  debug_metrics: false
+  debug_capture: false

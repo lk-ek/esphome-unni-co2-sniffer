@@ -7,6 +7,19 @@ This project adds a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor as a **p
 
 The tested device is sold as **CO2 Monitor Carbon Dioxide Detector 0601**. The ESPHome component is therefore named `co2_monitor_0601`. Older configurations using the former `bus_sniffer:` component key must be changed to `co2_monitor_0601:`.
 
+
+## BLE-only measurement build
+
+For power measurements without Home Assistant/Wi-Fi overhead, use
+`i2c-sniffer-ble-only.yaml`. It sets `home_assistant: false` and intentionally
+omits `wifi:`, `api:`, captive portal and OTA. Sensor decoding, BLE live data
+and BLE history remain active. Flash this build over USB.
+
+`home_assistant: false` is a compile-time configuration choice: no HA entities
+or Energy Save Mode HA switch are instantiated. Select the power policy with
+`energy_save_mode_default` instead. For USB power-meter measurements that
+should emulate battery operation, set it to `true`.
+
 ## What it provides
 
 - CO₂, temperature and relative humidity in ESPHome / Home Assistant
