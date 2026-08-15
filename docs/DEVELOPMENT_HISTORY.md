@@ -1,3 +1,12 @@
+
+## 2026-08-15: stabilize Wi-Fi association and stage SHT43 GATT restoration
+
+- Changed all Wi-Fi builds to `fast_connect: false` while retaining `post_connect_roaming: false`; this lets ESPHome scan at boot and select the stronger BSSID instead of reusing a weaker saved AP.
+- Kept the SHT43 probe on the known-stable single HA switch shape.
+- Re-enabled only the SHT43 serial-number GATT service (`0x6000` / `0x6001`) as the first staged restore step.
+- Temperature, humidity and Device Settings (`0x8100`) GATT services remain disabled for this A/B test.
+- Retained heap diagnostics to watch the BLE/API memory margin during the staged restore.
+
 <!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 

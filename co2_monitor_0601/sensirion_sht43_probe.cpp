@@ -48,6 +48,30 @@ void set_float(BLECharacteristic *characteristic, float value) {
 }
 }  // namespace
 
+
+void sensirion_sht43_probe_configure_serial_gatt(esp32_ble_server::BLEServer *server) {
+  if (gatt.bound || server == nullptr) return;
+
+  auto *sht = get_or_create_service(server, "00006000-B38D-4985-720E-0F993A68EE41", 4);
+  if (sht == nullptr) {
+    ESP_LOGE(TAG, "failed to create SHT43 serial-number service");
+    return;
+  }
+
+  gatt.serial = get_or_create(sht, "00006001-B38D-4985-720E-0F993A68EE41",
+                              BLECharacteristic::PROPERTY_READ);
+  if (gatt.serial == nullptr) {
+    ESP_LOGE(TAG, "failed to create SHT43 serial-number characteristic");
+    return;
+  }
+
+  const uint32_t serial = 0x68430001U;
+  gatt.serial->set_value(ByteBuffer::wrap(serial));
+  server->enqueue_start_service(sht);
+  gatt.bound = true;
+  ESP_LOGI(TAG, "SHT43 serial GATT configured (0x6000/0x6001 only)");
+}
+
 void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
   if (gatt.bound || server == nullptr) return;
 

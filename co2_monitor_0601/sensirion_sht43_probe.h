@@ -9,6 +9,7 @@
 namespace esphome {
 namespace co2_monitor_0601 {
 
+void sensirion_sht43_probe_configure_serial_gatt(esp32_ble_server::BLEServer *server);
 void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server);
 void sensirion_sht43_probe_set_temperature_humidity(float temperature_c, float humidity_percent);
 
