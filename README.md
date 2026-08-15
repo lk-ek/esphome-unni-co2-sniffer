@@ -791,3 +791,8 @@ The `i2c-sniffer-sht43-probe.yaml` variant in this diagnostic build sets `sniffe
 
 The `rtrh_gpio_setup` option is a diagnostic A/B switch. When enabled with `rtrh_enabled: false`, the RT/RH pins and power-save wake configuration are initialized while the RT/RH edge ISR and decoder remain disabled. It is intended only for isolating ESP32-C3 radio/capture scheduling conflicts.
 
+
+## Diagnostic build: RT/RH publication A/B
+
+The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and publication path again while retaining the RAM-headroom test baseline: web server and captive portal remain disabled, SHT43 serial/T/RH GATT remains enabled, Device Settings 0x8100 remains disabled, and Wi-Fi uses normal scanning with post-connect roaming disabled. This isolates the effect of ESPHome/BLE publication after the ISR and decoder-only stages proved stable.
+

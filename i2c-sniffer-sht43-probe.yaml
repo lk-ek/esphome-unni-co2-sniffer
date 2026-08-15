@@ -61,10 +61,10 @@ co2_monitor_0601:
   sniffer_enabled: true
   # Decoder A/B: run the real RT/RH edge ISR and complete decoder/math path,
   # but suppress all RT/RH publication to HA, BLE and history.
-  rtrh_enabled: false
-  rtrh_gpio_setup: true
-  rtrh_edge_capture: true
-  rtrh_decode_only: true
+  rtrh_enabled: true
+  rtrh_gpio_setup: false
+  rtrh_edge_capture: false
+  rtrh_decode_only: false
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false
