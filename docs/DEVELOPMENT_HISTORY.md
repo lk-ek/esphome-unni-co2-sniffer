@@ -1,11 +1,3 @@
-## 2026-08-15: bisect SHT43 temperature and humidity GATT memory pressure
-
-- Kept `fast_connect: false` and `post_connect_roaming: false` as the stable Wi-Fi baseline.
-- Kept the SHT43 serial-number GATT service (`0x6000` / `0x6001`) enabled.
-- Re-enabled only the temperature service (`0x2234` / `0x2235`) for this A/B step.
-- Left humidity (`0x1234` / `0x1235`) and Device Settings (`0x8100`) disabled.
-- Retained heap diagnostics to distinguish a single-service issue from cumulative GATT memory/fragmentation pressure.
-
 
 ## 2026-08-15: stabilize Wi-Fi association and stage SHT43 GATT restoration
 

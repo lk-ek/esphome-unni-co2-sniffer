@@ -11,11 +11,7 @@ external_components:
       path: .
 
 logger:
-  level: VERBOSE
-  initial_level: DEBUG
-  logs:
-    api: VERBOSE
-    api.connection: VERBOSE
+  level: DEBUG
 
 api:
   encryption:
@@ -41,10 +37,6 @@ wifi:
     ssid: "I2CSniffer Fallback Hotspot"
     password: !secret i2csniffer__ap_password
 
-captive_portal:
-
-web_server:
-  port: 80
 
 # Match the SHT43 DemoBoard security model closely enough to probe
 # MyAmbience pairing and Device Settings behavior.
@@ -63,8 +55,8 @@ co2_monitor_0601:
   home_assistant: true
   # Experimental identity only: advertise as a new SHT43 DemoBoard so
   # MyAmbience cannot reuse the cached SCD-Gadget classification.
-  # A/B test: the SHT43-specific GATT services are intentionally disabled in
-  # C++ while identity/advertising/security and Sensirion history stay active.
+  # RAM-headroom A/B test: full SHT43 Serial + T/RH GATT stays enabled while
+  # optional HTTP/captive-portal diagnostics are removed from this build.
   sht43_identity_probe: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
@@ -73,4 +65,5 @@ co2_monitor_0601:
   energy_save_grace: 3s
   sniffer_start_delay: 10s
   debug_metrics: true
-  debug_capture: true
+  # Raw capture requires the HTTP server and is disabled for this RAM A/B test.
+  debug_capture: false
