@@ -424,3 +424,15 @@ MyAmbience behavior is verified. ESPHome's BLECharacteristic wrapper currently
 uses its default ATT permissions, so the probe does not yet duplicate the SHT43's
 per-characteristic encrypted/authenticated permissions; authenticated link
 security is requested proactively instead.
+
+### MyAmbience SHT43 identity probe (2026-08-15)
+
+A dedicated diagnostic build can set `sht43_identity_probe: true`. It uses a
+separate test BLE identity (`...:68:43`), local name `SHT43 DB`, Sensirion SHT
+advertisement sample type `0x06`, SHT-style temperature/humidity ticks, and the
+SHT/temperature/humidity GATT UUID topology alongside the Device Settings probe.
+The separate identity is intentional so MyAmbience cannot reuse its previously
+cached SCD-Gadget classification for device `68:3A`.
+
+This is a compatibility experiment only. The normal build remains the
+T/RH/CO2 SCD-Gadget identity and does not claim to be a Sensirion SHT43 board.

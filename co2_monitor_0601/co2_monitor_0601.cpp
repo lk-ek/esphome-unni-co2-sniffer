@@ -11,6 +11,9 @@
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
 #include "sensirion_settings.h"
+#if UNNI_SHT43_IDENTITY_PROBE
+#include "sensirion_sht43_probe.h"
+#endif
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
@@ -450,6 +453,11 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 }
 
 void CO2Monitor0601::setup() {
+#if UNNI_HOME_ASSISTANT_ENABLED
+  ESP_LOGI(TAG, "Home Assistant entities: enabled (compile-time)");
+#else
+  ESP_LOGI(TAG, "Home Assistant entities: disabled (compile-time BLE-only build)");
+#endif
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
 #if UNNI_BLE_ENABLED
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(false);
@@ -479,17 +487,29 @@ void CO2Monitor0601::setup() {
   if (this->gatt_server_ != nullptr) {
     auto *info = this->gatt_server_->get_service(esp32_ble::ESPBTUUID::from_uint16(0x180A));
     if (info != nullptr) {
+#if UNNI_SHT43_IDENTITY_PROBE
+      if (auto *manufacturer = info->get_characteristic(0x2A29))
+        manufacturer->set_value(std::string("Sensirion"));
+      if (auto *model = info->get_characteristic(0x2A24))
+        model->set_value(std::string("SHT43 DB"));
+      if (auto *firmware = info->get_characteristic(0x2A26))
+        firmware->set_value(std::string("1.0.0"));
+#else
       if (auto *manufacturer = info->get_characteristic(0x2A29))
         manufacturer->set_value(std::string("Gadget"));
       if (auto *model = info->get_characteristic(0x2A24))
         model->set_value(std::string("MyCO2 Gadget"));
       if (auto *firmware = info->get_characteristic(0x2A26))
         firmware->set_value(std::string("1.0.1"));
+#endif
     }
 #if UNNI_BLE_HISTORY_ENABLED
     sensirion_history_configure_gatt(this->gatt_server_);
 #endif
     sensirion_settings_configure_gatt(this->gatt_server_);
+#if UNNI_SHT43_IDENTITY_PROBE
+    sensirion_sht43_probe_configure_gatt(this->gatt_server_);
+#endif
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }

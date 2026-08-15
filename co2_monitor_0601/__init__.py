@@ -55,6 +55,7 @@ CONF_USB_POWER = "usb_power"
 CONF_ENERGY_SAVE_MODE = "energy_save_mode"
 CONF_BLE_PAIRING_MODE = "ble_pairing_mode"
 CONF_BLE_PAIRING_WINDOW = "ble_pairing_window"
+CONF_SHT43_IDENTITY_PROBE = "sht43_identity_probe"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
@@ -185,6 +186,11 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
+    # `home_assistant` is deliberately opt-out. Materialize the default here as
+    # well as in cv.Optional so every later validation/codegen path sees True
+    # when the key is omitted.
+    config.setdefault(CONF_HOME_ASSISTANT, True)
+
     pins = [config[CONF_RT_PIN], config[CONF_RH_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
     if len(set(pins)) != len(pins):
         raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
@@ -195,13 +201,18 @@ def _validate_features(config):
         raise cv.Invalid("ble_live: true requires ble: true")
     if config[CONF_BLE_HISTORY] and not config[CONF_BLE]:
         raise cv.Invalid("ble_history: true requires ble: true")
+    if config.get(CONF_SHT43_IDENTITY_PROBE, False) and not config[CONF_BLE]:
+        raise cv.Invalid("sht43_identity_probe: true requires ble: true")
 
     if not config[CONF_BLE]:
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
         config.pop(CONF_BLE_PAIRING_MODE, None)
 
-    if not config[CONF_HOME_ASSISTANT]:
+    # Be defensive here: Home Assistant support is ON unless explicitly disabled.
+    # This mirrors the schema default even if a caller reaches validation with the
+    # optional key absent (for example via composed/external component schemas).
+    if not config.get(CONF_HOME_ASSISTANT, True):
         for key in SENSOR_OUTPUTS:
             config.pop(key, None)
         for key in BINARY_OUTPUTS:
@@ -235,6 +246,7 @@ _SCHEMA = {
     ),
     cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
+    cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
@@ -319,7 +331,10 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     ble_enabled = config[CONF_BLE]
-    home_assistant_enabled = config[CONF_HOME_ASSISTANT]
+    # HA is opt-out. Keep a code-level True fallback in addition to the schema
+    # default so a missing key can never silently turn a normal build BLE-only.
+    home_assistant_enabled = config.get(CONF_HOME_ASSISTANT, True)
+    sht43_identity_probe = config.get(CONF_SHT43_IDENTITY_PROBE, False)
 
     # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
     # Keep that platform detail out of user YAML.
@@ -366,6 +381,7 @@ async def to_code(config):
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
+    cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
 
     if ble_enabled:
@@ -373,7 +389,7 @@ async def to_code(config):
         # Set the Sensirion GAP/local name on ESPHome's BLE component itself.
         # This runs before component setup and prevents ESP32BLE from falling
         # back to the ESPHome node name (for example "i2csniffer").
-        cg.add(ble.set_name("S"))
+        cg.add(ble.set_name("SHT43 DB" if sht43_identity_probe else "S"))
         esp32_ble.register_gatts_event_handler(ble, var)
         esp32_ble.register_gap_event_handler(ble, var)
 

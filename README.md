@@ -325,3 +325,15 @@ probe initiates authenticated link encryption explicitly but cannot yet reproduc
 those per-characteristic permissions exactly. If MyAmbience requires the ATT
 permission failure itself to trigger/discover pairing, the next step is a small
 raw ESP-IDF GATT service or an ESPHome permission-setter extension.
+
+### Experimental MyAmbience SHT43 identity probe
+
+`i2c-sniffer-sht43-probe.yaml` is a diagnostic build for determining whether
+MyAmbience enables the SHT43-only Device Settings UI from gadget identity. It
+uses `sht43_identity_probe: true`, advertises as `SHT43 DB` with SHT sample type
+`0x06`, and deliberately uses test device ID `68:43` to avoid cached SCD-Gadget
+classification. Do not use this identity mode as the normal production build.
+
+`home_assistant` is opt-out and defaults to `true`; all shipped normal/debug
+YAML files also state `home_assistant: true` explicitly. Only the BLE-only
+measurement YAML sets it to `false`.

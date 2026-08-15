@@ -10,6 +10,9 @@
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
+#if UNNI_SHT43_IDENTITY_PROBE
+#include "sensirion_sht43_probe.h"
+#endif
 
 #include "esphome/components/esp32_ble/ble.h"
 #include "esphome/core/log.h"
@@ -24,7 +27,12 @@ namespace co2_monitor_0601 {
 static const char *TAG = "sensirion_ble";
 
 // Keep the identity used by the working MyAmbience test build.
+#if UNNI_SHT43_IDENTITY_PROBE
+// Separate identity avoids MyAmbience reusing its cached SCD-Gadget classification.
+static constexpr uint8_t TEST_BT_MAC[6] = {0x82, 0xF1, 0xB2, 0x61, 0x68, 0x43};
+#else
 static constexpr uint8_t TEST_BT_MAC[6] = {0x82, 0xF1, 0xB2, 0x61, 0x68, 0x3A};
+#endif
 static esp_err_t bt_mac_set_result = ESP_FAIL;
 
 __attribute__((constructor)) static void set_bt_identity_early() {
@@ -35,15 +43,16 @@ static constexpr uint8_t COMPANY_ID_LO = 0xD5;
 static constexpr uint8_t COMPANY_ID_HI = 0x06;
 static constexpr uint8_t ADV_TYPE_SAMPLE = 0x00;
 static constexpr uint8_t SAMPLE_TYPE_T_RH_CO2_ALT = 0x08;
+static constexpr uint8_t SAMPLE_TYPE_SHT43 = 0x06;
 
 static SensirionSample sample;
 static uint16_t device_id = 0;
 static bool device_id_ready = false;
 static uint32_t advertising_interval_ms = 2000;
 
-// Complete legacy advertising packet:
-// flags (3) + manufacturer data field (20) + complete name "S" (3).
-static std::array<uint8_t, 26> advertisement{};
+// Maximum legacy advertising payload; actual length depends on identity mode.
+static std::array<uint8_t, 31> advertisement{};
+static size_t advertisement_length = 0;
 static bool advertisement_ready = false;
 static uint32_t payload_version = 0;
 static uint32_t configured_version = 0;
@@ -82,7 +91,7 @@ static void configure_advertisement() {
 
   adv_state = AdvState::CONFIGURING;
   configured_version = payload_version;
-  const esp_err_t err = esp_ble_gap_config_adv_data_raw(advertisement.data(), advertisement.size());
+  const esp_err_t err = esp_ble_gap_config_adv_data_raw(advertisement.data(), advertisement_length);
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "adv data setup failed: %s", esp_err_to_name(err));
     adv_state = AdvState::IDLE;
@@ -200,6 +209,36 @@ static void build_advertisement() {
   advertisement[p++] = ESP_BLE_AD_TYPE_FLAG;
   advertisement[p++] = ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT;
 
+#if UNNI_SHT43_IDENTITY_PROBE
+  // Official SHT43 DemoBoard advertisement identity: Sensirion manufacturer
+  // data, advertisement type 0x00, sample type 0x06, LSB-first device ID,
+  // raw SHT4x T/RH ticks, and complete local name "SHT43 DB".
+  auto clamp_u16 = [](float value) -> uint16_t {
+    if (value < 0.0f) return 0;
+    if (value > 65535.0f) return 65535;
+    return static_cast<uint16_t>(value + 0.5f);
+  };
+  const uint16_t t_ticks = clamp_u16((sample.temperature_c + 45.0f) * 65535.0f / 175.0f);
+  const uint16_t rh_ticks = clamp_u16((sample.humidity_percent + 6.0f) * 65535.0f / 125.0f);
+
+  advertisement[p++] = 11;  // type byte + 10 bytes manufacturer data
+  advertisement[p++] = ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE;
+  advertisement[p++] = COMPANY_ID_LO;
+  advertisement[p++] = COMPANY_ID_HI;
+  advertisement[p++] = ADV_TYPE_SAMPLE;
+  advertisement[p++] = SAMPLE_TYPE_SHT43;
+  advertisement[p++] = static_cast<uint8_t>(id & 0xFF);
+  advertisement[p++] = static_cast<uint8_t>(id >> 8);
+  advertisement[p++] = static_cast<uint8_t>(t_ticks & 0xFF);
+  advertisement[p++] = static_cast<uint8_t>(t_ticks >> 8);
+  advertisement[p++] = static_cast<uint8_t>(rh_ticks & 0xFF);
+  advertisement[p++] = static_cast<uint8_t>(rh_ticks >> 8);
+
+  static constexpr char PROBE_NAME[] = "SHT43 DB";
+  advertisement[p++] = sizeof(PROBE_NAME);  // type + 8-byte name
+  advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
+  for (size_t i = 0; i < sizeof(PROBE_NAME) - 1; ++i) advertisement[p++] = PROBE_NAME[i];
+#else
   advertisement[p++] = 19;  // type byte + 18 bytes manufacturer data
   advertisement[p++] = ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE;
   advertisement[p++] = COMPANY_ID_LO;
@@ -208,26 +247,33 @@ static void build_advertisement() {
   advertisement[p++] = SAMPLE_TYPE_T_RH_CO2_ALT;
   advertisement[p++] = static_cast<uint8_t>(id >> 8);
   advertisement[p++] = static_cast<uint8_t>(id & 0xFF);
-  for (uint8_t byte : encoded)
-    advertisement[p++] = byte;
-  // The legacy Gadget library advertises a 12-byte sample backing store.
-  for (int i = 0; i < 4; i++)
-    advertisement[p++] = 0;
+  for (uint8_t byte : encoded) advertisement[p++] = byte;
+  for (int i = 0; i < 4; i++) advertisement[p++] = 0;
 
   advertisement[p++] = 0x02;
   advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
   advertisement[p++] = 'S';
+#endif
+  advertisement_length = p;
 
   advertisement_ready = true;
   ++payload_version;
   request_refresh();
 
+#if UNNI_SHT43_IDENTITY_PROBE
+  ESP_LOGD(TAG, "SHT43 probe advertisement: %.2f C / %.1f %%, device 0x%04X",
+           sample.temperature_c, sample.humidity_percent, static_cast<unsigned>(id));
+#else
   ESP_LOGD(TAG, "T_RH_CO2_ALT: %.2f C / %.1f %% / %u ppm, device 0x%04X",
            sample.temperature_c, sample.humidity_percent,
            static_cast<unsigned>(sample.co2_ppm), static_cast<unsigned>(id));
+#endif
 }
 
 void sensirion_ble_set_temperature_humidity(float temperature_c, float humidity_percent) {
+#if UNNI_SHT43_IDENTITY_PROBE
+  sensirion_sht43_probe_set_temperature_humidity(temperature_c, humidity_percent);
+#endif
   sample.temperature_c = temperature_c;
   sample.humidity_percent = humidity_percent;
   sample.have_temperature = true;
@@ -248,10 +294,12 @@ const SensirionSample &sensirion_ble_sample() {
 }
 
 void sensirion_ble_setup() {
-  // The component sets ESPHome's ESP32BLE name to "S" during codegen so the
-  // GAP name is correct before BLE setup. Re-apply it here defensively for
-  // direct IDF GAP users and to keep the runtime identity explicit.
+#if UNNI_SHT43_IDENTITY_PROBE
+  esp_ble_gap_set_device_name("SHT43 DB");
+  ESP_LOGW(TAG, "SHT43 identity probe ON: name='SHT43 DB', sample=0x06, test device=0x6843");
+#else
   esp_ble_gap_set_device_name("S");
+#endif
 
   adv_params = {
       .adv_int_min = 0,

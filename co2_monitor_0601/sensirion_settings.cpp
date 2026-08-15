@@ -69,7 +69,11 @@ void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server) {
   gatt.version->set_value({0x01});
   set_bool(gatt.log_enabled, false);
   set_bool(gatt.advertise_data_enabled, true);
+#if UNNI_SHT43_IDENTITY_PROBE
+  gatt.alternative_name->set_value(std::string("SHT43 DB"));
+#else
   gatt.alternative_name->set_value(std::string("MyCO2 Gadget"));
+#endif
 
   gatt.log_enabled->on_write([](std::span<const uint8_t> x, uint16_t conn_id) {
     if (x.empty()) return;

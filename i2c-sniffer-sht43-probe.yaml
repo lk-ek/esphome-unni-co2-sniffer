@@ -3,7 +3,7 @@
 
 esphome:
   name: i2csniffer
-  friendly_name: I2C-Sniffer
+  friendly_name: I2C-Sniffer SHT43 Probe
 
 external_components:
   - source:
@@ -11,7 +11,7 @@ external_components:
       path: .
 
 logger:
-  level: WARN
+  level: DEBUG
 
 api:
   encryption:
@@ -39,23 +39,33 @@ wifi:
 
 captive_portal:
 
+web_server:
+  port: 80
+
+# Match the SHT43 DemoBoard security model closely enough to probe
+# MyAmbience pairing and Device Settings behavior.
+esp32_ble:
+  io_capability: display_yes_no
+  auth_req_mode: sc_mitm_bond
+  min_key_size: 10
+  max_key_size: 16
+
 esp32:
   board: seeed_xiao_esp32c3
   framework:
     type: esp-idf
-# BLE deliberately omitted for timing A/B test.
 
 co2_monitor_0601:
   # Home Assistant support is opt-out; explicit here to make build intent obvious.
   home_assistant: true
+  # Experimental identity only: advertise as a new SHT43 DemoBoard so
+  # MyAmbience cannot reuse the cached SCD-Gadget classification.
+  sht43_identity_probe: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false
   # Keep HA/API reachable briefly before Light-sleep may drop native USB serial.
   energy_save_grace: 3s
-  ble: false
-  ble_live: false
-  ble_history: false
   sniffer_start_delay: 10s
-  debug_metrics: false
-  debug_capture: false
+  debug_metrics: true
+  debug_capture: true
