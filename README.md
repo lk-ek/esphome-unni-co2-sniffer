@@ -198,23 +198,11 @@ The SHT43 probe is diagnostic firmware and should not be used as the normal devi
 
 # Home Assistant
 
-Home Assistant support is enabled by default:
+The component always creates its ESPHome sensor, binary-sensor and switch entities through the normal ESPHome registration path.
 
-```yaml
-co2_monitor_0601:
-  home_assistant: true
-```
+A normal build includes `wifi:` and `api:` and therefore exposes those entities to Home Assistant. There is no separate component-level `home_assistant` compile-time switch.
 
-Omitting `home_assistant` is equivalent to setting it to `true`.
-
-Only the dedicated BLE-only build intentionally uses:
-
-```yaml
-co2_monitor_0601:
-  home_assistant: false
-```
-
-In that build the local ESPHome entity objects remain registered internally so ESPHome 2026.8 can derive its entity-vector sizes correctly, but the supplied YAML contains no `wifi:` or `api:` component, so they are not exposed to Home Assistant and cause no network traffic.
+The dedicated BLE-only build simply omits `wifi:` and `api:`. Its local entity objects still exist inside the firmware, but there is no native API connection that could expose them to Home Assistant. This avoids special ESPHome entity-count code paths while still removing all Wi-Fi/API runtime power consumption.
 
 Normal builds create:
 
@@ -251,8 +239,7 @@ Useful options include:
 
 ```yaml
 co2_monitor_0601:
-  # Home Assistant
-  home_assistant: true
+  # Home Assistant publication cadence when api: is present
   ha_publish_interval: 60s
 
   # BLE
@@ -385,6 +372,7 @@ It intentionally contains no:
 
 It keeps:
 
+- the normal local ESPHome entity objects (not externally exposed because `api:` is absent)
 - sensor decoding
 - BLE live data
 - BLE history
@@ -394,8 +382,6 @@ The relevant configuration is:
 
 ```yaml
 co2_monitor_0601:
-  home_assistant: false
-
   ble: true
   ble_live: true
   ble_history: true

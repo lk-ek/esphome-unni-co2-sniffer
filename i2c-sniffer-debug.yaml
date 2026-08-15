@@ -56,8 +56,6 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
-  # Home Assistant support is opt-out; explicit here to make build intent obvious.
-  home_assistant: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false

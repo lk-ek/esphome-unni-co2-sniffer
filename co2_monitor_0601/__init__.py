@@ -35,7 +35,6 @@ CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
-CONF_HOME_ASSISTANT = "home_assistant"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
@@ -186,11 +185,6 @@ BINARY_OUTPUTS = {
 
 
 def _validate_features(config):
-    # `home_assistant` is deliberately opt-out. Materialize the default here as
-    # well as in cv.Optional so every later validation/codegen path sees True
-    # when the key is omitted.
-    config.setdefault(CONF_HOME_ASSISTANT, True)
-
     pins = [config[CONF_RT_PIN], config[CONF_RH_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
     if len(set(pins)) != len(pins):
         raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
@@ -207,17 +201,6 @@ def _validate_features(config):
     if not config[CONF_BLE]:
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
-        config.pop(CONF_BLE_PAIRING_MODE, None)
-
-    # Keep the BLE-only build on the previously validated ESPHome 2026.8 path:
-    # do not create entity objects at all when HA support is disabled. Shared
-    # framework types still require explicit zero capacities below.
-    if not config[CONF_HOME_ASSISTANT]:
-        for key in SENSOR_OUTPUTS:
-            config.pop(key, None)
-        for key in BINARY_OUTPUTS:
-            config.pop(key, None)
-        config.pop(CONF_ENERGY_SAVE_MODE, None)
         config.pop(CONF_BLE_PAIRING_MODE, None)
 
     if not config[CONF_DEBUG_METRICS]:
@@ -245,7 +228,6 @@ _SCHEMA = {
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
     cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
@@ -331,9 +313,6 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     ble_enabled = config[CONF_BLE]
-    # HA is opt-out. Keep a code-level True fallback in addition to the schema
-    # default so a missing key can never silently turn a normal build BLE-only.
-    home_assistant_enabled = config.get(CONF_HOME_ASSISTANT, True)
     sht43_identity_probe = config.get(CONF_SHT43_IDENTITY_PROBE, False)
 
     # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
@@ -355,24 +334,6 @@ async def to_code(config):
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
 
-    # Child entities are created from this component schema rather than from
-    # top-level sensor:/binary_sensor:/switch: platform entries. Keep the
-    # corresponding ESPHome domains compiled so the native API can enumerate
-    # them. This is the same registration path as the last known-good HA build.
-    cg.add_define("USE_SENSOR")
-    cg.add_define("USE_BINARY_SENSOR")
-    cg.add_define("USE_SWITCH")
-
-    # ESPHome 2026.8 uses fixed-capacity entity vectors. In the BLE-only build
-    # the shared C++ types still make these domains visible to the core, but no
-    # entities are intentionally instantiated, so define that zero-entity case
-    # explicitly. Never override these counts in normal/HA builds.
-    if not home_assistant_enabled:
-        cg.add_define("ESPHOME_ENTITY_SENSOR_COUNT", 0)
-        cg.add_define("ESPHOME_ENTITY_BINARY_SENSOR_COUNT", 0)
-        cg.add_define("ESPHOME_ENTITY_SWITCH_COUNT", 0)
-
-    cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
@@ -407,18 +368,16 @@ async def to_code(config):
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
     cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
 
-    if home_assistant_enabled:
-        energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
-        cg.add(energy_save.set_parent(var))
-        cg.add(var.set_energy_save_mode_switch(energy_save))
-        if ble_enabled and CONF_BLE_PAIRING_MODE in config:
-            pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
-            cg.add(pairing.set_parent(var))
-            cg.add(var.set_ble_pairing_mode_switch(pairing))
-            cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
+    energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
+    cg.add(energy_save.set_parent(var))
+    cg.add(var.set_energy_save_mode_switch(energy_save))
+    if ble_enabled and CONF_BLE_PAIRING_MODE in config:
+        pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
+        cg.add(pairing.set_parent(var))
+        cg.add(var.set_ble_pairing_mode_switch(pairing))
+        cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
 
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 
-    if home_assistant_enabled:
-        await _configure_outputs(var, config)
+    await _configure_outputs(var, config)

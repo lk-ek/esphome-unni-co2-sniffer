@@ -402,14 +402,14 @@ Added a Home Assistant `Energy Save Mode` switch plus `energy_save_mode_default`
 
 Changed shipped Wi-Fi power saving from HIGH/MAX_MODEM to LIGHT/MIN_MODEM after Energy Save Mode caused Wi-Fi loss when automatic MCU Light-sleep became active. Added configurable `energy_save_grace` (default 3 s) so a Home Assistant switch transition is visible before the USB PM locks are released and native USB Serial/JTAG may disconnect.
 
-### 2026-08-15 — BLE-only zero-entity build fix
+### 2026-08-15 — BLE-only zero-entity experiment (superseded)
 
-The BLE-only configuration keeps the shared sensor/binary-sensor/switch C++ type
-framework available but intentionally registers zero ESPHome entities. ESPHome
-2026.8 requires `ESPHOME_ENTITY_*_COUNT` for every enabled entity domain, so the
-component now emits explicit zero counts when `home_assistant: false`. This does
-not instantiate entities or enable Wi-Fi/API; it only makes the zero-entity
-framework state explicit to core code generation.
+An experimental BLE-only implementation attempted to remove all ESPHome entity
+objects and manually provide zero `ESPHOME_ENTITY_*_COUNT` values behind a
+`home_assistant: false` component option. This interacted badly with ESPHome
+2026.8 child-entity/API code generation: normal API builds could connect while
+exposing no entities. The approach was removed later the same day. See the
+current entry below for the final design.
 
 ### 2026-08-15 — MyAmbience secure Device Settings pairing probe
 
@@ -454,3 +454,19 @@ with a `ByteBuffer` argument and keeps the vector-backed constructor protected.
 ### ESPHome 2026.8 child-entity API registration
 
 Child sensor, binary-sensor and switch objects created by the component need both normal entity registration (so ESPHome derives the `ESPHOME_ENTITY_*_COUNT` values) and the corresponding `USE_SENSOR`, `USE_BINARY_SENSOR` and `USE_SWITCH` feature defines (so native API entity enumeration is compiled in). The BLE-only build keeps the objects internal and omits Wi-Fi/API instead of forcing zero entity counts.
+
+## 2026-08-15: remove component-level Home Assistant compile-time switch
+
+The experimental `home_assistant: false` component option introduced special
+ESPHome entity-domain and fixed-capacity count handling. On ESPHome 2026.8 this
+proved fragile: the native API could connect while enumerating no child
+entities.
+
+The option and all related `UNNI_HOME_ASSISTANT_ENABLED`, manual `USE_*`, and
+manual `ESPHOME_ENTITY_*_COUNT` code were removed. The component now always
+creates its entities through ESPHome's ordinary `new_sensor`,
+`new_binary_sensor`, and `new_switch` registration path.
+
+The BLE-only measurement build remains Wi-Fi/API-free simply by omitting
+`wifi:` and `api:` from its YAML. Local entity objects therefore add only static
+RAM/flash overhead and cannot create Wi-Fi or Home Assistant runtime traffic.
