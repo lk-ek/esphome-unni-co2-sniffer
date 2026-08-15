@@ -11,12 +11,14 @@
 #include <cstring>
 
 #if RTRH_DEBUG_CAPTURE
-#include "esphome/components/web_server_base/web_server_base.h"
-#include "esp_http_server.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include <string>
 #include <utility>
+#if defined(USE_WEB_SERVER_BASE)
+#include "esphome/components/web_server_base/web_server_base.h"
+#include "esp_http_server.h"
+#endif
 #endif
 
 namespace esphome {
@@ -685,6 +687,7 @@ static void release_frozen_capture_after_success(uint32_t sequence, bool was_fro
   }
 }
 
+#if defined(USE_WEB_SERVER_BASE)
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
@@ -733,14 +736,20 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
   }
 };
 static CaptureHandler capture_handler;
+#endif
+
 
 void register_debug_handler() {
   if (!last_capture_mutex) last_capture_mutex = xSemaphoreCreateMutex();
+#if defined(USE_WEB_SERVER_BASE)
   if (web_server_base::global_web_server_base) {
     web_server_base::global_web_server_base->add_handler(&capture_handler);
   } else {
     ESP_LOGW(TAG, "web_server_base unavailable");
   }
+#else
+  ESP_LOGD(TAG, "Raw I2C capture instrumentation enabled without HTTP endpoint");
+#endif
 }
 
 bool freeze_last_capture(uint32_t sequence, const char *reason) {

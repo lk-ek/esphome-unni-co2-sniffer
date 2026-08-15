@@ -12,9 +12,11 @@
 #include <cstring>
 
 #if RTRH_DEBUG_CAPTURE
+#if defined(USE_WEB_SERVER_BASE)
 #include "esphome/components/web_server_base/web_server_base.h"
 #include "esp_http_server.h"
 #include <string>
+#endif
 #endif
 
 namespace esphome {
@@ -501,6 +503,7 @@ bool poll(Measurement &measurement) {
 void update_latest(const Measurement &measurement) { decoder.latest_measurement = measurement; }
 
 #if RTRH_DEBUG_CAPTURE
+#if defined(USE_WEB_SERVER_BASE)
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
@@ -661,13 +664,19 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
 };
 static TimingHandler timing_handler;
 
+#endif
+
 void register_debug_handlers() {
+#if defined(USE_WEB_SERVER_BASE)
   if (!web_server_base::global_web_server_base) {
     ESP_LOGW(TAG, "web_server_base unavailable");
     return;
   }
   web_server_base::global_web_server_base->add_handler(&capture_handler);
   web_server_base::global_web_server_base->add_handler(&timing_handler);
+#else
+  ESP_LOGD(TAG, "RT/RH debug capture instrumentation enabled without HTTP endpoints");
+#endif
 }
 #endif
 

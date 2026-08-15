@@ -576,7 +576,7 @@ void CO2Monitor0601::setup() {
     if (this->rtrh_enabled_)
       ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
     else if (this->rtrh_decode_only_)
-      ESP_LOGD(TAG, "RT/RH decoder A/B active; publication disabled");
+      ESP_LOGD(TAG, "RT/RH decoder A/B active; publication disabled; debug capture instrumentation enabled");
     else
       ESP_LOGD(TAG, "CO2-only capture A/B active; RT/RH decoder disabled");
 #endif

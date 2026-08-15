@@ -73,4 +73,4 @@ co2_monitor_0601:
   sniffer_start_delay: 10s
   debug_metrics: true
   # Raw capture requires the HTTP server and is disabled for this RAM A/B test.
-  debug_capture: false
+  debug_capture: true
