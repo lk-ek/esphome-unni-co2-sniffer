@@ -450,3 +450,7 @@ with a `ByteBuffer` argument and keeps the vector-backed constructor protected.
 - Added raw GATT read/write handle logging while the Device Settings probe is active.
 - Coupled runtime Wi-Fi modem-sleep to the existing USB/battery policy: USB requests `WIFI_PS_NONE`; battery/Energy Save requests `WIFI_PS_MIN_MODEM`.
 - Kept `power_save_mode: LIGHT` in shipped YAML as initialization/default before VBUS policy is established.
+
+### ESPHome 2026.8 child-entity API registration
+
+Child sensor, binary-sensor and switch objects created by the component need both normal entity registration (so ESPHome derives the `ESPHOME_ENTITY_*_COUNT` values) and the corresponding `USE_SENSOR`, `USE_BINARY_SENSOR` and `USE_SWITCH` feature defines (so native API entity enumeration is compiled in). The BLE-only build keeps the objects internal and omits Wi-Fi/API instead of forcing zero entity counts.

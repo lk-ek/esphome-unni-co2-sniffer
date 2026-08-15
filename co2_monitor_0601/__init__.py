@@ -353,6 +353,15 @@ async def to_code(config):
     # objects but marks them internal; its YAML still omits Wi-Fi and API, so
     # there is no Home Assistant/network power cost.
 
+    # These child entities are declared from this component schema rather than
+    # from top-level sensor:/binary_sensor:/switch: platform entries. Keep the
+    # corresponding ESPHome domains compiled so the native API can enumerate
+    # them. Entity counts are still derived normally from the registrations
+    # below; do not manually override ESPHOME_ENTITY_*_COUNT.
+    cg.add_define("USE_SENSOR")
+    cg.add_define("USE_BINARY_SENSOR")
+    cg.add_define("USE_SWITCH")
+
     cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
