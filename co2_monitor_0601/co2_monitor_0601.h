@@ -57,6 +57,7 @@ class CO2Monitor0601 : public Component {
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
   void set_sniffer_enabled(bool value) { this->sniffer_enabled_ = value; }
   void set_rtrh_enabled(bool value) { this->rtrh_enabled_ = value; }
+  void set_rtrh_edge_capture(bool value) { this->rtrh_edge_capture_ = value; }
   void set_rtrh_gpio_setup(bool value) { this->rtrh_gpio_setup_ = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
@@ -201,6 +202,7 @@ class CO2Monitor0601 : public Component {
 
   bool sniffer_enabled_{true};
   bool rtrh_enabled_{true};
+  bool rtrh_edge_capture_{false};
   bool rtrh_gpio_setup_{false};
   uint32_t start_delay_ms_{0};
   uint32_t boot_ms_{0};

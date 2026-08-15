@@ -59,10 +59,11 @@ co2_monitor_0601:
   # optional HTTP/captive-portal diagnostics are removed from this build.
   sht43_identity_probe: true
   sniffer_enabled: true
-  # Capture conflict A/B: CO2 sniffing stays active while RT/RH GPIO and
-  # power-save/wake setup return, but the high-rate RT/RH edge ISR stays off.
+  # Capture conflict A/B: run the real RT/RH edge ISR and capture state
+  # machine, but keep RT/RH publication/HA/BLE updates disabled.
   rtrh_enabled: false
   rtrh_gpio_setup: true
+  rtrh_edge_capture: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false

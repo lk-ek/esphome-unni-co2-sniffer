@@ -444,13 +444,16 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
   }
-  const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_;
+  const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
   if (setup_rtrh_gpio) {
-    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_, this->rtrh_enabled_)) {
+    const bool enable_rtrh_edge_isr = this->rtrh_enabled_ || this->rtrh_edge_capture_;
+    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_, enable_rtrh_edge_isr)) {
       ESP_LOGE(TAG, "RT/RH GPIO setup failed");
       return false;
     }
-    if (!this->rtrh_enabled_)
+    if (this->rtrh_edge_capture_ && !this->rtrh_enabled_)
+      ESP_LOGW(TAG, "Capture A/B: RT/RH edge ISR enabled; RT/RH publish/decoder path disabled");
+    else if (!this->rtrh_enabled_)
       ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO/power-save setup enabled; RT/RH edge ISR disabled");
   } else {
     ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO setup and edge ISR disabled; CO2 I2C sniffer only");
@@ -893,11 +896,25 @@ void CO2Monitor0601::loop() {
 
   if (!this->io_initialized_) return;
 
-  const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_;
+  const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
   if (rtrh_power_path && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 
-  if (this->rtrh_enabled_) this->process_rtrh_();
+  if (this->rtrh_enabled_) {
+    this->process_rtrh_();
+  } else if (this->rtrh_edge_capture_) {
+    // A/B test: run the real RT/RH edge ISR and its capture state machine, but
+    // do not publish or feed measurements into HA/BLE. Poll only to release
+    // completed snapshots and keep the capture path representative.
+    rtrh_decoder::loop();
+    rtrh_decoder::Measurement discarded;
+    if (rtrh_decoder::poll(discarded)) {
+      power_save::on_rtrh_complete(discarded.valid);
+      ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
+               static_cast<unsigned long>(discarded.sequence),
+               discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);
+    }
+  }
   this->process_co2_();
   if (rtrh_power_path) power_save::loop();
 
