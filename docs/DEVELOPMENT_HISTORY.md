@@ -454,3 +454,11 @@ history and measurement paths remain enabled. The previous omission of the
 `BLE Pairing Mode` Home Assistant switch is retained so this test changes only
 one additional subsystem. The probe also logs free 8-bit heap and the largest
 free 8-bit block after BLE/GATT setup and every 30 seconds.
+
+### 2026-08-15: SHT43 GATT heap isolation
+
+For API/heap diagnosis, the SHT43 probe build can advertise the SHT43 identity
+without creating the additional SHT, temperature, humidity, or Device Settings
+GATT services. The established Sensirion history service remains enabled. Heap
+logging records memory before BLE activation, on the first GATTS event, and
+periodically at runtime.

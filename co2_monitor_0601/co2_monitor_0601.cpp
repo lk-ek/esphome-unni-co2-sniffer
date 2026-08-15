@@ -98,6 +98,15 @@ void CO2Monitor0601::gap_event_handler(esp_gap_ble_cb_event_t event,
 void CO2Monitor0601::gatts_event_handler(esp_gatts_cb_event_t event,
                                      esp_gatt_if_t gatts_if,
                                      esp_ble_gatts_cb_param_t *param) {
+#if UNNI_SHT43_IDENTITY_PROBE
+  static bool heap_logged_after_ble_start = false;
+  if (!heap_logged_after_ble_start) {
+    heap_logged_after_ble_start = true;
+    ESP_LOGI(TAG, "Heap after BLE stack activation: free=%u B, largest_8bit=%u B",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
+  }
+#endif
   sensirion_ble_gatts_event_handler(event, param);
 #if !UNNI_SHT43_IDENTITY_PROBE
   sensirion_settings_gatts_event_handler(event, gatts_if, param);
@@ -513,9 +522,8 @@ void CO2Monitor0601::setup() {
     sensirion_history_configure_gatt(this->gatt_server_);
 #endif
 #if UNNI_SHT43_IDENTITY_PROBE
-    ESP_LOGW(TAG, "SHT43 A/B probe: Device Settings service 0x8100 disabled");
-    sensirion_sht43_probe_configure_gatt(this->gatt_server_);
-    ESP_LOGI(TAG, "Heap after BLE/GATT setup: free=%u B, largest_8bit=%u B",
+    ESP_LOGW(TAG, "SHT43 A/B probe: all extra SHT43 GATT services disabled (0x6000/T/RH/0x8100)");
+    ESP_LOGI(TAG, "Heap before BLE enable: free=%u B, largest_8bit=%u B",
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
 #else
