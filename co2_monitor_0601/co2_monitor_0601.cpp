@@ -23,6 +23,7 @@
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esphome/core/log.h"
+#include "esphome/core/application.h"
 
 #include <cmath>
 #include <string>
@@ -455,6 +456,12 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 void CO2Monitor0601::setup() {
 #if UNNI_HOME_ASSISTANT_ENABLED
   ESP_LOGI(TAG, "Home Assistant entities: enabled (compile-time)");
+#if defined(USE_SENSOR) && defined(USE_BINARY_SENSOR) && defined(USE_SWITCH)
+  ESP_LOGI(TAG, "ESPHome entity registry: sensors=%u binary_sensors=%u switches=%u",
+           static_cast<unsigned>(App.get_sensors().size()),
+           static_cast<unsigned>(App.get_binary_sensors().size()),
+           static_cast<unsigned>(App.get_switches().size()));
+#endif
 #else
   ESP_LOGI(TAG, "Home Assistant entities: disabled (compile-time BLE-only build)");
 #endif

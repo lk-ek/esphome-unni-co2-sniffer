@@ -209,6 +209,17 @@ def _validate_features(config):
         config.pop(CONF_BLE_SERVER_ID, None)
         config.pop(CONF_BLE_PAIRING_MODE, None)
 
+    # Keep the BLE-only build on the previously validated ESPHome 2026.8 path:
+    # do not create entity objects at all when HA support is disabled. Shared
+    # framework types still require explicit zero capacities below.
+    if not config[CONF_HOME_ASSISTANT]:
+        for key in SENSOR_OUTPUTS:
+            config.pop(key, None)
+        for key in BINARY_OUTPUTS:
+            config.pop(key, None)
+        config.pop(CONF_ENERGY_SAVE_MODE, None)
+        config.pop(CONF_BLE_PAIRING_MODE, None)
+
     if not config[CONF_DEBUG_METRICS]:
         for key in DEBUG_SENSOR_DEFAULTS:
             config.pop(key, None)
@@ -344,23 +355,22 @@ async def to_code(config):
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
         add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
 
-    # Always let ESPHome register the component's entity objects normally.
-    # ESPHome 2026.8 derives its fixed entity-vector sizes from registrations
-    # queued by sensor.new_sensor()/binary_sensor.new_binary_sensor()/
-    # switch.new_switch(). Manually forcing ESPHOME_ENTITY_*_COUNT for the
-    # BLE-only build can poison a later normal build and leave the API online
-    # with an empty entity registry. BLE-only therefore keeps local entity
-    # objects but marks them internal; its YAML still omits Wi-Fi and API, so
-    # there is no Home Assistant/network power cost.
-
-    # These child entities are declared from this component schema rather than
-    # from top-level sensor:/binary_sensor:/switch: platform entries. Keep the
+    # Child entities are created from this component schema rather than from
+    # top-level sensor:/binary_sensor:/switch: platform entries. Keep the
     # corresponding ESPHome domains compiled so the native API can enumerate
-    # them. Entity counts are still derived normally from the registrations
-    # below; do not manually override ESPHOME_ENTITY_*_COUNT.
+    # them. This is the same registration path as the last known-good HA build.
     cg.add_define("USE_SENSOR")
     cg.add_define("USE_BINARY_SENSOR")
     cg.add_define("USE_SWITCH")
+
+    # ESPHome 2026.8 uses fixed-capacity entity vectors. In the BLE-only build
+    # the shared C++ types still make these domains visible to the core, but no
+    # entities are intentionally instantiated, so define that zero-entity case
+    # explicitly. Never override these counts in normal/HA builds.
+    if not home_assistant_enabled:
+        cg.add_define("ESPHOME_ENTITY_SENSOR_COUNT", 0)
+        cg.add_define("ESPHOME_ENTITY_BINARY_SENSOR_COUNT", 0)
+        cg.add_define("ESPHOME_ENTITY_SWITCH_COUNT", 0)
 
     cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
@@ -397,30 +407,18 @@ async def to_code(config):
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
     cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
 
-    if not home_assistant_enabled:
-        # Keep the local entity registrations so ESPHome can derive correct
-        # ESPHOME_ENTITY_*_COUNT values, but make every entity internal. The
-        # shipped BLE-only YAML has no `api:` or `wifi:` component anyway.
-        for key in SENSOR_OUTPUTS:
-            if key in config:
-                config[key]["internal"] = True
-        for key in BINARY_OUTPUTS:
-            if key in config:
-                config[key]["internal"] = True
-        config[CONF_ENERGY_SAVE_MODE]["internal"] = True
+    if home_assistant_enabled:
+        energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
+        cg.add(energy_save.set_parent(var))
+        cg.add(var.set_energy_save_mode_switch(energy_save))
         if ble_enabled and CONF_BLE_PAIRING_MODE in config:
-            config[CONF_BLE_PAIRING_MODE]["internal"] = True
-
-    energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
-    cg.add(energy_save.set_parent(var))
-    cg.add(var.set_energy_save_mode_switch(energy_save))
-    if ble_enabled and CONF_BLE_PAIRING_MODE in config:
-        pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
-        cg.add(pairing.set_parent(var))
-        cg.add(var.set_ble_pairing_mode_switch(pairing))
-        cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
+            pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
+            cg.add(pairing.set_parent(var))
+            cg.add(var.set_ble_pairing_mode_switch(pairing))
+            cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
 
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 
-    await _configure_outputs(var, config)
+    if home_assistant_enabled:
+        await _configure_outputs(var, config)
