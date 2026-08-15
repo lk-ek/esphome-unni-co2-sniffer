@@ -22,6 +22,7 @@
 #include "driver/gpio.h"
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_cali_scheme.h"
+#include "esp_heap_caps.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
@@ -98,7 +99,9 @@ void CO2Monitor0601::gatts_event_handler(esp_gatts_cb_event_t event,
                                      esp_gatt_if_t gatts_if,
                                      esp_ble_gatts_cb_param_t *param) {
   sensirion_ble_gatts_event_handler(event, param);
+#if !UNNI_SHT43_IDENTITY_PROBE
   sensirion_settings_gatts_event_handler(event, gatts_if, param);
+#endif
   if (event == ESP_GATTS_CONNECT_EVT && param != nullptr && this->ble_pairing_mode_)
     this->begin_ble_security_(param->connect.remote_bda);
 #if UNNI_BLE_HISTORY_ENABLED
@@ -509,9 +512,14 @@ void CO2Monitor0601::setup() {
 #if UNNI_BLE_HISTORY_ENABLED
     sensirion_history_configure_gatt(this->gatt_server_);
 #endif
-    sensirion_settings_configure_gatt(this->gatt_server_);
 #if UNNI_SHT43_IDENTITY_PROBE
+    ESP_LOGW(TAG, "SHT43 A/B probe: Device Settings service 0x8100 disabled");
     sensirion_sht43_probe_configure_gatt(this->gatt_server_);
+    ESP_LOGI(TAG, "Heap after BLE/GATT setup: free=%u B, largest_8bit=%u B",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
+#else
+    sensirion_settings_configure_gatt(this->gatt_server_);
 #endif
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
@@ -830,6 +838,16 @@ void CO2Monitor0601::process_co2_() {
 }
 
 void CO2Monitor0601::loop() {
+#if UNNI_SHT43_IDENTITY_PROBE
+  static uint32_t last_heap_log_ms = 0;
+  const uint32_t now_ms = millis();
+  if (last_heap_log_ms == 0 || static_cast<uint32_t>(now_ms - last_heap_log_ms) >= 30000U) {
+    last_heap_log_ms = now_ms;
+    ESP_LOGI(TAG, "Heap: free=%u B, largest_8bit=%u B",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
+  }
+#endif
   if (!this->io_initialized_ &&
       static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();

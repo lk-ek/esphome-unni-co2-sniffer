@@ -438,3 +438,19 @@ does **not** register the experimental `BLE Pairing Mode` ESPHome switch. The
 normal/debug builds retain that switch. A SHT43 probe boot should therefore
 report one ESPHome switch instead of two. This is intentionally an A/B
 diagnostic, not a final pairing UX decision.
+
+
+## 2026-08-15: SHT43 Device Settings GATT A/B test
+
+After the pairing-switch A/B build proved that Home Assistant could enumerate all
+entities and receive `ListEntitiesDoneResponse`, the native API still stopped
+responding immediately after `SubscribeStatesRequest`; even keep-alive pings were
+left unanswered while the sensor main loop continued to run.
+
+For the next isolation step, only the SHT43 identity-probe build omits the
+experimental Sensirion Device Settings service (`0x8100`) and its GATT event
+handler. The SHT43 identity, SHT/T/RH GATT services, BLE security, advertising,
+history and measurement paths remain enabled. The previous omission of the
+`BLE Pairing Mode` Home Assistant switch is retained so this test changes only
+one additional subsystem. The probe also logs free 8-bit heap and the largest
+free 8-bit block after BLE/GATT setup and every 30 seconds.
