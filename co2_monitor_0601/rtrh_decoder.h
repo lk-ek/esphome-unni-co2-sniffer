@@ -47,6 +47,12 @@ struct Measurement {
   float rh_state_us{NAN};
   uint8_t rh_state_samples{0};
   uint32_t rh_state_seen{0};
+  uint32_t rh_irq_rt{0};
+  uint32_t rh_irq_rh{0};
+  uint32_t rh_state_00{0};
+  uint32_t rh_state_01{0};
+  uint32_t rh_state_08{0};
+  uint32_t rh_state_09{0};
 
   float rt_ratio{NAN};
   float rh_ratio{NAN};

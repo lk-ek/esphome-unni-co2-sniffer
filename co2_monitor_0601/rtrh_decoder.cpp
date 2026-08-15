@@ -57,6 +57,12 @@ struct Snapshot {
   uint32_t rt_temp_period_sum{0};
   uint16_t rt_temp_count{0};
   RhStateStats rh_state;
+  uint32_t rh_irq_rt{0};
+  uint32_t rh_irq_rh{0};
+  uint32_t rh_state_00{0};
+  uint32_t rh_state_01{0};
+  uint32_t rh_state_08{0};
+  uint32_t rh_state_09{0};
   uint32_t sequence{0};
 };
 
@@ -111,6 +117,12 @@ struct DecoderState {
   volatile uint32_t rt_temperature_period_sum{0};
   volatile uint16_t rt_temperature_count{0};
   RhStateStats rh_state;
+  volatile uint32_t rh_irq_rt{0};
+  volatile uint32_t rh_irq_rh{0};
+  volatile uint32_t rh_state_00{0};
+  volatile uint32_t rh_state_01{0};
+  volatile uint32_t rh_state_08{0};
+  volatile uint32_t rh_state_09{0};
 
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
@@ -159,6 +171,12 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.rt_temperature_period_sum = 0;
   decoder.rt_temperature_count = 0;
   clear_rh_state();
+  decoder.rh_irq_rt = 0;
+  decoder.rh_irq_rh = 0;
+  decoder.rh_state_00 = 0;
+  decoder.rh_state_01 = 0;
+  decoder.rh_state_08 = 0;
+  decoder.rh_state_09 = 0;
 }
 
 static inline void IRAM_ATTR add_period(Accum &a, uint32_t period) {
@@ -230,6 +248,12 @@ static void finalize_measurement() {
   next.rt_temp_period_sum = decoder.rt_temperature_period_sum;
   next.rt_temp_count = decoder.rt_temperature_count;
   next.rh_state = decoder.rh_state;
+  next.rh_irq_rt = decoder.rh_irq_rt;
+  next.rh_irq_rh = decoder.rh_irq_rh;
+  next.rh_state_00 = decoder.rh_state_00;
+  next.rh_state_01 = decoder.rh_state_01;
+  next.rh_state_08 = decoder.rh_state_08;
+  next.rh_state_09 = decoder.rh_state_09;
   next.sequence = decoder.snapshot.sequence + 1;
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
@@ -274,6 +298,11 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   else decoder.last_edge_us = now;
   update_phase(now);
 
+  if (decoder.phase == Phase::RH) {
+    if (pin_index == 0) decoder.rh_irq_rt++;
+    else decoder.rh_irq_rh++;
+  }
+
   // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
   // errors when several sensor lines change almost simultaneously.
   const bool is_rt_irq = pin_index == 0;
@@ -300,6 +329,14 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   }
 
   if (state != decoder.gpio_state) {
+    if (decoder.phase == Phase::RH) {
+      switch (state & 0x09) {
+        case 0x00: decoder.rh_state_00++; break;
+        case 0x01: decoder.rh_state_01++; break;
+        case 0x08: decoder.rh_state_08++; break;
+        case 0x09: decoder.rh_state_09++; break;
+      }
+    }
     observe_rh_state(now, state);
     decoder.gpio_state = state;
   }
@@ -456,6 +493,12 @@ static Measurement derive(const Snapshot &s) {
   m.rt_count = s.rt_temp_count;
   m.rh_state_samples = s.rh_state.sample_count;
   m.rh_state_seen = s.rh_state.seen;
+  m.rh_irq_rt = s.rh_irq_rt;
+  m.rh_irq_rh = s.rh_irq_rh;
+  m.rh_state_00 = s.rh_state_00;
+  m.rh_state_01 = s.rh_state_01;
+  m.rh_state_08 = s.rh_state_08;
+  m.rh_state_09 = s.rh_state_09;
 
   m.ref_period_us = s.ref.count ? float(s.ref.period_sum) / s.ref.count : 0.0f;
   m.ref_duration_ms = float(s.ref.period_sum) / 1000.0f;

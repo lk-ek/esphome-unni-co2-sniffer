@@ -696,6 +696,13 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
              static_cast<unsigned long>(m.sequence),
              rtrh_decoder::reject_reason_to_string(m.reject_reason), m.quality_percent,
              publish_outputs ? "" : " [decode-only A/B]");
+    ESP_LOGI(TAG,
+             "RT/RH RH-phase diag %lu: IRQ RT=%lu RH=%lu, states 00=%lu 01=%lu 08=%lu 09=%lu, provisional T=%.2f C",
+             static_cast<unsigned long>(m.sequence),
+             static_cast<unsigned long>(m.rh_irq_rt), static_cast<unsigned long>(m.rh_irq_rh),
+             static_cast<unsigned long>(m.rh_state_00), static_cast<unsigned long>(m.rh_state_01),
+             static_cast<unsigned long>(m.rh_state_08), static_cast<unsigned long>(m.rh_state_09),
+             m.temperature_c);
     rtrh_decoder::update_latest(m);
     return;
   }
