@@ -401,3 +401,12 @@ Added a Home Assistant `Energy Save Mode` switch plus `energy_save_mode_default`
 ### 2026-08-15: Energy Save transition grace and Wi-Fi MIN_MODEM
 
 Changed shipped Wi-Fi power saving from HIGH/MAX_MODEM to LIGHT/MIN_MODEM after Energy Save Mode caused Wi-Fi loss when automatic MCU Light-sleep became active. Added configurable `energy_save_grace` (default 3 s) so a Home Assistant switch transition is visible before the USB PM locks are released and native USB Serial/JTAG may disconnect.
+
+### 2026-08-15 — BLE-only zero-entity build fix
+
+The BLE-only configuration keeps the shared sensor/binary-sensor/switch C++ type
+framework available but intentionally registers zero ESPHome entities. ESPHome
+2026.8 requires `ESPHOME_ENTITY_*_COUNT` for every enabled entity domain, so the
+component now emits explicit zero counts when `home_assistant: false`. This does
+not instantiate entities or enable Wi-Fi/API; it only makes the zero-entity
+framework state explicit to core code generation.

@@ -344,6 +344,17 @@ async def to_code(config):
     cg.add_define("USE_BINARY_SENSOR")
     cg.add_define("USE_SWITCH")
 
+    # ESPHome 2026.8 sizes the per-domain App entity vectors from generated
+    # ESPHOME_ENTITY_*_COUNT defines. In a BLE-only build these framework
+    # domains are still referenced by the shared C++ type declarations, but
+    # no entities are registered, so core codegen has no count to emit.
+    # Define the intentional zero-entity case explicitly; this does not create
+    # entities and does not pull in API/Wi-Fi.
+    if not home_assistant_enabled:
+        cg.add_define("ESPHOME_ENTITY_SENSOR_COUNT", 0)
+        cg.add_define("ESPHOME_ENTITY_BINARY_SENSOR_COUNT", 0)
+        cg.add_define("ESPHOME_ENTITY_SWITCH_COUNT", 0)
+
     cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
