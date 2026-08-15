@@ -58,7 +58,10 @@ co2_monitor_0601:
   # RAM-headroom A/B test: full SHT43 Serial + T/RH GATT stays enabled while
   # optional HTTP/captive-portal diagnostics are removed from this build.
   sht43_identity_probe: true
-  sniffer_enabled: false
+  sniffer_enabled: true
+  # Capture conflict A/B: restore only the passive CO2 I2C sniffer.
+  # RT/RH GPIO setup, edge ISR, decoding and light-sleep wake handling stay off.
+  rtrh_enabled: false
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false

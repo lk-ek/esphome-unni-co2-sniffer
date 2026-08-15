@@ -444,21 +444,27 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
   }
-  if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
-    ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
-    return false;
+  if (this->rtrh_enabled_) {
+    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
+      ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
+      return false;
+    }
+  } else {
+    ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO setup and edge ISR disabled; CO2 I2C sniffer only");
   }
 
   this->io_initialized_ = true;
-  if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_,
-                         this->rt_pin_, this->rh_pin_,
-                         this->co2_sda_pin_, this->co2_scl_pin_)) {
-    ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
-  } else if (power_save::enabled()) {
-    // If VBUS was already debounced before delayed sniffer initialization,
-    // immediately apply the matching USB/battery power policy.
-    this->apply_power_policy_(true);
-    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+  if (this->rtrh_enabled_) {
+    if (!power_save::setup(this->light_sleep_enabled_, this->light_sleep_max_awake_ms_,
+                           this->rt_pin_, this->rh_pin_,
+                           this->co2_sda_pin_, this->co2_scl_pin_)) {
+      ESP_LOGW(TAG, "Requested auto Light-sleep could not be enabled; continuing normally");
+    } else if (power_save::enabled()) {
+      // If VBUS was already debounced before delayed sniffer initialization,
+      // immediately apply the matching USB/battery power policy.
+      this->apply_power_policy_(true);
+      i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+    }
   }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
@@ -555,10 +561,12 @@ void CO2Monitor0601::setup() {
 
 #if RTRH_DEBUG_CAPTURE
     i2c_sniffer::register_debug_handler();
-    rtrh_decoder::register_debug_handlers();
-    ESP_LOGD(TAG, "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv");
+    if (this->rtrh_enabled_) rtrh_decoder::register_debug_handlers();
+    ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv"
+                                     : "Raw debug: /capture (RT/RH capture disabled)");
 #else
-    ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
+    ESP_LOGD(TAG, this->rtrh_enabled_ ? "RT/RH time-phase decoder active; debug capture disabled"
+                                     : "CO2-only capture A/B active; RT/RH decoder disabled");
 #endif
 
     publish(this->out_.crc_errors, 0.0f);
@@ -882,16 +890,16 @@ void CO2Monitor0601::loop() {
 
   if (!this->io_initialized_) return;
 
-  if (power_save::enabled())
+  if (this->rtrh_enabled_ && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 
-  this->process_rtrh_();
+  if (this->rtrh_enabled_) this->process_rtrh_();
   this->process_co2_();
-  power_save::loop();
+  if (this->rtrh_enabled_) power_save::loop();
 
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
-  if (power_save::enabled())
+  if (this->rtrh_enabled_ && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 }
 
