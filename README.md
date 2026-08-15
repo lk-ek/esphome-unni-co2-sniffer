@@ -3,64 +3,97 @@
 
 # Unni CO₂ Sensor Smartification
 
-This project adds a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor as a **passive sniffer**. The original Unni electronics remain in control; the ESP only observes existing signals and publishes the decoded measurements.
+ESPHome firmware for adding a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor without taking control away from the original electronics.
 
-The tested device is sold as **CO2 Monitor Carbon Dioxide Detector 0601**. The ESPHome component is therefore named `co2_monitor_0601`. Older configurations using the former `bus_sniffer:` component key must be changed to `co2_monitor_0601:`.
+The ESP32-C3 acts primarily as a **passive sniffer**:
 
+- CO₂ is decoded from the existing I²C traffic between the Unni controller and the CO₂ module.
+- Temperature and relative humidity are reconstructed from the existing RT/RH timing signals.
+- Measurements are exposed to Home Assistant through ESPHome.
+- The same measurements can be advertised over BLE in a Sensirion MyAmbience-compatible format.
+- Optional persistent BLE history allows historical samples to be downloaded with MyAmbience.
 
-## BLE-only measurement build
+The tested monitor is sold as **CO2 Monitor Carbon Dioxide Detector 0601**, hence the ESPHome component name:
 
-For power measurements without Home Assistant/Wi-Fi overhead, use
-`i2c-sniffer-ble-only.yaml`. It sets `home_assistant: false` and intentionally
-omits `wifi:`, `api:`, captive portal and OTA. Sensor decoding, BLE live data
-and BLE history remain active. Flash this build over USB.
-
-`home_assistant: false` is a compile-time configuration choice: no HA entities
-or Energy Save Mode HA switch are instantiated. Select the power policy with
-`energy_save_mode_default` instead. For USB power-meter measurements that
-should emulate battery operation, set it to `true`.
-
-## What it provides
-
-- CO₂, temperature and relative humidity in ESPHome / Home Assistant
-- Sensirion-compatible BLE advertisements for MyAmbience
-- optional persistent BLE history with GATT download
-- battery voltage and estimated battery level
-- USB/VBUS presence detection
-- automatic USB/battery power policy with Light Sleep and BLE modem sleep
-- Home Assistant `Energy Save Mode` switch for USB-powered battery-policy measurements
-- optional diagnostic metrics and raw capture support
-
-The signal decoding and calibration were derived from the tested Unni hardware revision. Other revisions may need verification.
-
-## Hardware
-
-### XIAO ESP32-C3 wiring
-
-| XIAO | GPIO | Connect to | Purpose |
-|---|---:|---|---|
-| D1 | GPIO3 | Unni **RT** test/sensor point | temperature timing signal |
-| D2 | GPIO4 | Unni **RH** test/sensor point | humidity timing signal |
-| D4 | GPIO6 | CO₂ SDA | passive CO₂ bus data |
-| D5 | GPIO7 | CO₂ SCL | passive CO₂ bus clock |
-| D0 | GPIO2 / ADC1_CH2 | midpoint of battery divider | battery voltage |
-| D3 | GPIO5 | midpoint of VBUS divider | USB power detection |
-| 5V | — | Unni 5 V / VBUS | shared supply |
-| GND | — | Unni GND / battery − | common ground |
-
-`RT` and `RH` refer to the PCB points where the unpopulated temperature and humidity sensors can be fitted.
-
-The ESP connections are passive. If desired, add 4.7–10 kΩ series resistors in the ESP sniffing branches:
-
-```text
-Unni signal ---- 10 kΩ ---- XIAO GPIO
+```yaml
+co2_monitor_0601:
 ```
 
-Do not place those resistors in series with the original Unni signal path.
+This project was developed against one specific hardware revision. Other revisions should be verified before connecting the ESP.
 
-### Battery measurement
+---
 
-The default hardware is:
+## Features
+
+### Measurements
+
+- CO₂ concentration
+- temperature
+- relative humidity
+- battery voltage
+- estimated battery state of charge
+- USB/VBUS presence
+
+### Integrations
+
+- ESPHome / Home Assistant
+- Sensirion-compatible BLE live advertisements
+- persistent BLE history with MyAmbience-compatible GATT download
+
+### Power management
+
+- automatic distinction between USB and battery operation
+- ESP32-C3 dynamic frequency scaling
+- automatic Light Sleep in battery mode
+- reduced BLE advertising rate on battery
+- reduced Home Assistant publication rate on battery
+- optional `Energy Save Mode` for measuring battery-style firmware behavior while physically powered through USB
+- dedicated BLE-only measurement build without Wi-Fi or Home Assistant
+
+### Diagnostics
+
+Optional debug builds provide:
+
+- RT/RH timing diagnostics
+- I²C framing and decoder diagnostics
+- raw I²C captures
+- VCD conversion tools
+- recovery diagnostics for occasionally missed GPIO edges
+
+---
+
+# Hardware
+
+## XIAO ESP32-C3 wiring
+
+| XIAO | GPIO | Unni connection | Purpose |
+|---|---:|---|---|
+| D1 | GPIO3 | RT | temperature timing signal |
+| D2 | GPIO4 | RH | humidity timing signal |
+| D4 | GPIO6 | CO₂ SDA | passive I²C data sniffing |
+| D5 | GPIO7 | CO₂ SCL | passive I²C clock sniffing |
+| D0 | GPIO2 / ADC1_CH2 | battery-divider midpoint | battery voltage |
+| D3 | GPIO5 | VBUS-divider midpoint | USB power detection |
+| 5V | — | Unni VBUS / 5 V | ESP supply |
+| GND | — | Unni GND / battery − | common ground |
+
+`RT` and `RH` are the PCB points associated with the temperature and humidity measurement circuitry.
+
+The ESP must remain electrically passive with respect to the original signal paths.
+
+Optional series resistors can be added to the ESP branches:
+
+```text
+Unni signal ---- 4.7–10 kΩ ---- XIAO GPIO
+```
+
+Do not put these resistors in series with the signal path used by the original Unni controller.
+
+---
+
+## Battery voltage measurement
+
+The tested circuit uses two 1 MΩ resistors:
 
 ```text
 Battery + --- 1 MΩ ---+--- D0 / GPIO2
@@ -72,13 +105,22 @@ Battery − / GND ------+
 D0 / GPIO2 --- 0.1 µF --- GND
 ```
 
-The 1 MΩ / 1 MΩ divider gives a ratio of 2.0. The component uses ESP-IDF ADC calibration, 12 dB attenuation and sample averaging.
+This produces a divider ratio of 2.0.
 
-`Battery Voltage` is always published. `Battery Level` is a voltage-based Li-ion/LiPo estimate and is marked unavailable while USB power is present, because charging voltage is not a useful open-circuit SOC measurement.
+The firmware uses ESP-IDF ADC calibration, averaging and 12 dB attenuation.
 
-### USB/VBUS detection
+Two entities are exposed:
 
-The tested divider is:
+- `Battery Voltage`
+- `Battery Level`
+
+`Battery Level` is a voltage-based Li-ion estimate. It is intentionally unavailable while physical USB power is present because charger-driven battery voltage is not a useful open-circuit state-of-charge measurement.
+
+---
+
+## USB/VBUS detection
+
+The tested VBUS divider is:
 
 ```text
 VBUS / 5 V --- 220 kΩ ---+--- D3 / GPIO5
@@ -88,73 +130,143 @@ VBUS / 5 V --- 220 kΩ ---+--- D3 / GPIO5
                         GND
 ```
 
-The component publishes this as the `USB Power` binary sensor.
+The physical state is exposed as:
 
-### Energy Save Mode for power measurements
-
-The component also exposes an `Energy Save Mode` switch in Home Assistant. When enabled, the ESP keeps reporting the **physical** `USB Power` state truthfully, but the runtime policy behaves as if external power were absent. This is intended for reproducible USB power-meter comparisons without having to power the complete sensor from a battery.
-
-With `Energy Save Mode` enabled while VBUS is present:
-
-- automatic Light Sleep and the RT/RH-triggered awake window are used as in battery operation;
-- CO2 I2C capture is restricted to the battery awake window;
-- BLE uses `ble_battery_advertising_interval` (default `5s`);
-- Home Assistant sensor publication uses the battery throttle (`ha_publish_interval`, default `60s`);
-- the physical `USB Power` entity remains `ON`;
-- `Battery Level` remains unavailable while physical USB is present, because the battery node is still charger-driven.
-
-The switch defaults to off. To boot directly into the measurement mode, set:
-
-```yaml
-co2_monitor_0601:
-  energy_save_mode_default: true
-  energy_save_grace: 3s
+```text
+USB Power
 ```
 
-This option changes only firmware behavior. A USB power meter still measures the complete hardware actually powered through USB, including the original CO2 monitor electronics.
+The reported value always reflects actual VBUS presence, even when the firmware is deliberately using the battery power policy through `Energy Save Mode`.
 
-## Default pin assignment
+---
 
-The defaults can be overridden in `co2_monitor_0601:`:
+# Installation
+
+A minimal normal configuration is:
 
 ```yaml
+esphome:
+  name: i2csniffer
+
+external_components:
+  - source:
+      type: local
+      path: .
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+api:
+  encryption:
+    key: !secret i2csniffer__encryption_key
+
 co2_monitor_0601:
-  rt_pin: 3
-  rh_pin: 4
-  co2_sda_pin: 6
-  co2_scl_pin: 7
-  battery_pin: 2
-  usb_power_pin: 5
-  energy_save_mode_default: false
-  energy_save_grace: 3s
 ```
 
-All configured pins must be unique. `battery_pin` must be an ESP32-C3 ADC1 GPIO (GPIO0–GPIO4).
+The repository contains complete example configurations, so in normal use it is easier to start with one of those rather than build the YAML from scratch.
 
-## ESPHome configuration
+Build or flash with ESPHome:
 
-The component intentionally owns most platform details. A normal configuration only needs the component itself; all options below already have defaults:
-
-```yaml
-co2_monitor_0601:
-  sniffer_start_delay: 10s
+```bash
+esphome compile i2c-sniffer.yaml
+esphome run i2c-sniffer.yaml
 ```
 
-Useful optional settings:
+---
+
+# Build variants
+
+The repository contains several configurations for different purposes.
+
+| Configuration | Wi-Fi / HA | BLE | Debug capture | Purpose |
+|---|---|---|---|---|
+| `i2c-sniffer.yaml` | yes | yes | no | normal operation |
+| `i2c-sniffer-debug.yaml` | yes | yes | yes | protocol/debugging work |
+| `i2c-sniffer-no-ble.yaml` | yes | no | optional | BLE power comparison |
+| `i2c-sniffer-ble-only.yaml` | no | yes | no | BLE-only power measurement |
+| `i2c-sniffer-sht43-probe.yaml` | yes | experimental | yes | MyAmbience reverse engineering |
+
+The SHT43 probe is diagnostic firmware and should not be used as the normal device identity.
+
+---
+
+# Home Assistant
+
+Home Assistant support is enabled by default:
 
 ```yaml
 co2_monitor_0601:
+  home_assistant: true
+```
+
+Omitting `home_assistant` is equivalent to setting it to `true`.
+
+Only the dedicated BLE-only build intentionally uses:
+
+```yaml
+co2_monitor_0601:
+  home_assistant: false
+```
+
+In that build the local ESPHome entity objects remain registered internally so ESPHome 2026.8 can derive its entity-vector sizes correctly, but the supplied YAML contains no `wifi:` or `api:` component, so they are not exposed to Home Assistant and cause no network traffic.
+
+Normal builds create:
+
+- `CO2`
+- `RT Temperature`
+- `RH Humidity`
+- `Battery Voltage`
+- `Battery Level`
+- `USB Power`
+- `Energy Save Mode`
+- `BLE Pairing Mode` while the experimental secure MyAmbience settings support is enabled
+
+Sensor definitions may be customized:
+
+```yaml
+co2_monitor_0601:
+  co2:
+    name: "Living Room CO2"
+
+  rt_temperature:
+    name: "Temperature"
+
+  rh_humidity:
+    name: "Humidity"
+```
+
+With `debug_metrics: true`, additional timing, quality and decoder diagnostic entities are created.
+
+---
+
+# Component configuration
+
+Useful options include:
+
+```yaml
+co2_monitor_0601:
+  # Home Assistant
+  home_assistant: true
+  ha_publish_interval: 60s
+
   # BLE
   ble: true
   ble_live: true
   ble_history: true
-  ble_advertising_interval: 2s          # USB/VBUS power
-  ble_battery_advertising_interval: 5s  # battery power
+  ble_advertising_interval: 2s
+  ble_battery_advertising_interval: 5s
 
-  # Power saving
+  # Power management
   light_sleep: true
   light_sleep_max_awake: 10s
-  ha_publish_interval: 60s  # battery-mode HA throttle
+  energy_save_mode_default: false
+  energy_save_grace: 3s
 
   # Hardware
   rt_pin: 3
@@ -166,181 +278,505 @@ co2_monitor_0601:
   battery_update_interval: 60s
   usb_power_pin: 5
 
-  # Debugging
+  # Startup
+  sniffer_start_delay: 10s
+
+  # Diagnostics
   debug_metrics: false
   debug_capture: false
 ```
 
-The component automatically configures the required ESP-IDF power-management options, BLE server, 80 MHz maximum CPU frequency and BLE-history partition. These do not need to be repeated in user YAML.
+The defaults match the tested XIAO ESP32-C3 installation.
 
-## Automatically created entities
+All configured GPIOs must be unique.
 
-Normal builds create:
+`battery_pin` must be an ESP32-C3 ADC1-capable GPIO.
 
-- `CO2`
-- `RT Temperature`
-- `RH Humidity`
-- `Battery Voltage`
-- `Battery Level`
-- `USB Power`
-- `Energy Save Mode`
+The component configures the ESP-IDF power-management requirements, BLE server and persistent history partition automatically.
 
-The primary sensor definitions can still be overridden, for example:
+---
 
-```yaml
-co2_monitor_0601:
-  co2:
-    name: "Living Room CO2"
-  rt_temperature:
-    name: "Temperature"
-  rh_humidity:
-    name: "Humidity"
-```
+# USB and battery power policy
 
-With `debug_metrics: true`, the component additionally creates decoder-quality, timing, frame-error and calibration diagnostic entities automatically.
+The firmware uses different runtime policies depending on physical power.
 
-In the debug build (`debug_capture: true`, logger level `DEBUG`), structurally valid I²C frames that are not claimed by the CO₂ protocol decoder are logged as `Unhandled I2C frame`. Framing failures are logged separately as `Malformed I2C frame` with a status such as `INCOMPLETE_BYTE`, `CAPTURE_END_IN_FRAME`, or `TRUNCATED`. Malformed frames are never passed to the CO₂ decoder.
+## USB power
 
-The GPIO path includes two conservative safeguards derived from real VCD captures. First, a combined SDA-setup/SCL-rise sample can be resolved contextually when it occurs inside a byte. Second, when a capture is rejected by the CO₂ protocol decoder, the sniffer can reconstruct up to two completely missed SCL pulses. Candidate locations are derived from unusually long intervals during which the captured SCL level never changes; SDA-only transitions inside such an interval do not hide the timing anomaly. Timing is only used to generate hypotheses. A repair is accepted only when all protocol-valid hypotheses decode to the **same** complete `0x62` / `0xEC05` command plus response with the expected ACK/NACK pattern and a valid Sensirion CRC. Competing decoded results, insufficient data, or timing plausibility alone never produce a repair.
+Normal USB operation prioritizes responsiveness and reliability:
 
-The first malformed, otherwise unhandled, protocol-invalid, or software-recovered CO₂ transaction freezes its **original GPIO** raw edge capture so that later normal traffic cannot overwrite the interesting waveform. A coalesced SDA/SCL sample that is resolved successfully is logged but does not occupy the single freeze slot by itself. Download `/capture` to retrieve the frozen trace; only a successful HTTP transfer releases the freeze, so a failed client can retry. I²C captures observed in practice are small (typically well below 1 KiB) and are sent synchronously by the ESP-IDF HTTP server rather than through a separate FreeRTOS sender task. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
-
-## Automatic USB / battery power policy
-
-`Energy Save Mode` can override this automatic choice and force the battery policy even while physical VBUS is present. The `USB Power` sensor always reports the real VBUS state; only the effective runtime policy is overridden.
-
-The VBUS detector automatically selects one of two runtime policies. No Home Assistant automation is required.
-
-**USB/VBUS power:**
-
-- automatic Light Sleep is held off
+- automatic MCU Light Sleep is prevented
 - CPU frequency is held at 80 MHz
-- the CO₂ bus is captured continuously
-- every valid CO₂ frame is published to Home Assistant immediately
-- every valid RT/RH measurement is published immediately
-- BLE advertises every 2 seconds by default
+- Wi-Fi power saving is disabled at runtime with `WIFI_PS_NONE`
+- CO₂ I²C capture remains continuously enabled
+- valid CO₂ measurements are published immediately
+- valid RT/RH measurements are published immediately
+- BLE advertisements use the USB interval, default `2s`
 
-**Battery power:**
+Because USB power is available, reducing ESP consumption is not the priority in this mode.
 
-- the existing RT/RH-triggered automatic Light-Sleep scheme is used
-- RT/RH wakes the ESP and opens a short 80 MHz capture window
-- CO₂ capture is enabled only until one valid frame has been received after RT/RH
-- Home Assistant receives the latest CO₂/T/RH values at most once per 60 seconds
-- BLE advertises every 5 seconds by default
+## Battery power
 
-The battery HA interval is configured with `ha_publish_interval` (default `60s`). The two BLE intervals are independently configurable with `ble_advertising_interval` (USB, default `2s`) and `ble_battery_advertising_interval` (battery, default `5s`). `light_sleep: false` disables the battery Light-Sleep policy as before.
+Battery operation prioritizes low average power:
 
-BLE builds also enable ESP32-C3 Bluetooth modem sleep and PHY/MAC/baseband power-down.
+- automatic Light Sleep is enabled
+- GPIO3/GPIO4 RT/RH activity wakes the ESP
+- CPU frequency is temporarily raised to 80 MHz while measurements are captured
+- CO₂ sniffing is enabled only for the active measurement window
+- after RT/RH and a valid CO₂ sample are obtained, the ESP may sleep again
+- Wi-Fi uses `WIFI_PS_MIN_MODEM`
+- Home Assistant publication is throttled to the latest values, default once per minute
+- BLE advertisements use the battery interval, default `5s`
 
-## BLE / MyAmbience
-
-BLE is enabled by default. The component advertises a Sensirion Gadget/MyAmbience-compatible temperature/RH/CO₂ payload and uses the GAP name `S` for protocol compatibility. The BLE Device Information Service identifies the manufacturer as `Gadget`; the firmware does not claim that the device was manufactured by Sensirion.
-
-The production firmware does **not** vendor or directly link the Sensirion Gadget BLE Arduino Library or Sensirion UPT Core. The compatible advertisement, sample encoding, GATT topology and history-download wire format are implemented locally using ESPHome/ESP-IDF BLE APIs. Parts of that compatibility layer were developed with reference to Sensirion Gadget BLE 1.5.0 and Sensirion UPT Core 0.5.1; their BSD-3-Clause notices and detailed provenance are preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `LICENSES/`.
-
-With `ble_history: true`, a project-specific persistent history ring is stored in the automatically created `senshist` partition and can be downloaded through MyAmbience using the compatible Gadget history protocol.
-
-To build without BLE:
+The corresponding options are:
 
 ```yaml
 co2_monitor_0601:
-  ble: false
-  ble_live: false
-  ble_history: false
+  light_sleep: true
+  light_sleep_max_awake: 10s
+  ha_publish_interval: 60s
+  ble_advertising_interval: 2s
+  ble_battery_advertising_interval: 5s
 ```
 
-## Build variants
+---
 
-The repository includes:
+# Energy Save Mode
 
-- `i2c-sniffer.yaml` — normal build
-- `i2c-sniffer-debug.yaml` — debug metrics, web server and raw captures
-- `i2c-sniffer-no-ble.yaml` — no-BLE power baseline
+`Energy Save Mode` exists mainly for controlled power measurements.
 
-Build with ESPHome, for example:
+When enabled while the hardware is still physically powered from USB, the component behaves as if USB power were absent.
 
-```bash
-esphome compile i2c-sniffer.yaml
-esphome run i2c-sniffer.yaml
+This allows a USB power meter to compare normal firmware behavior against the battery-oriented runtime policy without changing the electrical power source.
+
+The physical `USB Power` entity remains truthful.
+
+In Energy Save Mode:
+
+- automatic Light Sleep is enabled
+- the battery capture-window policy is used
+- Wi-Fi uses `WIFI_PS_MIN_MODEM`
+- BLE uses the battery advertising interval
+- Home Assistant publication uses the battery throttle
+
+The default is:
+
+```yaml
+co2_monitor_0601:
+  energy_save_mode_default: false
+  energy_save_grace: 3s
 ```
 
-## Repository layout
+The grace period keeps the normal USB power locks briefly after the HA switch is enabled so that the state change can propagate before automatic Light Sleep becomes active.
+
+Native USB Serial/JTAG may become unavailable while automatic Light Sleep is active. This does not affect the ESP32-C3 ROM USB bootloader, so USB flashing remains possible.
+
+---
+
+# BLE-only measurement build
+
+`i2c-sniffer-ble-only.yaml` is intended for measuring the cost of BLE without Wi-Fi/API overhead.
+
+It intentionally contains no:
+
+- `wifi:`
+- `api:`
+- captive portal
+- OTA
+
+It keeps:
+
+- sensor decoding
+- BLE live data
+- BLE history
+- power management
+
+The relevant configuration is:
+
+```yaml
+co2_monitor_0601:
+  home_assistant: false
+
+  ble: true
+  ble_live: true
+  ble_history: true
+
+  energy_save_mode_default: true
+  energy_save_grace: 0s
+```
+
+Flash this build over USB.
+
+Recent example measurements on the tested hardware were approximately:
+
+| Mode | Average power |
+|---|---:|
+| normal Wi-Fi + HA + BLE | 2.84 mW |
+| Energy Save Mode | 2.07 mW |
+| BLE-only | 1.34 mW |
+
+These measurements were made with a USB power meter and should be treated as comparative rather than laboratory-grade absolute values.
+
+Avoid running `ping`, `esphome logs`, an actively polling web UI or other unnecessary network traffic during power measurements.
+
+---
+
+# Sensirion / MyAmbience compatibility
+
+The normal firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format.
+
+The GAP name used by the normal compatibility mode is:
 
 ```text
-co2_monitor_0601/       ESPHome external component
-  __init__.py              configuration schema and code generation
-  co2_monitor_0601.*       orchestration and entity publishing
-  rtrh_decoder.*           RT/RH timing decoder
-  i2c_sniffer.*            generic passive I²C edge capture and framing
-  co2_decoder.*            CO₂ protocol/CRC decoder consuming I²C frames
-  power_save.*             Light-Sleep capture-window control
-  calibration.h            RT/RH calibration
-  sensirion_ble.*          BLE live advertising
-  sensirion_history.*      persistent BLE history / GATT
-docs/
-  DEVELOPMENT_HISTORY.md development process and design rationale
-  ISR_ARCHITECTURE.md    timing-critical ISR design
-  LIGHT_SLEEP.md         power-management design
-  history/               detailed superseded engineering notes
-tools/                reverse-engineering utilities
+S
 ```
 
-Historical notes under `docs/history/` may use old signal names or describe superseded implementations. The README, active docs and source are the current reference.
+The Device Information Service identifies the manufacturer as:
 
-## Safety
+```text
+Gadget
+```
 
-Verify polarity, signal levels and wiring on the actual hardware before connecting the XIAO. The project is not affiliated with the manufacturer of the Unni monitor or with Sensirion.
+The firmware does not claim that the hardware was manufactured by Sensirion.
 
-## License
+The BLE compatibility implementation is local code using ESPHome and ESP-IDF BLE APIs. The production firmware does not directly vendor or link the Sensirion Gadget BLE Arduino Library or Sensirion UPT Core.
 
-Project-authored code and documentation are distributed under the GNU General Public License v3.0 or later (`GPL-3.0-or-later`). See [LICENSE](LICENSE).
+Parts of the protocol implementation were developed with reference to Sensirion's published software. See:
 
-The Sensirion-derived/referenced BLE compatibility portions retain the applicable upstream BSD-3-Clause notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the complete upstream license texts in `LICENSES/`.
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- `LICENSES/`
 
-### Experimental MyAmbience pairing / Device Settings probe
+for attribution, provenance and upstream license texts.
 
-The normal BLE builds expose an experimental SHT43-compatible Device Settings
-service (`0x8100`) to determine how MyAmbience discovers secure runtime settings.
-The probe mirrors the Settings Version (`0x81FF`), IsLogEnabled (`0x81FE`),
-IsAdvertiseDataEnabled (`0x8130`) and AlternativeDeviceName (`0x8120`)
-characteristic UUIDs. Writes are deliberately non-destructive for this test:
-changing the MyAmbience privacy/log/name controls only updates the probe value
-and logs the write; it does **not** yet disable Wi-Fi, Home Assistant or BLE live
-advertising.
+---
 
-Normal/debug YAML builds configure ESPHome BLE for Secure Connections + bonding
-+ MITM-capable Numeric Comparison. Home Assistant exposes `BLE Pairing Mode`.
-Enable it immediately before connecting/pairing from MyAmbience. The authorization
-window defaults to 60 seconds (`ble_pairing_window: 60s`). Numeric Comparison is
-accepted only while that window is open, and the window closes automatically
-after successful authentication or timeout. This is an experimental ownership
-gate: because the ESP has no local display/button, the ESP side automatically
-confirms the numeric comparison while the HA-authorized window is open rather
-than independently displaying and comparing the six-digit value.
+## BLE history
 
-The SHT43 reference firmware marks Device Settings characteristics as encrypted
-and authenticated at the ATT attribute-permission level. ESPHome's current
-`BLECharacteristic` wrapper does not expose custom attribute permissions, so this
-probe initiates authenticated link encryption explicitly but cannot yet reproduce
-those per-characteristic permissions exactly. If MyAmbience requires the ATT
-permission failure itself to trigger/discover pairing, the next step is a small
-raw ESP-IDF GATT service or an ESPHome permission-setter extension.
+With:
 
-### Experimental MyAmbience SHT43 identity probe
+```yaml
+co2_monitor_0601:
+  ble_history: true
+```
 
-`i2c-sniffer-sht43-probe.yaml` is a diagnostic build for determining whether
-MyAmbience enables the SHT43-only Device Settings UI from gadget identity. It
-uses `sht43_identity_probe: true`, advertises as `SHT43 DB` with SHT sample type
-`0x06`, and deliberately uses test device ID `68:43` to avoid cached SCD-Gadget
-classification. Do not use this identity mode as the normal production build.
+samples are stored in the `senshist` flash partition.
 
-`home_assistant` is opt-out and defaults to `true`; all shipped normal/debug
-YAML files also state `home_assistant: true` explicitly. Only the BLE-only
-measurement YAML sets it to `false`.
+MyAmbience can download the history through the compatible GATT protocol.
 
+The history ring is persistent across normal reboots.
 
-### SHT43 / MyAmbience compatibility probe
+---
 
-The experimental SHT43 identity probe reserves enough ATT handles for the full Device Settings, SHT, temperature and humidity service topology. Debug builds log GATT reads/writes while testing MyAmbience Device Name and Privacy behavior.
+# Experimental secure MyAmbience settings
 
-On normal USB power the runtime Wi-Fi policy requests `WIFI_PS_NONE`; battery/Energy Save requests `WIFI_PS_MIN_MODEM`.
+This part of the project is under active reverse engineering and is not required for normal sensor operation.
+
+The firmware can expose a Sensirion-compatible Device Settings service:
+
+```text
+Service   0x8100
+```
+
+The current probe includes the known SHT43 DemoBoard setting characteristics:
+
+```text
+0x81FF  Settings Version
+0x81FE  IsLogEnabled
+0x8130  IsAdvertiseDataEnabled / Privacy
+0x8120  AlternativeDeviceName
+```
+
+The ESP32 BLE stack is configured for:
+
+- LE Secure Connections
+- bonding
+- MITM-capable Numeric Comparison
+- 10–16 byte encryption keys
+
+Because the ESP installation has neither a dedicated display nor a physical confirmation button, pairing authorization is currently provided through Home Assistant.
+
+Enable:
+
+```text
+BLE Pairing Mode
+```
+
+immediately before pairing in MyAmbience.
+
+The authorization window defaults to 60 seconds.
+
+During that window an incoming Numeric Comparison request may be accepted automatically by the ESP. After successful authentication, or when the timeout expires, Pairing Mode is switched off.
+
+This is not equivalent to the original SHT43 DemoBoard's physical numeric-comparison confirmation and should be regarded as an experimental ownership gate.
+
+---
+
+# SHT43 identity probe
+
+`i2c-sniffer-sht43-probe.yaml` deliberately makes the ESP appear to MyAmbience as an SHT43 DemoBoard.
+
+It is used only to study how MyAmbience selects device-specific functionality.
+
+The probe currently uses:
+
+```text
+GAP name:       SHT43 DB
+Sample type:    0x06
+Test device ID: 68:43
+```
+
+and exposes SHT43-style temperature, humidity and Device Settings GATT services.
+
+This experiment confirmed that MyAmbience switches to its SHT43-specific UI when the SHT43 identity is advertised. The app then exposes:
+
+- Device Information
+- Device Name
+- Logging Interval
+- Sensor Certificate
+- Privacy
+
+MyAmbience also treats history in this mode as temperature/humidity history, so CO₂ values stored in the same internal history are not displayed.
+
+The production firmware should therefore continue to use the normal SCD-compatible identity.
+
+Future experiments may investigate whether separate logical SHT43 and SCD identities can coexist so that one exposes secure settings while the other remains visible as a CO₂ gadget.
+
+---
+
+# Passive CO₂ decoding
+
+The CO₂ channel is passively sniffed from the original I²C bus.
+
+The observed module uses address:
+
+```text
+0x62
+```
+
+and the relevant transaction corresponds to the SCD4x-style measurement command:
+
+```text
+0xEC05
+```
+
+The decoder validates:
+
+- I²C addressing
+- read/write direction
+- expected command bytes
+- ACK/NACK structure
+- complete response length
+- Sensirion CRC
+
+Malformed or incomplete captures are rejected rather than converted into measurements.
+
+---
+
+## Missed-edge recovery
+
+GPIO-based passive sniffing on the ESP32-C3 occasionally loses a complete SCL pulse.
+
+Real captures showed that this can produce an exact one-bit shift in an otherwise valid transaction.
+
+The decoder therefore contains a deliberately conservative recovery mechanism.
+
+It can attempt to reconstruct at most two missing SCL clocks per capture.
+
+Candidate locations are generated only from unusually long periods in which captured SCL remains at a constant level.
+
+Timing is used only to generate possible hypotheses.
+
+A recovery is accepted only if all valid hypotheses produce the same complete CO₂ transaction with:
+
+- address `0x62`
+- command `0xEC05`
+- correct ACK/NACK behavior
+- valid Sensirion CRC
+
+If valid hypotheses disagree, recovery is rejected.
+
+The original GPIO waveform is retained unchanged for diagnostics.
+
+---
+
+# Raw debug capture
+
+With:
+
+```yaml
+co2_monitor_0601:
+  debug_capture: true
+```
+
+the debug web server exposes:
+
+```text
+/capture
+/rt_rh_capture.csv
+/rt_rh_timing.csv
+```
+
+The first suspicious I²C transaction is frozen until successfully downloaded.
+
+Interesting conditions include:
+
+- malformed framing
+- unhandled transactions
+- protocol-invalid CO₂ frames
+- software-recovered missing clocks
+
+A successfully resolved coalesced SDA/SCL sample alone does not consume the freeze slot.
+
+The current raw format is:
+
+```text
+LA02
+```
+
+which includes the bus state before the first captured edge.
+
+The supplied converter:
+
+```text
+tools/capture2vcd.py
+```
+
+supports `LA02` and the older `LA01` formats.
+
+Captured transactions are normally well below 1 KiB and are sent synchronously by the ESP-IDF HTTP server.
+
+---
+
+# RT/RH decoding
+
+Temperature and humidity are derived from timing relationships observed on the original Unni RT/RH circuitry.
+
+The decoder measures:
+
+- reference timing
+- RT timing
+- RH state timing
+- signal counts and duration
+- derived timing ratios
+
+Calibration is specific to the tested device family.
+
+Diagnostic builds expose additional information including:
+
+- measurement quality
+- timing ratios
+- logarithmic RH ratio
+- temperature rate of change
+- extrapolation flags
+- thermal-transient detection
+
+The active calibration is defined in:
+
+```text
+co2_monitor_0601/calibration.h
+```
+
+---
+
+# Startup behavior
+
+The ESP deliberately leaves the sniffing GPIOs untouched during the initial startup delay:
+
+```yaml
+co2_monitor_0601:
+  sniffer_start_delay: 10s
+```
+
+This reduces the risk that ESP GPIO initialization influences the original Unni electronics during their own startup sequence.
+
+After the delay, passive capture is enabled.
+
+The shared GPIO ISR service is installed IRAM-safe before Wi-Fi initialization, while the actual sensor GPIO capture remains isolated until the startup delay has elapsed.
+
+---
+
+# Repository layout
+
+```text
+co2_monitor_0601/
+  __init__.py
+      ESPHome schema and code generation
+
+  co2_monitor_0601.cpp/.h
+      component orchestration
+      Home Assistant publishing
+      USB/battery policy
+
+  i2c_sniffer.cpp/.h
+      passive GPIO I²C capture and framing
+
+  co2_decoder.cpp/.h
+      CO₂ protocol and CRC validation
+
+  rtrh_decoder.cpp/.h
+      RT/RH timing decoder
+
+  power_save.cpp/.h
+      CPU frequency and Light-Sleep policy
+
+  calibration.h
+      RT/RH calibration
+
+  sensirion_ble.cpp/.h
+      BLE live advertising
+
+  sensirion_history.cpp/.h
+      persistent BLE history and GATT download
+
+  sensirion_settings.cpp/.h
+      experimental Device Settings support
+
+  sensirion_sht43_probe.cpp/.h
+      experimental SHT43 identity probe
+
+docs/
+  DEVELOPMENT_HISTORY.md
+      development process and design rationale
+
+  ISR_ARCHITECTURE.md
+      timing-critical GPIO/ISR architecture
+
+  LIGHT_SLEEP.md
+      power-management implementation
+
+  history/
+      detailed notes about superseded approaches
+
+tools/
+  reverse-engineering and capture utilities
+```
+
+Historical documents may describe earlier pin assignments, names or implementations. The current source, README and active documentation are authoritative.
+
+---
+
+# Safety
+
+Verify polarity, voltage levels and actual PCB connections before attaching the XIAO.
+
+The ESP and Unni electronics share ground, and mistakes on battery, VBUS or signal connections can damage either device.
+
+This project is independent community work and is not affiliated with the manufacturer of the Unni monitor or with Sensirion.
+
+---
+
+# License
+
+Project-authored code and documentation are licensed under:
+
+```text
+GPL-3.0-or-later
+```
+
+See [LICENSE](LICENSE).
+
+Referenced or adapted Sensirion-compatible portions retain the required upstream notices and provenance information.
+
+See:
+
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- `LICENSES/`
