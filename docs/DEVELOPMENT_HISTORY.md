@@ -436,3 +436,10 @@ cached SCD-Gadget classification for device `68:3A`.
 
 This is a compatibility experiment only. The normal build remains the
 T/RH/CO2 SCD-Gadget identity and does not claim to be a Sensirion SHT43 board.
+
+### ESPHome 2026.8 ByteBuffer API fix
+
+The experimental SHT43 identity probe now writes numeric GATT values through
+`bytebuffer::ByteBuffer::wrap()` instead of relying on implicit conversion from
+`std::vector<uint8_t>`. ESPHome 2026.8 exposes `BLECharacteristic::set_value()`
+with a `ByteBuffer` argument and keeps the vector-backed constructor protected.

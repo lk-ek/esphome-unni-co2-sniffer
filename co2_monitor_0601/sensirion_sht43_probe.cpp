@@ -9,10 +9,9 @@
 
 #include "esphome/components/esp32_ble/ble.h"
 #include "esphome/components/esp32_ble_server/ble_characteristic.h"
+#include "esphome/components/bytebuffer/bytebuffer.h"
 #include "esphome/core/log.h"
 
-#include <cstring>
-#include <vector>
 
 namespace esphome {
 namespace co2_monitor_0601 {
@@ -20,6 +19,7 @@ namespace {
 static const char *TAG = "sht43_identity";
 using esp32_ble::ESPBTUUID;
 using esp32_ble_server::BLECharacteristic;
+using bytebuffer::ByteBuffer;
 
 struct ProbeGatt {
   bool bound{false};
@@ -44,9 +44,7 @@ esp32_ble_server::BLEService *get_or_create_service(esp32_ble_server::BLEServer 
 
 void set_float(BLECharacteristic *characteristic, float value) {
   if (characteristic == nullptr) return;
-  std::vector<uint8_t> raw(sizeof(value));
-  std::memcpy(raw.data(), &value, sizeof(value));
-  characteristic->set_value(raw);
+  characteristic->set_value(ByteBuffer::wrap(value));
 }
 }  // namespace
 
@@ -77,9 +75,7 @@ void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
   // A plausible fixed serial is sufficient for classification probing; the
   // advertisement uses a distinct test BLE identity/device ID (0x6843).
   const uint32_t serial = 0x68430001U;
-  gatt.serial->set_value(std::vector<uint8_t>{
-      static_cast<uint8_t>(serial & 0xFF), static_cast<uint8_t>((serial >> 8) & 0xFF),
-      static_cast<uint8_t>((serial >> 16) & 0xFF), static_cast<uint8_t>((serial >> 24) & 0xFF)});
+  gatt.serial->set_value(ByteBuffer::wrap(serial));
   set_float(gatt.temperature, 25.0f);
   set_float(gatt.humidity, 50.0f);
 
