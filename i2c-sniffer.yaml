@@ -30,7 +30,7 @@ wifi:
   power_save_mode: LIGHT
   # Skip the normal active channel scan on reconnect/boot. ESPHome falls back
   # to scanning automatically if the remembered AP cannot be reached.
-  fast_connect: true
+  fast_connect: false
   # Stationary device with multiple APs: avoid disruptive BSSID roaming.
   post_connect_roaming: false
   ap:

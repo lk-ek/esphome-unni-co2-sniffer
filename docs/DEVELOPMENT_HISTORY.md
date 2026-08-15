@@ -471,3 +471,13 @@ without creating the additional SHT, temperature, humidity, or Device Settings
 GATT services. The established Sensirion history service remains enabled. Heap
 logging records memory before BLE activation, on the first GATTS event, and
 periodically at runtime.
+
+
+### 2026-08-15: Restore SHT43 temperature and humidity GATT
+
+After `fast_connect: false` plus `post_connect_roaming: false` produced stable
+Home Assistant startup with the SHT43 serial service restored, the staged GATT
+reintroduction advances one step. The SHT43 probe now exposes its serial,
+temperature, and humidity services again while the experimental Device Settings
+service (`0x8100`) remains disabled. Heap diagnostics stay enabled so the memory
+impact can be compared directly with the serial-only build.
