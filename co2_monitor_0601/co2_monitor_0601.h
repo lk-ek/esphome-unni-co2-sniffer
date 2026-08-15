@@ -54,7 +54,11 @@ class CO2Monitor0601 : public Component {
   void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
   void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
   void set_usb_power_pin(uint8_t pin) { this->usb_power_.pin = pin; }
-  void set_energy_save_mode_default(bool value) { this->energy_save_mode_ = value; }
+  void set_energy_save_mode_default(bool value) {
+    this->energy_save_mode_ = value;
+    this->energy_save_policy_active_ = value;
+  }
+  void set_energy_save_grace(uint32_t value) { this->energy_save_grace_ms_ = value; }
   void set_energy_save_mode_switch(EnergySaveModeSwitch *s) { this->energy_save_switch_ = s; }
   void set_energy_save_mode(bool enabled);
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
@@ -159,7 +163,8 @@ class CO2Monitor0601 : public Component {
   void maybe_publish_ha_();
   void publish_cached_ha_now_();
   bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
-  bool external_powered_() const { return this->usb_powered_() && !this->energy_save_mode_; }
+  bool external_powered_() const { return this->usb_powered_() && !this->energy_save_policy_active_; }
+  void process_energy_save_grace_();
   void apply_power_policy_(bool force = false);
   void process_rtrh_();
   void process_co2_();
@@ -182,6 +187,10 @@ class CO2Monitor0601 : public Component {
 #endif
   bool light_sleep_enabled_{true};
   bool energy_save_mode_{false};
+  bool energy_save_policy_active_{false};
+  bool energy_save_grace_pending_{false};
+  uint32_t energy_save_grace_started_ms_{0};
+  uint32_t energy_save_grace_ms_{3000};
   bool power_policy_have_state_{false};
   bool power_policy_external_power_{false};
   EnergySaveModeSwitch *energy_save_switch_{nullptr};

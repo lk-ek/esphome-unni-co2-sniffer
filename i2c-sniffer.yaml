@@ -25,9 +25,9 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  # ESP32 already defaults to LIGHT modem sleep. HIGH saves more RF power;
-  # if your AP proves unreliable, change this back to LIGHT.
-  power_save_mode: HIGH
+  # Keep Wi-Fi modem sleep conservative while automatic MCU Light-sleep is used.
+  # HIGH/MAX_MODEM proved unreliable on this ESP32-C3/AP combination.
+  power_save_mode: LIGHT
   # Skip the normal active channel scan on reconnect/boot. ESPHome falls back
   # to scanning automatically if the remembered AP cannot be reached.
   fast_connect: true
@@ -48,6 +48,8 @@ co2_monitor_0601:
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
   energy_save_mode_default: false
+  # Keep HA/API reachable briefly before Light-sleep may drop native USB serial.
+  energy_save_grace: 3s
   sniffer_start_delay: 10s
   debug_metrics: false
   debug_capture: false

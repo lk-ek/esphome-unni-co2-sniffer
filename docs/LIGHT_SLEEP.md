@@ -85,3 +85,8 @@ BLE advertising switches dynamically between the USB and battery intervals when 
 The Home Assistant `Energy Save Mode` switch forces the battery power policy while leaving physical USB/VBUS detection unchanged. It is intended for USB power-meter A/B measurements. Enabling it releases the persistent USB no-Light-Sleep/CPU-max locks and uses the same RT/RH-triggered awake windows, CO2 capture gating, BLE battery advertising interval and Home Assistant battery publish throttle as real battery operation. Disabling it immediately restores the normal USB policy if VBUS is physically present.
 
 `energy_save_mode_default` controls the boot state and defaults to `false`. Battery SOC interpretation remains based on physical VBUS, not on the override.
+
+
+## Energy Save Mode transition
+
+When Energy Save Mode is enabled while VBUS is physically present, `energy_save_grace` (default 3 s) keeps the normal USB PM locks briefly before applying the battery policy. This gives Home Assistant/API and logs time to observe the switch transition before automatic Light-sleep may disconnect native USB Serial/JTAG. Shipped Wi-Fi examples use `power_save_mode: LIGHT`; `HIGH`/MAX_MODEM was unreliable together with automatic Light-sleep on the tested ESP32-C3 setup.

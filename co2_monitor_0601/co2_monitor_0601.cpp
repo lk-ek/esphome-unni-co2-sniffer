@@ -111,7 +111,48 @@ void CO2Monitor0601::set_energy_save_mode(bool enabled) {
 
   this->energy_save_mode_ = enabled;
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(enabled);
-  ESP_LOGI(TAG, "Energy Save Mode: %s", enabled ? "ON (battery policy forced)" : "OFF (automatic USB/battery policy)");
+
+  if (!enabled) {
+    this->energy_save_grace_pending_ = false;
+    this->energy_save_policy_active_ = false;
+    ESP_LOGI(TAG, "Energy Save Mode: OFF (automatic USB/battery policy)");
+    this->apply_power_policy_(true);
+    return;
+  }
+
+  if (this->usb_powered_() && this->energy_save_grace_ms_ > 0) {
+    // Keep the normal USB PM locks briefly so HA receives the switch update and
+    // final log messages before native USB Serial/JTAG may disappear in sleep.
+    this->energy_save_policy_active_ = false;
+    this->energy_save_grace_pending_ = true;
+    this->energy_save_grace_started_ms_ = millis();
+    ESP_LOGI(TAG, "Energy Save Mode: ON; battery policy starts in %lu ms",
+             static_cast<unsigned long>(this->energy_save_grace_ms_));
+    ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect once Light-sleep becomes active");
+    this->apply_power_policy_(true);
+    return;
+  }
+
+  this->energy_save_grace_pending_ = false;
+  this->energy_save_policy_active_ = true;
+  ESP_LOGI(TAG, "Energy Save Mode: ON (battery policy forced)");
+  ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect while Light-sleep is active");
+  this->apply_power_policy_(true);
+}
+
+void CO2Monitor0601::process_energy_save_grace_() {
+  if (!this->energy_save_grace_pending_) return;
+  if (!this->energy_save_mode_) {
+    this->energy_save_grace_pending_ = false;
+    return;
+  }
+  const uint32_t now = millis();
+  if (static_cast<uint32_t>(now - this->energy_save_grace_started_ms_) < this->energy_save_grace_ms_) return;
+
+  this->energy_save_grace_pending_ = false;
+  this->energy_save_policy_active_ = true;
+  ESP_LOGI(TAG, "Energy Save Mode grace period complete; enabling battery policy");
+  ESP_LOGI(TAG, "WiFi modem sleep remains enabled; native USB Serial/JTAG may disconnect");
   this->apply_power_policy_(true);
 }
 
@@ -151,7 +192,7 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
   }
 
   ESP_LOGI(TAG, "Power policy: %s%s", external ? "USB" : "battery",
-           this->energy_save_mode_ ? " (Energy Save Mode override)" : "");
+           this->energy_save_policy_active_ ? " (Energy Save Mode override)" : "");
 }
 
 bool CO2Monitor0601::setup_usb_power_() {
@@ -699,6 +740,7 @@ void CO2Monitor0601::loop() {
   sensirion_history_loop();
 #endif
   this->process_usb_power_();
+  this->process_energy_save_grace_();
   this->maybe_publish_ha_();
   this->process_battery_();
 

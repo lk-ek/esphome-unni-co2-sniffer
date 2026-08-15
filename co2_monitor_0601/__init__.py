@@ -53,6 +53,7 @@ CONF_USB_POWER_PIN = "usb_power_pin"
 CONF_USB_POWER = "usb_power"
 CONF_ENERGY_SAVE_MODE = "energy_save_mode"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
+CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -234,6 +235,7 @@ _SCHEMA = {
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
     cv.Optional(CONF_USB_POWER_PIN, default=5): cv.int_range(min=0, max=21),
     cv.Optional(CONF_ENERGY_SAVE_MODE_DEFAULT, default=False): cv.boolean,
+    cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
@@ -361,6 +363,7 @@ async def to_code(config):
     cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))
     cg.add(var.set_usb_power_pin(config[CONF_USB_POWER_PIN]))
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
+    cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
 
     energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
     cg.add(energy_save.set_parent(var))

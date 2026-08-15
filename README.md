@@ -95,6 +95,7 @@ The switch defaults to off. To boot directly into the measurement mode, set:
 ```yaml
 co2_monitor_0601:
   energy_save_mode_default: true
+  energy_save_grace: 3s
 ```
 
 This option changes only firmware behavior. A USB power meter still measures the complete hardware actually powered through USB, including the original CO2 monitor electronics.
@@ -112,6 +113,7 @@ co2_monitor_0601:
   battery_pin: 2
   usb_power_pin: 5
   energy_save_mode_default: false
+  energy_save_grace: 3s
 ```
 
 All configured pins must be unique. `battery_pin` must be an ESP32-C3 ADC1 GPIO (GPIO0–GPIO4).

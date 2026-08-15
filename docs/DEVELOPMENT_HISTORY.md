@@ -396,3 +396,8 @@ ends after the command without any read edges remains intentionally unrecoverabl
 ## 2026-08-15 — Energy Save Mode measurement override
 
 Added a Home Assistant `Energy Save Mode` switch plus `energy_save_mode_default`. The override preserves truthful physical USB/VBUS reporting but forces the runtime battery policy so USB power meters can compare normal and power-saving behavior on identical hardware. The switch affects PM locks/Light Sleep, CO2 capture gating, BLE advertising cadence, and Home Assistant publication cadence; battery SOC availability continues to follow physical VBUS.
+
+
+### 2026-08-15: Energy Save transition grace and Wi-Fi MIN_MODEM
+
+Changed shipped Wi-Fi power saving from HIGH/MAX_MODEM to LIGHT/MIN_MODEM after Energy Save Mode caused Wi-Fi loss when automatic MCU Light-sleep became active. Added configurable `energy_save_grace` (default 3 s) so a Home Assistant switch transition is visible before the USB PM locks are released and native USB Serial/JTAG may disconnect.
