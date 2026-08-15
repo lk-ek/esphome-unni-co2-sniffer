@@ -57,20 +57,6 @@ struct Snapshot {
   uint32_t rt_temp_period_sum{0};
   uint16_t rt_temp_count{0};
   RhStateStats rh_state;
-  uint32_t rh_irq_rt{0};
-  uint32_t rh_irq_rh{0};
-  uint32_t rh_state_00{0};
-  uint32_t rh_state_01{0};
-  uint32_t rh_state_08{0};
-  uint32_t rh_state_09{0};
-  uint32_t rh_rise_pairs{0};
-  uint32_t rh_fall_pairs{0};
-  uint32_t rh_rise_rt_first{0};
-  uint32_t rh_rise_rh_first{0};
-  uint32_t rh_fall_rt_first{0};
-  uint32_t rh_fall_rh_first{0};
-  uint32_t rh_rise_skew_sum_us{0};
-  uint32_t rh_fall_skew_sum_us{0};
   uint32_t sequence{0};
 };
 
@@ -125,21 +111,6 @@ struct DecoderState {
   volatile uint32_t rt_temperature_period_sum{0};
   volatile uint16_t rt_temperature_count{0};
   RhStateStats rh_state;
-  volatile uint32_t rh_irq_rt{0};
-  volatile uint32_t rh_irq_rh{0};
-  volatile uint32_t rh_state_00{0};
-  volatile uint32_t rh_state_01{0};
-  volatile uint32_t rh_state_08{0};
-  volatile uint32_t rh_state_09{0};
-  volatile uint32_t rh_last_edge_us[2][2]{{0, 0}, {0, 0}};
-  volatile uint32_t rh_rise_pairs{0};
-  volatile uint32_t rh_fall_pairs{0};
-  volatile uint32_t rh_rise_rt_first{0};
-  volatile uint32_t rh_rise_rh_first{0};
-  volatile uint32_t rh_fall_rt_first{0};
-  volatile uint32_t rh_fall_rh_first{0};
-  volatile uint32_t rh_rise_skew_sum_us{0};
-  volatile uint32_t rh_fall_skew_sum_us{0};
 
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
@@ -188,22 +159,6 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.rt_temperature_period_sum = 0;
   decoder.rt_temperature_count = 0;
   clear_rh_state();
-  decoder.rh_irq_rt = 0;
-  decoder.rh_irq_rh = 0;
-  decoder.rh_state_00 = 0;
-  decoder.rh_state_01 = 0;
-  decoder.rh_state_08 = 0;
-  decoder.rh_state_09 = 0;
-  for (uint8_t pin_i = 0; pin_i < 2; pin_i++)
-    for (uint8_t level_i = 0; level_i < 2; level_i++) decoder.rh_last_edge_us[pin_i][level_i] = 0;
-  decoder.rh_rise_pairs = 0;
-  decoder.rh_fall_pairs = 0;
-  decoder.rh_rise_rt_first = 0;
-  decoder.rh_rise_rh_first = 0;
-  decoder.rh_fall_rt_first = 0;
-  decoder.rh_fall_rh_first = 0;
-  decoder.rh_rise_skew_sum_us = 0;
-  decoder.rh_fall_skew_sum_us = 0;
 }
 
 static inline void IRAM_ATTR add_period(Accum &a, uint32_t period) {
@@ -275,20 +230,6 @@ static void finalize_measurement() {
   next.rt_temp_period_sum = decoder.rt_temperature_period_sum;
   next.rt_temp_count = decoder.rt_temperature_count;
   next.rh_state = decoder.rh_state;
-  next.rh_irq_rt = decoder.rh_irq_rt;
-  next.rh_irq_rh = decoder.rh_irq_rh;
-  next.rh_state_00 = decoder.rh_state_00;
-  next.rh_state_01 = decoder.rh_state_01;
-  next.rh_state_08 = decoder.rh_state_08;
-  next.rh_state_09 = decoder.rh_state_09;
-  next.rh_rise_pairs = decoder.rh_rise_pairs;
-  next.rh_fall_pairs = decoder.rh_fall_pairs;
-  next.rh_rise_rt_first = decoder.rh_rise_rt_first;
-  next.rh_rise_rh_first = decoder.rh_rise_rh_first;
-  next.rh_fall_rt_first = decoder.rh_fall_rt_first;
-  next.rh_fall_rh_first = decoder.rh_fall_rh_first;
-  next.rh_rise_skew_sum_us = decoder.rh_rise_skew_sum_us;
-  next.rh_fall_skew_sum_us = decoder.rh_fall_skew_sum_us;
   next.sequence = decoder.snapshot.sequence + 1;
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
@@ -333,36 +274,6 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   else decoder.last_edge_us = now;
   update_phase(now);
 
-  if (decoder.phase == Phase::RH) {
-    if (pin_index == 0) decoder.rh_irq_rt++;
-    else decoder.rh_irq_rh++;
-
-    // The physical RT/RH edges can be only a few microseconds apart. Reading
-    // both GPIO levels from one ISR can therefore miss the short 01/08 state.
-    // Pair equal-polarity edges by timestamp so the phase relationship remains
-    // observable even when the intermediate GPIO state has already vanished.
-    const uint8_t edge_level = level ? 1 : 0;
-    const uint8_t other = pin_index ^ 1;
-    const uint32_t other_us = decoder.rh_last_edge_us[other][edge_level];
-    if (other_us != 0) {
-      const uint32_t skew = static_cast<uint32_t>(now - other_us);
-      if (skew <= 100) {
-        if (edge_level) {
-          decoder.rh_rise_pairs++;
-          decoder.rh_rise_skew_sum_us += skew;
-          if (pin_index == 1) decoder.rh_rise_rt_first++;  // RH edge arrived second.
-          else decoder.rh_rise_rh_first++;                // RT edge arrived second.
-        } else {
-          decoder.rh_fall_pairs++;
-          decoder.rh_fall_skew_sum_us += skew;
-          if (pin_index == 1) decoder.rh_fall_rt_first++;  // RH edge arrived second.
-          else decoder.rh_fall_rh_first++;                // RT edge arrived second.
-        }
-      }
-    }
-    decoder.rh_last_edge_us[pin_index][edge_level] = now;
-  }
-
   // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
   // errors when several sensor lines change almost simultaneously.
   const bool is_rt_irq = pin_index == 0;
@@ -389,14 +300,6 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   }
 
   if (state != decoder.gpio_state) {
-    if (decoder.phase == Phase::RH) {
-      switch (state & 0x09) {
-        case 0x00: decoder.rh_state_00++; break;
-        case 0x01: decoder.rh_state_01++; break;
-        case 0x08: decoder.rh_state_08++; break;
-        case 0x09: decoder.rh_state_09++; break;
-      }
-    }
     observe_rh_state(now, state);
     decoder.gpio_state = state;
   }
@@ -437,7 +340,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 #endif
 }
 
-bool setup(uint8_t rt_pin, uint8_t rh_pin, bool enable_edge_isr) {
+bool setup(uint8_t rt_pin, uint8_t rh_pin) {
   pin_rt = static_cast<gpio_num_t>(rt_pin);
   pin_rh = static_cast<gpio_num_t>(rh_pin);
   pins[0] = pin_rt;
@@ -451,18 +354,13 @@ bool setup(uint8_t rt_pin, uint8_t rh_pin, bool enable_edge_isr) {
   esp_err_t err = gpio_config(&io);
   if (err != ESP_OK) return false;
 
+  for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   decoder.gpio_state = read_state();
   for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
 #if RTRH_DEBUG_CAPTURE
   debug.last_value = read_state();
 #endif
 
-  if (!enable_edge_isr) {
-    ESP_LOGW(TAG, "RT/RH GPIOs configured as inputs; edge interrupts intentionally disabled for A/B test");
-    return true;
-  }
-
-  for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
   for (uint8_t i = 0; i < 2; i++) {
     err = gpio_isr_handler_add(pins[i], gpio_isr,
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
@@ -553,20 +451,6 @@ static Measurement derive(const Snapshot &s) {
   m.rt_count = s.rt_temp_count;
   m.rh_state_samples = s.rh_state.sample_count;
   m.rh_state_seen = s.rh_state.seen;
-  m.rh_irq_rt = s.rh_irq_rt;
-  m.rh_irq_rh = s.rh_irq_rh;
-  m.rh_state_00 = s.rh_state_00;
-  m.rh_state_01 = s.rh_state_01;
-  m.rh_state_08 = s.rh_state_08;
-  m.rh_state_09 = s.rh_state_09;
-  m.rh_rise_pairs = s.rh_rise_pairs;
-  m.rh_fall_pairs = s.rh_fall_pairs;
-  m.rh_rise_rt_first = s.rh_rise_rt_first;
-  m.rh_rise_rh_first = s.rh_rise_rh_first;
-  m.rh_fall_rt_first = s.rh_fall_rt_first;
-  m.rh_fall_rh_first = s.rh_fall_rh_first;
-  m.rh_rise_skew_mean_us = s.rh_rise_pairs ? float(s.rh_rise_skew_sum_us) / s.rh_rise_pairs : NAN;
-  m.rh_fall_skew_mean_us = s.rh_fall_pairs ? float(s.rh_fall_skew_sum_us) / s.rh_fall_pairs : NAN;
 
   m.ref_period_us = s.ref.count ? float(s.ref.period_sum) / s.ref.count : 0.0f;
   m.ref_duration_ms = float(s.ref.period_sum) / 1000.0f;
@@ -774,7 +658,6 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
   }
 };
 static TimingHandler timing_handler;
-
 #endif
 
 void register_debug_handlers() {

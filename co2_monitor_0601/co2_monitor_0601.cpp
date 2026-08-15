@@ -447,16 +447,18 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
   const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
   if (setup_rtrh_gpio) {
     const bool enable_rtrh_edge_isr = this->rtrh_enabled_ || this->rtrh_edge_capture_;
-    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_, enable_rtrh_edge_isr)) {
-      ESP_LOGE(TAG, "RT/RH GPIO setup failed");
+    if (!enable_rtrh_edge_isr) {
+      ESP_LOGE(TAG, "Known-good RT/RH restore test requires edge capture enabled");
       return false;
     }
-    if (this->rtrh_decode_only_ && !this->rtrh_enabled_)
-      ESP_LOGW(TAG, "Capture A/B: RT/RH edge ISR + decoder enabled; HA/BLE/history publication disabled");
-    else if (this->rtrh_edge_capture_ && !this->rtrh_enabled_)
-      ESP_LOGW(TAG, "Capture A/B: RT/RH edge ISR enabled; RT/RH publish/decoder path disabled");
-    else if (!this->rtrh_enabled_)
-      ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO/power-save setup enabled; RT/RH edge ISR disabled");
+    // A/B: use the exact pre-regression RT/RH setup path. In particular,
+    // GPIO_INTR_ANYEDGE is configured before the initial GPIO snapshots, just
+    // as in the 16:05 build that produced valid temperature/humidity samples.
+    if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
+      ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
+      return false;
+    }
+    ESP_LOGW(TAG, "RT/RH A/B: exact known-good decoder and GPIO/ISR setup restored");
   } else {
     ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO setup and edge ISR disabled; CO2 I2C sniffer only");
   }
@@ -696,22 +698,6 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
              static_cast<unsigned long>(m.sequence),
              rtrh_decoder::reject_reason_to_string(m.reject_reason), m.quality_percent,
              publish_outputs ? "" : " [decode-only A/B]");
-    ESP_LOGI(TAG,
-             "RT/RH RH-phase diag %lu: IRQ RT=%lu RH=%lu, states 00=%lu 01=%lu 08=%lu 09=%lu, provisional T=%.2f C",
-             static_cast<unsigned long>(m.sequence),
-             static_cast<unsigned long>(m.rh_irq_rt), static_cast<unsigned long>(m.rh_irq_rh),
-             static_cast<unsigned long>(m.rh_state_00), static_cast<unsigned long>(m.rh_state_01),
-             static_cast<unsigned long>(m.rh_state_08), static_cast<unsigned long>(m.rh_state_09),
-             m.temperature_c);
-    ESP_LOGI(TAG,
-             "RT/RH edge-skew diag %lu: rise pairs=%lu RT-first=%lu RH-first=%lu mean=%.2f us; fall pairs=%lu RT-first=%lu RH-first=%lu mean=%.2f us",
-             static_cast<unsigned long>(m.sequence),
-             static_cast<unsigned long>(m.rh_rise_pairs),
-             static_cast<unsigned long>(m.rh_rise_rt_first),
-             static_cast<unsigned long>(m.rh_rise_rh_first), m.rh_rise_skew_mean_us,
-             static_cast<unsigned long>(m.rh_fall_pairs),
-             static_cast<unsigned long>(m.rh_fall_rt_first),
-             static_cast<unsigned long>(m.rh_fall_rh_first), m.rh_fall_skew_mean_us);
     rtrh_decoder::update_latest(m);
     return;
   }

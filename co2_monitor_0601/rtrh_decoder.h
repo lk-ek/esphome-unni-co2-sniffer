@@ -47,20 +47,6 @@ struct Measurement {
   float rh_state_us{NAN};
   uint8_t rh_state_samples{0};
   uint32_t rh_state_seen{0};
-  uint32_t rh_irq_rt{0};
-  uint32_t rh_irq_rh{0};
-  uint32_t rh_state_00{0};
-  uint32_t rh_state_01{0};
-  uint32_t rh_state_08{0};
-  uint32_t rh_state_09{0};
-  uint32_t rh_rise_pairs{0};
-  uint32_t rh_fall_pairs{0};
-  uint32_t rh_rise_rt_first{0};
-  uint32_t rh_rise_rh_first{0};
-  uint32_t rh_fall_rt_first{0};
-  uint32_t rh_fall_rh_first{0};
-  float rh_rise_skew_mean_us{NAN};
-  float rh_fall_skew_mean_us{NAN};
 
   float rt_ratio{NAN};
   float rh_ratio{NAN};
@@ -77,7 +63,7 @@ struct Measurement {
 };
 
 // GPIO3/D1 = RT, GPIO4/D2 = RH. D3/GPIO5 is not required.
-bool setup(uint8_t rt_pin, uint8_t rh_pin, bool enable_edge_isr = true);
+bool setup(uint8_t rt_pin, uint8_t rh_pin);
 void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);
