@@ -90,13 +90,3 @@ The Home Assistant `Energy Save Mode` switch forces the battery power policy whi
 ## Energy Save Mode transition
 
 When Energy Save Mode is enabled while VBUS is physically present, `energy_save_grace` (default 3 s) keeps the normal USB PM locks briefly before applying the battery policy. This gives Home Assistant/API and logs time to observe the switch transition before automatic Light-sleep may disconnect native USB Serial/JTAG. Shipped Wi-Fi examples use `power_save_mode: LIGHT`; `HIGH`/MAX_MODEM was unreliable together with automatic Light-sleep on the tested ESP32-C3 setup.
-
-
-### Runtime Wi-Fi power-save policy
-
-The component now couples ESP-IDF Wi-Fi modem-sleep to the same external-power policy:
-
-- physical USB policy: `WIFI_PS_NONE` (favor connection robustness and latency)
-- battery / Energy Save policy: `WIFI_PS_MIN_MODEM` (favor power saving while keeping Wi-Fi associated)
-
-The shipped YAML still uses `power_save_mode: LIGHT` as the safe initialization/default. Once the USB/VBUS state is known, the runtime policy above takes over. In Wi-Fi/BLE coexistence, ESP-IDF may still sleep outside the Wi-Fi time slice even when `WIFI_PS_NONE` is selected.

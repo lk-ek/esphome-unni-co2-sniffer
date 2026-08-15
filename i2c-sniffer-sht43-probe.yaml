@@ -56,6 +56,7 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  home_assistant: true
   # Experimental identity only: advertise as a new SHT43 DemoBoard so
   # MyAmbience cannot reuse the cached SCD-Gadget classification.
   sht43_identity_probe: true
