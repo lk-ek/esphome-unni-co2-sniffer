@@ -796,3 +796,7 @@ The `rtrh_gpio_setup` option is a diagnostic A/B switch. When enabled with `rtrh
 
 The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and publication path again while retaining the RAM-headroom test baseline: web server and captive portal remain disabled, SHT43 serial/T/RH GATT remains enabled, Device Settings 0x8100 remains disabled, and Wi-Fi uses normal scanning with post-connect roaming disabled. This isolates the effect of ESPHome/BLE publication after the ISR and decoder-only stages proved stable.
 
+
+### Temporary RH edge-skew diagnostic
+
+The SHT43 isolation build additionally pairs equal-polarity RT/RH GPIO edges by ISR timestamp during the RH phase. This diagnoses sub-ISR-latency 01/08 states that cannot be observed reliably by reading both GPIO levels after an interrupt has already fired. The log reports rising/falling pair counts, which line led, and mean skew.

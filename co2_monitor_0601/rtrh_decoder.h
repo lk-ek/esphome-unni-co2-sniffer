@@ -53,6 +53,14 @@ struct Measurement {
   uint32_t rh_state_01{0};
   uint32_t rh_state_08{0};
   uint32_t rh_state_09{0};
+  uint32_t rh_rise_pairs{0};
+  uint32_t rh_fall_pairs{0};
+  uint32_t rh_rise_rt_first{0};
+  uint32_t rh_rise_rh_first{0};
+  uint32_t rh_fall_rt_first{0};
+  uint32_t rh_fall_rh_first{0};
+  float rh_rise_skew_mean_us{NAN};
+  float rh_fall_skew_mean_us{NAN};
 
   float rt_ratio{NAN};
   float rh_ratio{NAN};

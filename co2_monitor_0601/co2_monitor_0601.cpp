@@ -703,6 +703,15 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
              static_cast<unsigned long>(m.rh_state_00), static_cast<unsigned long>(m.rh_state_01),
              static_cast<unsigned long>(m.rh_state_08), static_cast<unsigned long>(m.rh_state_09),
              m.temperature_c);
+    ESP_LOGI(TAG,
+             "RT/RH edge-skew diag %lu: rise pairs=%lu RT-first=%lu RH-first=%lu mean=%.2f us; fall pairs=%lu RT-first=%lu RH-first=%lu mean=%.2f us",
+             static_cast<unsigned long>(m.sequence),
+             static_cast<unsigned long>(m.rh_rise_pairs),
+             static_cast<unsigned long>(m.rh_rise_rt_first),
+             static_cast<unsigned long>(m.rh_rise_rh_first), m.rh_rise_skew_mean_us,
+             static_cast<unsigned long>(m.rh_fall_pairs),
+             static_cast<unsigned long>(m.rh_fall_rt_first),
+             static_cast<unsigned long>(m.rh_fall_rh_first), m.rh_fall_skew_mean_us);
     rtrh_decoder::update_latest(m);
     return;
   }
