@@ -451,7 +451,9 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
       ESP_LOGE(TAG, "RT/RH GPIO setup failed");
       return false;
     }
-    if (this->rtrh_edge_capture_ && !this->rtrh_enabled_)
+    if (this->rtrh_decode_only_ && !this->rtrh_enabled_)
+      ESP_LOGW(TAG, "Capture A/B: RT/RH edge ISR + decoder enabled; HA/BLE/history publication disabled");
+    else if (this->rtrh_edge_capture_ && !this->rtrh_enabled_)
       ESP_LOGW(TAG, "Capture A/B: RT/RH edge ISR enabled; RT/RH publish/decoder path disabled");
     else if (!this->rtrh_enabled_)
       ESP_LOGW(TAG, "Capture A/B: RT/RH GPIO/power-save setup enabled; RT/RH edge ISR disabled");
@@ -571,8 +573,12 @@ void CO2Monitor0601::setup() {
     ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv"
                                      : "Raw debug: /capture (RT/RH capture disabled)");
 #else
-    ESP_LOGD(TAG, this->rtrh_enabled_ ? "RT/RH time-phase decoder active; debug capture disabled"
-                                     : "CO2-only capture A/B active; RT/RH decoder disabled");
+    if (this->rtrh_enabled_)
+      ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
+    else if (this->rtrh_decode_only_)
+      ESP_LOGD(TAG, "RT/RH decoder A/B active; publication disabled");
+    else
+      ESP_LOGD(TAG, "CO2-only capture A/B active; RT/RH decoder disabled");
 #endif
 
     publish(this->out_.crc_errors, 0.0f);
@@ -657,7 +663,7 @@ float CO2Monitor0601::update_thermal_transient_(float temperature_c) {
   return rate_c_per_min;
 }
 
-void CO2Monitor0601::process_rtrh_() {
+void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   rtrh_decoder::loop();
 
   rtrh_decoder::Measurement m;
@@ -674,19 +680,22 @@ void CO2Monitor0601::process_rtrh_() {
            m.valid ? "VALID" : "REJECT");
 
   if (!m.valid) {
-    publish(this->out_.quality, m.quality_percent);
-    publish(this->out_.ref_period, m.ref_period_us);
-    publish_positive(this->out_.rt_period, m.rt_period_us);
-    publish_positive(this->out_.rh_state_period, m.rh_state_us);
-    publish_finite(this->out_.rt_ratio, m.rt_ratio);
-    publish_finite(this->out_.rh_ratio, m.rh_ratio);
-    publish(this->out_.temperature_extrapolation, true);
-    publish(this->out_.humidity_extrapolation, true);
-    publish(this->out_.calibration_extrapolation, true);
+    if (publish_outputs) {
+      publish(this->out_.quality, m.quality_percent);
+      publish(this->out_.ref_period, m.ref_period_us);
+      publish_positive(this->out_.rt_period, m.rt_period_us);
+      publish_positive(this->out_.rh_state_period, m.rh_state_us);
+      publish_finite(this->out_.rt_ratio, m.rt_ratio);
+      publish_finite(this->out_.rh_ratio, m.rh_ratio);
+      publish(this->out_.temperature_extrapolation, true);
+      publish(this->out_.humidity_extrapolation, true);
+      publish(this->out_.calibration_extrapolation, true);
+    }
 
-    ESP_LOGW(TAG, "RT/RH measurement %lu values not published: REJECT=%s (quality %.0f%%)",
+    ESP_LOGW(TAG, "RT/RH measurement %lu values not published: REJECT=%s (quality %.0f%%)%s",
              static_cast<unsigned long>(m.sequence),
-             rtrh_decoder::reject_reason_to_string(m.reject_reason), m.quality_percent);
+             rtrh_decoder::reject_reason_to_string(m.reject_reason), m.quality_percent,
+             publish_outputs ? "" : " [decode-only A/B]");
     rtrh_decoder::update_latest(m);
     return;
   }
@@ -711,49 +720,54 @@ void CO2Monitor0601::process_rtrh_() {
              m.humidity_extrapolation ? "YES" : "no");
   }
 
-  publish(this->out_.ref_period, m.ref_period_us);
-  publish(this->out_.rt_period, m.rt_period_us);
-  publish(this->out_.rh_state_period, m.rh_state_us);
-  publish(this->out_.rt_ratio, m.rt_ratio);
-  publish(this->out_.rh_ratio, m.rh_ratio);
-  publish(this->out_.rh_log, m.rh_log);
-  publish(this->out_.quality, m.quality_percent);
-  publish(this->out_.thermal_transient, m.thermal_transient);
-  publish(this->out_.temperature_extrapolation, m.temperature_extrapolation);
-  publish(this->out_.humidity_extrapolation, m.humidity_extrapolation);
-  publish(this->out_.calibration_extrapolation, m.calibration_extrapolation);
+  if (publish_outputs) {
+    publish(this->out_.ref_period, m.ref_period_us);
+    publish(this->out_.rt_period, m.rt_period_us);
+    publish(this->out_.rh_state_period, m.rh_state_us);
+    publish(this->out_.rt_ratio, m.rt_ratio);
+    publish(this->out_.rh_ratio, m.rh_ratio);
+    publish(this->out_.rh_log, m.rh_log);
+    publish(this->out_.quality, m.quality_percent);
+    publish(this->out_.thermal_transient, m.thermal_transient);
+    publish(this->out_.temperature_extrapolation, m.temperature_extrapolation);
+    publish(this->out_.humidity_extrapolation, m.humidity_extrapolation);
+    publish(this->out_.calibration_extrapolation, m.calibration_extrapolation);
 
 #if UNNI_BLE_ENABLED
-  sensirion_ble_set_temperature_humidity(m.temperature_c, m.humidity_percent);
+    sensirion_ble_set_temperature_humidity(m.temperature_c, m.humidity_percent);
 #if UNNI_BLE_LIVE_ENABLED
-  sensirion_ble_commit_live_advertisement();
+    sensirion_ble_commit_live_advertisement();
 #endif
 #endif
 
-  this->ha_.temperature = m.temperature_c;
-  this->ha_.humidity = m.humidity_percent;
-  this->ha_.have_temperature = true;
-  this->ha_.have_humidity = true;
+    this->ha_.temperature = m.temperature_c;
+    this->ha_.humidity = m.humidity_percent;
+    this->ha_.have_temperature = true;
+    this->ha_.have_humidity = true;
 
-  if (this->external_powered_()) {
-    // USB policy: publish every fresh RT/RH measurement (the Unni cycle is
-    // roughly 30 s), rather than repeating cached values on a timer.
-    if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
-    if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
-    this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
-    this->ha_.initial_humidity_published = this->out_.humidity != nullptr;
-    this->ha_.last_publish_ms = millis();
+    if (this->external_powered_()) {
+      // USB policy: publish every fresh RT/RH measurement (the Unni cycle is
+      // roughly 30 s), rather than repeating cached values on a timer.
+      if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
+      if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
+      this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
+      this->ha_.initial_humidity_published = this->out_.humidity != nullptr;
+      this->ha_.last_publish_ms = millis();
+    } else {
+      if (!this->ha_.initial_temperature_published && this->out_.temperature) {
+        this->out_.temperature->publish_state(m.temperature_c);
+        this->ha_.initial_temperature_published = true;
+        this->ha_.last_publish_ms = millis();
+      }
+      if (!this->ha_.initial_humidity_published && this->out_.humidity) {
+        this->out_.humidity->publish_state(m.humidity_percent);
+        this->ha_.initial_humidity_published = true;
+        this->ha_.last_publish_ms = millis();
+      }
+    }
   } else {
-    if (!this->ha_.initial_temperature_published && this->out_.temperature) {
-      this->out_.temperature->publish_state(m.temperature_c);
-      this->ha_.initial_temperature_published = true;
-      this->ha_.last_publish_ms = millis();
-    }
-    if (!this->ha_.initial_humidity_published && this->out_.humidity) {
-      this->out_.humidity->publish_state(m.humidity_percent);
-      this->ha_.initial_humidity_published = true;
-      this->ha_.last_publish_ms = millis();
-    }
+    ESP_LOGI(TAG, "RT/RH decode-only A/B %lu: %.2f C / %.1f %% / quality %.0f%%; no HA/BLE/history publication",
+             static_cast<unsigned long>(m.sequence), m.temperature_c, m.humidity_percent, m.quality_percent);
   }
 
   rtrh_decoder::update_latest(m);
@@ -902,6 +916,8 @@ void CO2Monitor0601::loop() {
 
   if (this->rtrh_enabled_) {
     this->process_rtrh_();
+  } else if (this->rtrh_decode_only_) {
+    this->process_rtrh_(false);
   } else if (this->rtrh_edge_capture_) {
     // A/B test: run the real RT/RH edge ISR and its capture state machine, but
     // do not publish or feed measurements into HA/BLE. Poll only to release

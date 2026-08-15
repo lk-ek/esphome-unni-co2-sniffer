@@ -58,6 +58,7 @@ class CO2Monitor0601 : public Component {
   void set_sniffer_enabled(bool value) { this->sniffer_enabled_ = value; }
   void set_rtrh_enabled(bool value) { this->rtrh_enabled_ = value; }
   void set_rtrh_edge_capture(bool value) { this->rtrh_edge_capture_ = value; }
+  void set_rtrh_decode_only(bool value) { this->rtrh_decode_only_ = value; }
   void set_rtrh_gpio_setup(bool value) { this->rtrh_gpio_setup_ = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
@@ -190,7 +191,7 @@ class CO2Monitor0601 : public Component {
   void begin_ble_security_(esp_bd_addr_t remote_bda);
 #endif
   void apply_power_policy_(bool force = false);
-  void process_rtrh_();
+  void process_rtrh_(bool publish_outputs = true);
   void process_co2_();
   bool setup_battery_adc_();
   void process_battery_();
@@ -203,6 +204,7 @@ class CO2Monitor0601 : public Component {
   bool sniffer_enabled_{true};
   bool rtrh_enabled_{true};
   bool rtrh_edge_capture_{false};
+  bool rtrh_decode_only_{false};
   bool rtrh_gpio_setup_{false};
   uint32_t start_delay_ms_{0};
   uint32_t boot_ms_{0};
