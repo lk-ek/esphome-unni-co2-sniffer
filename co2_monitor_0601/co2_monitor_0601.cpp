@@ -478,17 +478,21 @@ void CO2Monitor0601::setup() {
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(false);
 #endif
 
-  // Claim the shared GPIO ISR service before Wi-Fi/BLE setup reaches steady
-  // state, but without touching any sniffer signal pin. ESP_INTR_FLAG_IRAM
-  // keeps the dispatcher and our IRAM_ATTR pin handlers callable while flash
-  // cache is disabled. This preserves the configured GPIO isolation delay.
-  const esp_err_t gpio_isr_err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
-  if (gpio_isr_err == ESP_OK) {
-    ESP_LOGI(TAG, "GPIO ISR service installed IRAM-safe");
-  } else if (gpio_isr_err == ESP_ERR_INVALID_STATE) {
-    ESP_LOGW(TAG, "GPIO ISR service was already installed; IRAM allocation flag cannot be verified");
+  if (this->sniffer_enabled_) {
+    // Claim the shared GPIO ISR service before Wi-Fi/BLE setup reaches steady
+    // state, but without touching any sniffer signal pin. ESP_INTR_FLAG_IRAM
+    // keeps the dispatcher and our IRAM_ATTR pin handlers callable while flash
+    // cache is disabled. This preserves the configured GPIO isolation delay.
+    const esp_err_t gpio_isr_err = gpio_install_isr_service(ESP_INTR_FLAG_IRAM);
+    if (gpio_isr_err == ESP_OK) {
+      ESP_LOGI(TAG, "GPIO ISR service installed IRAM-safe");
+    } else if (gpio_isr_err == ESP_ERR_INVALID_STATE) {
+      ESP_LOGW(TAG, "GPIO ISR service was already installed; IRAM allocation flag cannot be verified");
+    } else {
+      ESP_LOGE(TAG, "gpio_install_isr_service(IRAM) failed: %d", gpio_isr_err);
+    }
   } else {
-    ESP_LOGE(TAG, "gpio_install_isr_service(IRAM) failed: %d", gpio_isr_err);
+    ESP_LOGW(TAG, "Sniffer A/B: GPIO ISR service and CO2/RT/RH capture disabled");
   }
 
 #if UNNI_BLE_ENABLED
@@ -541,24 +545,28 @@ void CO2Monitor0601::setup() {
   this->setup_usb_power_();
   this->setup_battery_adc_();
   this->boot_ms_ = millis();
-  if (this->start_delay_ms_ == 0) {
-    this->initialize_sniffer_io_();
-  } else {
-    ESP_LOGI(TAG, "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
-             static_cast<unsigned long>(this->start_delay_ms_));
-  }
+  if (this->sniffer_enabled_) {
+    if (this->start_delay_ms_ == 0) {
+      this->initialize_sniffer_io_();
+    } else {
+      ESP_LOGI(TAG, "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
+               static_cast<unsigned long>(this->start_delay_ms_));
+    }
 
 #if RTRH_DEBUG_CAPTURE
-  i2c_sniffer::register_debug_handler();
-  rtrh_decoder::register_debug_handlers();
-  ESP_LOGD(TAG, "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv");
+    i2c_sniffer::register_debug_handler();
+    rtrh_decoder::register_debug_handlers();
+    ESP_LOGD(TAG, "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv");
 #else
-  ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
+    ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
 #endif
 
-  publish(this->out_.crc_errors, 0.0f);
-  publish(this->out_.frame_errors, 0.0f);
-  ESP_LOGI(TAG, "Passive CO2 + RT/RH sniffer ready");
+    publish(this->out_.crc_errors, 0.0f);
+    publish(this->out_.frame_errors, 0.0f);
+    ESP_LOGI(TAG, "Passive CO2 + RT/RH sniffer ready");
+  } else {
+    ESP_LOGW(TAG, "Sniffer A/B active: no signal GPIO setup, no capture ISR, no RT/RH or CO2 decoding");
+  }
 }
 
 void CO2Monitor0601::publish_cached_ha_now_() {
@@ -857,7 +865,7 @@ void CO2Monitor0601::loop() {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
   }
 #endif
-  if (!this->io_initialized_ &&
+  if (this->sniffer_enabled_ && !this->io_initialized_ &&
       static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();
 

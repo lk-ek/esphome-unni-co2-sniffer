@@ -55,6 +55,7 @@ class CO2Monitor0601 : public Component {
 #endif
 
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
+  void set_sniffer_enabled(bool value) { this->sniffer_enabled_ = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
@@ -196,6 +197,7 @@ class CO2Monitor0601 : public Component {
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
 
+  bool sniffer_enabled_{true};
   uint32_t start_delay_ms_{0};
   uint32_t boot_ms_{0};
   bool io_initialized_{false};

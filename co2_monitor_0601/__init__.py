@@ -36,6 +36,7 @@ CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_HOME_ASSISTANT = "home_assistant"
+CONF_SNIFFER_ENABLED = "sniffer_enabled"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
@@ -244,6 +245,7 @@ _SCHEMA = {
     cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
+    cv.Optional(CONF_SNIFFER_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
@@ -394,6 +396,7 @@ async def to_code(config):
         cg.add(var.set_ble_battery_advertising_interval(config[CONF_BLE_BATTERY_ADVERTISING_INTERVAL]))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
+    cg.add(var.set_sniffer_enabled(config[CONF_SNIFFER_ENABLED]))
     cg.add(var.set_sniffer_start_delay(config[CONF_SNIFFER_START_DELAY]))
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))

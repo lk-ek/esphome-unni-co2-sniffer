@@ -780,3 +780,8 @@ See:
 
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - `LICENSES/`
+
+
+### SHT43 sniffer-off A/B diagnostic
+
+The `i2c-sniffer-sht43-probe.yaml` variant in this diagnostic build sets `sniffer_enabled: false`. This keeps Wi-Fi, Home Assistant, BLE advertising, Sensirion history, and the SHT43 serial/T/RH GATT services active while completely skipping installation of the shared GPIO ISR service and all CO2/RT/RH capture/decoder GPIO setup. It is intended only to isolate BLE/GATT behavior from the passive sniffer ISR path.
