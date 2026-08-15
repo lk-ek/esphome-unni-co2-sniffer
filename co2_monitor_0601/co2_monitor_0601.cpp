@@ -522,8 +522,8 @@ void CO2Monitor0601::setup() {
     sensirion_history_configure_gatt(this->gatt_server_);
 #endif
 #if UNNI_SHT43_IDENTITY_PROBE
-    sensirion_sht43_probe_configure_gatt(this->gatt_server_);
-    ESP_LOGW(TAG, "SHT43 staged GATT restore: serial + T/RH services enabled; Device Settings 0x8100 disabled");
+    sensirion_sht43_probe_configure_serial_temperature_gatt(this->gatt_server_);
+    ESP_LOGW(TAG, "SHT43 staged GATT restore: serial + temperature enabled; humidity + Device Settings 0x8100 disabled");
     ESP_LOGI(TAG, "Heap before BLE enable: free=%u B, largest_8bit=%u B",
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
