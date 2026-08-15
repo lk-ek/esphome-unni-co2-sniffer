@@ -78,3 +78,10 @@ chooses the wake level opposite the observed idle level of each RT/RH line.
 On USB power, valid CO2 frames are published as they arrive and valid RT/RH measurements are published when each approximately 30-second Unni measurement completes. On battery power, the decoder continues to collect the required measurements but Home Assistant publication is throttled to the latest cached values once per `ha_publish_interval` (60 seconds by default).
 
 BLE advertising switches dynamically between the USB and battery intervals when VBUS changes. The advertising stack is restarted when necessary so the new interval takes effect without rebooting.
+
+
+## Energy Save Mode test override
+
+The Home Assistant `Energy Save Mode` switch forces the battery power policy while leaving physical USB/VBUS detection unchanged. It is intended for USB power-meter A/B measurements. Enabling it releases the persistent USB no-Light-Sleep/CPU-max locks and uses the same RT/RH-triggered awake windows, CO2 capture gating, BLE battery advertising interval and Home Assistant battery publish throttle as real battery operation. Disabling it immediately restores the normal USB policy if VBUS is physically present.
+
+`energy_save_mode_default` controls the boot state and defaults to `false`. Battery SOC interpretation remains based on physical VBUS, not on the override.

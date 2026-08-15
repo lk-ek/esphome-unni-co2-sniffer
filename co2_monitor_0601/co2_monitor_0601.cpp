@@ -96,6 +96,64 @@ float CO2Monitor0601::battery_percent_from_voltage_(float voltage) {
 }
 
 
+void EnergySaveModeSwitch::write_state(bool state) {
+  if (this->parent_ != nullptr)
+    this->parent_->set_energy_save_mode(state);
+  else
+    this->publish_state(state);
+}
+
+void CO2Monitor0601::set_energy_save_mode(bool enabled) {
+  if (this->energy_save_mode_ == enabled) {
+    if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(enabled);
+    return;
+  }
+
+  this->energy_save_mode_ = enabled;
+  if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(enabled);
+  ESP_LOGI(TAG, "Energy Save Mode: %s", enabled ? "ON (battery policy forced)" : "OFF (automatic USB/battery policy)");
+  this->apply_power_policy_(true);
+}
+
+void CO2Monitor0601::apply_power_policy_(bool force) {
+  // Do not make policy decisions from an undebounced VBUS input. The configured
+  // default is applied as soon as process_usb_power_() has established the
+  // first physical USB state.
+  if (this->usb_power_.initialized && !this->usb_power_.have_state) return;
+
+  const bool external = this->external_powered_();
+  if (!force && this->power_policy_have_state_ && this->power_policy_external_power_ == external) return;
+
+  this->power_policy_have_state_ = true;
+  this->power_policy_external_power_ = external;
+  power_save::set_external_power(external);
+
+  if (this->io_initialized_ && power_save::enabled())
+    i2c_sniffer::set_capture_enabled(external || power_save::awake_window_active());
+
+#if UNNI_BLE_ENABLED
+  const uint32_t adv_ms = external ? this->ble_usb_advertising_interval_ms_
+                                   : this->ble_battery_advertising_interval_ms_;
+  sensirion_ble_set_advertising_interval(adv_ms);
+  ESP_LOGI(TAG, "BLE advertising interval: %lu ms (%s policy)",
+           static_cast<unsigned long>(adv_ms), external ? "USB" : "battery");
+#endif
+
+  const uint32_t now = millis();
+  if (external) {
+    // Returning to normal USB policy should immediately expose the freshest
+    // cached values instead of waiting for the next sensor cycle.
+    this->publish_cached_ha_now_();
+  } else {
+    // Battery policy publishes Home Assistant values only at its configured
+    // interval, regardless of whether VBUS is physically present.
+    this->ha_.last_publish_ms = now;
+  }
+
+  ESP_LOGI(TAG, "Power policy: %s%s", external ? "USB" : "battery",
+           this->energy_save_mode_ ? " (Energy Save Mode override)" : "");
+}
+
 bool CO2Monitor0601::setup_usb_power_() {
   gpio_config_t cfg{};
   cfg.pin_bit_mask = 1ULL << this->usb_power_.pin;
@@ -138,28 +196,10 @@ void CO2Monitor0601::process_usb_power_() {
   publish(this->out_.usb_power, raw);
   ESP_LOGI(TAG, "USB Power: %s", raw ? "ON" : "OFF");
 
-  // Power policy follows VBUS automatically. On USB, keep the MCU fully awake
-  // at 80 MHz and sniff CO2 continuously. On battery, restore the RT/RH-triggered
-  // Light-sleep window and only capture CO2 while that window is active.
-  power_save::set_external_power(raw);
-  if (this->io_initialized_ && power_save::enabled())
-    i2c_sniffer::set_capture_enabled(raw || power_save::awake_window_active());
-
-#if UNNI_BLE_ENABLED
-  const uint32_t adv_ms = raw ? this->ble_usb_advertising_interval_ms_
-                              : this->ble_battery_advertising_interval_ms_;
-  sensirion_ble_set_advertising_interval(adv_ms);
-  ESP_LOGI(TAG, "BLE advertising interval: %lu ms (%s power)",
-           static_cast<unsigned long>(adv_ms), raw ? "USB" : "battery");
-#endif
-
-  if (raw) {
-    // Expose the freshest cached sensor set immediately when mains power arrives.
-    this->publish_cached_ha_now_();
-  } else {
-    // Start the one-minute battery publication window at the source transition.
-    this->ha_.last_publish_ms = now;
-  }
+  // Keep the physical USB entity truthful, but let Energy Save Mode override
+  // the runtime policy so USB power meters can measure the same behavior used
+  // on battery.
+  this->apply_power_policy_();
 
   // Cell voltage is not a useful open-circuit SOC estimate while USB is
   // present and the battery node may be driven by the charger. Mark Battery
@@ -289,9 +329,8 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
   } else if (power_save::enabled()) {
     // If VBUS was already debounced before delayed sniffer initialization,
     // immediately apply the matching USB/battery power policy.
-    const bool usb = this->usb_powered_();
-    power_save::set_external_power(usb);
-    i2c_sniffer::set_capture_enabled(usb);
+    this->apply_power_policy_(true);
+    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
   }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
            static_cast<unsigned long>(millis() - this->boot_ms_));
@@ -299,6 +338,8 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 }
 
 void CO2Monitor0601::setup() {
+  if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
+
   // Claim the shared GPIO ISR service before Wi-Fi/BLE setup reaches steady
   // state, but without touching any sniffer signal pin. ESP_INTR_FLAG_IRAM
   // keeps the dispatcher and our IRAM_ATTR pin handlers callable while flash
@@ -387,7 +428,7 @@ void CO2Monitor0601::publish_cached_ha_now_() {
 void CO2Monitor0601::maybe_publish_ha_() {
   // On USB power every fresh measurement is published directly from its
   // decoder. The interval below is deliberately a battery-mode throttle.
-  if (this->usb_powered_()) return;
+  if (this->external_powered_()) return;
 
   const uint32_t now = millis();
   if (this->ha_.last_publish_ms &&
@@ -516,8 +557,8 @@ void CO2Monitor0601::process_rtrh_() {
   this->ha_.have_temperature = true;
   this->ha_.have_humidity = true;
 
-  if (this->usb_powered_()) {
-    // Mains power: publish every fresh RT/RH measurement (the Unni cycle is
+  if (this->external_powered_()) {
+    // USB policy: publish every fresh RT/RH measurement (the Unni cycle is
     // roughly 30 s), rather than repeating cached values on a timer.
     if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
     if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
@@ -625,8 +666,8 @@ void CO2Monitor0601::process_co2_() {
   this->ha_.co2 = static_cast<float>(ppm);
   this->ha_.have_co2 = true;
 
-  if (this->usb_powered_() && this->out_.co2) {
-    // Mains power: every valid CO2 frame is a useful fresh measurement, even
+  if (this->external_powered_() && this->out_.co2) {
+    // USB policy: every valid CO2 frame is a useful fresh measurement, even
     // when the integer ppm value happens to be unchanged.
     this->out_.co2->publish_state(this->ha_.co2);
     this->ha_.initial_co2_published = true;
@@ -642,7 +683,7 @@ void CO2Monitor0601::process_co2_() {
   this->co2_.last_ppm = ppm;
   ESP_LOGI(TAG, "CO2: %u ppm", ppm);
 
-  if (!this->usb_powered_() && !this->ha_.initial_co2_published && this->out_.co2) {
+  if (!this->external_powered_() && !this->ha_.initial_co2_published && this->out_.co2) {
     this->out_.co2->publish_state(this->ha_.co2);
     this->ha_.initial_co2_published = true;
     this->ha_.last_publish_ms = millis();
@@ -664,7 +705,7 @@ void CO2Monitor0601::loop() {
   if (!this->io_initialized_) return;
 
   if (power_save::enabled())
-    i2c_sniffer::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
+    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 
   this->process_rtrh_();
   this->process_co2_();
@@ -673,7 +714,7 @@ void CO2Monitor0601::loop() {
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
   if (power_save::enabled())
-    i2c_sniffer::set_capture_enabled(this->usb_powered_() || power_save::awake_window_active());
+    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 }
 
 }  // namespace co2_monitor_0601

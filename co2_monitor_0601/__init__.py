@@ -3,7 +3,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor
+from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor, switch
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
@@ -17,7 +17,7 @@ DEPENDENCIES = []
 
 
 def AUTO_LOAD(config):
-    loads = ["sensor", "binary_sensor"]
+    loads = ["sensor", "binary_sensor", "switch"]
     if config.get(CONF_BLE, True):
         loads.append("esp32_ble_server")
     return loads
@@ -51,6 +51,8 @@ CONF_BATTERY_VOLTAGE = "battery_voltage"
 CONF_BATTERY_LEVEL = "battery_level"
 CONF_USB_POWER_PIN = "usb_power_pin"
 CONF_USB_POWER = "usb_power"
+CONF_ENERGY_SAVE_MODE = "energy_save_mode"
+CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
 CONF_THERMAL_TRANSIENT_OFF_RATE = "thermal_transient_off_rate"
 
@@ -68,6 +70,7 @@ CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 
 co2_monitor_0601_ns = cg.esphome_ns.namespace("co2_monitor_0601")
 CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
+EnergySaveModeSwitch = co2_monitor_0601_ns.class_("EnergySaveModeSwitch", switch.Switch)
 
 
 def _sensor_schema(**kwargs):
@@ -230,6 +233,8 @@ _SCHEMA = {
     cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
     cv.Optional(CONF_USB_POWER_PIN, default=5): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_ENERGY_SAVE_MODE_DEFAULT, default=False): cv.boolean,
+    cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -323,6 +328,7 @@ async def to_code(config):
     # USB Power is a primary binary sensor; diagnostic binary sensors are
     # additionally instantiated when debug_metrics is enabled.
     cg.add_define("USE_BINARY_SENSOR")
+    cg.add_define("USE_SWITCH")
 
     cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
@@ -354,6 +360,11 @@ async def to_code(config):
     cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))
     cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))
     cg.add(var.set_usb_power_pin(config[CONF_USB_POWER_PIN]))
+    cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
+
+    energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
+    cg.add(energy_save.set_parent(var))
+    cg.add(var.set_energy_save_mode_switch(energy_save))
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))
 

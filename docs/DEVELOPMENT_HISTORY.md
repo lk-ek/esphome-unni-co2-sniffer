@@ -391,3 +391,8 @@ protocol-valid candidate decodes to the same `0x62 W EC05` plus CRC-valid read
 transaction; ambiguous results remain errors. Captures requiring one and two
 missing clocks are covered by the field VCD regression set, while a trace that
 ends after the command without any read edges remains intentionally unrecoverable.
+
+
+## 2026-08-15 — Energy Save Mode measurement override
+
+Added a Home Assistant `Energy Save Mode` switch plus `energy_save_mode_default`. The override preserves truthful physical USB/VBUS reporting but forces the runtime battery policy so USB power meters can compare normal and power-saving behavior on identical hardware. The switch affects PM locks/Light Sleep, CO2 capture gating, BLE advertising cadence, and Home Assistant publication cadence; battery SOC availability continues to follow physical VBUS.

@@ -5,6 +5,7 @@
 #include "ble_options.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/core/component.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
@@ -16,6 +17,17 @@
 
 namespace esphome {
 namespace co2_monitor_0601 {
+
+class CO2Monitor0601;
+
+class EnergySaveModeSwitch : public switch_::Switch {
+ public:
+  void set_parent(CO2Monitor0601 *parent) { this->parent_ = parent; }
+
+ protected:
+  void write_state(bool state) override;
+  CO2Monitor0601 *parent_{nullptr};
+};
 
 class CO2Monitor0601 : public Component {
  public:
@@ -42,6 +54,9 @@ class CO2Monitor0601 : public Component {
   void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
   void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
   void set_usb_power_pin(uint8_t pin) { this->usb_power_.pin = pin; }
+  void set_energy_save_mode_default(bool value) { this->energy_save_mode_ = value; }
+  void set_energy_save_mode_switch(EnergySaveModeSwitch *s) { this->energy_save_switch_ = s; }
+  void set_energy_save_mode(bool enabled);
   void set_thermal_transient_on_rate(float value) { this->thermal_.on_rate = value; }
   void set_thermal_transient_off_rate(float value) { this->thermal_.off_rate = value; }
 
@@ -144,6 +159,8 @@ class CO2Monitor0601 : public Component {
   void maybe_publish_ha_();
   void publish_cached_ha_now_();
   bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
+  bool external_powered_() const { return this->usb_powered_() && !this->energy_save_mode_; }
+  void apply_power_policy_(bool force = false);
   void process_rtrh_();
   void process_co2_();
   bool setup_battery_adc_();
@@ -164,6 +181,10 @@ class CO2Monitor0601 : public Component {
   uint32_t ble_battery_advertising_interval_ms_{5000};
 #endif
   bool light_sleep_enabled_{true};
+  bool energy_save_mode_{false};
+  bool power_policy_have_state_{false};
+  bool power_policy_external_power_{false};
+  EnergySaveModeSwitch *energy_save_switch_{nullptr};
   uint32_t light_sleep_max_awake_ms_{10000};
   uint8_t rt_pin_{3};
   uint8_t rh_pin_{4};

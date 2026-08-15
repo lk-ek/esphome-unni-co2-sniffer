@@ -15,6 +15,7 @@ The tested device is sold as **CO2 Monitor Carbon Dioxide Detector 0601**. The E
 - battery voltage and estimated battery level
 - USB/VBUS presence detection
 - automatic USB/battery power policy with Light Sleep and BLE modem sleep
+- Home Assistant `Energy Save Mode` switch for USB-powered battery-policy measurements
 - optional diagnostic metrics and raw capture support
 
 The signal decoding and calibration were derived from the tested Unni hardware revision. Other revisions may need verification.
@@ -76,6 +77,28 @@ VBUS / 5 V --- 220 kΩ ---+--- D3 / GPIO5
 
 The component publishes this as the `USB Power` binary sensor.
 
+### Energy Save Mode for power measurements
+
+The component also exposes an `Energy Save Mode` switch in Home Assistant. When enabled, the ESP keeps reporting the **physical** `USB Power` state truthfully, but the runtime policy behaves as if external power were absent. This is intended for reproducible USB power-meter comparisons without having to power the complete sensor from a battery.
+
+With `Energy Save Mode` enabled while VBUS is present:
+
+- automatic Light Sleep and the RT/RH-triggered awake window are used as in battery operation;
+- CO2 I2C capture is restricted to the battery awake window;
+- BLE uses `ble_battery_advertising_interval` (default `5s`);
+- Home Assistant sensor publication uses the battery throttle (`ha_publish_interval`, default `60s`);
+- the physical `USB Power` entity remains `ON`;
+- `Battery Level` remains unavailable while physical USB is present, because the battery node is still charger-driven.
+
+The switch defaults to off. To boot directly into the measurement mode, set:
+
+```yaml
+co2_monitor_0601:
+  energy_save_mode_default: true
+```
+
+This option changes only firmware behavior. A USB power meter still measures the complete hardware actually powered through USB, including the original CO2 monitor electronics.
+
 ## Default pin assignment
 
 The defaults can be overridden in `co2_monitor_0601:`:
@@ -88,6 +111,7 @@ co2_monitor_0601:
   co2_scl_pin: 7
   battery_pin: 2
   usb_power_pin: 5
+  energy_save_mode_default: false
 ```
 
 All configured pins must be unique. `battery_pin` must be an ESP32-C3 ADC1 GPIO (GPIO0–GPIO4).
@@ -144,6 +168,7 @@ Normal builds create:
 - `Battery Voltage`
 - `Battery Level`
 - `USB Power`
+- `Energy Save Mode`
 
 The primary sensor definitions can still be overridden, for example:
 
@@ -166,6 +191,8 @@ The GPIO path includes two conservative safeguards derived from real VCD capture
 The first malformed, otherwise unhandled, protocol-invalid, or software-recovered CO₂ transaction freezes its **original GPIO** raw edge capture so that later normal traffic cannot overwrite the interesting waveform. A coalesced SDA/SCL sample that is resolved successfully is logged but does not occupy the single freeze slot by itself. Download `/capture` to retrieve the frozen trace; only a successful HTTP transfer releases the freeze, so a failed client can retry. I²C captures observed in practice are small (typically well below 1 KiB) and are sent synchronously by the ESP-IDF HTTP server rather than through a separate FreeRTOS sender task. New captures use the `LA02` format, which preserves the bus state before the first edge. `tools/capture2vcd.py` reads `LA02` and both historical `LA01` header variants.
 
 ## Automatic USB / battery power policy
+
+`Energy Save Mode` can override this automatic choice and force the battery policy even while physical VBUS is present. The `USB Power` sensor always reports the real VBUS state; only the effective runtime policy is overridden.
 
 The VBUS detector automatically selects one of two runtime policies. No Home Assistant automation is required.
 

@@ -48,6 +48,9 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  # Force battery-style runtime policy while physically powered by USB.
+  # Toggle the Energy Save Mode switch in Home Assistant for power measurements.
+  energy_save_mode_default: false
   sniffer_start_delay: 10s
   debug_metrics: true
   debug_capture: true
