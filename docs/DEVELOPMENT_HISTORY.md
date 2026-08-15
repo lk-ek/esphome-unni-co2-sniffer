@@ -443,3 +443,10 @@ The experimental SHT43 identity probe now writes numeric GATT values through
 `bytebuffer::ByteBuffer::wrap()` instead of relying on implicit conversion from
 `std::vector<uint8_t>`. ESPHome 2026.8 exposes `BLECharacteristic::set_value()`
 with a `ByteBuffer` argument and keeps the vector-backed constructor protected.
+
+## 2026-08-15: SHT43 settings handle and USB Wi-Fi robustness follow-up
+
+- Increased ATT handle reserves for the Device Settings, SHT, temperature, and humidity probe services after MyAmbience successfully classified the device as an SHT43 DemoBoard but Device Name/Privacy reads did not complete.
+- Added raw GATT read/write handle logging while the Device Settings probe is active.
+- Coupled runtime Wi-Fi modem-sleep to the existing USB/battery policy: USB requests `WIFI_PS_NONE`; battery/Energy Save requests `WIFI_PS_MIN_MODEM`.
+- Kept `power_save_mode: LIGHT` in shipped YAML as initialization/default before VBUS policy is established.

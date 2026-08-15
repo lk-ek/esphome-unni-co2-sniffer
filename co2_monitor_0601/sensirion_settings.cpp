@@ -45,7 +45,7 @@ void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server) {
 
   const auto service_uuid = ESPBTUUID::from_raw("00008100-B38D-4985-720E-0F993A68EE41");
   auto *service = server->get_service(service_uuid);
-  if (service == nullptr) service = server->create_service(service_uuid, false, 4);
+  if (service == nullptr) service = server->create_service(service_uuid, false, 12);
   if (service == nullptr) {
     ESP_LOGE(TAG, "failed to create Sensirion Device Settings service");
     return;
@@ -98,15 +98,19 @@ void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server) {
 
   server->enqueue_start_service(service);
   gatt.bound = true;
-  ESP_LOGI(TAG, "Sensirion Device Settings probe configured (0x8100)");
+  ESP_LOGI(TAG, "Sensirion Device Settings probe configured (0x8100, 12-handle reserve)");
 }
 
 void sensirion_settings_gatts_event_handler(esp_gatts_cb_event_t event,
                                             esp_gatt_if_t,
                                             esp_ble_gatts_cb_param_t *param) {
   if (param == nullptr) return;
-  if (event == ESP_GATTS_WRITE_EVT && !param->write.is_prep) {
-    ESP_LOGD(TAG, "Device Settings GATT write handle=0x%04X len=%u conn=%u",
+  if (event == ESP_GATTS_READ_EVT) {
+    ESP_LOGD(TAG, "GATT READ handle=0x%04X conn=%u (Device Settings probe active)",
+             static_cast<unsigned>(param->read.handle),
+             static_cast<unsigned>(param->read.conn_id));
+  } else if (event == ESP_GATTS_WRITE_EVT && !param->write.is_prep) {
+    ESP_LOGD(TAG, "GATT WRITE handle=0x%04X len=%u conn=%u (Device Settings probe active)",
              static_cast<unsigned>(param->write.handle), static_cast<unsigned>(param->write.len),
              static_cast<unsigned>(param->write.conn_id));
   }

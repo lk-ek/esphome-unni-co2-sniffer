@@ -6,6 +6,7 @@
 #include "esp_pm.h"
 #include "esp_sleep.h"
 #include "esp_timer.h"
+#include "esp_wifi.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -107,6 +108,22 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
 
 void set_external_power(bool present) {
   external_power = present;
+
+  // USB power is unconstrained: favor Wi-Fi robustness/latency. Battery and
+  // Energy Save use MIN_MODEM so the AP can buffer traffic between DTIM wakeups.
+  // In Wi-Fi/BLE coexistence ESP-IDF may still sleep outside the Wi-Fi time slice
+  // even with WIFI_PS_NONE; this call nevertheless selects the least aggressive
+  // Wi-Fi power-saving policy available to the station.
+  const wifi_ps_type_t wifi_ps = present ? WIFI_PS_NONE : WIFI_PS_MIN_MODEM;
+  const esp_err_t wifi_err = esp_wifi_set_ps(wifi_ps);
+  if (wifi_err == ESP_OK) {
+    ESP_LOGI(TAG, "WiFi power save: %s (%s policy)",
+             present ? "NONE" : "MIN_MODEM", present ? "USB" : "battery");
+  } else if (wifi_err != ESP_ERR_WIFI_NOT_INIT) {
+    ESP_LOGW(TAG, "esp_wifi_set_ps(%s) failed: %s",
+             present ? "NONE" : "MIN_MODEM", esp_err_to_name(wifi_err));
+  }
+
   if (!configured || external_awake_lock == nullptr || external_cpu_lock == nullptr) return;
   if (present == external_locks_held) return;
 

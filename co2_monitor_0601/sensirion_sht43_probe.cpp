@@ -52,10 +52,10 @@ void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
   if (gatt.bound || server == nullptr) return;
 
   // SHT service: serial number characteristic.
-  auto *sht = get_or_create_service(server, "00006000-B38D-4985-720E-0F993A68EE41", 2);
+  auto *sht = get_or_create_service(server, "00006000-B38D-4985-720E-0F993A68EE41", 4);
   // Dedicated temperature and humidity services used by the SHT43 DemoBoard.
-  auto *temperature = get_or_create_service(server, "00002234-B38D-4985-720E-0F993A68EE41", 3);
-  auto *humidity = get_or_create_service(server, "00001234-B38D-4985-720E-0F993A68EE41", 3);
+  auto *temperature = get_or_create_service(server, "00002234-B38D-4985-720E-0F993A68EE41", 5);
+  auto *humidity = get_or_create_service(server, "00001234-B38D-4985-720E-0F993A68EE41", 5);
   if (sht == nullptr || temperature == nullptr || humidity == nullptr) {
     ESP_LOGE(TAG, "failed to create SHT43 identity-probe services");
     return;
@@ -83,7 +83,7 @@ void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
   server->enqueue_start_service(temperature);
   server->enqueue_start_service(humidity);
   gatt.bound = true;
-  ESP_LOGI(TAG, "SHT43 identity-probe GATT configured (SHT/T/RH services)");
+  ESP_LOGI(TAG, "SHT43 identity-probe GATT configured (SHT/T/RH services; expanded handle reserves)");
 }
 
 void sensirion_sht43_probe_set_temperature_humidity(float temperature_c, float humidity_percent) {

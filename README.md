@@ -337,3 +337,10 @@ classification. Do not use this identity mode as the normal production build.
 `home_assistant` is opt-out and defaults to `true`; all shipped normal/debug
 YAML files also state `home_assistant: true` explicitly. Only the BLE-only
 measurement YAML sets it to `false`.
+
+
+### SHT43 / MyAmbience compatibility probe
+
+The experimental SHT43 identity probe reserves enough ATT handles for the full Device Settings, SHT, temperature and humidity service topology. Debug builds log GATT reads/writes while testing MyAmbience Device Name and Privacy behavior.
+
+On normal USB power the runtime Wi-Fi policy requests `WIFI_PS_NONE`; battery/Energy Save requests `WIFI_PS_MIN_MODEM`.
