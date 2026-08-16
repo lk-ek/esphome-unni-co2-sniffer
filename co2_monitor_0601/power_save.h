@@ -29,8 +29,9 @@ void on_valid_co2();
 
 // Track the Unni CO2 power window. In battery mode, a quiet LOW/LOW bus arms
 // GPIO-high wake on SCL and permits sleep after RT/RH completes. When the bus
-// comes back, SCL wake is disabled and a NO_LIGHT_SLEEP lock keeps the ESP
-// awake until the CO2 window closes again.
+// comes back, SCL wake is disabled and NO_LIGHT_SLEEP + CPU_FREQ_MAX locks keep
+// the ESP awake at 80 MHz until the CO2 window closes again. This minimizes
+// ISR latency while passively capturing the relatively fast native I2C bus.
 void set_co2_bus_powered_down(bool powered_down);
 bool co2_bus_powered_down();
 

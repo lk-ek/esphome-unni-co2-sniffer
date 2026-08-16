@@ -848,6 +848,8 @@ The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not ex
 
 ### CO₂ capture and light sleep
 
+While the native CO₂ bus is powered, the component now holds both `NO_LIGHT_SLEEP` and `CPU_FREQ_MAX`. The 80 MHz CPU lock is intentional: it reduces GPIO ISR latency/coalesced SDA/SCL samples during the short native measurement window. The lock is released again after the bus has been quiet LOW/LOW for 1 s.
+
 The passive CO₂ I²C sniffer stays armed independently of the RT/RH light-sleep awake window. GPIO6/GPIO7 are still excluded from light-sleep wake sources, so CO₂ traffic does not wake the ESP32-C3 by itself. Keeping the GPIO edge ISR armed prevents valid CO₂ transactions that occur while the MCU is already awake from being discarded by battery-policy transitions.
 
 

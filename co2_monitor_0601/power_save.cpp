@@ -25,6 +25,7 @@ static esp_pm_lock_handle_t cpu_lock = nullptr;
 static esp_pm_lock_handle_t external_awake_lock = nullptr;
 static esp_pm_lock_handle_t external_cpu_lock = nullptr;
 static esp_pm_lock_handle_t co2_active_lock = nullptr;
+static esp_pm_lock_handle_t co2_cpu_lock = nullptr;
 static volatile bool external_power = false;
 static bool external_locks_held = false;
 static bool co2_active_lock_held = false;
@@ -103,6 +104,11 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
     ESP_LOGE(TAG, "esp_pm_lock_create(CO2 NO_LIGHT_SLEEP) failed: %d", err);
     return false;
   }
+  err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_co2_cpu", &co2_cpu_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(CO2 CPU_FREQ_MAX) failed: %d", err);
+    return false;
+  }
 
   configure_wakeup_pin(pin_rt);
   configure_wakeup_pin(pin_rh);
@@ -126,7 +132,7 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
 }
 
 void set_co2_bus_powered_down(bool powered_down) {
-  if (!configured || co2_active_lock == nullptr) return;
+  if (!configured || co2_active_lock == nullptr || co2_cpu_lock == nullptr) return;
 
   // USB already holds the ESP awake continuously. Keep the CO2-specific wake
   // source and lock out of the way until battery policy is active again.
@@ -137,6 +143,7 @@ void set_co2_bus_powered_down(bool powered_down) {
     }
     if (co2_active_lock_held) {
       esp_pm_lock_release(co2_active_lock);
+      esp_pm_lock_release(co2_cpu_lock);
       co2_active_lock_held = false;
     }
     co2_powered_down = false;
@@ -150,9 +157,14 @@ void set_co2_bus_powered_down(bool powered_down) {
 
   if (powered_down) {
     if (co2_active_lock_held) {
-      const esp_err_t err = esp_pm_lock_release(co2_active_lock);
-      if (err == ESP_OK) co2_active_lock_held = false;
-      else ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP release failed: %d", err);
+      const esp_err_t sleep_err = esp_pm_lock_release(co2_active_lock);
+      const esp_err_t cpu_err = esp_pm_lock_release(co2_cpu_lock);
+      if (sleep_err == ESP_OK && cpu_err == ESP_OK) {
+        co2_active_lock_held = false;
+      } else {
+        if (sleep_err != ESP_OK) ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP release failed: %d", sleep_err);
+        if (cpu_err != ESP_OK) ESP_LOGE(TAG, "CO2 window CPU_FREQ_MAX release failed: %d", cpu_err);
+      }
     }
 
     // The dead Unni bus sits LOW/LOW. Its next power-up raises SCL, so HIGH is
@@ -180,11 +192,18 @@ void set_co2_bus_powered_down(bool powered_down) {
       co2_scl_wakeup_armed = false;
     }
     if (!co2_active_lock_held) {
-      const esp_err_t err = esp_pm_lock_acquire(co2_active_lock);
-      if (err == ESP_OK) co2_active_lock_held = true;
-      else ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP acquire failed: %d", err);
+      const esp_err_t sleep_err = esp_pm_lock_acquire(co2_active_lock);
+      const esp_err_t cpu_err = esp_pm_lock_acquire(co2_cpu_lock);
+      if (sleep_err == ESP_OK && cpu_err == ESP_OK) {
+        co2_active_lock_held = true;
+      } else {
+        if (sleep_err == ESP_OK) esp_pm_lock_release(co2_active_lock);
+        if (cpu_err == ESP_OK) esp_pm_lock_release(co2_cpu_lock);
+        if (sleep_err != ESP_OK) ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP acquire failed: %d", sleep_err);
+        if (cpu_err != ESP_OK) ESP_LOGE(TAG, "CO2 window CPU_FREQ_MAX acquire failed: %d", cpu_err);
+      }
     }
-    ESP_LOGI(TAG, "CO2 subsystem active: SCL wake disarmed; keeping ESP awake for native window");
+    ESP_LOGI(TAG, "CO2 subsystem active: SCL wake disarmed; keeping ESP awake at 80 MHz for native window");
   }
 }
 
@@ -198,8 +217,9 @@ void set_external_power(bool present) {
       gpio_wakeup_disable(pin_co2_scl);
       co2_scl_wakeup_armed = false;
     }
-    if (co2_active_lock_held && co2_active_lock != nullptr) {
+    if (co2_active_lock_held && co2_active_lock != nullptr && co2_cpu_lock != nullptr) {
       esp_pm_lock_release(co2_active_lock);
+      esp_pm_lock_release(co2_cpu_lock);
       co2_active_lock_held = false;
     }
     co2_powered_down = false;
