@@ -17,6 +17,11 @@ bool setup(bool enabled, uint32_t max_awake_ms, uint8_t rt_pin, uint8_t rh_pin,
 // Called from the RT/RH GPIO ISR. esp_pm_lock_acquire() is explicitly ISR-safe.
 void on_rtrh_edge_from_isr();
 
+// Monotonic generation incremented when an RT/RH edge opens a new battery
+// awake window after automatic Light-sleep. Task code can use this to restore
+// passive GPIO state outside ISR context.
+uint32_t wake_generation();
+
 // Called once the corresponding decoders have produced complete data.
 void on_rtrh_complete(bool valid);
 void on_valid_co2();

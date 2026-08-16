@@ -1327,6 +1327,16 @@ void CO2Monitor0601::loop() {
   }
 
   const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
+
+  // The first RT/RH edge after automatic Light-sleep opens the battery awake
+  // window from ISR context. Restore the passive CO2 GPIO input/interrupt state
+  // here in normal task context before polling the next I2C transaction.
+  const uint32_t wake_generation = power_save::wake_generation();
+  if (wake_generation != this->light_sleep_wake_generation_) {
+    this->light_sleep_wake_generation_ = wake_generation;
+    i2c_sniffer::rearm_after_light_sleep();
+  }
+
   // CO2 capture remains armed independently of the RT/RH awake window. The CO2
   // pins are not wake sources, but any frame occurring while we are awake must
   // be capturable instead of being gated by the RT/RH power-save state.

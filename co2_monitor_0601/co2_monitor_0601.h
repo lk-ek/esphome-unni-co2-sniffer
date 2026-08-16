@@ -318,6 +318,7 @@ class CO2Monitor0601 : public Component {
   uint32_t ble_pairing_window_ms_{60000};
 #endif
   uint32_t light_sleep_max_awake_ms_{10000};
+  uint32_t light_sleep_wake_generation_{0};
   uint8_t rt_pin_{3};
   uint8_t rh_pin_{4};
   uint8_t co2_sda_pin_{6};

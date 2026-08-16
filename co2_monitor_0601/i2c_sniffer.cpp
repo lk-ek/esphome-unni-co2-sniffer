@@ -1007,6 +1007,45 @@ void set_capture_enabled(bool enabled) {
   }
 }
 
+void rearm_after_light_sleep() {
+  // Automatic Light-sleep should retain GPIO configuration, but the observed
+  // battery-only failure mode leaves the passive tap reading both CO2 lines
+  // LOW until Light-sleep is disabled. Re-assert only the input-side GPIO
+  // state here; never enable pulls and never drive either bus line.
+  gpio_intr_disable(pin_scl);
+  gpio_intr_disable(pin_sda);
+  gpio_set_intr_type(pin_scl, GPIO_INTR_DISABLE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_DISABLE);
+
+  gpio_set_direction(pin_scl, GPIO_MODE_INPUT);
+  gpio_set_direction(pin_sda, GPIO_MODE_INPUT);
+  gpio_pullup_dis(pin_scl);
+  gpio_pullup_dis(pin_sda);
+  gpio_pulldown_dis(pin_scl);
+  gpio_pulldown_dis(pin_sda);
+
+  // Drop any waveform fragment spanning sleep/wake and establish a fresh
+  // baseline before ANYEDGE capture is armed again.
+  capturing = false;
+  sample_count = 0;
+  capture_finished = false;
+  capture_overflow = false;
+  last_value = read_gpio_state();
+  capture_initial_value = last_value;
+  last_edge = static_cast<uint32_t>(esp_timer_get_time());
+
+  gpio_set_intr_type(pin_scl, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_ANYEDGE);
+  capturing = capture_enabled;
+  if (capture_enabled) {
+    gpio_intr_enable(pin_scl);
+    gpio_intr_enable(pin_sda);
+  }
+
+  ESP_LOGI(TAG, "I2C GPIOs re-armed after Light-sleep wake: SCL=%d SDA=%d",
+           gpio_get_level(pin_scl), gpio_get_level(pin_sda));
+}
+
 bool poll(Capture &capture, CaptureValidator recovery_validator) {
   if (!capture_enabled) return false;
 #if RTRH_DEBUG_CAPTURE

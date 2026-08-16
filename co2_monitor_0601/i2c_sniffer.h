@@ -93,6 +93,10 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin);
 // disabling drops any partial frame collected so far.
 void set_capture_enabled(bool enabled);
 
+// Re-assert the passive GPIO input/interrupt configuration after automatic
+// Light-sleep wake. This never enables pulls and never drives SDA/SCL.
+void rearm_after_light_sleep();
+
 // Returns true when one quiet-period-delimited edge capture was consumed.
 // A capture may contain multiple frames (for example across repeated STARTs).
 bool poll(Capture &capture, CaptureValidator recovery_validator = nullptr);

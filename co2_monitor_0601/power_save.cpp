@@ -31,6 +31,7 @@ static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
 static volatile bool co2_after_rtrh = false;
 static volatile bool transport_busy = false;
+static volatile uint32_t wake_gen = 0;
 static uint32_t max_awake_ms = 10000;
 static uint32_t completed_cycles = 0;
 static uint32_t timeout_cycles = 0;
@@ -173,7 +174,10 @@ void IRAM_ATTR on_rtrh_edge_from_isr() {
   wake_started_us = static_cast<uint64_t>(esp_timer_get_time());
   rtrh_complete = false;
   co2_after_rtrh = false;
+  wake_gen++;
 }
+
+uint32_t wake_generation() { return wake_gen; }
 
 void on_rtrh_complete(bool valid) {
   if (!configured || !lock_held) return;
