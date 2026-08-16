@@ -17,7 +17,7 @@ logger:
 api:
   # Debug builds are RAM constrained; Home Assistant must be the only native API client.
   # Use USB serial for live logs while raw UDP capture is enabled.
-  max_connections: 1
+  max_connections: 2
   encryption:
     key: !secret i2csniffer__encryption_key
 
