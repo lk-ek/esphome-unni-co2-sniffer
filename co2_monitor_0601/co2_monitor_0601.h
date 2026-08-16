@@ -294,7 +294,7 @@ class CO2Monitor0601 : public Component {
   uint32_t active_i2c_probe_interval_ms_{60000};
   uint32_t active_i2c_probe_last_attempt_ms_{0};
   uint32_t active_i2c_probe_due_ms_{0};
-  enum class ActiveProbePhase : uint8_t { Idle, ReadCurrent, WaitPeriodic };
+  enum class ActiveProbePhase : uint8_t { Idle, WaitPeriodic };
   ActiveProbePhase active_i2c_probe_phase_{ActiveProbePhase::Idle};
   std::string debug_udp_host_;
   uint16_t debug_udp_port_{0};

@@ -1232,22 +1232,21 @@ void CO2Monitor0601::process_active_i2c_probe_() {
 
   const uint32_t now = millis();
 
-  // If the native bus has come alive, never contend with it. Drop any pending
-  // active step and let the passive sniffer observe the Unni transaction.
-  if (!i2c_sniffer::bus_is_low_low() || i2c_sniffer::last_edge_age_us() < 1000000U) {
-    if (this->active_i2c_probe_phase_ != ActiveProbePhase::Idle) {
+  // While waiting after our own 21B1, restore_passive_gpio_() intentionally
+  // resets the capture baseline/last_edge timestamp. Do not mistake that
+  // self-generated timestamp for native Unni activity. A non-LOW/LOW bus,
+  // however, really means the Unni side woke and we must yield immediately.
+  if (this->active_i2c_probe_phase_ == ActiveProbePhase::WaitPeriodic) {
+    if (!i2c_sniffer::bus_is_low_low()) {
       ESP_LOGI(TAG, "Active I2C probe cancelled: native CO2 bus became active");
       this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
+      return;
     }
-    return;
-  }
-
-  if (this->active_i2c_probe_phase_ == ActiveProbePhase::ReadCurrent) {
     if (static_cast<int32_t>(now - this->active_i2c_probe_due_ms_) < 0) return;
-    uint8_t data[3]{};
-    const bool ok = i2c_sniffer::active_read_bytes(data, sizeof(data));
     this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
-    if (!ok) return;
+    ESP_LOGI(TAG, "Active I2C probe: periodic-start wait complete; requesting and reading measurement directly");
+    uint8_t data[3]{};
+    if (!i2c_sniffer::active_read_command(0xEC05, data, sizeof(data))) return;
     if (data[2] != active_probe_crc_(data[0], data[1])) {
       ESP_LOGW(TAG, "Active I2C probe: CO2 CRC mismatch (%02X %02X %02X)",
                data[0], data[1], data[2]);
@@ -1262,17 +1261,9 @@ void CO2Monitor0601::process_active_i2c_probe_() {
     return;
   }
 
-  if (this->active_i2c_probe_phase_ == ActiveProbePhase::WaitPeriodic) {
-    if (static_cast<int32_t>(now - this->active_i2c_probe_due_ms_) < 0) return;
-    ESP_LOGI(TAG, "Active I2C probe: periodic-start wait complete; requesting measurement");
-    if (i2c_sniffer::active_write_command(0xEC05)) {
-      this->active_i2c_probe_phase_ = ActiveProbePhase::ReadCurrent;
-      this->active_i2c_probe_due_ms_ = now + 3U;
-    } else {
-      this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
-    }
+  // Idle probes are only started on a genuinely quiet native LOW/LOW bus.
+  if (!i2c_sniffer::bus_is_low_low() || i2c_sniffer::last_edge_age_us() < 1000000U)
     return;
-  }
 
   if (this->active_i2c_probe_last_attempt_ms_ != 0 &&
       static_cast<uint32_t>(now - this->active_i2c_probe_last_attempt_ms_) <
@@ -1283,19 +1274,30 @@ void CO2Monitor0601::process_active_i2c_probe_() {
   ESP_LOGI(TAG,
            "Active I2C probe HARD: bus LOW/LOW and quiet >1 s; driving 3.3 V through 10 kOhm taps and trying EC05");
 
-  // Least invasive first: ask for the current measurement in case the sensor
-  // remains powered while only its normal bus pull-ups are gated off.
-  if (i2c_sniffer::active_write_command(0xEC05)) {
-    this->active_i2c_probe_phase_ = ActiveProbePhase::ReadCurrent;
-    this->active_i2c_probe_due_ms_ = now + 3U;
+  // Least invasive first: issue EC05 and perform the response read while we
+  // still own the GPIOs and the passive interrupts are disabled. This avoids
+  // interpreting our own clock/data transitions as native Unni activity.
+  uint8_t data[3]{};
+  if (i2c_sniffer::active_read_command(0xEC05, data, sizeof(data))) {
+    if (data[2] != active_probe_crc_(data[0], data[1])) {
+      ESP_LOGW(TAG, "Active I2C probe: CO2 CRC mismatch (%02X %02X %02X)",
+               data[0], data[1], data[2]);
+      return;
+    }
+    const uint16_t ppm = (static_cast<uint16_t>(data[0]) << 8) | data[1];
+    if (ppm < 350) {
+      ESP_LOGW(TAG, "Active I2C probe: rejected implausible CO2 value %u ppm", ppm);
+      return;
+    }
+    this->accept_co2_ppm_(ppm, "active probe");
     return;
   }
 
-  // If there is an answering slave but periodic mode stopped, try the exact
+  // If the direct command/read did not produce a usable transaction, try the exact
   // start command observed from the Unni. If it ACKs, wait one measurement
   // period before EC05. If the bus cannot even be raised or no slave ACKs,
   // this attempt ends immediately and the pins are passive again.
-  ESP_LOGI(TAG, "Active I2C probe: EC05 did not ACK; trying observed 21B1 start command");
+  ESP_LOGI(TAG, "Active I2C probe: EC05 direct read failed; trying observed 21B1 start command");
   if (i2c_sniffer::active_write_command(0x21B1)) {
     this->active_i2c_probe_phase_ = ActiveProbePhase::WaitPeriodic;
     this->active_i2c_probe_due_ms_ = now + 6000U;

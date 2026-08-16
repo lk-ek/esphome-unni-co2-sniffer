@@ -97,15 +97,15 @@ void set_capture_enabled(bool enabled);
 // Light-sleep wake. This never enables pulls and never drives SDA/SCL.
 void rearm_after_light_sleep();
 
-// Experimental diagnostic helpers. These temporarily switch the two tap GPIOs
-// to open-drain I2C with the ESP32-C3's weak internal pull-ups, perform one
-// master transaction through the external 10 kOhm series resistors, and then
-// restore the normal passive sniffer configuration. They are intended only for
+// Experimental diagnostic helpers. These temporarily take ownership of the two
+// tap GPIOs, disable the passive edge interrupts, perform a slow master
+// transaction through the external 10 kOhm series resistors, and then restore
+// the normal no-pull passive sniffer configuration. They are intended only for
 // a bus that has been electrically quiet LOW/LOW for a long time.
 bool bus_is_low_low();
 uint32_t last_edge_age_us();
 bool active_write_command(uint16_t command);
-bool active_read_bytes(uint8_t *data, uint8_t length);
+bool active_read_command(uint16_t command, uint8_t *data, uint8_t length);
 
 // Returns true when one quiet-period-delimited edge capture was consumed.
 // A capture may contain multiple frames (for example across repeated STARTs).

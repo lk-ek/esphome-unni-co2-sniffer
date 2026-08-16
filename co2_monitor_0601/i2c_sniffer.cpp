@@ -1318,19 +1318,38 @@ bool active_write_command(uint16_t command) {
   return ok;
 }
 
-bool active_read_bytes(uint8_t *data, uint8_t length) {
+bool active_read_command(uint16_t command, uint8_t *data, uint8_t length) {
   if (!data || length == 0) return false;
   if (!begin_active_master_()) {
     ESP_LOGW(TAG, "Active I2C probe read: hard-drive master setup failed");
     return false;
   }
 
+  ESP_LOGI(TAG, "Active I2C probe: passive IRQs disabled; taking temporary bus ownership");
+
+  // Keep ownership for the complete command + read sequence. In particular,
+  // do not restore/re-arm the passive sniffer between EC05 and the direct read:
+  // our own GPIO transitions must never look like native Unni bus activity.
   bool ok = master_start_();
-  if (ok) ok = master_write_byte_(static_cast<uint8_t>((0x62U << 1) | 1U));
-  for (uint8_t i = 0; ok && i < length; ++i)
-    ok = master_read_byte_(data[i], i + 1U < length);
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>((0x62U << 1) | 0U));
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>(command >> 8));
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>(command & 0xFF));
   master_stop_();
-  restore_passive_gpio_();
+
+  ESP_LOGI(TAG, "Active I2C probe: W 0x62 %02X %02X -> %s",
+           static_cast<unsigned>(command >> 8), static_cast<unsigned>(command & 0xFF),
+           ok ? "ACK" : "NACK/failed");
+
+  if (ok) {
+    // SCD4x command-to-read delay is tiny for read_measurement; retain the
+    // diagnostic build's conservative 3 ms delay while keeping IRQs disabled.
+    esp_rom_delay_us(3000);
+    ok = master_start_();
+    if (ok) ok = master_write_byte_(static_cast<uint8_t>((0x62U << 1) | 1U));
+    for (uint8_t i = 0; ok && i < length; ++i)
+      ok = master_read_byte_(data[i], i + 1U < length);
+    master_stop_();
+  }
 
   if (ok) {
     char bytes[3 * 9 + 1]{};
@@ -1338,10 +1357,14 @@ bool active_read_bytes(uint8_t *data, uint8_t length) {
     for (uint8_t i = 0; i < length && used + 4 < sizeof(bytes); ++i)
       used += static_cast<size_t>(snprintf(bytes + used, sizeof(bytes) - used, "%02X%s",
                                           data[i], i + 1U < length ? " " : ""));
-    ESP_LOGI(TAG, "Active I2C probe: R 0x62 -> %s", bytes);
+    ESP_LOGI(TAG, "Active I2C probe: direct R 0x62 -> %s", bytes);
   } else {
-    ESP_LOGI(TAG, "Active I2C probe: R 0x62 -> NACK/failed");
+    ESP_LOGI(TAG, "Active I2C probe: direct R 0x62 -> NACK/failed");
   }
+
+  restore_passive_gpio_();
+  ESP_LOGI(TAG, "Active I2C probe: passive sniffer restored: SCL=%d SDA=%d",
+           gpio_get_level(pin_scl), gpio_get_level(pin_sda));
   return ok;
 }
 
