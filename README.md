@@ -461,7 +461,10 @@ for attribution, provenance and upstream license texts.
 
 ---
 
-## BLE history
+## BLE
+
+Advertising after GATT disconnects is reasserted deterministically so ESPHome's automatic advertiser restart cannot replace the Sensirion manufacturer-data payload. The Device Settings privacy flag (`IsAdvertiseDataEnabled`) is persistent and is logged explicitly at startup.
+ history
 
 With:
 

@@ -16,6 +16,7 @@
 
 #include "esphome/components/esp32_ble/ble.h"
 #include "esphome/core/log.h"
+#include "esphome/core/helpers.h"
 
 #include "esp_mac.h"
 
@@ -58,6 +59,9 @@ static bool advertisement_ready = false;
 static uint32_t payload_version = 0;
 static uint32_t configured_version = 0;
 static bool gatt_connected = false;
+static bool restart_pending = false;
+static uint32_t restart_due_ms = 0;
+static const char *restart_reason = nullptr;
 
 enum class AdvState : uint8_t { IDLE, CONFIGURING, STARTING, ADVERTISING, STOPPING };
 static AdvState adv_state = AdvState::IDLE;
@@ -65,6 +69,14 @@ static esp_ble_adv_params_t adv_params{};
 
 static void build_advertisement();
 static void configure_advertisement();
+
+static void schedule_advertising_reassert(const char *reason, uint32_t delay_ms = 250) {
+  restart_pending = true;
+  restart_due_ms = millis() + delay_ms;
+  restart_reason = reason;
+  ESP_LOGD(TAG, "Sensirion ADV reassert scheduled in %u ms (%s)",
+           static_cast<unsigned>(delay_ms), reason ? reason : "unspecified");
+}
 
 static void request_refresh() {
   if (!advertisement_ready || esp32_ble::global_ble == nullptr ||
@@ -93,18 +105,24 @@ static void configure_advertisement() {
 
   adv_state = AdvState::CONFIGURING;
   configured_version = payload_version;
+  ESP_LOGD(TAG, "Sensirion ADV payload configuring: len=%u version=%lu sample_data=%s",
+           static_cast<unsigned>(advertisement_length),
+           static_cast<unsigned long>(configured_version),
+           advertise_data_enabled ? "enabled" : "disabled");
   const esp_err_t err = esp_ble_gap_config_adv_data_raw(advertisement.data(), advertisement_length);
   if (err != ESP_OK) {
-    ESP_LOGW(TAG, "adv data setup failed: %s", esp_err_to_name(err));
+    ESP_LOGW(TAG, "Sensirion ADV payload setup failed: %s", esp_err_to_name(err));
     adv_state = AdvState::IDLE;
+    schedule_advertising_reassert("config failed", 500);
   }
 }
 
 void sensirion_ble_set_advertise_data_enabled(bool enabled) {
-  if (advertise_data_enabled == enabled) return;
+  const bool changed = advertise_data_enabled != enabled;
   advertise_data_enabled = enabled;
-  ESP_LOGI(TAG, "manufacturer sample advertising: %s", enabled ? "enabled" : "disabled");
-  if (sample.complete()) build_advertisement();
+  ESP_LOGI(TAG, "manufacturer sample advertising: %s%s", enabled ? "enabled" : "disabled",
+           changed ? " (changed)" : "");
+  if (changed && sample.complete()) build_advertisement();
 }
 
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms) {
@@ -138,34 +156,48 @@ void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_c
         adv_state = AdvState::IDLE;
         break;
       }
+      ESP_LOGD(TAG, "Sensirion ADV payload configured: len=%u version=%lu",
+               static_cast<unsigned>(advertisement_length),
+               static_cast<unsigned long>(configured_version));
       adv_state = AdvState::STARTING;
-      if (esp_ble_gap_start_advertising(&adv_params) != ESP_OK)
-        adv_state = AdvState::IDLE;
+      {
+        const esp_err_t err = esp_ble_gap_start_advertising(&adv_params);
+        if (err != ESP_OK) {
+          ESP_LOGW(TAG, "Sensirion ADV start request failed: %s", esp_err_to_name(err));
+          adv_state = AdvState::IDLE;
+          schedule_advertising_reassert("start request failed", 500);
+        }
+      }
       break;
 
     case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
       if (adv_state == AdvState::STARTING) {
         if (param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
           adv_state = AdvState::ADVERTISING;
+          restart_pending = false;
+          ESP_LOGI(TAG, "Sensirion ADV started: %u ms, payload=%lu, sample_data=%s",
+                   static_cast<unsigned>(advertising_interval_ms),
+                   static_cast<unsigned long>(configured_version),
+                   advertise_data_enabled ? "enabled" : "disabled");
           if (configured_version != payload_version)
             request_refresh();
         } else {
+          ESP_LOGW(TAG, "Sensirion ADV start failed: status=%d", param->adv_start_cmpl.status);
           adv_state = AdvState::IDLE;
+          schedule_advertising_reassert("start complete failed", 500);
         }
       } else if (!gatt_connected && advertisement_ready &&
                  param->adv_start_cmpl.status == ESP_BT_STATUS_SUCCESS) {
-        // ESPHome may restart its fast default advertiser after disconnect.
-        // Replace it with our current packet and low-duty-cycle interval.
-        adv_state = AdvState::STOPPING;
-        if (esp_ble_gap_stop_advertising() != ESP_OK) {
-          adv_state = AdvState::IDLE;
-          configure_advertisement();
-        }
+        // ESPHome may restart its own advertiser after disconnect. Defer the
+        // takeover slightly so both stacks do not race stop/config/start calls.
+        adv_state = AdvState::ADVERTISING;
+        schedule_advertising_reassert("foreign/default ADV start", 100);
       }
       break;
 
     case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
       if (adv_state == AdvState::STOPPING) {
+        ESP_LOGD(TAG, "Sensirion ADV stopped; reconfiguring current payload");
         adv_state = AdvState::IDLE;
         if (!gatt_connected)
           configure_advertisement();
@@ -187,8 +219,36 @@ void sensirion_ble_gatts_event_handler(esp_gatts_cb_event_t event,
   } else if (event == ESP_GATTS_DISCONNECT_EVT) {
     gatt_connected = false;
     adv_state = AdvState::IDLE;
+    // ESPHome's BLE server also restarts advertising on disconnect. Let that
+    // complete first, then deterministically replace it with our Sensirion
+    // manufacturer payload and configured interval.
     if (advertisement_ready)
-      configure_advertisement();
+      schedule_advertising_reassert("GATT disconnect", 250);
+  }
+}
+
+void sensirion_ble_loop() {
+  if (!restart_pending || gatt_connected || !advertisement_ready ||
+      esp32_ble::global_ble == nullptr || !esp32_ble::global_ble->is_active())
+    return;
+
+  const uint32_t now = millis();
+  if (static_cast<int32_t>(now - restart_due_ms) < 0)
+    return;
+
+  restart_pending = false;
+  ESP_LOGI(TAG, "Sensirion ADV reasserting after %s",
+           restart_reason ? restart_reason : "unspecified event");
+  restart_reason = nullptr;
+
+  // Stop whatever advertiser is active (ours or ESPHome's). If none is
+  // active, Bluedroid returns an error and we can configure immediately.
+  adv_state = AdvState::STOPPING;
+  const esp_err_t err = esp_ble_gap_stop_advertising();
+  if (err != ESP_OK) {
+    ESP_LOGD(TAG, "Sensirion ADV stop not needed: %s", esp_err_to_name(err));
+    adv_state = AdvState::IDLE;
+    configure_advertisement();
   }
 }
 

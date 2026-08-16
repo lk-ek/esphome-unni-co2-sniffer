@@ -1103,6 +1103,7 @@ void CO2Monitor0601::loop() {
 
   uint64_t stage_us = static_cast<uint64_t>(esp_timer_get_time());
 #if UNNI_BLE_ENABLED
+  sensirion_ble_loop();
   sensirion_settings_loop();
 #endif
 #if UNNI_BLE_HISTORY_ENABLED

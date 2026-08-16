@@ -14,6 +14,7 @@ namespace esphome {
 namespace co2_monitor_0601 {
 
 void sensirion_ble_setup();
+void sensirion_ble_loop();
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms);
 void sensirion_ble_set_advertise_data_enabled(bool enabled);
 void sensirion_ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
