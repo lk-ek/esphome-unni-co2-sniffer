@@ -508,3 +508,10 @@ The production MyCO2 identity is retained because it is required for live CO2 an
 ### 2026-08-16 — Restore MyCO2 live advertisements
 
 After pairing, MyAmbience recognized the device as a CO2 Gadget and history downloads worked, but live values disappeared. The normal MyCO2/DIY Gadget UI does not expose the SHT43-only `IsAdvertiseDataEnabled` setting. The live advertisement implementation was restored to the previously verified `adv-reassert` version, and the normal MyCO2 identity now forces sample advertising enabled so a stale SHT43 privacy preference cannot suppress live data.
+
+### 2026-08-16: keep passive CO₂ capture armed across RT/RH sleep windows
+
+- Removed battery-policy gating of the passive I²C sniffer.
+- GPIO6/GPIO7 remain excluded from light-sleep wake sources.
+- CO₂ transactions can now be captured whenever the MCU is awake, regardless of the RT/RH awake-window state.
+- This fixes runs where T/RH were valid but the BLE live sample remained `CO2=no`.

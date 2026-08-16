@@ -467,8 +467,12 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
   this->power_policy_external_power_ = external;
   power_save::set_external_power(external);
 
-  if (this->io_initialized_ && power_save::enabled())
-    i2c_sniffer::set_capture_enabled(external || power_save::awake_window_active());
+  // Keep the passive CO2 I2C sniffer armed continuously. GPIO6/GPIO7 are
+  // intentionally not light-sleep wake sources, so this does not change wake
+  // policy; it only prevents battery-policy transitions from discarding CO2
+  // frames that happen while the MCU is already awake.
+  if (this->io_initialized_)
+    i2c_sniffer::set_capture_enabled(true);
 
 #if UNNI_BLE_ENABLED
   const uint32_t adv_ms = external ? this->ble_usb_advertising_interval_ms_
@@ -691,7 +695,7 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
       // If VBUS was already debounced before delayed sniffer initialization,
       // immediately apply the matching USB/battery power policy.
       this->apply_power_policy_(true);
-      i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+      i2c_sniffer::set_capture_enabled(true);
     }
   }
   ESP_LOGI(TAG, "Sniffer GPIO/ISR initialization enabled after %lu ms",
@@ -1278,8 +1282,10 @@ void CO2Monitor0601::loop() {
   }
 
   const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
-  if (rtrh_power_path && power_save::enabled())
-    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+  // CO2 capture remains armed independently of the RT/RH awake window. The CO2
+  // pins are not wake sources, but any frame occurring while we are awake must
+  // be capturable instead of being gated by the RT/RH power-save state.
+  i2c_sniffer::set_capture_enabled(true);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   if (this->rtrh_enabled_) {
@@ -1318,10 +1324,10 @@ void CO2Monitor0601::loop() {
   runtime_diag_update_max_(this->runtime_diag_.max_power_save_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
-  // power_save::loop() may have just closed the window. Drop any partial CO2
-  // transaction immediately instead of carrying it into the next sleep cycle.
-  if (rtrh_power_path && power_save::enabled())
-    i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+  // Do not gate CO2 capture when the RT/RH awake window closes. GPIO6/GPIO7
+  // remain excluded from light-sleep wakeup, but keeping the ISR armed avoids
+  // losing the next CO2 transaction after an RT/RH-triggered wake.
+  i2c_sniffer::set_capture_enabled(true);
 
   this->runtime_diag_loop_end_();
 }

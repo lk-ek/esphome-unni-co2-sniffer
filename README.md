@@ -838,3 +838,7 @@ This matches the earlier identity probe: MyAmbience exposes Privacy when the dev
 `0x81FE` remains an **experimental direct-BLE alias** for disabling WiFi/Home Assistant. MyAmbience is not expected to render this SHT43-only setting as a switch for the production MyCO2 identity. The Home Assistant `WiFi / Home Assistant` switch and USB recovery window remain the supported UI for that function.
 
 The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not exposed yet: accepting credentials without safely integrating them into ESPHome's configured-network lifecycle would create a setting that appears functional but is not reliable.
+
+### CO₂ capture and light sleep
+
+The passive CO₂ I²C sniffer stays armed independently of the RT/RH light-sleep awake window. GPIO6/GPIO7 are still excluded from light-sleep wake sources, so CO₂ traffic does not wake the ESP32-C3 by itself. Keeping the GPIO edge ISR armed prevents valid CO₂ transactions that occur while the MCU is already awake from being discarded by battery-policy transitions.
