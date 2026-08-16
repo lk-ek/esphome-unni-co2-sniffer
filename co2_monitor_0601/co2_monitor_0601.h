@@ -76,6 +76,8 @@ class CO2Monitor0601 : public Component {
   void set_rtrh_gpio_setup(bool value) { this->rtrh_gpio_setup_ = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
+  void set_active_i2c_probe(bool value) { this->active_i2c_probe_enabled_ = value; }
+  void set_active_i2c_probe_interval(uint32_t value) { this->active_i2c_probe_interval_ms_ = value; }
   void set_debug_udp_host(const std::string &value) { this->debug_udp_host_ = value; }
   void set_debug_udp_port(uint16_t value) { this->debug_udp_port_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
@@ -264,6 +266,8 @@ class CO2Monitor0601 : public Component {
   void apply_power_policy_(bool force = false);
   void process_rtrh_(bool publish_outputs = true);
   void process_co2_();
+  void process_active_i2c_probe_();
+  void accept_co2_ppm_(uint16_t ppm, const char *source);
   bool setup_battery_adc_();
   void process_battery_();
   bool setup_usb_power_();
@@ -286,6 +290,12 @@ class CO2Monitor0601 : public Component {
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
   bool debug_metrics_{false};
+  bool active_i2c_probe_enabled_{false};
+  uint32_t active_i2c_probe_interval_ms_{60000};
+  uint32_t active_i2c_probe_last_attempt_ms_{0};
+  uint32_t active_i2c_probe_due_ms_{0};
+  enum class ActiveProbePhase : uint8_t { Idle, ReadCurrent, WaitPeriodic };
+  ActiveProbePhase active_i2c_probe_phase_{ActiveProbePhase::Idle};
   std::string debug_udp_host_;
   uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED

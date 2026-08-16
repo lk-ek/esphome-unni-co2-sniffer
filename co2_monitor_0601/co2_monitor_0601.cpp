@@ -1172,13 +1172,14 @@ void CO2Monitor0601::process_co2_() {
     this->co2_.have_confirmation_candidate = false;
   }
 
+  this->accept_co2_ppm_(ppm, "passive sniffer");
+}
+
+void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
   power_save::on_valid_co2();
 #if UNNI_BLE_ENABLED
   sensirion_ble_set_co2(ppm);
 #if UNNI_BLE_LIVE_ENABLED
-  // A CO2 frame can arrive well after the first RT/RH sample, especially in
-  // battery operation. Refresh immediately once the sample becomes complete
-  // instead of waiting for the next ~30 s RT/RH cycle.
   sensirion_ble_commit_live_advertisement();
 #endif
 #endif
@@ -1186,27 +1187,119 @@ void CO2Monitor0601::process_co2_() {
   this->ha_.co2 = static_cast<float>(ppm);
   this->ha_.have_co2 = true;
 
-  if (this->external_powered_() && this->out_.co2) {
-    // USB policy: every valid CO2 frame is a useful fresh measurement, even
-    // when the integer ppm value happens to be unchanged.
+  // An explicitly requested active probe is a fresh measurement, so publish it
+  // immediately even under the normal battery throttling policy.
+  const bool active_probe = source && std::strcmp(source, "active probe") == 0;
+  if ((this->external_powered_() || active_probe) && this->out_.co2) {
     this->out_.co2->publish_state(this->ha_.co2);
     this->ha_.initial_co2_published = true;
     this->ha_.last_publish_ms = millis();
   }
 
   if (this->co2_.have_last_ppm && ppm == this->co2_.last_ppm) {
-    ESP_LOGV(TAG, "CO2 unchanged: %u ppm", ppm);
+    ESP_LOGI(TAG, "CO2%s: %u ppm (unchanged)", active_probe ? " [active probe]" : "", ppm);
     return;
   }
 
   this->co2_.have_last_ppm = true;
   this->co2_.last_ppm = ppm;
-  ESP_LOGI(TAG, "CO2: %u ppm", ppm);
+  ESP_LOGI(TAG, "CO2%s: %u ppm", active_probe ? " [active probe]" : "", ppm);
 
   if (!this->external_powered_() && !this->ha_.initial_co2_published && this->out_.co2) {
     this->out_.co2->publish_state(this->ha_.co2);
     this->ha_.initial_co2_published = true;
     this->ha_.last_publish_ms = millis();
+  }
+}
+
+static uint8_t active_probe_crc_(uint8_t msb, uint8_t lsb) {
+  uint8_t crc = 0xFF;
+  const uint8_t data[2] = {msb, lsb};
+  for (uint8_t value : data) {
+    crc ^= value;
+    for (uint8_t bit = 0; bit < 8; ++bit)
+      crc = (crc & 0x80) ? static_cast<uint8_t>((crc << 1) ^ 0x31)
+                         : static_cast<uint8_t>(crc << 1);
+  }
+  return crc;
+}
+
+void CO2Monitor0601::process_active_i2c_probe_() {
+  if (!this->active_i2c_probe_enabled_ || this->external_powered_()) {
+    this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
+    return;
+  }
+
+  const uint32_t now = millis();
+
+  // If the native bus has come alive, never contend with it. Drop any pending
+  // active step and let the passive sniffer observe the Unni transaction.
+  if (!i2c_sniffer::bus_is_low_low() || i2c_sniffer::last_edge_age_us() < 1000000U) {
+    if (this->active_i2c_probe_phase_ != ActiveProbePhase::Idle) {
+      ESP_LOGI(TAG, "Active I2C probe cancelled: native CO2 bus became active");
+      this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
+    }
+    return;
+  }
+
+  if (this->active_i2c_probe_phase_ == ActiveProbePhase::ReadCurrent) {
+    if (static_cast<int32_t>(now - this->active_i2c_probe_due_ms_) < 0) return;
+    uint8_t data[3]{};
+    const bool ok = i2c_sniffer::active_read_bytes(data, sizeof(data));
+    this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
+    if (!ok) return;
+    if (data[2] != active_probe_crc_(data[0], data[1])) {
+      ESP_LOGW(TAG, "Active I2C probe: CO2 CRC mismatch (%02X %02X %02X)",
+               data[0], data[1], data[2]);
+      return;
+    }
+    const uint16_t ppm = (static_cast<uint16_t>(data[0]) << 8) | data[1];
+    if (ppm < 350) {
+      ESP_LOGW(TAG, "Active I2C probe: rejected implausible CO2 value %u ppm", ppm);
+      return;
+    }
+    this->accept_co2_ppm_(ppm, "active probe");
+    return;
+  }
+
+  if (this->active_i2c_probe_phase_ == ActiveProbePhase::WaitPeriodic) {
+    if (static_cast<int32_t>(now - this->active_i2c_probe_due_ms_) < 0) return;
+    ESP_LOGI(TAG, "Active I2C probe: periodic-start wait complete; requesting measurement");
+    if (i2c_sniffer::active_write_command(0xEC05)) {
+      this->active_i2c_probe_phase_ = ActiveProbePhase::ReadCurrent;
+      this->active_i2c_probe_due_ms_ = now + 3U;
+    } else {
+      this->active_i2c_probe_phase_ = ActiveProbePhase::Idle;
+    }
+    return;
+  }
+
+  if (this->active_i2c_probe_last_attempt_ms_ != 0 &&
+      static_cast<uint32_t>(now - this->active_i2c_probe_last_attempt_ms_) <
+          this->active_i2c_probe_interval_ms_)
+    return;
+
+  this->active_i2c_probe_last_attempt_ms_ = now;
+  ESP_LOGI(TAG,
+           "Active I2C probe: bus LOW/LOW and quiet >1 s; trying EC05 using weak internal pull-ups through 10 kOhm taps");
+
+  // Least invasive first: ask for the current measurement in case the sensor
+  // remains powered while only its normal bus pull-ups are gated off.
+  if (i2c_sniffer::active_write_command(0xEC05)) {
+    this->active_i2c_probe_phase_ = ActiveProbePhase::ReadCurrent;
+    this->active_i2c_probe_due_ms_ = now + 3U;
+    return;
+  }
+
+  // If there is an answering slave but periodic mode stopped, try the exact
+  // start command observed from the Unni. If it ACKs, wait one measurement
+  // period before EC05. If the bus cannot even be raised or no slave ACKs,
+  // this attempt ends immediately and the pins are passive again.
+  ESP_LOGI(TAG, "Active I2C probe: EC05 did not ACK; trying observed 21B1 start command");
+  if (i2c_sniffer::active_write_command(0x21B1)) {
+    this->active_i2c_probe_phase_ = ActiveProbePhase::WaitPeriodic;
+    this->active_i2c_probe_due_ms_ = now + 6000U;
+    ESP_LOGI(TAG, "Active I2C probe: 21B1 ACK; waiting 6 s for a measurement");
   }
 }
 
@@ -1365,6 +1458,7 @@ void CO2Monitor0601::loop() {
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_co2_();
+  this->process_active_i2c_probe_();
   i2c_sniffer::log_edge_diagnostics(millis());
   runtime_diag_update_max_(this->runtime_diag_.max_co2_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);

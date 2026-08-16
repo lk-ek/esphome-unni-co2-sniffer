@@ -296,6 +296,11 @@ co2_monitor_0601:
   # Diagnostics
   debug_metrics: false
   debug_capture: false
+  # Experimental only: temporarily becomes an I2C master on a long-idle
+  # LOW/LOW CO2 bus, using only the ESP32-C3 internal pull-ups through the
+  # external 10 kOhm tap resistors.
+  active_i2c_probe: false
+  active_i2c_probe_interval: 60s
 ```
 
 The defaults match the tested XIAO ESP32-C3 installation.
@@ -305,6 +310,8 @@ All configured GPIOs must be unique.
 `battery_pin` must be an ESP32-C3 ADC1-capable GPIO.
 
 The component configures the ESP-IDF power-management requirements, BLE server and persistent history partition automatically.
+
+`active_i2c_probe` is intentionally disabled by default. It is a hardware diagnostic, not normal passive-sniffer operation. The probe runs only on battery policy after the CO2 bus has remained LOW/LOW and edge-free for at least one second. It first tries `0xEC05`; if no slave ACKs, it tries the observed `0x21B1` start command. Every attempt restores SDA/SCL to input-only/no-pull mode immediately afterwards. Do not enable it without series resistance on both CO2 tap lines.
 
 ---
 

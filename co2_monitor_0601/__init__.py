@@ -43,6 +43,8 @@ CONF_RTRH_EDGE_CAPTURE = "rtrh_edge_capture"
 CONF_RTRH_DECODE_ONLY = "rtrh_decode_only"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
+CONF_ACTIVE_I2C_PROBE = "active_i2c_probe"
+CONF_ACTIVE_I2C_PROBE_INTERVAL = "active_i2c_probe_interval"
 CONF_DEBUG_CAPTURE = "debug_capture"
 CONF_DEBUG_UDP_HOST = "debug_udp_host"
 CONF_DEBUG_UDP_PORT = "debug_udp_port"
@@ -303,6 +305,8 @@ _SCHEMA = {
     cv.Optional(CONF_RTRH_DECODE_ONLY, default=False): cv.boolean,
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
+    cv.Optional(CONF_ACTIVE_I2C_PROBE, default=False): cv.boolean,
+    cv.Optional(CONF_ACTIVE_I2C_PROBE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_UDP_HOST, default=""): cv.string_strict,
     cv.Optional(CONF_DEBUG_UDP_PORT, default=45678): cv.int_range(min=1, max=65535),
@@ -470,6 +474,8 @@ async def to_code(config):
     cg.add(var.set_rtrh_decode_only(config[CONF_RTRH_DECODE_ONLY]))
     cg.add(var.set_sniffer_start_delay(config[CONF_SNIFFER_START_DELAY]))
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
+    cg.add(var.set_active_i2c_probe(config[CONF_ACTIVE_I2C_PROBE]))
+    cg.add(var.set_active_i2c_probe_interval(config[CONF_ACTIVE_I2C_PROBE_INTERVAL]))
     cg.add(var.set_debug_udp_host(config[CONF_DEBUG_UDP_HOST]))
     cg.add(var.set_debug_udp_port(config[CONF_DEBUG_UDP_PORT]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))

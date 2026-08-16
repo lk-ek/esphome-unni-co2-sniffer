@@ -6,6 +6,7 @@
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include "esp_rom_sys.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -958,6 +959,143 @@ void log_frame(const Frame &frame, const char *label) {
 }
 #endif
 
+
+
+static void restore_passive_gpio_() {
+  gpio_intr_disable(pin_scl);
+  gpio_intr_disable(pin_sda);
+  gpio_set_intr_type(pin_scl, GPIO_INTR_DISABLE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_DISABLE);
+
+  gpio_config_t io{};
+  io.mode = GPIO_MODE_INPUT;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io.intr_type = GPIO_INTR_DISABLE;
+  io.pin_bit_mask = (1ULL << pin_scl) | (1ULL << pin_sda);
+  gpio_config(&io);
+
+  capturing = false;
+  sample_count = 0;
+  capture_finished = false;
+  capture_overflow = false;
+  last_value = read_gpio_state();
+  capture_initial_value = last_value;
+  last_edge = static_cast<uint32_t>(esp_timer_get_time());
+
+  gpio_set_intr_type(pin_scl, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_ANYEDGE);
+  capturing = capture_enabled;
+  if (capture_enabled) {
+    gpio_intr_enable(pin_scl);
+    gpio_intr_enable(pin_sda);
+  }
+}
+
+static bool begin_active_master_() {
+  gpio_intr_disable(pin_scl);
+  gpio_intr_disable(pin_sda);
+  capturing = false;
+  sample_count = 0;
+  capture_finished = false;
+  capture_overflow = false;
+
+  gpio_config_t io{};
+  io.mode = GPIO_MODE_INPUT_OUTPUT_OD;
+  io.pull_up_en = GPIO_PULLUP_ENABLE;
+  io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  io.intr_type = GPIO_INTR_DISABLE;
+  io.pin_bit_mask = (1ULL << pin_scl) | (1ULL << pin_sda);
+  if (gpio_config(&io) != ESP_OK) {
+    restore_passive_gpio_();
+    return false;
+  }
+  gpio_set_level(pin_scl, 1);
+  gpio_set_level(pin_sda, 1);
+  // The internal pull-ups are intentionally weak and sit behind the user's
+  // external 10 kOhm series resistors. Give the bus ample time to rise.
+  esp_rom_delay_us(500);
+  if (!gpio_get_level(pin_scl) || !gpio_get_level(pin_sda)) {
+    restore_passive_gpio_();
+    return false;
+  }
+  return true;
+}
+
+static inline void i2c_delay_() { esp_rom_delay_us(20); }  // ~25 kHz
+static inline void drive_scl_(bool high) { gpio_set_level(pin_scl, high ? 1 : 0); }
+static inline void drive_sda_(bool high) { gpio_set_level(pin_sda, high ? 1 : 0); }
+
+static bool wait_scl_high_() {
+  drive_scl_(true);
+  for (uint16_t i = 0; i < 250; i++) {
+    if (gpio_get_level(pin_scl)) return true;
+    esp_rom_delay_us(2);
+  }
+  return false;
+}
+
+static bool master_start_() {
+  drive_sda_(true);
+  if (!wait_scl_high_()) return false;
+  i2c_delay_();
+  drive_sda_(false);
+  i2c_delay_();
+  drive_scl_(false);
+  i2c_delay_();
+  return true;
+}
+
+static void master_stop_() {
+  drive_sda_(false);
+  i2c_delay_();
+  if (!wait_scl_high_()) return;
+  i2c_delay_();
+  drive_sda_(true);
+  i2c_delay_();
+}
+
+static bool master_write_byte_(uint8_t value) {
+  for (int bit = 7; bit >= 0; --bit) {
+    drive_sda_((value & (1U << bit)) != 0);
+    i2c_delay_();
+    if (!wait_scl_high_()) return false;
+    i2c_delay_();
+    drive_scl_(false);
+    i2c_delay_();
+  }
+  // Release SDA for the slave ACK bit.
+  drive_sda_(true);
+  i2c_delay_();
+  if (!wait_scl_high_()) return false;
+  i2c_delay_();
+  const bool ack = !gpio_get_level(pin_sda);
+  drive_scl_(false);
+  i2c_delay_();
+  return ack;
+}
+
+static bool master_read_byte_(uint8_t &value, bool ack) {
+  value = 0;
+  drive_sda_(true);
+  for (uint8_t bit = 0; bit < 8; ++bit) {
+    i2c_delay_();
+    if (!wait_scl_high_()) return false;
+    i2c_delay_();
+    value = static_cast<uint8_t>((value << 1) | (gpio_get_level(pin_sda) ? 1U : 0U));
+    drive_scl_(false);
+    i2c_delay_();
+  }
+  drive_sda_(!ack);
+  i2c_delay_();
+  if (!wait_scl_high_()) return false;
+  i2c_delay_();
+  drive_scl_(false);
+  drive_sda_(true);
+  i2c_delay_();
+  return true;
+}
+
 bool setup(uint8_t sda_pin, uint8_t scl_pin) {
   pin_sda = static_cast<gpio_num_t>(sda_pin);
   pin_scl = static_cast<gpio_num_t>(scl_pin);
@@ -1126,6 +1264,62 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   capturing = true;
   diag_completed_captures++;
   return true;
+}
+
+
+
+bool bus_is_low_low() {
+  return gpio_get_level(pin_scl) == 0 && gpio_get_level(pin_sda) == 0;
+}
+
+uint32_t last_edge_age_us() {
+  return static_cast<uint32_t>(static_cast<uint32_t>(esp_timer_get_time()) - last_edge);
+}
+
+bool active_write_command(uint16_t command) {
+  if (!begin_active_master_()) {
+    ESP_LOGW(TAG, "Active I2C probe: weak pull-ups could not raise bus HIGH/HIGH");
+    return false;
+  }
+
+  bool ok = master_start_();
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>((0x62U << 1) | 0U));
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>(command >> 8));
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>(command & 0xFF));
+  master_stop_();
+  restore_passive_gpio_();
+
+  ESP_LOGI(TAG, "Active I2C probe: W 0x62 %02X %02X -> %s",
+           static_cast<unsigned>(command >> 8), static_cast<unsigned>(command & 0xFF),
+           ok ? "ACK" : "NACK/failed");
+  return ok;
+}
+
+bool active_read_bytes(uint8_t *data, uint8_t length) {
+  if (!data || length == 0) return false;
+  if (!begin_active_master_()) {
+    ESP_LOGW(TAG, "Active I2C probe read: weak pull-ups could not raise bus HIGH/HIGH");
+    return false;
+  }
+
+  bool ok = master_start_();
+  if (ok) ok = master_write_byte_(static_cast<uint8_t>((0x62U << 1) | 1U));
+  for (uint8_t i = 0; ok && i < length; ++i)
+    ok = master_read_byte_(data[i], i + 1U < length);
+  master_stop_();
+  restore_passive_gpio_();
+
+  if (ok) {
+    char bytes[3 * 9 + 1]{};
+    size_t used = 0;
+    for (uint8_t i = 0; i < length && used + 4 < sizeof(bytes); ++i)
+      used += static_cast<size_t>(snprintf(bytes + used, sizeof(bytes) - used, "%02X%s",
+                                          data[i], i + 1U < length ? " " : ""));
+    ESP_LOGI(TAG, "Active I2C probe: R 0x62 -> %s", bytes);
+  } else {
+    ESP_LOGI(TAG, "Active I2C probe: R 0x62 -> NACK/failed");
+  }
+  return ok;
 }
 
 void log_edge_diagnostics(uint32_t now_ms) {
