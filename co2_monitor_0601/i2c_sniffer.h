@@ -97,6 +97,9 @@ void set_capture_enabled(bool enabled);
 // A capture may contain multiple frames (for example across repeated STARTs).
 bool poll(Capture &capture, CaptureValidator recovery_validator = nullptr);
 
+// Emit a 5-second summary of raw GPIO activity on the passive I2C tap.
+void log_edge_diagnostics(uint32_t now_ms);
+
 #if RTRH_DEBUG_CAPTURE
 // Registers the raw logic-analyzer download endpoint (/capture).
 void register_debug_handler();

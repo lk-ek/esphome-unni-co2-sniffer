@@ -842,3 +842,8 @@ The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not ex
 ### CO₂ capture and light sleep
 
 The passive CO₂ I²C sniffer stays armed independently of the RT/RH light-sleep awake window. GPIO6/GPIO7 are still excluded from light-sleep wake sources, so CO₂ traffic does not wake the ESP32-C3 by itself. Keeping the GPIO edge ISR armed prevents valid CO₂ transactions that occur while the MCU is already awake from being discarded by battery-policy transitions.
+
+
+### I2C edge diagnostics
+
+Debug builds periodically emit an `I2C edge diag` line with raw SCL/SDA edge counts and capture state. A report with zero SCL/SDA changes while the Unni CO2 bus should be active points to the electrical tap or GPIO/ISR setup; non-zero edges with no completed CO2 decode points further downstream at capture framing or protocol decoding.

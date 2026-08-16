@@ -48,6 +48,22 @@ static bool capture_enabled = true;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
+// Low-overhead edge diagnostics used to distinguish decoder failures from an
+// electrically quiet or misconfigured passive I2C tap. Counters are updated
+// only inside the GPIO ISR; reporting happens from the main loop.
+static volatile uint32_t diag_isr_calls = 0;
+static volatile uint32_t diag_state_changes = 0;
+static volatile uint32_t diag_scl_changes = 0;
+static volatile uint32_t diag_sda_changes = 0;
+static volatile uint32_t diag_overflows = 0;
+static uint32_t diag_completed_captures = 0;
+static uint32_t diag_last_report_ms = 0;
+static uint32_t diag_prev_isr_calls = 0;
+static uint32_t diag_prev_state_changes = 0;
+static uint32_t diag_prev_scl_changes = 0;
+static uint32_t diag_prev_sda_changes = 0;
+static uint32_t diag_prev_completed_captures = 0;
+
 
 static inline uint8_t IRAM_ATTR read_gpio_state() {
   uint8_t value = 0;
@@ -59,10 +75,15 @@ static inline bool scl_level(uint8_t value) { return (value & 0x01) != 0; }
 static inline bool sda_level(uint8_t value) { return (value & 0x02) != 0; }
 
 static void IRAM_ATTR gpio_isr(void *) {
+  diag_isr_calls++;
   if (!capturing) return;
   const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   const uint8_t value = read_gpio_state();
-  if (value == last_value) return;
+  const uint8_t previous_value = last_value;
+  if (value == previous_value) return;
+  diag_state_changes++;
+  if ((value ^ previous_value) & 0x01) diag_scl_changes++;
+  if ((value ^ previous_value) & 0x02) diag_sda_changes++;
   if (sample_count == 0) capture_initial_value = last_value;
   last_value = value;
   last_edge = now;
@@ -74,6 +95,7 @@ static void IRAM_ATTR gpio_isr(void *) {
     sample_count = index + 1;
   } else {
     capture_overflow = true;
+    diag_overflows++;
     capturing = false;
     capture_finished = true;
   }
@@ -1063,7 +1085,50 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
   capturing = true;
+  diag_completed_captures++;
   return true;
+}
+
+void log_edge_diagnostics(uint32_t now_ms) {
+  if (diag_last_report_ms == 0) {
+    diag_last_report_ms = now_ms;
+    diag_prev_isr_calls = diag_isr_calls;
+    diag_prev_state_changes = diag_state_changes;
+    diag_prev_scl_changes = diag_scl_changes;
+    diag_prev_sda_changes = diag_sda_changes;
+    diag_prev_completed_captures = diag_completed_captures;
+    return;
+  }
+  if (static_cast<uint32_t>(now_ms - diag_last_report_ms) < 5000U) return;
+
+  const uint32_t isr = diag_isr_calls;
+  const uint32_t changes = diag_state_changes;
+  const uint32_t scl = diag_scl_changes;
+  const uint32_t sda = diag_sda_changes;
+  const uint32_t completed = diag_completed_captures;
+  const uint32_t edge_age_us = static_cast<uint32_t>(
+      static_cast<uint32_t>(esp_timer_get_time()) - last_edge);
+  const uint8_t levels = read_gpio_state();
+
+  ESP_LOGI(TAG,
+           "I2C edge diag: +ISR=%lu +state=%lu +SCL=%lu +SDA=%lu /5s; levels SCL=%u SDA=%u; samples=%u capturing=%s finished=%s enabled=%s; +captures=%lu overflows=%lu; last_edge=%lu us ago",
+           static_cast<unsigned long>(isr - diag_prev_isr_calls),
+           static_cast<unsigned long>(changes - diag_prev_state_changes),
+           static_cast<unsigned long>(scl - diag_prev_scl_changes),
+           static_cast<unsigned long>(sda - diag_prev_sda_changes),
+           scl_level(levels) ? 1U : 0U, sda_level(levels) ? 1U : 0U,
+           static_cast<unsigned>(sample_count), capturing ? "yes" : "no",
+           capture_finished ? "yes" : "no", capture_enabled ? "yes" : "no",
+           static_cast<unsigned long>(completed - diag_prev_completed_captures),
+           static_cast<unsigned long>(diag_overflows),
+           static_cast<unsigned long>(edge_age_us));
+
+  diag_last_report_ms = now_ms;
+  diag_prev_isr_calls = isr;
+  diag_prev_state_changes = changes;
+  diag_prev_scl_changes = scl;
+  diag_prev_sda_changes = sda;
+  diag_prev_completed_captures = completed;
 }
 
 }  // namespace i2c_sniffer

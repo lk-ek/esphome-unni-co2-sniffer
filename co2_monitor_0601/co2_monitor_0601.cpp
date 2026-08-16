@@ -1310,6 +1310,7 @@ void CO2Monitor0601::loop() {
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_co2_();
+  i2c_sniffer::log_edge_diagnostics(millis());
   runtime_diag_update_max_(this->runtime_diag_.max_co2_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 

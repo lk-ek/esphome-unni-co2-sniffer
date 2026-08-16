@@ -515,3 +515,10 @@ After pairing, MyAmbience recognized the device as a CO2 Gadget and history down
 - GPIO6/GPIO7 remain excluded from light-sleep wake sources.
 - CO₂ transactions can now be captured whenever the MCU is awake, regardless of the RT/RH awake-window state.
 - This fixes runs where T/RH were valid but the BLE live sample remained `CO2=no`.
+
+
+### 2026-08-16: add passive I2C edge diagnostics
+
+- Added five-second raw GPIO diagnostics for the CO2 I2C tap.
+- Reports ISR invocations, observed SCL/SDA transitions, live pin levels, sample-buffer state, completed captures, overflows, and time since the last edge.
+- This isolates electrical/ISR inactivity from decoder-level failures without changing capture or decoding behavior.
