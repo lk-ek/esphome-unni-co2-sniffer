@@ -112,7 +112,14 @@ void load_settings() {
   PersistedSettings saved{};
   if (!gatt.preference.load(&saved) || saved.version != SETTINGS_PREF_VERSION) return;
   gatt.log_enabled = saved.log_enabled ? 1 : 0;
+#if UNNI_SHT43_IDENTITY_PROBE
   gatt.advertise_data_enabled = saved.advertise_data_enabled ? 1 : 0;
+#else
+  // MyAmbience does not expose 0x8130 for the MyCO2/DIY Gadget identity.
+  // Never inherit a stale SHT43 privacy value into this identity: live values
+  // are the primary data path and must remain advertised.
+  gatt.advertise_data_enabled = 1;
+#endif
   const size_t len = strnlen(saved.alternative_name, MAX_NAME_LENGTH);
   gatt.alternative_name.fill(0);
   gatt.alternative_name_len = len;
@@ -328,6 +335,12 @@ void sensirion_settings_set_ha_disabled(bool disabled) {
 }
 
 void sensirion_settings_set_advertise_data_enabled(bool enabled) {
+#if !UNNI_SHT43_IDENTITY_PROBE
+  if (!enabled) {
+    ESP_LOGW(TAG, "ignoring privacy disable for MyCO2 identity; MyAmbience does not expose 0x8130 here");
+  }
+  enabled = true;
+#endif
   const uint8_t value = enabled ? 1 : 0;
   if (gatt.advertise_data_enabled == value) {
     sensirion_ble_set_advertise_data_enabled(enabled);
