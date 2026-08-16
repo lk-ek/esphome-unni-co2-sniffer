@@ -20,3 +20,7 @@ python3 tools/unni_debug_collector.py \
   --port 45678 \
   --output ./unni-debug
 ```
+
+### Segmenting capture sessions
+
+While `unni_debug_collector.py` is running in an interactive terminal, press any key to create a ZIP archive containing every completed I2C and RT/RH capture received since the collector started or since the previous keypress. The archive also contains only the RT/RH timing rows from that same interval plus a small `capture_batch.txt` manifest. Capture collection continues after the archive boundary; `Ctrl-C` stops the collector.
