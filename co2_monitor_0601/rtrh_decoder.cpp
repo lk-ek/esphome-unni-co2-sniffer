@@ -288,6 +288,7 @@ struct DebugCaptureState {
 };
 static DebugCaptureState debug;
 static uint16_t debug_udp_packet_index = 0;
+static bool debug_udp_timing_pending = false;
 
 static uint8_t rtrh_stream_byte(size_t offset, uint16_t count, bool overflow) {
   // Stream prefix: sample_count LE16, overflow U8, reserved U8.
@@ -307,8 +308,14 @@ static uint8_t rtrh_stream_byte(size_t offset, uint16_t count, bool overflow) {
   return value;
 }
 
+static void debug_udp_timing_loop();
+
 static void debug_udp_loop() {
-  if (!debug_udp::enabled() || !debug.ready || !debug.sample_count) return;
+  if (!debug_udp::enabled()) return;
+  if (!debug.ready || !debug.sample_count) {
+    debug_udp_timing_loop();
+    return;
+  }
   const uint16_t count = debug.sample_count;
   const bool overflow = debug.overflow;
   const size_t total_bytes = 4U + static_cast<size_t>(count) * 7U;
@@ -597,6 +604,16 @@ struct __attribute__((packed)) TimingPayload {
   uint8_t reserved;
 };
 
+static TimingPayload debug_udp_timing_payload{};
+
+static void debug_udp_timing_loop() {
+  if (!debug_udp::enabled() || !debug_udp_timing_pending) return;
+  const auto &payload = debug_udp_timing_payload;
+  if (debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, payload.sequence, 0, 1,
+                             reinterpret_cast<const uint8_t *>(&payload), sizeof(payload)))
+    debug_udp_timing_pending = false;
+}
+
 static void send_timing_udp(const Measurement &m) {
   if (!debug_udp::enabled()) return;
   TimingPayload payload{};
@@ -622,9 +639,10 @@ static void send_timing_udp(const Measurement &m) {
   payload.near_220 = m.rh_state_near_220;
   payload.near_440 = m.rh_state_near_440;
   payload.other = m.rh_state_other;
-  debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, m.sequence, 0, 1,
-                         reinterpret_cast<const uint8_t *>(&payload), sizeof(payload));
+  debug_udp_timing_payload = payload;
+  debug_udp_timing_pending = true;
 }
+
 #endif
 
 bool poll(Measurement &measurement) {

@@ -52,3 +52,12 @@ No ACK/retry protocol is used. This is deliberate: debug export must not introdu
 ## Socket initialization
 
 The UDP destination is configured during component setup, but the lwIP socket is opened lazily on the first capture packet from the normal loop. This avoids using lwIP before ESPHome has initialized Wi-Fi/TCP-IP.
+
+### Retry/backpressure follow-up
+
+The UDP exporter now treats network unavailability and transient lwIP allocation
+failures as backpressure rather than capture loss. It waits until the station is
+associated, spaces datagrams by at least 5 ms, keeps multi-packet I2C captures
+frozen in the existing ISR buffer until all fragments have been sent, and keeps
+RT/RH timing payloads pending until they can be transmitted. No UDP send occurs
+from an ISR.

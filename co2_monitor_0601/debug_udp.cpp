@@ -6,6 +6,8 @@
 
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
+#include "esp_wifi.h"
+#include "esphome/core/hal.h"
 
 #include <cerrno>
 #include <cstring>
@@ -18,6 +20,8 @@ static const char *TAG = "debug_udp";
 static int udp_socket = -1;
 static sockaddr_in destination{};
 static bool configured = false;
+static uint32_t last_send_ms = 0;
+static constexpr uint32_t MIN_SEND_GAP_MS = 5;
 
 struct __attribute__((packed)) PacketHeader {
   char magic[4];          // "UND1"
@@ -84,6 +88,20 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   if (!enabled() || payload == nullptr || payload_length > MAX_PAYLOAD || packet_count == 0 ||
       packet_index >= packet_count)
     return false;
+
+  // Do not touch lwIP until the station is actually associated. During boot the
+  // sniffer can finish its first capture a few hundred milliseconds before DHCP
+  // completes; keeping the capture pending is cheaper and safer than provoking a
+  // send on a half-initialized network path.
+  wifi_ap_record_t ap{};
+  if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK) return false;
+
+  // One datagram at a time. This deliberately back-pressures the capture
+  // exporters instead of filling lwIP pbuf/mailbox queues and hitting ENOMEM.
+  const uint32_t now_ms = millis();
+  if (last_send_ms != 0 && static_cast<uint32_t>(now_ms - last_send_ms) < MIN_SEND_GAP_MS)
+    return false;
+
   if (!ensure_socket()) return false;
 
   static uint8_t datagram[sizeof(PacketHeader) + MAX_PAYLOAD];
@@ -96,11 +114,16 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   const int sent = sendto(udp_socket, datagram, total, MSG_DONTWAIT,
                           reinterpret_cast<const sockaddr *>(&destination), sizeof(destination));
   if (sent != static_cast<int>(total)) {
-    ESP_LOGW(TAG, "UDP send failed for type=%u capture=%lu packet=%u/%u: sent=%d errno=%d",
-             static_cast<unsigned>(type), static_cast<unsigned long>(capture_id),
-             static_cast<unsigned>(packet_index + 1), static_cast<unsigned>(packet_count), sent, errno);
+    static uint32_t last_error_log_ms = 0;
+    if (last_error_log_ms == 0 || static_cast<uint32_t>(now_ms - last_error_log_ms) >= 1000U) {
+      last_error_log_ms = now_ms;
+      ESP_LOGW(TAG, "UDP send deferred for type=%u capture=%lu packet=%u/%u: sent=%d errno=%d",
+               static_cast<unsigned>(type), static_cast<unsigned long>(capture_id),
+               static_cast<unsigned>(packet_index + 1), static_cast<unsigned>(packet_count), sent, errno);
+    }
     return false;
   }
+  last_send_ms = now_ms;
   return true;
 }
 

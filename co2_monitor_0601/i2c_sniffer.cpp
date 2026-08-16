@@ -651,35 +651,63 @@ static uint8_t la02_stream_byte(const volatile Sample *data, uint16_t count,
   return data[sample_index].value;
 }
 
-static bool udp_export_raw_capture(const volatile Sample *data, uint16_t count,
-                                   uint8_t initial_value, bool overflow, uint32_t sequence) {
-  if (!debug_udp::enabled() || !count) return false;
-  const size_t total_bytes = 10U + static_cast<size_t>(count) * 5U;
-  const uint16_t packet_count = static_cast<uint16_t>(
-      (total_bytes + debug_udp::MAX_PAYLOAD - 1U) / debug_udp::MAX_PAYLOAD);
-  const uint32_t base = data[0].t;
+struct UdpPendingCapture {
+  bool active{false};
+  uint16_t count{0};
+  uint8_t initial_value{0xff};
+  bool overflow{false};
+  uint32_t sequence{0};
+  uint16_t packet_index{0};
+  uint16_t packet_count{0};
+};
+static UdpPendingCapture udp_pending;
+
+static bool udp_export_pending_step() {
+  if (!debug_udp::enabled() || !udp_pending.active || !udp_pending.count) return true;
+
+  const size_t total_bytes = 10U + static_cast<size_t>(udp_pending.count) * 5U;
+  if (udp_pending.packet_count == 0) {
+    udp_pending.packet_count = static_cast<uint16_t>(
+        (total_bytes + debug_udp::MAX_PAYLOAD - 1U) / debug_udp::MAX_PAYLOAD);
+  }
+  if (udp_pending.packet_index >= udp_pending.packet_count) return true;
+
+  const uint32_t base = samples[0].t;
+  const size_t offset = static_cast<size_t>(udp_pending.packet_index) * debug_udp::MAX_PAYLOAD;
+  const uint16_t len = static_cast<uint16_t>(
+      std::min<size_t>(debug_udp::MAX_PAYLOAD, total_bytes - offset));
   static uint8_t payload[debug_udp::MAX_PAYLOAD];
-  bool complete = true;
-  for (uint16_t packet = 0; packet < packet_count; packet++) {
-    const size_t offset = static_cast<size_t>(packet) * debug_udp::MAX_PAYLOAD;
-    const uint16_t len = static_cast<uint16_t>(
-        std::min<size_t>(debug_udp::MAX_PAYLOAD, total_bytes - offset));
-    for (uint16_t i = 0; i < len; i++)
-      payload[i] = la02_stream_byte(data, count, initial_value, overflow, base, offset + i);
-    if (!debug_udp::send_packet(debug_udp::PacketType::I2C_LA02, sequence, packet,
-                                packet_count, payload, len, overflow ? 1U : 0U)) {
-      complete = false;
-      break;
-    }
-  }
-  if (complete) {
+  for (uint16_t i = 0; i < len; i++)
+    payload[i] = la02_stream_byte(samples, udp_pending.count, udp_pending.initial_value,
+                                  udp_pending.overflow, base, offset + i);
+
+  if (!debug_udp::send_packet(debug_udp::PacketType::I2C_LA02, udp_pending.sequence,
+                              udp_pending.packet_index, udp_pending.packet_count,
+                              payload, len, udp_pending.overflow ? 1U : 0U))
+    return false;
+
+  udp_pending.packet_index++;
+  if (udp_pending.packet_index >= udp_pending.packet_count) {
     ESP_LOGD(TAG, "UDP exported raw I2C capture #%lu (%u samples, %u packets)",
-             static_cast<unsigned long>(sequence), static_cast<unsigned>(count),
-             static_cast<unsigned>(packet_count));
-  } else {
-    ESP_LOGW(TAG, "UDP raw I2C capture #%lu incomplete; collector will mark missing packets",
-             static_cast<unsigned long>(sequence));
+             static_cast<unsigned long>(udp_pending.sequence),
+             static_cast<unsigned>(udp_pending.count),
+             static_cast<unsigned>(udp_pending.packet_count));
+    udp_pending.active = false;
+    return true;
   }
+  return false;
+}
+
+static bool udp_begin_raw_capture(uint16_t count, uint8_t initial_value,
+                                  bool overflow, uint32_t sequence) {
+  if (!debug_udp::enabled() || !count || udp_pending.active) return false;
+  udp_pending.active = true;
+  udp_pending.count = count;
+  udp_pending.initial_value = initial_value;
+  udp_pending.overflow = overflow;
+  udp_pending.sequence = sequence;
+  udp_pending.packet_index = 0;
+  udp_pending.packet_count = 0;
   return true;
 }
 
@@ -694,7 +722,7 @@ static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
       last_capture_sequence = sequence;
       xSemaphoreGive(last_capture_mutex);
     }
-    if (sequence != 0) udp_export_raw_capture(data, count, initial_value, overflow, sequence);
+    if (sequence != 0) udp_begin_raw_capture(count, initial_value, overflow, sequence);
     return sequence;
   }
 
@@ -945,6 +973,22 @@ void set_capture_enabled(bool enabled) {
 
 bool poll(Capture &capture, CaptureValidator recovery_validator) {
   if (!capture_enabled) return false;
+#if RTRH_DEBUG_CAPTURE
+  // Keep the shared ISR sample buffer frozen while a multi-packet UDP export is
+  // pending. One packet is attempted per poll/loop; only after the final packet
+  // succeeds do we re-arm GPIO capture.
+  if (debug_udp::enabled() && udp_pending.active && capture_finished) {
+    if (!udp_export_pending_step()) return false;
+    sample_count = 0;
+    capture_overflow = false;
+    capture_finished = false;
+    last_value = read_gpio_state();
+    capture_initial_value = last_value;
+    last_edge = static_cast<uint32_t>(esp_timer_get_time());
+    capturing = true;
+    return false;
+  }
+#endif
   if (!capture_finished) {
     if (sample_count == 0) return false;
     const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
@@ -965,6 +1009,7 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
     // Preserve the unmodified GPIO waveform. Decoder-side recovery operates on
     // a temporary in-place transformation and never rewrites the frozen trace.
     capture.debug_raw_sequence = store_raw_capture(samples, count, initial_value, overflow);
+    if (debug_udp::enabled() && udp_pending.active) udp_export_pending_step();
 #endif
     if (overflow) {
       capture.frame_errors++;
@@ -987,6 +1032,14 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
       }
     }
   }
+
+#if RTRH_DEBUG_CAPTURE
+  if (debug_udp::enabled() && udp_pending.active) {
+    // The decoded Capture is already valid for the caller, but the raw sample
+    // array must stay untouched until all UDP fragments have left successfully.
+    return true;
+  }
+#endif
 
   sample_count = 0;
   capture_overflow = false;
