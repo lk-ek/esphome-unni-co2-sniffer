@@ -820,7 +820,7 @@ This A/B build restores `rtrh_decoder.cpp` and `rtrh_decoder.h` byte-for-byte fr
 
 Two runtime controls are exposed to Home Assistant when HA entities are enabled:
 
-- **WiFi / Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
+- **WiFi Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
 
 The example Wi-Fi/API configurations set `reboot_timeout: 0s`, otherwise ESPHome's normal connectivity watchdog could reboot a device that intentionally has Wi-Fi disabled.
 
@@ -835,7 +835,7 @@ This matches the earlier identity probe: MyAmbience exposes Privacy when the dev
 
 `0x8130` remains available for protocol experiments and direct GATT clients. Its privacy advertisement follows Sensirion's SHT43 implementation: the short Sensirion manufacturer header remains present with advertisement type `0xFF` and sample type `0x00`, while live measurement bytes are omitted.
 
-`0x81FE` remains an **experimental direct-BLE alias** for disabling WiFi/Home Assistant. MyAmbience is not expected to render this SHT43-only setting as a switch for the production MyCO2 identity. The Home Assistant `WiFi / Home Assistant` switch and USB recovery window remain the supported UI for that function.
+`0x81FE` remains an **experimental direct-BLE alias** for disabling WiFi/Home Assistant. MyAmbience is not expected to render this SHT43-only setting as a switch for the production MyCO2 identity. The Home Assistant `WiFi Home Assistant` switch and USB recovery window remain the supported UI for that function.
 
 The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not exposed yet: accepting credentials without safely integrating them into ESPHome's configured-network lifecycle would create a setting that appears functional but is not reliable.
 
@@ -847,3 +847,7 @@ The passive CO₂ I²C sniffer stays armed independently of the RT/RH light-slee
 ### I2C edge diagnostics
 
 Debug builds periodically emit an `I2C edge diag` line with raw SCL/SDA edge counts and capture state. A report with zero SCL/SDA changes while the Unni CO2 bus should be active points to the electrical tap or GPIO/ISR setup; non-zero edges with no completed CO2 decode points further downstream at capture framing or protocol decoding.
+
+### CO2 plausibility guard
+
+Because this project passively sniffs an external I2C bus, intermittent contacts can create electrically malformed captures. Decoded CO2 values below 350 ppm are therefore rejected. After any CRC/framing error, CO2 publication pauses until two plausible consecutive readings agree within 150 ppm. This prevents transient bus glitches from propagating obviously false values into Home Assistant, BLE live data, or history.

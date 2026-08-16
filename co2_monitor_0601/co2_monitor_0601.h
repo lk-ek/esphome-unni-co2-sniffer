@@ -185,6 +185,14 @@ class CO2Monitor0601 : public Component {
     uint16_t last_ppm{0};
     uint32_t crc_errors{0};
     uint32_t frame_errors{0};
+
+    // Plausibility guard for electrically unstable sniffing. Any malformed or
+    // CRC-failing capture arms confirmation mode. The next two plausible CO2
+    // readings must agree before publication resumes. Values below the modern
+    // atmospheric floor are rejected unconditionally.
+    bool confirmation_required{false};
+    bool have_confirmation_candidate{false};
+    uint16_t confirmation_candidate_ppm{0};
   } co2_;
 
   struct BatteryState {

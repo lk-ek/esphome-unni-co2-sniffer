@@ -494,7 +494,7 @@ The Home Assistant BLE Pairing Mode remains a 60-second authorization gate for N
 ### 2026-08-16: BLE privacy and Wi-Fi/HA runtime controls
 
 - Added a Home Assistant `BLE Privacy` switch synchronized with Sensirion Device Settings `IsAdvertiseDataEnabled` (0x8130).
-- Added a restorable `WiFi / Home Assistant` switch that disables the ESPHome Wi-Fi interface after a short acknowledgement grace period.
+- Added a restorable `WiFi Home Assistant` switch that disables the ESPHome Wi-Fi interface after a short acknowledgement grace period.
 - Added a five-minute USB recovery window so a deliberately offline device can be brought back into HA and re-enabled without reflashing.
 - Disabled Wi-Fi/API reboot timeouts in the example configurations so intentional offline operation does not trigger watchdog-style reboots.
 
@@ -522,3 +522,10 @@ After pairing, MyAmbience recognized the device as a CO2 Gadget and history down
 - Added five-second raw GPIO diagnostics for the CO2 I2C tap.
 - Reports ISR invocations, observed SCL/SDA transitions, live pin levels, sample-buffer state, completed captures, overflows, and time since the last edge.
 - This isolates electrical/ISR inactivity from decoder-level failures without changing capture or decoding behavior.
+
+### 2026-08-16: CO2 plausibility guard after unstable I2C contact
+
+- Reject decoded CO2 values below 350 ppm instead of publishing them to Home Assistant, BLE, or history.
+- Any CRC/framing error arms a recovery confirmation gate.
+- After such an error, require two plausible consecutive readings within 150 ppm before CO2 publication resumes.
+- Rename the ESPHome entity `WiFi / Home Assistant` to `WiFi Home Assistant` to avoid the reserved `/` path separator warning.

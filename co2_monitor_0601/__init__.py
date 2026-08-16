@@ -320,7 +320,7 @@ _SCHEMA = {
     cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
     cv.Optional(CONF_BLE_PAIRING_MODE, default={"name": "BLE Pairing Mode", "icon": "mdi:bluetooth-connect"}): switch.switch_schema(BlePairingModeSwitch),
-    cv.Optional(CONF_WIFI_HA_ENABLED, default={"name": "WiFi / Home Assistant", "icon": "mdi:wifi"}): switch.switch_schema(WifiHaSwitch, default_restore_mode="RESTORE_DEFAULT_ON"),
+    cv.Optional(CONF_WIFI_HA_ENABLED, default={"name": "WiFi Home Assistant", "icon": "mdi:wifi"}): switch.switch_schema(WifiHaSwitch, default_restore_mode="RESTORE_DEFAULT_ON"),
     cv.Optional(CONF_WIFI_RECOVERY_WINDOW, default="5min"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BLE_PAIRING_WINDOW, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),

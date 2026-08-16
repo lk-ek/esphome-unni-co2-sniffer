@@ -307,7 +307,7 @@ void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
 #if UNNI_BLE_ENABLED
   const bool enabled = !sensirion_settings_ha_disabled();
   if (enabled == this->wifi_ha_enabled_) return;
-  ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi / Home Assistant -> %s",
+  ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi Home Assistant -> %s",
            enabled ? "ON" : "OFF");
   // Apply without writing the same setting back; the GATT write has already
   // persisted it.
@@ -345,7 +345,7 @@ void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
     if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_disabled())
       wifi::global_wifi_component->enable();
 #endif
-    ESP_LOGI(TAG, "WiFi / Home Assistant: ON");
+    ESP_LOGI(TAG, "WiFi Home Assistant: ON");
     this->publish_cached_ha_now_();
     return;
   }
@@ -355,7 +355,7 @@ void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
   this->wifi_disable_pending_ = true;
   this->wifi_disable_requested_ms_ = millis();
   this->wifi_recovery_until_ms_ = 0;
-  ESP_LOGW(TAG, "WiFi / Home Assistant: OFF requested; WiFi will stop in 1500 ms");
+  ESP_LOGW(TAG, "WiFi Home Assistant: OFF requested; WiFi will stop in 1500 ms");
   ESP_LOGW(TAG, "Recovery: reconnect USB power (or reboot with USB attached) for a temporary HA window");
 }
 
@@ -381,7 +381,7 @@ void CO2Monitor0601::process_wifi_ha_control_() {
     if (wifi::global_wifi_component->is_disabled()) wifi::global_wifi_component->enable();
     if (!this->wifi_recovery_logged_) {
       this->wifi_recovery_logged_ = true;
-      ESP_LOGI(TAG, "WiFi / Home Assistant temporarily enabled for USB recovery");
+      ESP_LOGI(TAG, "WiFi Home Assistant temporarily enabled for USB recovery");
     }
     return;
   }
@@ -1124,10 +1124,55 @@ void CO2Monitor0601::process_co2_() {
     this->co2_.frame_errors += result.frame_errors;
     publish(this->out_.frame_errors, static_cast<float>(this->co2_.frame_errors));
   }
+
+  if (result.crc_errors || result.frame_errors) {
+    this->co2_.confirmation_required = true;
+    this->co2_.have_confirmation_candidate = false;
+  }
+
   if (!result.have_co2) return;
-  power_save::on_valid_co2();
 
   const uint16_t ppm = result.co2_ppm;
+  static constexpr uint16_t CO2_MIN_PLAUSIBLE_PPM = 350;
+  static constexpr uint16_t CO2_CONFIRM_MAX_DELTA_PPM = 150;
+
+  if (ppm < CO2_MIN_PLAUSIBLE_PPM) {
+    ESP_LOGW(TAG,
+             "Rejected implausible CO2 reading: %u ppm (< %u ppm); awaiting clean confirmation",
+             ppm, CO2_MIN_PLAUSIBLE_PPM);
+    this->co2_.confirmation_required = true;
+    this->co2_.have_confirmation_candidate = false;
+    return;
+  }
+
+  if (this->co2_.confirmation_required) {
+    if (!this->co2_.have_confirmation_candidate) {
+      this->co2_.confirmation_candidate_ppm = ppm;
+      this->co2_.have_confirmation_candidate = true;
+      ESP_LOGW(TAG,
+               "CO2 bus recovery candidate: %u ppm; waiting for a second reading within +/- %u ppm",
+               ppm, CO2_CONFIRM_MAX_DELTA_PPM);
+      return;
+    }
+
+    const int32_t delta = static_cast<int32_t>(ppm) -
+                          static_cast<int32_t>(this->co2_.confirmation_candidate_ppm);
+    const uint32_t abs_delta = static_cast<uint32_t>(delta < 0 ? -delta : delta);
+    if (abs_delta > CO2_CONFIRM_MAX_DELTA_PPM) {
+      ESP_LOGW(TAG,
+               "CO2 bus recovery candidate changed too much: %u -> %u ppm (delta %lu); restarting confirmation",
+               this->co2_.confirmation_candidate_ppm, ppm, static_cast<unsigned long>(abs_delta));
+      this->co2_.confirmation_candidate_ppm = ppm;
+      return;
+    }
+
+    ESP_LOGI(TAG, "CO2 bus recovery confirmed: %u / %u ppm",
+             this->co2_.confirmation_candidate_ppm, ppm);
+    this->co2_.confirmation_required = false;
+    this->co2_.have_confirmation_candidate = false;
+  }
+
+  power_save::on_valid_co2();
 #if UNNI_BLE_ENABLED
   sensirion_ble_set_co2(ppm);
 #if UNNI_BLE_LIVE_ENABLED
