@@ -28,6 +28,7 @@
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -147,6 +148,95 @@ float CO2Monitor0601::battery_percent_from_voltage_(float voltage) {
   return 0.0f;
 }
 
+
+
+void CO2Monitor0601::reset_battery_estimator_(bool usb_mode, uint32_t now) {
+  this->battery_.estimator_mode_usb = usb_mode;
+  this->battery_.estimator_have_mode = true;
+  this->battery_.estimator_have_anchor = false;
+  this->battery_.estimator_mode_since_ms = now;
+
+  // Learn each power-mode session independently. A source transition causes a
+  // voltage step that must never be mistaken for charge/discharge progress.
+  if (usb_mode) {
+    this->battery_.charge_rate_valid = false;
+    this->battery_.charge_rate_pct_h = NAN;
+    publish(this->out_.battery_charge_time_estimate, NAN);
+    publish(this->out_.battery_charge_rate, NAN);
+    publish(this->out_.battery_runtime_estimate, NAN);
+    publish(this->out_.battery_discharge_rate, NAN);
+  } else {
+    this->battery_.discharge_rate_valid = false;
+    this->battery_.discharge_rate_pct_h = NAN;
+    publish(this->out_.battery_runtime_estimate, NAN);
+    publish(this->out_.battery_discharge_rate, NAN);
+    publish(this->out_.battery_charge_time_estimate, NAN);
+    publish(this->out_.battery_charge_rate, NAN);
+  }
+}
+
+void CO2Monitor0601::update_battery_estimator_(float battery_voltage, bool usb_mode, uint32_t now) {
+  if (!this->battery_.estimator_have_mode || this->battery_.estimator_mode_usb != usb_mode)
+    this->reset_battery_estimator_(usb_mode, now);
+
+  // Ignore the first two minutes after a source change. Terminal voltage
+  // rebounds on discharge and rises immediately when the charger is attached.
+  constexpr uint32_t SETTLE_MS = 2UL * 60UL * 1000UL;
+  if (static_cast<uint32_t>(now - this->battery_.estimator_mode_since_ms) < SETTLE_MS) return;
+
+  // On battery this is the normal voltage-derived SOC. With VBUS present it is
+  // only a charge-progress proxy; Battery Level intentionally remains NaN.
+  const float progress = battery_percent_from_voltage_(battery_voltage);
+  if (!this->battery_.estimator_have_anchor) {
+    this->battery_.estimator_have_anchor = true;
+    this->battery_.estimator_anchor_ms = now;
+    this->battery_.estimator_anchor_progress = progress;
+    return;
+  }
+
+  const uint32_t elapsed_ms = static_cast<uint32_t>(now - this->battery_.estimator_anchor_ms);
+  const float delta = progress - this->battery_.estimator_anchor_progress;
+  constexpr uint32_t MIN_WINDOW_MS = 5UL * 60UL * 1000UL;
+  constexpr uint32_t MAX_WINDOW_MS = 15UL * 60UL * 1000UL;
+  constexpr float MIN_PROGRESS_DELTA = 0.20f;
+  if (elapsed_ms < MIN_WINDOW_MS) return;
+  if (std::fabs(delta) < MIN_PROGRESS_DELTA && elapsed_ms < MAX_WINDOW_MS) return;
+
+  const float hours = static_cast<float>(elapsed_ms) / 3600000.0f;
+  float observed_rate = usb_mode ? (delta / hours) : (-delta / hours);
+
+  // Wrong-direction changes are usually voltage relaxation/noise. Move the
+  // anchor forward but do not contaminate the learned rate.
+  if (!std::isfinite(observed_rate) || observed_rate <= 0.05f || observed_rate > 250.0f) {
+    this->battery_.estimator_anchor_ms = now;
+    this->battery_.estimator_anchor_progress = progress;
+    return;
+  }
+
+  constexpr float EMA_ALPHA = 0.35f;
+  float &rate = usb_mode ? this->battery_.charge_rate_pct_h : this->battery_.discharge_rate_pct_h;
+  bool &valid = usb_mode ? this->battery_.charge_rate_valid : this->battery_.discharge_rate_valid;
+  rate = valid ? (EMA_ALPHA * observed_rate + (1.0f - EMA_ALPHA) * rate) : observed_rate;
+  valid = true;
+
+  this->battery_.estimator_anchor_ms = now;
+  this->battery_.estimator_anchor_progress = progress;
+
+  if (usb_mode) {
+    publish(this->out_.battery_charge_rate, rate);
+    const float remaining_pct = std::max(0.0f, 100.0f - progress);
+    const float eta_h = remaining_pct / rate;
+    publish(this->out_.battery_charge_time_estimate, eta_h);
+    ESP_LOGD(TAG, "Battery charge estimate: proxy %.1f %% / %.2f %%/h -> %.2f h remaining",
+             progress, rate, eta_h);
+  } else {
+    publish(this->out_.battery_discharge_rate, rate);
+    const float eta_h = progress / rate;
+    publish(this->out_.battery_runtime_estimate, eta_h);
+    ESP_LOGD(TAG, "Battery runtime estimate: %.1f %% / %.2f %%/h -> %.2f h remaining",
+             progress, rate, eta_h);
+  }
+}
 
 
 #if UNNI_BLE_ENABLED
@@ -337,6 +427,10 @@ void CO2Monitor0601::process_usb_power_() {
   if (raw && this->out_.battery_level)
     this->out_.battery_level->publish_state(NAN);
 
+  // A power-source transition causes an immediate battery-node voltage step.
+  // Restart ETA learning so that step cannot be interpreted as charge/discharge.
+  this->reset_battery_estimator_(raw, now);
+
   // Measure immediately after a power-source transition rather than waiting
   // for the regular battery interval.
   this->battery_.last_measure_ms = 0;
@@ -432,10 +526,12 @@ void CO2Monitor0601::process_battery_() {
     // interpreted as an open-circuit battery state of charge.
     if (this->out_.battery_level) this->out_.battery_level->publish_state(NAN);
     ESP_LOGD(TAG, "Battery node: %.3f V (USB power present; SOC unavailable)", battery_voltage);
+    this->update_battery_estimator_(battery_voltage, true, now);
   } else {
     const float battery_level = battery_percent_from_voltage_(battery_voltage);
     publish(this->out_.battery_level, battery_level);
     ESP_LOGD(TAG, "Battery: %.3f V -> %.0f %%", battery_voltage, battery_level);
+    this->update_battery_estimator_(battery_voltage, false, now);
   }
 }
 

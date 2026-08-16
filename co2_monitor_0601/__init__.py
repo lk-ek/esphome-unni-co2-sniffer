@@ -57,6 +57,10 @@ CONF_BATTERY_UPDATE_INTERVAL = "battery_update_interval"
 CONF_BATTERY_DIVIDER_RATIO = "battery_divider_ratio"
 CONF_BATTERY_VOLTAGE = "battery_voltage"
 CONF_BATTERY_LEVEL = "battery_level"
+CONF_BATTERY_RUNTIME_ESTIMATE = "battery_runtime_estimate"
+CONF_BATTERY_CHARGE_TIME_ESTIMATE = "battery_charge_time_estimate"
+CONF_BATTERY_DISCHARGE_RATE = "battery_discharge_rate"
+CONF_BATTERY_CHARGE_RATE = "battery_charge_rate"
 CONF_USB_POWER_PIN = "usb_power_pin"
 CONF_USB_POWER = "usb_power"
 CONF_ENERGY_SAVE_MODE = "energy_save_mode"
@@ -152,6 +156,44 @@ SENSOR_OUTPUTS = {
             state_class="measurement",
         ),
         "set_battery_level_sensor",
+    ),
+    CONF_BATTERY_RUNTIME_ESTIMATE: (
+        _sensor_schema(
+            unit_of_measurement="h",
+            accuracy_decimals=1,
+            device_class="duration",
+            state_class="measurement",
+            icon="mdi:battery-clock-outline",
+        ),
+        "set_battery_runtime_estimate_sensor",
+    ),
+    CONF_BATTERY_CHARGE_TIME_ESTIMATE: (
+        _sensor_schema(
+            unit_of_measurement="h",
+            accuracy_decimals=1,
+            device_class="duration",
+            state_class="measurement",
+            icon="mdi:battery-clock",
+        ),
+        "set_battery_charge_time_estimate_sensor",
+    ),
+    CONF_BATTERY_DISCHARGE_RATE: (
+        _diagnostic_sensor(
+            unit_of_measurement="%/h",
+            accuracy_decimals=2,
+            state_class="measurement",
+            icon="mdi:battery-arrow-down-outline",
+        ),
+        "set_battery_discharge_rate_sensor",
+    ),
+    CONF_BATTERY_CHARGE_RATE: (
+        _diagnostic_sensor(
+            unit_of_measurement="%/h",
+            accuracy_decimals=2,
+            state_class="measurement",
+            icon="mdi:battery-arrow-up-outline",
+        ),
+        "set_battery_charge_rate_sensor",
     ),
     CONF_REF_PERIOD: (
         _diagnostic_sensor(unit_of_measurement="µs", accuracy_decimals=3, state_class="measurement"),
@@ -286,6 +328,8 @@ PRIMARY_SENSOR_DEFAULTS = {
     CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
     CONF_BATTERY_VOLTAGE: {"name": "Battery Voltage", "icon": "mdi:battery"},
     CONF_BATTERY_LEVEL: {"name": "Battery Level", "icon": "mdi:battery"},
+    CONF_BATTERY_RUNTIME_ESTIMATE: {"name": "Battery Runtime Estimate"},
+    CONF_BATTERY_CHARGE_TIME_ESTIMATE: {"name": "Battery Charge Time Estimate"},
 }
 
 DEBUG_SENSOR_DEFAULTS = {
@@ -298,6 +342,8 @@ DEBUG_SENSOR_DEFAULTS = {
     CONF_RH_RATIO: {"name": "RT RH RH Ratio"},
     CONF_RH_LOG: {"name": "RT RH RH Log Ratio"},
     CONF_MEASUREMENT_QUALITY: {"name": "RT RH Measurement Quality"},
+    CONF_BATTERY_DISCHARGE_RATE: {"name": "Battery Discharge Rate"},
+    CONF_BATTERY_CHARGE_RATE: {"name": "Battery Charge Rate"},
 }
 
 DEBUG_BINARY_DEFAULTS = {

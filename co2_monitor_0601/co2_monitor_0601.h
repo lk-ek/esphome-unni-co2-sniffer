@@ -9,6 +9,7 @@
 #include "esphome/core/component.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
+#include <cmath>
 #include <string>
 #if UNNI_BLE_ENABLED
 #include "esphome/components/esp32_ble_server/ble_server.h"
@@ -97,6 +98,10 @@ class CO2Monitor0601 : public Component {
   void set_rh_humidity_sensor(sensor::Sensor *s) { this->out_.humidity = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->out_.battery_voltage = s; }
   void set_battery_level_sensor(sensor::Sensor *s) { this->out_.battery_level = s; }
+  void set_battery_runtime_estimate_sensor(sensor::Sensor *s) { this->out_.battery_runtime_estimate = s; }
+  void set_battery_charge_time_estimate_sensor(sensor::Sensor *s) { this->out_.battery_charge_time_estimate = s; }
+  void set_battery_discharge_rate_sensor(sensor::Sensor *s) { this->out_.battery_discharge_rate = s; }
+  void set_battery_charge_rate_sensor(sensor::Sensor *s) { this->out_.battery_charge_rate = s; }
   void set_usb_power_sensor(binary_sensor::BinarySensor *s) { this->out_.usb_power = s; }
   void set_ref_period_sensor(sensor::Sensor *s) { this->out_.ref_period = s; }
   void set_rt_period_sensor(sensor::Sensor *s) { this->out_.rt_period = s; }
@@ -119,6 +124,10 @@ class CO2Monitor0601 : public Component {
     sensor::Sensor *humidity{nullptr};
     sensor::Sensor *battery_voltage{nullptr};
     sensor::Sensor *battery_level{nullptr};
+    sensor::Sensor *battery_runtime_estimate{nullptr};
+    sensor::Sensor *battery_charge_time_estimate{nullptr};
+    sensor::Sensor *battery_discharge_rate{nullptr};
+    sensor::Sensor *battery_charge_rate{nullptr};
     binary_sensor::BinarySensor *usb_power{nullptr};
     sensor::Sensor *ref_period{nullptr};
     sensor::Sensor *rt_period{nullptr};
@@ -173,6 +182,19 @@ class CO2Monitor0601 : public Component {
     adc_channel_t channel{ADC_CHANNEL_2};
     adc_oneshot_unit_handle_t adc_handle{nullptr};
     adc_cali_handle_t cali_handle{nullptr};
+
+    // Learned battery ETA state. Charging uses a voltage-derived progress proxy
+    // only; Battery Level itself remains unavailable while VBUS is present.
+    bool estimator_mode_usb{false};
+    bool estimator_have_mode{false};
+    bool estimator_have_anchor{false};
+    uint32_t estimator_mode_since_ms{0};
+    uint32_t estimator_anchor_ms{0};
+    float estimator_anchor_progress{0.0f};
+    bool discharge_rate_valid{false};
+    bool charge_rate_valid{false};
+    float discharge_rate_pct_h{NAN};
+    float charge_rate_pct_h{NAN};
   } battery_;
 
   struct UsbPowerState {
@@ -221,6 +243,8 @@ class CO2Monitor0601 : public Component {
   bool setup_usb_power_();
   void process_usb_power_();
   static float battery_percent_from_voltage_(float voltage);
+  void reset_battery_estimator_(bool usb_mode, uint32_t now);
+  void update_battery_estimator_(float battery_voltage, bool usb_mode, uint32_t now);
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
   void runtime_diag_loop_begin_();
