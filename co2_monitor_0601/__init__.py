@@ -349,6 +349,10 @@ async def to_code(config):
     # Keep that platform detail out of user YAML.
     add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
     add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
+    # RT/RH and I2C GPIO ISRs call gpio_get_level(). Keep the GPIO control
+    # functions in IRAM so an edge arriving while the flash cache is disabled
+    # (for example during NVS/history writes) cannot trigger a cache panic.
+    add_idf_sdkconfig_option("CONFIG_GPIO_CTRL_FUNC_IN_IRAM", True)
 
     if config[CONF_BLE_HISTORY]:
         add_partition("senshist", "data", "spiffs", 0x10000)
