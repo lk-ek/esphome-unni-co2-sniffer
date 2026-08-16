@@ -334,8 +334,17 @@ static void debug_udp_loop() {
 
   if (!debug_udp::send_packet(debug_udp::PacketType::RTRH_RAW, debug.sequence,
                               debug_udp_packet_index, packet_count, payload, payload_len,
-                              overflow ? 1U : 0U))
+                              overflow ? 1U : 0U)) {
+    if (debug_udp::sustained_resource_pressure()) {
+      ESP_LOGW(TAG, "Dropping RT/RH raw capture #%lu after sustained UDP ENOMEM pressure",
+               static_cast<unsigned long>(debug.sequence));
+      debug_udp::reset_after_resource_pressure();
+      debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+      debug.overflow = debug.ready = debug.capturing = false;
+      debug_udp_packet_index = 0;
+    }
     return;
+  }
 
   debug_udp_packet_index++;
   if (debug_udp_packet_index >= packet_count) {
@@ -618,8 +627,17 @@ static void debug_udp_timing_loop() {
 
   const auto &payload = debug_udp_timing_payload;
   if (!debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, payload.sequence, 0, 1,
-                              reinterpret_cast<const uint8_t *>(&payload), sizeof(payload)))
+                              reinterpret_cast<const uint8_t *>(&payload), sizeof(payload))) {
+    if (debug_udp::sustained_resource_pressure()) {
+      ESP_LOGW(TAG, "Dropping RT/RH timing export #%lu after sustained UDP ENOMEM pressure",
+               static_cast<unsigned long>(payload.sequence));
+      debug_udp::reset_after_resource_pressure();
+      debug_udp_timing_pending = false;
+      debug_udp_timing_copies_remaining = 0;
+      debug_udp_timing_next_send_ms = 0;
+    }
     return;
+  }
 
   debug_udp_timing_copies_remaining--;
   if (debug_udp_timing_copies_remaining == 0) {

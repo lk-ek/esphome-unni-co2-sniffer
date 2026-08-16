@@ -120,6 +120,8 @@ Battery-related entities include:
 
 `Battery Level` is a voltage-based Li-ion estimate. It is intentionally unavailable while physical USB power is present because charger-driven battery voltage is not a useful open-circuit state-of-charge measurement.
 
+Debug builds intentionally limit the native ESPHome API to one simultaneous client while raw UDP capture is enabled. Home Assistant should keep that slot; use USB serial for live `esphome logs`. Additional native API log clients can consume enough heap on the ESP32-C3 to starve lwIP. If UDP export sees sustained `ENOMEM` pressure, the affected debug capture is dropped after repeated failures instead of retrying indefinitely and holding memory/network resources.
+
 The runtime and charge-time estimates are learned from the observed voltage trend rather than from a fixed assumed current draw. Each USB/battery transition starts a new learning session, followed by a two-minute settling period. The estimator then uses at least a five-minute observation window and exponentially smooths subsequent rate measurements. Until a meaningful trend is available, the corresponding estimate remains unavailable instead of publishing a speculative value.
 
 On battery, the estimator uses the normal voltage-derived SOC curve. With USB present, `Battery Level` stays unavailable and the charge estimator uses the charger-influenced battery-node voltage only as a charge-progress proxy. The charge ETA is therefore inherently less accurate, especially in the constant-voltage/taper region near full charge.

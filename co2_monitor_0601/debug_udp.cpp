@@ -27,6 +27,8 @@ static constexpr uint32_t MIN_SEND_GAP_MS = 5;
 static constexpr uint32_t ENOMEM_RETRY_BACKOFF_MS = 50;
 static uint32_t retry_not_before_ms = 0;
 static uint32_t enomem_count = 0;
+static uint16_t consecutive_enomem = 0;
+static constexpr uint16_t ENOMEM_ABANDON_THRESHOLD = 20;
 
 struct __attribute__((packed)) PacketHeader {
   char magic[4];          // "UND1"
@@ -72,6 +74,18 @@ bool setup(const char *host, uint16_t port) {
 }
 
 bool enabled() { return configured; }
+
+bool sustained_resource_pressure() { return consecutive_enomem >= ENOMEM_ABANDON_THRESHOLD; }
+
+void reset_after_resource_pressure() {
+  consecutive_enomem = 0;
+  retry_not_before_ms = 0;
+  last_send_ms = 0;
+  if (udp_socket >= 0) {
+    lwip_close(udp_socket);
+    udp_socket = -1;
+  }
+}
 
 static bool ensure_socket() {
   if (!configured) return false;
@@ -127,6 +141,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
     const int send_errno = errno;
     if (send_errno == ENOMEM) {
       enomem_count++;
+      if (consecutive_enomem < UINT16_MAX) consecutive_enomem++;
       // A failed nonblocking send can itself mean lwIP had no pbuf/mailbox
       // resources available. Do not hammer sendto() again every component loop;
       // leave the exporter pending and let the network stack recover first.
@@ -157,6 +172,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
     return false;
   }
   retry_not_before_ms = 0;
+  consecutive_enomem = 0;
   last_send_ms = now_ms;
   return true;
 }

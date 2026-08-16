@@ -683,8 +683,18 @@ static bool udp_export_pending_step() {
 
   if (!debug_udp::send_packet(debug_udp::PacketType::I2C_LA02, udp_pending.sequence,
                               udp_pending.packet_index, udp_pending.packet_count,
-                              payload, len, udp_pending.overflow ? 1U : 0U))
+                              payload, len, udp_pending.overflow ? 1U : 0U)) {
+    if (debug_udp::sustained_resource_pressure()) {
+      ESP_LOGW(TAG, "Dropping raw I2C capture #%lu after sustained UDP ENOMEM pressure",
+               static_cast<unsigned long>(udp_pending.sequence));
+      debug_udp::reset_after_resource_pressure();
+      udp_pending.active = false;
+      udp_pending.packet_index = 0;
+      udp_pending.packet_count = 0;
+      return true;
+    }
     return false;
+  }
 
   udp_pending.packet_index++;
   if (udp_pending.packet_index >= udp_pending.packet_count) {
