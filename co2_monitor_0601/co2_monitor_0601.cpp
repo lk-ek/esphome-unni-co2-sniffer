@@ -23,6 +23,7 @@
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
 
@@ -489,6 +490,7 @@ void CO2Monitor0601::setup() {
            static_cast<unsigned>(App.get_binary_sensors().size()),
            static_cast<unsigned>(App.get_switches().size()));
 #endif
+  ESP_LOGW(TAG, "API stall diagnostic enabled: 1 Hz main-loop timing + 10 s heap telemetry; ISR paths unchanged");
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
 #if UNNI_BLE_ENABLED
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(false);
@@ -900,7 +902,71 @@ void CO2Monitor0601::process_co2_() {
   }
 }
 
+void CO2Monitor0601::runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us) {
+  const uint32_t value = elapsed_us > 0xFFFFFFFFULL ? 0xFFFFFFFFU : static_cast<uint32_t>(elapsed_us);
+  if (value > slot) slot = value;
+}
+
+void CO2Monitor0601::runtime_diag_loop_begin_() {
+  const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
+  const uint32_t now_ms = millis();
+
+  if (this->runtime_diag_.last_loop_start_us != 0) {
+    runtime_diag_update_max_(this->runtime_diag_.max_loop_gap_us,
+                             now_us - this->runtime_diag_.last_loop_start_us);
+  }
+  this->runtime_diag_.last_loop_start_us = now_us;
+  this->runtime_diag_.current_loop_start_us = now_us;
+  this->runtime_diag_.loops++;
+
+  if (this->runtime_diag_.last_report_ms == 0) this->runtime_diag_.last_report_ms = now_ms;
+  if (static_cast<uint32_t>(now_ms - this->runtime_diag_.last_report_ms) >= 1000U) {
+    ESP_LOGD(TAG,
+             "API diag heartbeat: loops=%lu max_gap=%.3f ms own=%.3f ms | history=%.3f policy=%.3f ha=%.3f battery=%.3f rtrh=%.3f co2=%.3f power=%.3f ms",
+             static_cast<unsigned long>(this->runtime_diag_.loops),
+             this->runtime_diag_.max_loop_gap_us / 1000.0f,
+             this->runtime_diag_.max_component_us / 1000.0f,
+             this->runtime_diag_.max_history_us / 1000.0f,
+             this->runtime_diag_.max_policy_us / 1000.0f,
+             this->runtime_diag_.max_ha_publish_us / 1000.0f,
+             this->runtime_diag_.max_battery_us / 1000.0f,
+             this->runtime_diag_.max_rtrh_us / 1000.0f,
+             this->runtime_diag_.max_co2_us / 1000.0f,
+             this->runtime_diag_.max_power_save_us / 1000.0f);
+
+    this->runtime_diag_.last_report_ms = now_ms;
+    this->runtime_diag_.loops = 0;
+    this->runtime_diag_.max_loop_gap_us = 0;
+    this->runtime_diag_.max_component_us = 0;
+    this->runtime_diag_.max_history_us = 0;
+    this->runtime_diag_.max_policy_us = 0;
+    this->runtime_diag_.max_ha_publish_us = 0;
+    this->runtime_diag_.max_battery_us = 0;
+    this->runtime_diag_.max_rtrh_us = 0;
+    this->runtime_diag_.max_co2_us = 0;
+    this->runtime_diag_.max_power_save_us = 0;
+  }
+
+  if (this->runtime_diag_.last_heap_report_ms == 0) this->runtime_diag_.last_heap_report_ms = now_ms;
+  if (static_cast<uint32_t>(now_ms - this->runtime_diag_.last_heap_report_ms) >= 10000U) {
+    this->runtime_diag_.last_heap_report_ms = now_ms;
+    ESP_LOGD(TAG, "API diag heap: free=%u B largest_8bit=%u B min_free=%u B",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
+             static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)),
+             static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT)));
+  }
+}
+
+void CO2Monitor0601::runtime_diag_loop_end_() {
+  if (this->runtime_diag_.current_loop_start_us == 0) return;
+  const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
+  runtime_diag_update_max_(this->runtime_diag_.max_component_us,
+                           now_us - this->runtime_diag_.current_loop_start_us);
+}
+
 void CO2Monitor0601::loop() {
+  this->runtime_diag_loop_begin_();
+
 #if UNNI_SHT43_IDENTITY_PROBE
   static uint32_t last_heap_log_ms = 0;
   const uint32_t now_ms = millis();
@@ -915,23 +981,42 @@ void CO2Monitor0601::loop() {
       static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();
 
+  uint64_t stage_us = static_cast<uint64_t>(esp_timer_get_time());
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
 #endif
+  runtime_diag_update_max_(this->runtime_diag_.max_history_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_usb_power_();
   this->process_energy_save_grace_();
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
 #endif
-  this->maybe_publish_ha_();
-  this->process_battery_();
+  runtime_diag_update_max_(this->runtime_diag_.max_policy_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
-  if (!this->io_initialized_) return;
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
+  this->maybe_publish_ha_();
+  runtime_diag_update_max_(this->runtime_diag_.max_ha_publish_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
+  this->process_battery_();
+  runtime_diag_update_max_(this->runtime_diag_.max_battery_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+
+  if (!this->io_initialized_) {
+    this->runtime_diag_loop_end_();
+    return;
+  }
 
   const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
   if (rtrh_power_path && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
 
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
   if (this->rtrh_enabled_) {
     this->process_rtrh_();
   } else if (this->rtrh_decode_only_) {
@@ -949,13 +1034,25 @@ void CO2Monitor0601::loop() {
                discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);
     }
   }
+  runtime_diag_update_max_(this->runtime_diag_.max_rtrh_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_co2_();
+  runtime_diag_update_max_(this->runtime_diag_.max_co2_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+
+  stage_us = static_cast<uint64_t>(esp_timer_get_time());
   if (rtrh_power_path) power_save::loop();
+  runtime_diag_update_max_(this->runtime_diag_.max_power_save_us,
+                           static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   // power_save::loop() may have just closed the window. Drop any partial CO2
   // transaction immediately instead of carrying it into the next sleep cycle.
   if (rtrh_power_path && power_save::enabled())
     i2c_sniffer::set_capture_enabled(this->external_powered_() || power_save::awake_window_active());
+
+  this->runtime_diag_loop_end_();
 }
 
 }  // namespace co2_monitor_0601

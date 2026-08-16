@@ -181,6 +181,26 @@ class CO2Monitor0601 : public Component {
     uint32_t candidate_since_ms{0};
   } usb_power_;
 
+  // Temporary runtime instrumentation for the intermittent Native API stall.
+  // All timing is collected from the normal component loop; no ISR path is
+  // modified by this diagnostic. Maxima are reported/reset once per second.
+  struct RuntimeDiagState {
+    uint64_t last_loop_start_us{0};
+    uint64_t current_loop_start_us{0};
+    uint32_t last_report_ms{0};
+    uint32_t last_heap_report_ms{0};
+    uint32_t loops{0};
+    uint32_t max_loop_gap_us{0};
+    uint32_t max_component_us{0};
+    uint32_t max_history_us{0};
+    uint32_t max_policy_us{0};
+    uint32_t max_ha_publish_us{0};
+    uint32_t max_battery_us{0};
+    uint32_t max_rtrh_us{0};
+    uint32_t max_co2_us{0};
+    uint32_t max_power_save_us{0};
+  } runtime_diag_;
+
   void maybe_publish_ha_();
   void publish_cached_ha_now_();
   bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
@@ -200,6 +220,9 @@ class CO2Monitor0601 : public Component {
   static float battery_percent_from_voltage_(float voltage);
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
+  void runtime_diag_loop_begin_();
+  void runtime_diag_loop_end_();
+  static void runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us);
 
   bool sniffer_enabled_{true};
   bool rtrh_enabled_{true};
