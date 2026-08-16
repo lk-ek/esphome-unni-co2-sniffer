@@ -1404,9 +1404,31 @@ void CO2Monitor0601::loop() {
     i2c_sniffer::rearm_after_light_sleep();
   }
 
-  // CO2 capture remains armed independently of the RT/RH awake window. The CO2
-  // pins are not wake sources, but any frame occurring while we are awake must
-  // be capturable instead of being gated by the RT/RH power-save state.
+  // Battery CO2 state machine: after the native shutdown storm the Unni bus
+  // settles at LOW/LOW. Once it has remained there for 1 s, arm SCL HIGH as a
+  // Light-sleep wake source and release the CO2-window awake lock. When Unni
+  // powers the bus again, the rising SCL level wakes the ESP; immediately drop
+  // that level wake source, keep the CPU awake for the native measurement
+  // window, and restore the passive ANYEDGE sniffer before 21B1 arrives.
+  if (!this->external_powered_()) {
+    const bool low_low = i2c_sniffer::bus_is_low_low();
+    const bool quiet_power_down = low_low && i2c_sniffer::last_edge_age_us() >= 1000000U;
+    if (quiet_power_down) {
+      power_save::set_co2_bus_powered_down(true);
+    } else if (power_save::co2_bus_powered_down() && !low_low) {
+      power_save::set_co2_bus_powered_down(false);
+      i2c_sniffer::rearm_after_light_sleep();
+      ESP_LOGI(TAG, "CO2 bus wake detected: passive sniffer rearmed for native measurement window");
+    } else if (!power_save::co2_bus_powered_down() && !low_low) {
+      // Initializes/maintains the CO2 active-window lock after boot or a
+      // USB->battery transition while the native bus is already powered.
+      power_save::set_co2_bus_powered_down(false);
+    }
+  } else {
+    power_save::set_co2_bus_powered_down(false);
+  }
+
+  // CO2 capture remains armed independently of the RT/RH awake window.
   i2c_sniffer::set_capture_enabled(true);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());

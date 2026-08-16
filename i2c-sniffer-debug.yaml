@@ -67,14 +67,13 @@ co2_monitor_0601:
   # Keep HA/API reachable briefly before Light-sleep may drop native USB serial.
   energy_save_grace: 3s
   sniffer_start_delay: 10s
-  # A/B diagnostic: keep battery/USB policy intact but disable MCU Light-sleep.
-  # Wi-Fi still switches to MIN_MODEM on battery; only automatic Light-sleep is removed.
-  light_sleep: false
+  # Battery policy: sleep between native sensor windows. RT/RH remains a wake
+  # source; when the CO2 bus is quiet LOW/LOW, SCL HIGH is armed as an
+  # additional wake source for the next native CO2 power window.
+  light_sleep: true
   debug_metrics: true
-  # Aggressive battery diagnostic: while the native bus is quiet LOW/LOW,
-  # drive the ESP side of SDA/SCL at 3.3 V through the existing 10 kOhm series
-  # resistors and try an SCD4x-compatible transaction. SDA is released for ACK/read.
-  active_i2c_probe: true
+  # Active bus takeover was diagnostic-only; normal battery operation is fully passive.
+  active_i2c_probe: false
   active_i2c_probe_interval: 60s
   debug_capture: true
   debug_udp_host: 10.0.42.149

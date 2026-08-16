@@ -104,3 +104,26 @@ Debug builds also keep the current awake window open while raw I2C or RT/RH UDP
 packets are queued. This drain grace is bounded to one second beyond the normal
 awake timeout, so a missing collector cannot keep a battery-powered device awake
 indefinitely.
+
+
+## Battery CO2 window synchronization
+
+The Unni monitor was observed to switch its CO2 I2C bus into a quiet LOW/LOW
+state between native measurement windows. In battery mode the component now
+uses that electrical state as an additional power-saving signal:
+
+- after SDA/SCL have remained LOW/LOW without an edge for at least 1 second,
+  the CO2 subsystem is treated as powered down;
+- GPIO SCL is then armed as a HIGH-level Light-sleep wake source; no pull-up is
+  enabled and the sniffer remains electrically passive;
+- an RT/RH wake does not wait for the normal CO2 timeout while the CO2 bus is
+  known to be powered down;
+- when Unni raises SCL for its next native CO2 window, the ESP wakes, disables
+  the temporary SCL wake source, restores the passive ANYEDGE sniffer, and
+  holds a NO_LIGHT_SLEEP lock for the active CO2 window;
+- after the shutdown transition settles back to quiet LOW/LOW, that lock is
+  released and SCL HIGH wake is armed again.
+
+This does not predict the native measurement interval and does not actively
+drive the Unni I2C bus. It follows the hardware state instead, so a changed
+Unni schedule is detected by the SCL wake transition rather than by a timer.

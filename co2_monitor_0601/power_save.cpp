@@ -24,8 +24,13 @@ static esp_pm_lock_handle_t awake_lock = nullptr;
 static esp_pm_lock_handle_t cpu_lock = nullptr;
 static esp_pm_lock_handle_t external_awake_lock = nullptr;
 static esp_pm_lock_handle_t external_cpu_lock = nullptr;
+static esp_pm_lock_handle_t co2_active_lock = nullptr;
 static volatile bool external_power = false;
 static bool external_locks_held = false;
+static bool co2_active_lock_held = false;
+static bool co2_state_initialized = false;
+static volatile bool co2_powered_down = false;
+static bool co2_scl_wakeup_armed = false;
 static volatile bool lock_held = false;
 static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
@@ -93,6 +98,11 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
     ESP_LOGE(TAG, "esp_pm_lock_create(USB CPU_FREQ_MAX) failed: %d", err);
     return false;
   }
+  err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_co2_window", &co2_active_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(CO2 NO_LIGHT_SLEEP) failed: %d", err);
+    return false;
+  }
 
   configure_wakeup_pin(pin_rt);
   configure_wakeup_pin(pin_rh);
@@ -105,17 +115,96 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   configured = true;
   ESP_LOGI(TAG,
            "Auto Light-sleep enabled: CPU 40..80 MHz, forced 80 MHz while capturing; "
-           "wake GPIO%d/GPIO%d; CO2 GPIO%d/GPIO%d excluded; awake timeout %lu ms; "
+           "wake GPIO%d/GPIO%d; CO2 SCL GPIO%d armed HIGH only during powered-down windows "
+           "(SDA GPIO%d remains passive); awake timeout %lu ms; "
            "debug transport drain grace %lu ms",
            static_cast<int>(pin_rt), static_cast<int>(pin_rh),
-           static_cast<int>(pin_co2_sda), static_cast<int>(pin_co2_scl),
+           static_cast<int>(pin_co2_scl), static_cast<int>(pin_co2_sda),
            static_cast<unsigned long>(max_awake_ms),
            static_cast<unsigned long>(TRANSPORT_DRAIN_GRACE_MS));
   return true;
 }
 
+void set_co2_bus_powered_down(bool powered_down) {
+  if (!configured || co2_active_lock == nullptr) return;
+
+  // USB already holds the ESP awake continuously. Keep the CO2-specific wake
+  // source and lock out of the way until battery policy is active again.
+  if (external_power) {
+    if (co2_scl_wakeup_armed) {
+      gpio_wakeup_disable(pin_co2_scl);
+      co2_scl_wakeup_armed = false;
+    }
+    if (co2_active_lock_held) {
+      esp_pm_lock_release(co2_active_lock);
+      co2_active_lock_held = false;
+    }
+    co2_powered_down = false;
+    co2_state_initialized = false;
+    return;
+  }
+
+  if (co2_state_initialized && powered_down == co2_powered_down) return;
+  co2_state_initialized = true;
+  co2_powered_down = powered_down;
+
+  if (powered_down) {
+    if (co2_active_lock_held) {
+      const esp_err_t err = esp_pm_lock_release(co2_active_lock);
+      if (err == ESP_OK) co2_active_lock_held = false;
+      else ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP release failed: %d", err);
+    }
+
+    // The dead Unni bus sits LOW/LOW. Its next power-up raises SCL, so HIGH is
+    // a stable level wake condition and gives us ample lead time before 21B1.
+    const esp_err_t wake_err = gpio_wakeup_enable(pin_co2_scl, GPIO_INTR_HIGH_LEVEL);
+    if (wake_err == ESP_OK) {
+      co2_scl_wakeup_armed = true;
+      ESP_LOGI(TAG, "CO2 subsystem powered down: SCL GPIO%d HIGH wake armed",
+               static_cast<int>(pin_co2_scl));
+    } else {
+      ESP_LOGE(TAG, "CO2 SCL wake arm failed on GPIO%d: %d",
+               static_cast<int>(pin_co2_scl), wake_err);
+    }
+
+    // If an RT/RH wake window is currently waiting for CO2, don't burn the
+    // full timeout: CO2 is known unavailable until SCL rises again.
+    if (lock_held && rtrh_complete) co2_after_rtrh = true;
+  } else {
+    if (co2_scl_wakeup_armed) {
+      const esp_err_t wake_err = gpio_wakeup_disable(pin_co2_scl);
+      if (wake_err != ESP_OK) {
+        ESP_LOGW(TAG, "CO2 SCL wake disable failed on GPIO%d: %d",
+                 static_cast<int>(pin_co2_scl), wake_err);
+      }
+      co2_scl_wakeup_armed = false;
+    }
+    if (!co2_active_lock_held) {
+      const esp_err_t err = esp_pm_lock_acquire(co2_active_lock);
+      if (err == ESP_OK) co2_active_lock_held = true;
+      else ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP acquire failed: %d", err);
+    }
+    ESP_LOGI(TAG, "CO2 subsystem active: SCL wake disarmed; keeping ESP awake for native window");
+  }
+}
+
+bool co2_bus_powered_down() { return co2_powered_down; }
+
 void set_external_power(bool present) {
   external_power = present;
+
+  if (present) {
+    if (co2_scl_wakeup_armed) {
+      gpio_wakeup_disable(pin_co2_scl);
+      co2_scl_wakeup_armed = false;
+    }
+    if (co2_active_lock_held && co2_active_lock != nullptr) {
+      esp_pm_lock_release(co2_active_lock);
+      co2_active_lock_held = false;
+    }
+    co2_powered_down = false;
+    co2_state_initialized = false;
+  }
 
   // USB power is unconstrained: favor Wi-Fi robustness/latency. Battery and
   // Energy Save use MIN_MODEM so the AP can buffer traffic between DTIM wakeups.
@@ -188,6 +277,7 @@ void on_rtrh_complete(bool valid) {
   // validity is logged by CO2Monitor0601 and the next cycle gets another chance.
   (void) valid;
   rtrh_complete = true;
+  if (co2_powered_down) co2_after_rtrh = true;
 }
 
 void on_valid_co2() {
