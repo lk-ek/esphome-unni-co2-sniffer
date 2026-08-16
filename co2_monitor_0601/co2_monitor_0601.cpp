@@ -245,6 +245,31 @@ void CO2Monitor0601::update_battery_estimator_(float battery_voltage, bool usb_m
 
 
 #if UNNI_BLE_ENABLED
+void BlePrivacySwitch::write_state(bool state) {
+  if (this->parent_ != nullptr)
+    this->parent_->set_ble_privacy_mode(state);
+  else
+    this->publish_state(state);
+}
+
+void CO2Monitor0601::set_ble_privacy_mode(bool enabled) {
+  // HA exposes the user-facing privacy sense: ON means do not advertise live
+  // measurement data. Sensirion 0x8130 uses the inverse sense.
+  sensirion_settings_set_advertise_data_enabled(!enabled);
+  this->ble_privacy_state_ = enabled;
+  this->ble_privacy_state_valid_ = true;
+  if (this->ble_privacy_switch_ != nullptr) this->ble_privacy_switch_->publish_state(enabled);
+  ESP_LOGI(TAG, "BLE Privacy: %s", enabled ? "ON (live values hidden from advertising)" : "OFF");
+}
+
+void CO2Monitor0601::sync_ble_privacy_switch_() {
+  const bool privacy = !sensirion_settings_advertise_data_enabled();
+  if (this->ble_privacy_state_valid_ && this->ble_privacy_state_ == privacy) return;
+  this->ble_privacy_state_ = privacy;
+  this->ble_privacy_state_valid_ = true;
+  if (this->ble_privacy_switch_ != nullptr) this->ble_privacy_switch_->publish_state(privacy);
+}
+
 void BlePairingModeSwitch::write_state(bool state) {
   if (this->parent_ != nullptr)
     this->parent_->set_ble_pairing_mode(state);
@@ -283,6 +308,84 @@ void CO2Monitor0601::process_ble_pairing_window_() {
 }
 
 #endif
+
+void WifiHaSwitch::write_state(bool state) {
+  if (this->parent_ != nullptr)
+    this->parent_->set_wifi_ha_enabled(state);
+  else
+    this->publish_state(state);
+}
+
+void CO2Monitor0601::open_wifi_recovery_window_(uint32_t now, const char *reason) {
+  if (this->wifi_ha_enabled_) return;
+  this->wifi_recovery_until_ms_ = now + this->wifi_recovery_window_ms_;
+  this->wifi_recovery_logged_ = false;
+#ifdef USE_WIFI
+  if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_disabled())
+    wifi::global_wifi_component->enable();
+#endif
+  ESP_LOGW(TAG, "WiFi/HA recovery window opened for %lu ms (%s); turn the switch ON to keep WiFi enabled",
+           static_cast<unsigned long>(this->wifi_recovery_window_ms_), reason);
+}
+
+void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
+  this->wifi_ha_enabled_ = enabled;
+  if (this->wifi_ha_switch_ != nullptr) this->wifi_ha_switch_->publish_state(enabled);
+  if (enabled) {
+    this->wifi_disable_pending_ = false;
+    this->wifi_recovery_until_ms_ = 0;
+#ifdef USE_WIFI
+    if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_disabled())
+      wifi::global_wifi_component->enable();
+#endif
+    ESP_LOGI(TAG, "WiFi / Home Assistant: ON");
+    this->publish_cached_ha_now_();
+    return;
+  }
+
+  // Give the API response and switch state a moment to reach Home Assistant
+  // before the interface disappears.
+  this->wifi_disable_pending_ = true;
+  this->wifi_disable_requested_ms_ = millis();
+  this->wifi_recovery_until_ms_ = 0;
+  ESP_LOGW(TAG, "WiFi / Home Assistant: OFF requested; WiFi will stop in 1500 ms");
+  ESP_LOGW(TAG, "Recovery: reconnect USB power (or reboot with USB attached) for a temporary HA window");
+}
+
+void CO2Monitor0601::process_wifi_ha_control_() {
+#ifdef USE_WIFI
+  if (wifi::global_wifi_component == nullptr) return;
+  if (this->usb_power_.initialized && !this->usb_power_.have_state) return;
+  const uint32_t now = millis();
+  if (this->wifi_ha_enabled_) {
+    if (wifi::global_wifi_component->is_disabled()) wifi::global_wifi_component->enable();
+    return;
+  }
+
+  if (this->wifi_disable_pending_) {
+    if (static_cast<uint32_t>(now - this->wifi_disable_requested_ms_) < 1500U) return;
+    this->wifi_disable_pending_ = false;
+    ESP_LOGI(TAG, "Disabling WiFi and Home Assistant connectivity");
+    wifi::global_wifi_component->disable();
+    return;
+  }
+
+  if (this->wifi_recovery_until_ms_ != 0 && static_cast<int32_t>(this->wifi_recovery_until_ms_ - now) > 0) {
+    if (wifi::global_wifi_component->is_disabled()) wifi::global_wifi_component->enable();
+    if (!this->wifi_recovery_logged_) {
+      this->wifi_recovery_logged_ = true;
+      ESP_LOGI(TAG, "WiFi / Home Assistant temporarily enabled for USB recovery");
+    }
+    return;
+  }
+
+  if (this->wifi_recovery_until_ms_ != 0) {
+    this->wifi_recovery_until_ms_ = 0;
+    ESP_LOGI(TAG, "WiFi/HA recovery window expired; disabling WiFi again");
+  }
+  if (!wifi::global_wifi_component->is_disabled()) wifi::global_wifi_component->disable();
+#endif
+}
 
 void EnergySaveModeSwitch::write_state(bool state) {
   if (this->parent_ != nullptr)
@@ -424,6 +527,7 @@ void CO2Monitor0601::process_usb_power_() {
   this->usb_power_.have_state = true;
   publish(this->out_.usb_power, raw);
   ESP_LOGI(TAG, "USB Power: %s", raw ? "ON" : "OFF");
+  if (raw && !this->wifi_ha_enabled_) this->open_wifi_recovery_window_(now, "USB power detected");
 
   // Keep the physical USB entity truthful, but let Energy Save Mode override
   // the runtime policy so USB power meters can measure the same behavior used
@@ -598,6 +702,11 @@ void CO2Monitor0601::setup() {
 #endif
   ESP_LOGW(TAG, "API stall diagnostic enabled: 1 Hz main-loop timing + 10 s heap telemetry; ISR paths unchanged");
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
+  if (this->wifi_ha_switch_ != nullptr) {
+    const auto restored = this->wifi_ha_switch_->get_initial_state_with_restore_mode();
+    this->wifi_ha_enabled_ = restored.value_or(true);
+    this->wifi_ha_switch_->publish_state(this->wifi_ha_enabled_);
+  }
 #if UNNI_BLE_ENABLED
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(false);
 #endif
@@ -657,6 +766,7 @@ void CO2Monitor0601::setup() {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
 #endif
     sensirion_settings_configure_gatt(this->gatt_server_);
+    this->sync_ble_privacy_switch_();
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }
@@ -734,6 +844,7 @@ void CO2Monitor0601::publish_cached_ha_now_() {
 }
 
 void CO2Monitor0601::maybe_publish_ha_() {
+  if (!this->wifi_ha_enabled_) return;
   // On USB power every fresh measurement is published directly from its
   // decoder. The interval below is deliberately a battery-mode throttle.
   if (this->external_powered_()) return;
@@ -1115,8 +1226,10 @@ void CO2Monitor0601::loop() {
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_usb_power_();
   this->process_energy_save_grace_();
+  this->process_wifi_ha_control_();
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
+  this->sync_ble_privacy_switch_();
 #endif
   runtime_diag_update_max_(this->runtime_diag_.max_policy_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);

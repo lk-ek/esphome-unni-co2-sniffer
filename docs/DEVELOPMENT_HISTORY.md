@@ -490,3 +490,10 @@ The persistent 4096-sample Sensirion history previously kept a redundant 32 KiB 
 With the RAM bottleneck removed, the experimental Sensirion Device Settings service was restored to the SHT43 identity probe and reworked to match the security model documented by Sensirion's SHT43 DemoBoard firmware. Service 0x8100 and characteristics 0x81FF, 0x81FE, 0x8130 and 0x8120 are now created through the raw ESP-IDF GATTS API with encrypted MITM read/write permissions. This avoids relying on ESPHome's BLECharacteristic wrapper, whose GATT permission field is not publicly configurable. Settings are persisted in NVS; the advertise-data privacy flag suppresses measurement manufacturer data at runtime, while the alternative name is stored without changing the compatibility-sensitive GAP identity.
 
 The Home Assistant BLE Pairing Mode remains a 60-second authorization gate for Numeric Comparison. Pairing now also works when the authorization switch is opened before connection; a connection established during the window immediately requests MITM-authenticated encryption.
+
+### 2026-08-16: BLE privacy and Wi-Fi/HA runtime controls
+
+- Added a Home Assistant `BLE Privacy` switch synchronized with Sensirion Device Settings `IsAdvertiseDataEnabled` (0x8130).
+- Added a restorable `WiFi / Home Assistant` switch that disables the ESPHome Wi-Fi interface after a short acknowledgement grace period.
+- Added a five-minute USB recovery window so a deliberately offline device can be brought back into HA and re-enabled without reflashing.
+- Disabled Wi-Fi/API reboot timeouts in the example configurations so intentional offline operation does not trigger watchdog-style reboots.

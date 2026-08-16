@@ -14,6 +14,7 @@ logger:
   level: WARN
 
 api:
+  reboot_timeout: 0s
   encryption:
     key: !secret i2csniffer__encryption_key
 
@@ -23,6 +24,7 @@ ota:
     allow_partition_access: true
 
 wifi:
+  reboot_timeout: 0s
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   # Keep Wi-Fi modem sleep conservative while automatic MCU Light-sleep is used.

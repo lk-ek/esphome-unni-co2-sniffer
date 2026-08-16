@@ -815,3 +815,12 @@ The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and p
 ## Diagnostic build: known-good RT/RH restore
 
 This A/B build restores `rtrh_decoder.cpp` and `rtrh_decoder.h` byte-for-byte from the known-good rebase that produced valid RT/RH measurements on 2026-08-15 around 16:05. The current full SHT43 GATT, Wi-Fi scan policy and RAM-headroom test configuration are retained. The purpose is to test the RT/RH GPIO/ISR initialization regression before changing the humidity decoding algorithm.
+
+### BLE privacy and Wi-Fi / Home Assistant switches
+
+Two runtime controls are exposed to Home Assistant when HA entities are enabled:
+
+- **BLE Privacy** maps to Sensirion Device Settings `IsAdvertiseDataEnabled` (0x8130). Privacy ON suppresses live T/RH/CO2 manufacturer data while keeping BLE connectable and history/settings available. Changes made by MyAmbience are reflected back into the HA switch.
+- **WiFi / Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
+
+The example Wi-Fi/API configurations set `reboot_timeout: 0s`, otherwise ESPHome's normal connectivity watchdog could reboot a device that intentionally has Wi-Fi disabled.

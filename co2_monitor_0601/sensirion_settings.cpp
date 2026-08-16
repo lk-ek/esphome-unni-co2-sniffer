@@ -278,10 +278,7 @@ void handle_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
     if (param->write.len != 1) {
       status = ESP_GATT_INVALID_ATTR_LEN;
     } else {
-      gatt.advertise_data_enabled = param->write.value[0] ? 1 : 0;
-      set_stack_value(gatt.advertise_data_enabled_handle, &gatt.advertise_data_enabled, 1);
-      save_settings();
-      sensirion_ble_set_advertise_data_enabled(gatt.advertise_data_enabled != 0);
+      sensirion_settings_set_advertise_data_enabled(param->write.value[0] != 0);
       ESP_LOGW(TAG, "MyAmbience IsAdvertiseDataEnabled=%u (applied to manufacturer sample advertising)",
                static_cast<unsigned>(gatt.advertise_data_enabled));
     }
@@ -308,6 +305,22 @@ void handle_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
            static_cast<unsigned>(param->write.conn_id), static_cast<unsigned>(status));
 }
 }  // namespace
+
+bool sensirion_settings_advertise_data_enabled() { return gatt.advertise_data_enabled != 0; }
+
+void sensirion_settings_set_advertise_data_enabled(bool enabled) {
+  const uint8_t value = enabled ? 1 : 0;
+  if (gatt.advertise_data_enabled == value) {
+    sensirion_ble_set_advertise_data_enabled(enabled);
+    return;
+  }
+  gatt.advertise_data_enabled = value;
+  set_stack_value(gatt.advertise_data_enabled_handle, &gatt.advertise_data_enabled, 1);
+  save_settings();
+  sensirion_ble_set_advertise_data_enabled(enabled);
+  ESP_LOGI(TAG, "IsAdvertiseDataEnabled=%u (%s)", static_cast<unsigned>(value),
+           enabled ? "live manufacturer data enabled" : "privacy mode");
+}
 
 void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server) {
   if (gatt.configured || server == nullptr) return;

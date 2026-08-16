@@ -15,6 +15,7 @@ logger:
   initial_level: DEBUG
 
 api:
+  reboot_timeout: 0s
   # Flash-backed BLE history leaves enough RAM for Home Assistant plus one
   # temporary native API client (for example `esphome logs`).
   max_connections: 2
@@ -27,6 +28,7 @@ ota:
     allow_partition_access: true
 
 wifi:
+  reboot_timeout: 0s
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   # Keep Wi-Fi modem sleep conservative while automatic MCU Light-sleep is used.
