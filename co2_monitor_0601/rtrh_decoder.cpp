@@ -199,10 +199,8 @@ static inline void IRAM_ATTR observe_rh_state(uint32_t now, uint8_t state) {
   observe_rh_stats(now, decoder.rh_state);
 }
 
-static float rh_state_period_median(const RhStateStats &s) {
+static uint8_t rh_state_sorted_samples(const RhStateStats &s, uint16_t *tmp) {
   const uint8_t n = s.sample_count;
-  if (!n) return 0.0f;
-  uint16_t tmp[RH_STATE_PERIOD_SAMPLES];
   for (uint8_t i = 0; i < n; i++) tmp[i] = s.samples[i];
   for (uint8_t i = 1; i < n; i++) {
     const uint16_t value = tmp[i];
@@ -213,8 +211,40 @@ static float rh_state_period_median(const RhStateStats &s) {
     }
     tmp[j] = value;
   }
+  return n;
+}
+
+static float rh_state_period_median(const RhStateStats &s) {
+  uint16_t tmp[RH_STATE_PERIOD_SAMPLES];
+  const uint8_t n = rh_state_sorted_samples(s, tmp);
+  if (!n) return 0.0f;
   if (n & 1) return static_cast<float>(tmp[n / 2]);
   return 0.5f * (static_cast<float>(tmp[n / 2 - 1]) + static_cast<float>(tmp[n / 2]));
+}
+
+static void derive_rh_distribution(const RhStateStats &s, Measurement &m) {
+  uint16_t tmp[RH_STATE_PERIOD_SAMPLES];
+  const uint8_t n = rh_state_sorted_samples(s, tmp);
+  if (!n) return;
+
+  m.rh_state_min_us = tmp[0];
+  m.rh_state_p25_us = tmp[(static_cast<uint16_t>(n - 1) * 25U) / 100U];
+  m.rh_state_p75_us = tmp[(static_cast<uint16_t>(n - 1) * 75U) / 100U];
+  m.rh_state_max_us = tmp[n - 1];
+
+  // Wide diagnostic windows around the two populations observed in the field:
+  // roughly 220 us and its near-exact 2x alias around 440 us. Keep an explicit
+  // 'other' bucket so a future third population cannot hide in the summary.
+  for (uint8_t i = 0; i < n; i++) {
+    const uint16_t value = tmp[i];
+    if (value >= 160U && value <= 280U) {
+      m.rh_state_near_220++;
+    } else if (value >= 360U && value <= 520U) {
+      m.rh_state_near_440++;
+    } else {
+      m.rh_state_other++;
+    }
+  }
 }
 
 static void finalize_measurement() {
@@ -459,6 +489,7 @@ static Measurement derive(const Snapshot &s) {
   m.rt_period_us = s.rt_temp_count ? float(s.rt_temp_period_sum) / s.rt_temp_count : 0.0f;
   m.rh_duration_ms = float(s.rh_timing.period_sum) / 1000.0f;
   m.rh_state_us = rh_state_period_median(s.rh_state);
+  derive_rh_distribution(s.rh_state, m);
   m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
   m.rh_ratio = m.ref_period_us > 0.0f && m.rh_state_us > 0.0f
                    ? m.rh_state_us / m.ref_period_us : NAN;

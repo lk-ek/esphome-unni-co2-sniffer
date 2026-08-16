@@ -681,6 +681,22 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
            static_cast<unsigned>(m.rh_state_samples), static_cast<unsigned long>(m.rh_state_seen),
            m.valid ? "VALID" : "REJECT");
 
+  if (m.rh_state_samples > 0) {
+    ESP_LOGI(TAG,
+             "RT/RH RH intervals %lu: min=%u p25=%u median=%.1f p75=%u max=%u us; "
+             "~220=%u ~440=%u other=%u (retained=%u, seen=%lu)",
+             static_cast<unsigned long>(m.sequence),
+             static_cast<unsigned>(m.rh_state_min_us),
+             static_cast<unsigned>(m.rh_state_p25_us), m.rh_state_us,
+             static_cast<unsigned>(m.rh_state_p75_us),
+             static_cast<unsigned>(m.rh_state_max_us),
+             static_cast<unsigned>(m.rh_state_near_220),
+             static_cast<unsigned>(m.rh_state_near_440),
+             static_cast<unsigned>(m.rh_state_other),
+             static_cast<unsigned>(m.rh_state_samples),
+             static_cast<unsigned long>(m.rh_state_seen));
+  }
+
   if (!m.valid) {
     if (publish_outputs) {
       publish(this->out_.quality, m.quality_percent);

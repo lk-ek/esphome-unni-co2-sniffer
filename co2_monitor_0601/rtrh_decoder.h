@@ -48,6 +48,17 @@ struct Measurement {
   uint8_t rh_state_samples{0};
   uint32_t rh_state_seen{0};
 
+  // Distribution diagnostics for the retained RH-state intervals. These do
+  // not influence validation or humidity decoding; they only make timing
+  // aliasing/missed-edge behaviour visible in the serial log.
+  uint16_t rh_state_min_us{0};
+  uint16_t rh_state_p25_us{0};
+  uint16_t rh_state_p75_us{0};
+  uint16_t rh_state_max_us{0};
+  uint8_t rh_state_near_220{0};
+  uint8_t rh_state_near_440{0};
+  uint8_t rh_state_other{0};
+
   float rt_ratio{NAN};
   float rh_ratio{NAN};
   float rh_log{NAN};
