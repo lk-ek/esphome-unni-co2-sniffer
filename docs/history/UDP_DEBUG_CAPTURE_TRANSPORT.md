@@ -47,3 +47,8 @@ No ACK/retry protocol is used. This is deliberate: debug export must not introdu
 - I2C raw captures are exported immediately after a complete quiet-period-delimited capture, before the ISR buffer is reused.
 - When UDP export is active, I2C raw captures are not duplicated into the old heap-backed HTTP snapshot string.
 - Normal Home Assistant data continues to use the ESPHome Native API.
+
+
+## Socket initialization
+
+The UDP destination is configured during component setup, but the lwIP socket is opened lazily on the first capture packet from the normal loop. This avoids using lwIP before ESPHome has initialized Wi-Fi/TCP-IP.

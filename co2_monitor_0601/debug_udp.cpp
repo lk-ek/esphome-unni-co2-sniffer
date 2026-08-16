@@ -49,21 +49,34 @@ bool setup(const char *host, uint16_t port) {
     return false;
   }
 
-  const int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (sock < 0) {
-    ESP_LOGE(TAG, "socket() failed: errno=%d", errno);
-    return false;
-  }
-
-  udp_socket = sock;
+  // Do not create a lwIP socket during this component's setup(). ESPHome sets
+  // this component up before Wi-Fi, so the TCP/IP synchronization primitives
+  // may not exist yet. Creating a socket here can trip FreeRTOS'
+  // xQueueSemaphoreTake(pxQueue) assertion. Store only the destination now and
+  // lazily create the socket on the first packet send, which happens from the
+  // normal loop after application setup has completed.
   destination = dest;
   configured = true;
-  ESP_LOGI(TAG, "UDP debug export enabled: %s:%u, payload <= %u bytes",
+  ESP_LOGI(TAG, "UDP debug export configured: %s:%u, payload <= %u bytes (socket opens lazily)",
            host, static_cast<unsigned>(port), static_cast<unsigned>(MAX_PAYLOAD));
   return true;
 }
 
-bool enabled() { return configured && udp_socket >= 0; }
+bool enabled() { return configured; }
+
+static bool ensure_socket() {
+  if (!configured) return false;
+  if (udp_socket >= 0) return true;
+
+  const int sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sock < 0) {
+    ESP_LOGW(TAG, "lazy socket() failed: errno=%d", errno);
+    return false;
+  }
+  udp_socket = sock;
+  ESP_LOGI(TAG, "UDP debug socket opened lazily");
+  return true;
+}
 
 bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
                  uint16_t packet_count, const uint8_t *payload, uint16_t payload_length,
@@ -71,6 +84,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   if (!enabled() || payload == nullptr || payload_length > MAX_PAYLOAD || packet_count == 0 ||
       packet_index >= packet_count)
     return false;
+  if (!ensure_socket()) return false;
 
   static uint8_t datagram[sizeof(PacketHeader) + MAX_PAYLOAD];
   PacketHeader header{{'U', 'N', 'D', '1'}, 1, static_cast<uint8_t>(type), flags,
