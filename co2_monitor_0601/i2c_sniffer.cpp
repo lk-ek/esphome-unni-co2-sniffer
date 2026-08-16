@@ -762,6 +762,7 @@ static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
   return sequence;
 }
 
+#if defined(USE_WEB_SERVER_BASE)
 static void release_frozen_capture_after_success(uint32_t sequence, bool was_frozen) {
   if (!was_frozen || !last_capture_mutex) return;
   bool released = false;
@@ -778,7 +779,6 @@ static void release_frozen_capture_after_success(uint32_t sequence, bool was_fro
   }
 }
 
-#if defined(USE_WEB_SERVER_BASE)
 class CaptureHandler : public web_server_idf::AsyncWebHandler {
  public:
   bool canHandle(web_server_idf::AsyncWebServerRequest *request) const override {
@@ -869,6 +869,10 @@ bool freeze_last_capture(uint32_t sequence, const char *reason) {
     (void) sequence;
   }
   return frozen;
+}
+
+bool debug_export_pending() {
+  return debug_udp::enabled() && udp_pending.active;
 }
 
 static const char *end_condition_name(EndCondition condition) {

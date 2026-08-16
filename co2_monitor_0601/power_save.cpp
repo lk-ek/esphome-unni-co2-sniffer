@@ -30,9 +30,11 @@ static volatile bool lock_held = false;
 static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
 static volatile bool co2_after_rtrh = false;
+static volatile bool transport_busy = false;
 static uint32_t max_awake_ms = 10000;
 static uint32_t completed_cycles = 0;
 static uint32_t timeout_cycles = 0;
+static constexpr uint32_t TRANSPORT_DRAIN_GRACE_MS = 1000;
 
 static void configure_wakeup_pin(gpio_num_t pin) {
   // Wake on the opposite of the current idle level. RT/RH lines spend almost
@@ -99,10 +101,12 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   configured = true;
   ESP_LOGI(TAG,
            "Auto Light-sleep enabled: CPU 40..80 MHz, forced 80 MHz while capturing; "
-           "wake GPIO%d/GPIO%d; CO2 GPIO%d/GPIO%d excluded; awake timeout %lu ms",
+           "wake GPIO%d/GPIO%d; CO2 GPIO%d/GPIO%d excluded; awake timeout %lu ms; "
+           "debug transport drain grace %lu ms",
            static_cast<int>(pin_rt), static_cast<int>(pin_rh),
            static_cast<int>(pin_co2_sda), static_cast<int>(pin_co2_scl),
-           static_cast<unsigned long>(max_awake_ms));
+           static_cast<unsigned long>(max_awake_ms),
+           static_cast<unsigned long>(TRANSPORT_DRAIN_GRACE_MS));
   return true;
 }
 
@@ -157,6 +161,9 @@ bool external_power_present() { return external_power; }
 
 void IRAM_ATTR on_rtrh_edge_from_isr() {
   if (!configured || external_power || awake_lock == nullptr || cpu_lock == nullptr || lock_held) return;
+  // ESP-IDF allows PM-lock acquire/release from ISR context, but operations on
+  // the same lock handle are not thread-safe against concurrent calls. loop()
+  // therefore masks both RT/RH GPIO interrupts while it releases these handles.
   if (esp_pm_lock_acquire(awake_lock) != ESP_OK) return;
   if (esp_pm_lock_acquire(cpu_lock) != ESP_OK) {
     esp_pm_lock_release(awake_lock);
@@ -181,6 +188,8 @@ void on_valid_co2() {
   co2_after_rtrh = true;
 }
 
+void set_transport_busy(bool busy) { transport_busy = busy; }
+
 void loop() {
   if (!configured || !lock_held || awake_lock == nullptr || cpu_lock == nullptr) return;
 
@@ -190,13 +199,34 @@ void loop() {
   const bool timeout = elapsed_us >= static_cast<uint64_t>(max_awake_ms) * 1000ULL;
   if (!complete && !timeout) return;
 
-  // Update state before releasing: a new GPIO ISR after this point may acquire
-  // the lock for the next cycle without recursively incrementing this handle.
+  // Let queued debug UDP packets drain while the NO_LIGHT_SLEEP lock is still
+  // held. Never let a missing collector keep the ESP awake indefinitely.
+  const uint64_t drain_deadline_us =
+      (static_cast<uint64_t>(max_awake_ms) + TRANSPORT_DRAIN_GRACE_MS) * 1000ULL;
+  if (transport_busy && elapsed_us < drain_deadline_us) {
+    return;
+  }
+
+  // esp_pm_lock_* is not thread-safe when the same handle is manipulated from
+  // ISR and task context concurrently. Mask both RT/RH IRQs across the release
+  // so on_rtrh_edge_from_isr() cannot recursively acquire either handle in the
+  // small state transition window.
+  gpio_intr_disable(pin_rt);
+  gpio_intr_disable(pin_rh);
+
+  const esp_err_t cpu_err = esp_pm_lock_release(cpu_lock);
+  const esp_err_t sleep_err = esp_pm_lock_release(awake_lock);
+
+  // Only expose an unlocked state after both handles have been released. The
+  // previous ordering cleared lock_held first, allowing an ISR to re-acquire a
+  // handle while loop() was concurrently releasing it.
   lock_held = false;
   rtrh_complete = false;
   co2_after_rtrh = false;
-  const esp_err_t cpu_err = esp_pm_lock_release(cpu_lock);
-  const esp_err_t sleep_err = esp_pm_lock_release(awake_lock);
+
+  gpio_intr_enable(pin_rt);
+  gpio_intr_enable(pin_rh);
+
   if (cpu_err != ESP_OK || sleep_err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_release failed: CPU=%d sleep=%d", cpu_err, sleep_err);
     return;
@@ -209,9 +239,10 @@ void loop() {
              static_cast<unsigned long>(completed_cycles));
   } else {
     timeout_cycles++;
-    ESP_LOGW(TAG, "Light-sleep awake-window timeout after %llu ms (timeout %lu)",
+    ESP_LOGW(TAG, "Light-sleep awake-window timeout after %llu ms (timeout %lu)%s",
              static_cast<unsigned long long>(elapsed_us / 1000ULL),
-             static_cast<unsigned long>(timeout_cycles));
+             static_cast<unsigned long>(timeout_cycles),
+             transport_busy ? " after debug-transport drain grace" : "");
   }
 }
 

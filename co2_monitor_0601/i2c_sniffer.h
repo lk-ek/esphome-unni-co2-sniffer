@@ -110,6 +110,9 @@ void log_frame(const Frame &frame, const char *label = "I2C frame");
 // captures cannot overwrite /capture. The first successful GET of /capture
 // releases the freeze again. Returns true when a new freeze was established.
 bool freeze_last_capture(uint32_t sequence, const char *reason);
+
+// True while a debug UDP capture is still being drained to the collector.
+bool debug_export_pending();
 #endif
 
 }  // namespace i2c_sniffer

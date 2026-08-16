@@ -81,6 +81,9 @@ void update_latest(const Measurement &measurement);
 
 #if RTRH_DEBUG_CAPTURE
 void register_debug_handlers();
+
+// True while raw/timing debug data is still queued for UDP export.
+bool debug_export_pending();
 #endif
 
 }  // namespace rtrh_decoder

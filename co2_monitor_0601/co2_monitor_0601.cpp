@@ -1059,6 +1059,12 @@ void CO2Monitor0601::loop() {
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#if RTRH_DEBUG_CAPTURE
+  power_save::set_transport_busy(i2c_sniffer::debug_export_pending() ||
+                                 rtrh_decoder::debug_export_pending());
+#else
+  power_save::set_transport_busy(false);
+#endif
   if (rtrh_power_path) power_save::loop();
   runtime_diag_update_max_(this->runtime_diag_.max_power_save_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);

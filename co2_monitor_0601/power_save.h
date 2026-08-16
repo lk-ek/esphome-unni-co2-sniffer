@@ -21,6 +21,10 @@ void on_rtrh_edge_from_isr();
 void on_rtrh_complete(bool valid);
 void on_valid_co2();
 
+// Keep automatic Light-sleep inhibited until queued debug-network traffic has
+// drained, with a bounded grace period enforced by loop().
+void set_transport_busy(bool busy);
+
 // Keep the ESP fully awake at 80 MHz while external USB/VBUS power is present.
 // Battery mode releases these persistent locks and falls back to the RT/RH wake window.
 void set_external_power(bool present);

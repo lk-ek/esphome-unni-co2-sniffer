@@ -90,3 +90,17 @@ The Home Assistant `Energy Save Mode` switch forces the battery power policy whi
 ## Energy Save Mode transition
 
 When Energy Save Mode is enabled while VBUS is physically present, `energy_save_grace` (default 3 s) keeps the normal USB PM locks briefly before applying the battery policy. This gives Home Assistant/API and logs time to observe the switch transition before automatic Light-sleep may disconnect native USB Serial/JTAG. Shipped Wi-Fi examples use `power_save_mode: LIGHT`; `HIGH`/MAX_MODEM was unreliable together with automatic Light-sleep on the tested ESP32-C3 setup.
+
+## Wake-window synchronization hardening (2026-08-16)
+
+RT/RH GPIO interrupts acquire the per-cycle `ESP_PM_NO_LIGHT_SLEEP` and
+`ESP_PM_CPU_FREQ_MAX` locks. ESP-IDF permits acquire/release from ISR context,
+but operations on the same PM-lock handle must not race between ISR and task
+context. The wake-window close path therefore masks the two RT/RH GPIO
+interrupts while releasing both handles and only marks the window unlocked
+after both releases have completed.
+
+Debug builds also keep the current awake window open while raw I2C or RT/RH UDP
+packets are queued. This drain grace is bounded to one second beyond the normal
+awake timeout, so a missing collector cannot keep a battery-powered device awake
+indefinitely.

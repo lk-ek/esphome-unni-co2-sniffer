@@ -853,6 +853,12 @@ void register_debug_handlers() {
   ESP_LOGD(TAG, "RT/RH debug capture instrumentation enabled without HTTP endpoints");
 #endif
 }
+
+bool debug_export_pending() {
+  return debug_udp::enabled() &&
+         ((debug.ready && debug.sample_count != 0) || debug_udp_timing_pending ||
+          debug_udp_timing_copies_remaining != 0);
+}
 #endif
 
 }  // namespace rtrh_decoder
