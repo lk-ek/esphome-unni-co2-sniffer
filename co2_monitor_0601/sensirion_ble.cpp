@@ -63,6 +63,7 @@ enum class AdvState : uint8_t { IDLE, CONFIGURING, STARTING, ADVERTISING, STOPPI
 static AdvState adv_state = AdvState::IDLE;
 static esp_ble_adv_params_t adv_params{};
 
+static void build_advertisement();
 static void configure_advertisement();
 
 static void request_refresh() {
