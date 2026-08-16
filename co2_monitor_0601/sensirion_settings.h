@@ -14,8 +14,10 @@ void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server);
 void sensirion_settings_loop();
 bool sensirion_settings_advertise_data_enabled();
 void sensirion_settings_set_advertise_data_enabled(bool enabled);
-// MyAmbience exposes UUID 0x81FE as IsLogEnabled. The Unni bridge reuses
-// that standard Sensirion boolean as its BLE-accessible HA/WiFi disable flag:
+// UUID 0x81FE is the SHT43 DemoBoard IsLogEnabled setting. The Unni bridge
+// retains it as an experimental direct-BLE alias for HA/WiFi disable.
+// Sensirion does not list 0x81FE for DIY/MyCO2 gadgets, so MyAmbience is not
+// expected to render it in the production gadget UI.
 // false = WiFi/HA enabled, true = WiFi/HA disabled.
 bool sensirion_settings_ha_disabled();
 void sensirion_settings_set_ha_disabled(bool disabled);

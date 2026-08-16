@@ -43,6 +43,8 @@ __attribute__((constructor)) static void set_bt_identity_early() {
 static constexpr uint8_t COMPANY_ID_LO = 0xD5;
 static constexpr uint8_t COMPANY_ID_HI = 0x06;
 static constexpr uint8_t ADV_TYPE_SAMPLE = 0x00;
+static constexpr uint8_t ADV_TYPE_NO_SAMPLE = 0xFF;
+static constexpr uint8_t SAMPLE_TYPE_NO_SAMPLE = 0x00;
 static constexpr uint8_t SAMPLE_TYPE_T_RH_CO2_ALT = 0x08;
 static constexpr uint8_t SAMPLE_TYPE_SHT43 = 0x06;
 
@@ -278,16 +280,28 @@ static void build_advertisement() {
   advertisement[p++] = ESP_BLE_AD_TYPE_FLAG;
   advertisement[p++] = ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT;
 
-  // Sensirion Device Settings 0x8130 acts as a privacy switch. Keep the
-  // connectable local-name advertisement available, but omit measurement
-  // manufacturer data while sample advertising is disabled.
+  // Match Sensirion's SHT43 privacy wire behavior: retain a short
+  // manufacturer header so the peripheral remains recognizable, but replace
+  // the sample advertisement with the 0xFF/0x00 no-sample marker and omit all
+  // measurement bytes.
   if (!advertise_data_enabled) {
+    advertisement[p++] = 7;  // type byte + 6 bytes manufacturer data
+    advertisement[p++] = ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE;
+    advertisement[p++] = COMPANY_ID_LO;
+    advertisement[p++] = COMPANY_ID_HI;
+    advertisement[p++] = ADV_TYPE_NO_SAMPLE;
+    advertisement[p++] = SAMPLE_TYPE_NO_SAMPLE;
 #if UNNI_SHT43_IDENTITY_PROBE
+    advertisement[p++] = static_cast<uint8_t>(id & 0xFF);
+    advertisement[p++] = static_cast<uint8_t>(id >> 8);
     static constexpr char PRIVATE_NAME[] = "SHT43 DB";
     advertisement[p++] = sizeof(PRIVATE_NAME);
     advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
     for (size_t i = 0; i < sizeof(PRIVATE_NAME) - 1; ++i) advertisement[p++] = PRIVATE_NAME[i];
 #else
+    // Keep the DIY Gadget device-id byte order used by AdvertisementHeader.
+    advertisement[p++] = static_cast<uint8_t>(id >> 8);
+    advertisement[p++] = static_cast<uint8_t>(id & 0xFF);
     advertisement[p++] = 0x02;
     advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
     advertisement[p++] = 'S';
@@ -295,6 +309,7 @@ static void build_advertisement() {
     advertisement_length = p;
     advertisement_ready = true;
     ++payload_version;
+    ESP_LOGI(TAG, "Sensirion privacy advertisement built: short manufacturer header, no sample data");
     request_refresh();
     return;
   }

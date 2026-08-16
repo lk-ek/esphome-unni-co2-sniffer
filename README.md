@@ -504,7 +504,7 @@ with the known SHT43 DemoBoard characteristics:
 
 The service is created directly with the ESP-IDF GATT server API rather than the ESPHome characteristic wrapper. This is intentional: all four characteristics require encrypted MITM-authenticated access, matching the security flags used by Sensirion's SHT43 DemoBoard firmware. The BLE stack is configured for LE Secure Connections, bonding, Numeric Comparison and 10–16 byte encryption keys.
 
-Settings are persisted in ESPHome NVS. `IsAdvertiseDataEnabled` is applied at runtime: when disabled, the device remains connectable but measurement manufacturer data is omitted from advertising. `AlternativeDeviceName` is retained as the MyAmbience setting while the GAP identity remains unchanged so the compatibility classification is not accidentally altered. `IsLogEnabled` is persisted and reported to MyAmbience but intentionally does not override the ESPHome logger policy.
+Settings are persisted in ESPHome NVS. `IsAdvertiseDataEnabled` is applied at runtime. `AlternativeDeviceName` is retained while the GAP identity remains unchanged so the compatibility classification is not accidentally altered. `IsLogEnabled` is retained as an experimental direct-BLE alias for the WiFi/Home Assistant disable state; Sensirion does not define that meaning, and MyAmbience does not expose this SHT43-only switch for a normal MyCO2/DIY identity.
 
 Because the ESP installation has neither a dedicated display nor a physical confirmation button, pairing authorization is provided through Home Assistant. Enable:
 
@@ -820,18 +820,21 @@ This A/B build restores `rtrh_decoder.cpp` and `rtrh_decoder.h` byte-for-byte fr
 
 Two runtime controls are exposed to Home Assistant when HA entities are enabled:
 
-- **BLE Privacy** maps to Sensirion Device Settings `IsAdvertiseDataEnabled` (0x8130). Privacy ON suppresses live T/RH/CO2 manufacturer data while keeping BLE connectable and history/settings available. Changes made by MyAmbience are reflected back into the HA switch.
 - **WiFi / Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
 
 The example Wi-Fi/API configurations set `reboot_timeout: 0s`, otherwise ESPHome's normal connectivity watchdog could reboot a device that intentionally has Wi-Fi disabled.
 
 
-### MyAmbience controls
+### MyAmbience Device Settings compatibility
 
-The Sensirion Device Settings service (`0x8100`) follows the upstream SHT43 DemoBoard topology.
-MyAmbience therefore controls the bridge through the standard settings it already knows:
+Reviewing the bundled Sensirion repositories shows that MyAmbience settings are device-type specific rather than purely characteristic-driven.
 
-- `0x8130 IsAdvertiseDataEnabled`: native Sensirion privacy control. `false` suppresses live measurement manufacturer data while keeping the BLE GATT/history path available.
-- `0x81FE IsLogEnabled`: reused by this bridge as the **HA/WiFi disable** flag. `false` keeps WiFi/Home Assistant enabled; `true` turns WiFi/Home Assistant off after a short grace period. The MyAmbience UI may label this switch as logging because the label is defined by the app, not by the peripheral.
+For the **SHT43 Demo Board**, Sensirion documents `0x81FE IsLogEnabled`, `0x8130 IsAdvertiseDataEnabled` (Privacy), `0x8120 AlternativeDeviceName`, and `0x81FF DeviceSettingsVersion`. For a **DIY Gadget**, the current Sensirion service specification and Arduino server instead list `0x8120 AlternativeDeviceName`, `0x8171 Wi-Fi SSID`, and `0x8172 Wi-Fi Password`.
 
-The Home Assistant `WiFi / Home Assistant` switch mirrors `0x81FE` in the inverse sense. The separate Home Assistant BLE privacy switch was intentionally removed so `0x8130` has a single Sensirion-compatible source of truth. USB power still opens the temporary WiFi recovery window when HA/WiFi has been disabled.
+This matches the earlier identity probe: MyAmbience exposes Privacy when the device advertises as an SHT43 Demo Board, but that identity makes the app treat the history as T/RH-only and loses the desired MyCO2 presentation. Production therefore keeps the MyCO2-compatible identity.
+
+`0x8130` remains available for protocol experiments and direct GATT clients. Its privacy advertisement follows Sensirion's SHT43 implementation: the short Sensirion manufacturer header remains present with advertisement type `0xFF` and sample type `0x00`, while live measurement bytes are omitted.
+
+`0x81FE` remains an **experimental direct-BLE alias** for disabling WiFi/Home Assistant. MyAmbience is not expected to render this SHT43-only setting as a switch for the production MyCO2 identity. The Home Assistant `WiFi / Home Assistant` switch and USB recovery window remain the supported UI for that function.
+
+The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not exposed yet: accepting credentials without safely integrating them into ESPHome's configured-network lifecycle would create a setting that appears functional but is not reliable.

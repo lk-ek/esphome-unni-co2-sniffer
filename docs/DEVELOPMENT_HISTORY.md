@@ -497,3 +497,10 @@ The Home Assistant BLE Pairing Mode remains a 60-second authorization gate for N
 - Added a restorable `WiFi / Home Assistant` switch that disables the ESPHome Wi-Fi interface after a short acknowledgement grace period.
 - Added a five-minute USB recovery window so a deliberately offline device can be brought back into HA and re-enabled without reflashing.
 - Disabled Wi-Fi/API reboot timeouts in the example configurations so intentional offline operation does not trigger watchdog-style reboots.
+
+
+## 2026-08-16 — Sensirion source bundle reconciliation
+
+The uploaded upstream source bundle was reviewed across `ble-services`, `arduino-ble-gadget`, `arduino-upt-ble-server`, and the SHT43 DemoBoard firmware. The review corrected the assumption that every Device Settings characteristic is a generic MyAmbience capability. Sensirion marks `AlternativeDeviceName` plus Wi-Fi SSID/password as DIY-Gadget settings, while `IsLogEnabled` and `IsAdvertiseDataEnabled` are SHT43 DemoBoard settings. This agrees with the earlier SHT43 identity probe, where MyAmbience exposed Privacy only after switching to the SHT43 advertisement identity.
+
+The production MyCO2 identity is retained because it is required for live CO2 and CO2-history presentation. UUID `0x81FE` therefore remains only an experimental direct-BLE alias for WiFi/HA disable. UUID `0x8130` remains available for direct access and its privacy advertisement now follows the SHT43 firmware's wire behavior: retain a short Sensirion manufacturer header with advertisement type `0xFF` and sample type `0x00`, and omit measurement bytes instead of removing manufacturer data entirely.

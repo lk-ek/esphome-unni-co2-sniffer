@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Sensirion-compatible Device Settings service (0x8100).
+// Sensirion documents 0x8120 for DIY gadgets; 0x81FE/0x8130 are SHT43
+// DemoBoard settings. They remain here for direct GATT experiments, without
+// assuming that MyAmbience renders them for a MyCO2 advertisement identity.
 //
 // Unlike ESPHome's BLECharacteristic wrapper, this service is created through
 // the ESP-IDF GATTS API directly so the characteristics can use authenticated
