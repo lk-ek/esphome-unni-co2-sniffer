@@ -245,31 +245,6 @@ void CO2Monitor0601::update_battery_estimator_(float battery_voltage, bool usb_m
 
 
 #if UNNI_BLE_ENABLED
-void BlePrivacySwitch::write_state(bool state) {
-  if (this->parent_ != nullptr)
-    this->parent_->set_ble_privacy_mode(state);
-  else
-    this->publish_state(state);
-}
-
-void CO2Monitor0601::set_ble_privacy_mode(bool enabled) {
-  // HA exposes the user-facing privacy sense: ON means do not advertise live
-  // measurement data. Sensirion 0x8130 uses the inverse sense.
-  sensirion_settings_set_advertise_data_enabled(!enabled);
-  this->ble_privacy_state_ = enabled;
-  this->ble_privacy_state_valid_ = true;
-  if (this->ble_privacy_switch_ != nullptr) this->ble_privacy_switch_->publish_state(enabled);
-  ESP_LOGI(TAG, "BLE Privacy: %s", enabled ? "ON (live values hidden from advertising)" : "OFF");
-}
-
-void CO2Monitor0601::sync_ble_privacy_switch_() {
-  const bool privacy = !sensirion_settings_advertise_data_enabled();
-  if (this->ble_privacy_state_valid_ && this->ble_privacy_state_ == privacy) return;
-  this->ble_privacy_state_ = privacy;
-  this->ble_privacy_state_valid_ = true;
-  if (this->ble_privacy_switch_ != nullptr) this->ble_privacy_switch_->publish_state(privacy);
-}
-
 void BlePairingModeSwitch::write_state(bool state) {
   if (this->parent_ != nullptr)
     this->parent_->set_ble_pairing_mode(state);
@@ -328,7 +303,39 @@ void CO2Monitor0601::open_wifi_recovery_window_(uint32_t now, const char *reason
            static_cast<unsigned long>(this->wifi_recovery_window_ms_), reason);
 }
 
+void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
+#if UNNI_BLE_ENABLED
+  const bool enabled = !sensirion_settings_ha_disabled();
+  if (enabled == this->wifi_ha_enabled_) return;
+  ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi / Home Assistant -> %s",
+           enabled ? "ON" : "OFF");
+  // Apply without writing the same setting back; the GATT write has already
+  // persisted it.
+  this->wifi_ha_enabled_ = enabled;
+  if (this->wifi_ha_switch_ != nullptr) this->wifi_ha_switch_->publish_state(enabled);
+  if (enabled) {
+    this->wifi_disable_pending_ = false;
+    this->wifi_recovery_until_ms_ = 0;
+#ifdef USE_WIFI
+    if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_disabled())
+      wifi::global_wifi_component->enable();
+#endif
+    this->publish_cached_ha_now_();
+  } else {
+    this->wifi_disable_pending_ = true;
+    this->wifi_disable_requested_ms_ = millis();
+    this->wifi_recovery_until_ms_ = 0;
+    ESP_LOGW(TAG, "MyAmbience requested HA/WiFi disable; WiFi will stop in 1500 ms");
+  }
+#endif
+}
+
 void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
+#if UNNI_BLE_ENABLED
+  // Keep the MyAmbience 0x81FE control synchronized with the HA switch.
+  // 0x81FE uses the inverse sense: true means HA/WiFi disabled.
+  sensirion_settings_set_ha_disabled(!enabled);
+#endif
   this->wifi_ha_enabled_ = enabled;
   if (this->wifi_ha_switch_ != nullptr) this->wifi_ha_switch_->publish_state(enabled);
   if (enabled) {
@@ -703,8 +710,14 @@ void CO2Monitor0601::setup() {
   ESP_LOGW(TAG, "API stall diagnostic enabled: 1 Hz main-loop timing + 10 s heap telemetry; ISR paths unchanged");
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
   if (this->wifi_ha_switch_ != nullptr) {
+#if UNNI_BLE_ENABLED
+    // The persistent Sensirion 0x81FE setting is the source of truth when BLE
+    // is present, so MyAmbience can always restore WiFi/HA after a reboot.
+    this->wifi_ha_enabled_ = true;
+#else
     const auto restored = this->wifi_ha_switch_->get_initial_state_with_restore_mode();
     this->wifi_ha_enabled_ = restored.value_or(true);
+#endif
     this->wifi_ha_switch_->publish_state(this->wifi_ha_enabled_);
   }
 #if UNNI_BLE_ENABLED
@@ -766,7 +779,16 @@ void CO2Monitor0601::setup() {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
 #endif
     sensirion_settings_configure_gatt(this->gatt_server_);
-    this->sync_ble_privacy_switch_();
+    // 0x81FE (shown by MyAmbience as IsLogEnabled) doubles as our HA/WiFi
+    // disable switch. This gives BLE a recovery/control path while WiFi is off.
+    this->wifi_ha_enabled_ = !sensirion_settings_ha_disabled();
+    if (this->wifi_ha_switch_ != nullptr)
+      this->wifi_ha_switch_->publish_state(this->wifi_ha_enabled_);
+    if (!this->wifi_ha_enabled_) {
+      this->wifi_disable_pending_ = true;
+      this->wifi_disable_requested_ms_ = millis();
+      ESP_LOGW(TAG, "MyAmbience HA/WiFi disable restored; WiFi will stop after startup grace");
+    }
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }
@@ -1226,10 +1248,10 @@ void CO2Monitor0601::loop() {
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_usb_power_();
   this->process_energy_save_grace_();
+  this->sync_wifi_ha_from_sensirion_settings_();
   this->process_wifi_ha_control_();
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
-  this->sync_ble_privacy_switch_();
 #endif
   runtime_diag_update_max_(this->runtime_diag_.max_policy_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);

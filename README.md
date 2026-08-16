@@ -824,3 +824,14 @@ Two runtime controls are exposed to Home Assistant when HA entities are enabled:
 - **WiFi / Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
 
 The example Wi-Fi/API configurations set `reboot_timeout: 0s`, otherwise ESPHome's normal connectivity watchdog could reboot a device that intentionally has Wi-Fi disabled.
+
+
+### MyAmbience controls
+
+The Sensirion Device Settings service (`0x8100`) follows the upstream SHT43 DemoBoard topology.
+MyAmbience therefore controls the bridge through the standard settings it already knows:
+
+- `0x8130 IsAdvertiseDataEnabled`: native Sensirion privacy control. `false` suppresses live measurement manufacturer data while keeping the BLE GATT/history path available.
+- `0x81FE IsLogEnabled`: reused by this bridge as the **HA/WiFi disable** flag. `false` keeps WiFi/Home Assistant enabled; `true` turns WiFi/Home Assistant off after a short grace period. The MyAmbience UI may label this switch as logging because the label is defined by the app, not by the peripheral.
+
+The Home Assistant `WiFi / Home Assistant` switch mirrors `0x81FE` in the inverse sense. The separate Home Assistant BLE privacy switch was intentionally removed so `0x8130` has a single Sensirion-compatible source of truth. USB power still opens the temporary WiFi recovery window when HA/WiFi has been disabled.

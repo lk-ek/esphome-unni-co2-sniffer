@@ -69,7 +69,6 @@ CONF_BLE_PAIRING_WINDOW = "ble_pairing_window"
 CONF_SHT43_IDENTITY_PROBE = "sht43_identity_probe"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
-CONF_BLE_PRIVACY = "ble_privacy"
 CONF_WIFI_HA_ENABLED = "wifi_ha_enabled"
 CONF_WIFI_RECOVERY_WINDOW = "wifi_recovery_window"
 CONF_THERMAL_TRANSIENT_ON_RATE = "thermal_transient_on_rate"
@@ -91,7 +90,6 @@ co2_monitor_0601_ns = cg.esphome_ns.namespace("co2_monitor_0601")
 CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
 EnergySaveModeSwitch = co2_monitor_0601_ns.class_("EnergySaveModeSwitch", switch.Switch)
 BlePairingModeSwitch = co2_monitor_0601_ns.class_("BlePairingModeSwitch", switch.Switch)
-BlePrivacySwitch = co2_monitor_0601_ns.class_("BlePrivacySwitch", switch.Switch)
 WifiHaSwitch = co2_monitor_0601_ns.class_("WifiHaSwitch", switch.Switch)
 
 
@@ -322,7 +320,6 @@ _SCHEMA = {
     cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
     cv.Optional(CONF_BLE_PAIRING_MODE, default={"name": "BLE Pairing Mode", "icon": "mdi:bluetooth-connect"}): switch.switch_schema(BlePairingModeSwitch),
-    cv.Optional(CONF_BLE_PRIVACY, default={"name": "BLE Privacy", "icon": "mdi:shield-lock"}): switch.switch_schema(BlePrivacySwitch),
     cv.Optional(CONF_WIFI_HA_ENABLED, default={"name": "WiFi / Home Assistant", "icon": "mdi:wifi"}): switch.switch_schema(WifiHaSwitch, default_restore_mode="RESTORE_DEFAULT_ON"),
     cv.Optional(CONF_WIFI_RECOVERY_WINDOW, default="5min"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BLE_PAIRING_WINDOW, default="60s"): cv.positive_time_period_milliseconds,
@@ -502,9 +499,6 @@ async def to_code(config):
             cg.add(pairing.set_parent(var))
             cg.add(var.set_ble_pairing_mode_switch(pairing))
             cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
-            privacy = await switch.new_switch(config[CONF_BLE_PRIVACY])
-            cg.add(privacy.set_parent(var))
-            cg.add(var.set_ble_privacy_switch(privacy))
 
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))

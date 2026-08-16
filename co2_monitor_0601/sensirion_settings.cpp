@@ -114,7 +114,7 @@ void load_settings() {
   gatt.alternative_name.fill(0);
   gatt.alternative_name_len = len;
   if (len != 0) std::memcpy(gatt.alternative_name.data(), saved.alternative_name, len);
-  ESP_LOGI(TAG, "restored Device Settings: log=%u advertise_data=%u name_len=%u",
+  ESP_LOGI(TAG, "restored Device Settings: ha_disable=%u advertise_data=%u name_len=%u",
            static_cast<unsigned>(gatt.log_enabled),
            static_cast<unsigned>(gatt.advertise_data_enabled),
            static_cast<unsigned>(gatt.alternative_name_len));
@@ -271,8 +271,9 @@ void handle_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
       gatt.log_enabled = param->write.value[0] ? 1 : 0;
       set_stack_value(gatt.log_enabled_handle, &gatt.log_enabled, 1);
       save_settings();
-      ESP_LOGW(TAG, "MyAmbience IsLogEnabled=%u (stored; ESPHome logger policy unchanged)",
-               static_cast<unsigned>(gatt.log_enabled));
+      ESP_LOGW(TAG, "MyAmbience IsLogEnabled=%u -> HA/WiFi %s",
+               static_cast<unsigned>(gatt.log_enabled),
+               gatt.log_enabled ? "DISABLE requested" : "ENABLE requested");
     }
   } else if (param->write.handle == gatt.advertise_data_enabled_handle) {
     if (param->write.len != 1) {
@@ -307,6 +308,21 @@ void handle_write(esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
 }  // namespace
 
 bool sensirion_settings_advertise_data_enabled() { return gatt.advertise_data_enabled != 0; }
+
+bool sensirion_settings_ha_disabled() { return gatt.log_enabled != 0; }
+
+void sensirion_settings_set_ha_disabled(bool disabled) {
+  const uint8_t value = disabled ? 1 : 0;
+  if (gatt.log_enabled == value) {
+    set_stack_value(gatt.log_enabled_handle, &gatt.log_enabled, 1);
+    return;
+  }
+  gatt.log_enabled = value;
+  set_stack_value(gatt.log_enabled_handle, &gatt.log_enabled, 1);
+  save_settings();
+  ESP_LOGI(TAG, "IsLogEnabled=%u mapped to HA/WiFi %s",
+           static_cast<unsigned>(value), disabled ? "disabled" : "enabled");
+}
 
 void sensirion_settings_set_advertise_data_enabled(bool enabled) {
   const uint8_t value = enabled ? 1 : 0;
