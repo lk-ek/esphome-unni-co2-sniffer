@@ -476,6 +476,8 @@ MyAmbience can download the history through the compatible GATT protocol.
 
 The history ring is persistent across normal reboots.
 
+The 4096-sample history is flash-backed. Only a small pending write ring is kept in RAM, so enabling MyAmbience history does not require a second 32 KiB in-memory copy of the persistent sample store.
+
 ---
 
 # Experimental secure MyAmbience settings

@@ -131,7 +131,7 @@ Relevant notes:
 
 History originally grew as a separate subsystem with its own sample encoding and state. It was later consolidated so live BLE and history use the same encoded Sensirion sample format.
 
-The current implementation uses a RAM ring plus an append-oriented flash journal in the `senshist` partition. The partition is requested by the component automatically when history is enabled, so users no longer need to maintain a custom partition table in YAML.
+The current implementation uses the dedicated `senshist` flash partition as the primary 4096-sample history store plus a small 64-sample pending RAM ring. Older versions mirrored all 4096 encoded samples in RAM as well as flash; removing that redundant mirror saves about 31.5 KiB of DRAM while preserving the MyAmbience history depth and download protocol. The partition is requested by the component automatically when history is enabled, so users no longer need to maintain a custom partition table in YAML.
 
 The preserved design history is in [`history/REFACTOR_V12.md`](history/REFACTOR_V12.md).
 

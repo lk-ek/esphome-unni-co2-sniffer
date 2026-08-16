@@ -34,13 +34,15 @@ namespace {
 static const char *const TAG = "sensirion_history";
 
 constexpr size_t SAMPLE_SIZE = 8;
-constexpr uint16_t RAM_CAPACITY = 4096;
+constexpr uint16_t HISTORY_CAPACITY = 4096;
+constexpr uint16_t PENDING_CAPACITY = 64;
 constexpr uint32_t DEFAULT_INTERVAL_MS = 600000;
 constexpr uint32_t FLASH_FLUSH_MS = 600000;
 constexpr size_t FLASH_SECTOR_SIZE = 4096;
 constexpr uint16_t FLASH_DATA_SECTORS = 14;
 constexpr uint16_t FLASH_SAMPLES_PER_SECTOR = FLASH_SECTOR_SIZE / SAMPLE_SIZE;
 constexpr uint16_t FLASH_CAPACITY = FLASH_DATA_SECTORS * FLASH_SAMPLES_PER_SECTOR;
+static_assert(HISTORY_CAPACITY <= FLASH_CAPACITY);
 constexpr uint32_t META_MAGIC = 0x53474832;  // "SGH2"
 constexpr uint16_t META_VERSION = 2;
 constexpr uint16_t DOWNLOAD_TYPE = 7;
@@ -62,8 +64,11 @@ struct __attribute__((packed)) FlashMeta {
 static_assert(sizeof(FlashMeta) == 32);
 
 struct HistoryState {
-  std::array<Sample, RAM_CAPACITY> samples{};
-  uint16_t head{0};
+  // Persisted history lives in the dedicated senshist flash partition. Keep
+  // only the newest, not-yet-flushed samples in RAM; a full 4096-sample RAM
+  // mirror costs 32 KiB on the ESP32-C3 and is unnecessary.
+  std::array<Sample, PENDING_CAPACITY> pending_samples{};
+  uint16_t pending_head{0};
   uint16_t count{0};
   uint16_t pending{0};
   uint32_t interval_ms{DEFAULT_INTERVAL_MS};
@@ -146,7 +151,7 @@ uint32_t meta_crc(const FlashMeta &meta) {
 
 bool valid_meta(const FlashMeta &meta) {
   return meta.magic == META_MAGIC && meta.version == META_VERSION &&
-         meta.size == sizeof(FlashMeta) && meta.count <= RAM_CAPACITY &&
+         meta.size == sizeof(FlashMeta) && meta.count <= HISTORY_CAPACITY &&
          meta.flash_write_slot < FLASH_CAPACITY && meta.interval_ms > 0 &&
          meta.crc == meta_crc(meta);
 }
@@ -156,9 +161,31 @@ size_t sample_offset(uint16_t slot) {
 }
 
 Sample logical_sample(uint16_t logical) {
-  const uint16_t oldest = static_cast<uint16_t>(
-      (history.head + RAM_CAPACITY - history.count) % RAM_CAPACITY);
-  return history.samples[(oldest + logical) % RAM_CAPACITY];
+  Sample sample{};
+  if (logical >= history.count)
+    return sample;
+
+  // history.count is capped at HISTORY_CAPACITY. Pending samples are always the
+  // newest entries. If the logical window is full, only the newest
+  // (count-pending) persisted samples remain visible.
+  const uint16_t visible_persisted = static_cast<uint16_t>(history.count - history.pending);
+  if (logical < visible_persisted) {
+    if (!flash.ready || flash.persisted == 0)
+      return sample;
+    const uint16_t persisted_skip = static_cast<uint16_t>(flash.persisted - visible_persisted);
+    const uint16_t oldest_flash = static_cast<uint16_t>(
+        (flash.write_slot + FLASH_CAPACITY - flash.persisted) % FLASH_CAPACITY);
+    const uint16_t slot = static_cast<uint16_t>(
+        (oldest_flash + persisted_skip + logical) % FLASH_CAPACITY);
+    if (esp_partition_read(flash.partition, sample_offset(slot), sample.data(), SAMPLE_SIZE) != ESP_OK)
+      ESP_LOGW(TAG, "history sample flash read failed at slot %u", static_cast<unsigned>(slot));
+    return sample;
+  }
+
+  const uint16_t pending_logical = static_cast<uint16_t>(logical - visible_persisted);
+  const uint16_t oldest_pending = static_cast<uint16_t>(
+      (history.pending_head + PENDING_CAPACITY - history.pending) % PENDING_CAPACITY);
+  return history.pending_samples[(oldest_pending + pending_logical) % PENDING_CAPACITY];
 }
 
 void sync_gatt() {
@@ -207,7 +234,7 @@ bool write_meta() {
 }
 
 void clear_history() {
-  history.head = history.count = history.pending = 0;
+  history.pending_head = history.count = history.pending = 0;
   history.latest_ms = history.last_sample_ms = 0;
   history.clock_started = false;
   flash.write_slot = flash.persisted = 0;
@@ -242,7 +269,7 @@ bool flush_flash() {
 
   const uint16_t pending = history.pending;
   const uint16_t first_ram = static_cast<uint16_t>(
-      (history.head + RAM_CAPACITY - pending) % RAM_CAPACITY);
+      (history.pending_head + PENDING_CAPACITY - pending) % PENDING_CAPACITY);
   uint16_t write_slot = flash.write_slot;
   uint16_t persisted = flash.persisted;
 
@@ -257,21 +284,22 @@ bool flush_flash() {
       }
     }
 
-    const uint16_t ram_slot = (first_ram + i) % RAM_CAPACITY;
+    const uint16_t ram_slot = (first_ram + i) % PENDING_CAPACITY;
     const esp_err_t err = esp_partition_write(
-        flash.partition, sample_offset(write_slot), history.samples[ram_slot].data(), SAMPLE_SIZE);
+        flash.partition, sample_offset(write_slot), history.pending_samples[ram_slot].data(), SAMPLE_SIZE);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "sample flash write failed: %d", err);
       return false;
     }
     write_slot = (write_slot + 1) % FLASH_CAPACITY;
-    if (persisted < RAM_CAPACITY)
+    if (persisted < HISTORY_CAPACITY)
       ++persisted;
   }
 
   flash.write_slot = write_slot;
   flash.persisted = persisted;
   history.pending = 0;
+  history.pending_head = 0;
   flash.last_flush_ms = now_ms();
   if (!write_meta())
     return false;
@@ -286,7 +314,7 @@ void init_flash() {
   flash.partition = esp_partition_find_first(
       ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "senshist");
   if (flash.partition == nullptr) {
-    ESP_LOGW(TAG, "no 'senshist' partition; history works in RAM only");
+    ESP_LOGE(TAG, "no 'senshist' partition; persistent 4096-sample history unavailable");
     return;
   }
 
@@ -328,21 +356,10 @@ void init_flash() {
   flash.generation = best.generation;
   flash.next_meta_slot = best_slot + 1;
 
-  const uint16_t first_flash = static_cast<uint16_t>(
-      (best.flash_write_slot + FLASH_CAPACITY - best.count) % FLASH_CAPACITY);
-  for (uint16_t i = 0; i < best.count; ++i) {
-    const uint16_t slot = (first_flash + i) % FLASH_CAPACITY;
-    Sample sample{};
-    if (esp_partition_read(flash.partition, sample_offset(slot), sample.data(), SAMPLE_SIZE) != ESP_OK) {
-      ESP_LOGW(TAG, "flash history read stopped at %u", i);
-      break;
-    }
-    history.samples[history.head] = sample;
-    history.head = (history.head + 1) % RAM_CAPACITY;
-    if (history.count < RAM_CAPACITY)
-      ++history.count;
-  }
-  flash.persisted = history.count;
+  history.count = best.count;
+  history.pending = 0;
+  history.pending_head = 0;
+  flash.persisted = best.count;
   history.latest_ms = flash.last_flush_ms = now_ms();
 
   ESP_LOGI(TAG, "restored %u sample(s), interval=%u ms, flash_slot=%u",
@@ -355,17 +372,22 @@ void commit_sample() {
   if (!sample.complete())
     return;
 
-  history.samples[history.head] = sample.encoded();
-  history.head = (history.head + 1) % RAM_CAPACITY;
-  if (history.count < RAM_CAPACITY)
+  // Never overwrite an unflushed sample. At unusually short history
+  // intervals, flush the small pending ring early instead of growing RAM use.
+  if (history.pending >= PENDING_CAPACITY && !flush_flash()) {
+    ESP_LOGW(TAG, "history pending ring full; dropping newest sample because flash flush failed");
+    return;
+  }
+  history.pending_samples[history.pending_head] = sample.encoded();
+  history.pending_head = (history.pending_head + 1) % PENDING_CAPACITY;
+  if (history.count < HISTORY_CAPACITY)
     ++history.count;
-  if (history.pending < RAM_CAPACITY)
-    ++history.pending;
+  ++history.pending;
   history.latest_ms = now_ms();
   sync_gatt();
 
   ESP_LOGI(TAG, "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
-           static_cast<unsigned>(history.count), static_cast<unsigned>(RAM_CAPACITY),
+           static_cast<unsigned>(history.count), static_cast<unsigned>(HISTORY_CAPACITY),
            sample.temperature_c, sample.humidity_percent, static_cast<unsigned>(sample.co2_ppm));
 }
 
@@ -535,6 +557,9 @@ void sensirion_history_setup() {
   init_flash();
   sync_gatt();
   flash.last_flush_ms = now_ms();
+  ESP_LOGI(TAG, "history storage: flash-backed %u samples, RAM pending ring %u samples (%u bytes)",
+           static_cast<unsigned>(HISTORY_CAPACITY), static_cast<unsigned>(PENDING_CAPACITY),
+           static_cast<unsigned>(PENDING_CAPACITY * SAMPLE_SIZE));
 }
 
 void sensirion_history_loop() {
