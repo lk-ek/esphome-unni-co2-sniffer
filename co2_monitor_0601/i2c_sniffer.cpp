@@ -992,6 +992,16 @@ static void restore_passive_gpio_() {
   }
 }
 
+static void hard_sda_output_() {
+  gpio_set_direction(pin_sda, GPIO_MODE_OUTPUT);
+}
+
+static void hard_sda_input_() {
+  gpio_set_direction(pin_sda, GPIO_MODE_INPUT);
+  gpio_pullup_en(pin_sda);
+  gpio_pulldown_dis(pin_sda);
+}
+
 static bool begin_active_master_() {
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
@@ -1000,9 +1010,13 @@ static bool begin_active_master_() {
   capture_finished = false;
   capture_overflow = false;
 
+  // Aggressive diagnostic mode: the user's external 10 kOhm series resistors
+  // bound worst-case DC current to about 0.33 mA per line at 3.3 V. Drive the
+  // ESP side HIGH push-pull so a powered-down / weakly clamped Unni bus has a
+  // chance to rise. SDA is released back to input for ACK/data sampling.
   gpio_config_t io{};
-  io.mode = GPIO_MODE_INPUT_OUTPUT_OD;
-  io.pull_up_en = GPIO_PULLUP_ENABLE;
+  io.mode = GPIO_MODE_OUTPUT;
+  io.pull_up_en = GPIO_PULLUP_DISABLE;
   io.pull_down_en = GPIO_PULLDOWN_DISABLE;
   io.intr_type = GPIO_INTR_DISABLE;
   io.pin_bit_mask = (1ULL << pin_scl) | (1ULL << pin_sda);
@@ -1012,27 +1026,24 @@ static bool begin_active_master_() {
   }
   gpio_set_level(pin_scl, 1);
   gpio_set_level(pin_sda, 1);
-  // The internal pull-ups are intentionally weak and sit behind the user's
-  // external 10 kOhm series resistors. Give the bus ample time to rise.
-  esp_rom_delay_us(500);
-  if (!gpio_get_level(pin_scl) || !gpio_get_level(pin_sda)) {
-    restore_passive_gpio_();
-    return false;
-  }
+  esp_rom_delay_us(2000);
   return true;
 }
 
-static inline void i2c_delay_() { esp_rom_delay_us(20); }  // ~25 kHz
+static inline void i2c_delay_() { esp_rom_delay_us(50); }  // ~10 kHz, intentionally slow
 static inline void drive_scl_(bool high) { gpio_set_level(pin_scl, high ? 1 : 0); }
-static inline void drive_sda_(bool high) { gpio_set_level(pin_sda, high ? 1 : 0); }
+static inline void drive_sda_(bool high) {
+  hard_sda_output_();
+  gpio_set_level(pin_sda, high ? 1 : 0);
+}
 
 static bool wait_scl_high_() {
+  // SCL is intentionally driven push-pull HIGH through the external 10 kOhm
+  // tap resistor in this diagnostic mode. Do not use the ESP-side level as a
+  // claim that the Unni-side node actually reached VIH.
   drive_scl_(true);
-  for (uint16_t i = 0; i < 250; i++) {
-    if (gpio_get_level(pin_scl)) return true;
-    esp_rom_delay_us(2);
-  }
-  return false;
+  esp_rom_delay_us(50);
+  return true;
 }
 
 static bool master_start_() {
@@ -1064,21 +1075,32 @@ static bool master_write_byte_(uint8_t value) {
     drive_scl_(false);
     i2c_delay_();
   }
-  // Release SDA for the slave ACK bit.
+
+  // For ACK the master must stop driving SDA. Precharge it HIGH first, then
+  // release it to an input with the weak internal pull-up; a live slave can
+  // pull the Unni side LOW through the 10 kOhm tap and be observed here.
   drive_sda_(true);
+  esp_rom_delay_us(20);
+  hard_sda_input_();
   i2c_delay_();
   if (!wait_scl_high_()) return false;
   i2c_delay_();
   const bool ack = !gpio_get_level(pin_sda);
   drive_scl_(false);
   i2c_delay_();
+  hard_sda_output_();
+  gpio_set_level(pin_sda, 1);
   return ack;
 }
 
 static bool master_read_byte_(uint8_t &value, bool ack) {
   value = 0;
-  drive_sda_(true);
   for (uint8_t bit = 0; bit < 8; ++bit) {
+    // Precharge the ESP side HIGH through 10 kOhm, then release SDA before the
+    // clock edge so the slave can pull it LOW for a zero bit.
+    drive_sda_(true);
+    esp_rom_delay_us(20);
+    hard_sda_input_();
     i2c_delay_();
     if (!wait_scl_high_()) return false;
     i2c_delay_();
@@ -1086,6 +1108,7 @@ static bool master_read_byte_(uint8_t &value, bool ack) {
     drive_scl_(false);
     i2c_delay_();
   }
+
   drive_sda_(!ack);
   i2c_delay_();
   if (!wait_scl_high_()) return false;
@@ -1278,7 +1301,7 @@ uint32_t last_edge_age_us() {
 
 bool active_write_command(uint16_t command) {
   if (!begin_active_master_()) {
-    ESP_LOGW(TAG, "Active I2C probe: weak pull-ups could not raise bus HIGH/HIGH");
+    ESP_LOGW(TAG, "Active I2C probe: hard-drive master setup failed");
     return false;
   }
 
@@ -1298,7 +1321,7 @@ bool active_write_command(uint16_t command) {
 bool active_read_bytes(uint8_t *data, uint8_t length) {
   if (!data || length == 0) return false;
   if (!begin_active_master_()) {
-    ESP_LOGW(TAG, "Active I2C probe read: weak pull-ups could not raise bus HIGH/HIGH");
+    ESP_LOGW(TAG, "Active I2C probe read: hard-drive master setup failed");
     return false;
   }
 

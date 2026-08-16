@@ -1281,7 +1281,7 @@ void CO2Monitor0601::process_active_i2c_probe_() {
 
   this->active_i2c_probe_last_attempt_ms_ = now;
   ESP_LOGI(TAG,
-           "Active I2C probe: bus LOW/LOW and quiet >1 s; trying EC05 using weak internal pull-ups through 10 kOhm taps");
+           "Active I2C probe HARD: bus LOW/LOW and quiet >1 s; driving 3.3 V through 10 kOhm taps and trying EC05");
 
   // Least invasive first: ask for the current measurement in case the sensor
   // remains powered while only its normal bus pull-ups are gated off.
@@ -1319,34 +1319,6 @@ void CO2Monitor0601::runtime_diag_loop_begin_() {
   this->runtime_diag_.last_loop_start_us = now_us;
   this->runtime_diag_.current_loop_start_us = now_us;
   this->runtime_diag_.loops++;
-
-  if (this->runtime_diag_.last_report_ms == 0) this->runtime_diag_.last_report_ms = now_ms;
-  if (static_cast<uint32_t>(now_ms - this->runtime_diag_.last_report_ms) >= 1000U) {
-    ESP_LOGD(TAG,
-             "API diag heartbeat: loops=%lu max_gap=%.3f ms own=%.3f ms | history=%.3f policy=%.3f ha=%.3f battery=%.3f rtrh=%.3f co2=%.3f power=%.3f ms",
-             static_cast<unsigned long>(this->runtime_diag_.loops),
-             this->runtime_diag_.max_loop_gap_us / 1000.0f,
-             this->runtime_diag_.max_component_us / 1000.0f,
-             this->runtime_diag_.max_history_us / 1000.0f,
-             this->runtime_diag_.max_policy_us / 1000.0f,
-             this->runtime_diag_.max_ha_publish_us / 1000.0f,
-             this->runtime_diag_.max_battery_us / 1000.0f,
-             this->runtime_diag_.max_rtrh_us / 1000.0f,
-             this->runtime_diag_.max_co2_us / 1000.0f,
-             this->runtime_diag_.max_power_save_us / 1000.0f);
-
-    this->runtime_diag_.last_report_ms = now_ms;
-    this->runtime_diag_.loops = 0;
-    this->runtime_diag_.max_loop_gap_us = 0;
-    this->runtime_diag_.max_component_us = 0;
-    this->runtime_diag_.max_history_us = 0;
-    this->runtime_diag_.max_policy_us = 0;
-    this->runtime_diag_.max_ha_publish_us = 0;
-    this->runtime_diag_.max_battery_us = 0;
-    this->runtime_diag_.max_rtrh_us = 0;
-    this->runtime_diag_.max_co2_us = 0;
-    this->runtime_diag_.max_power_save_us = 0;
-  }
 
   if (this->runtime_diag_.last_heap_report_ms == 0) this->runtime_diag_.last_heap_report_ms = now_ms;
   if (static_cast<uint32_t>(now_ms - this->runtime_diag_.last_heap_report_ms) >= 10000U) {

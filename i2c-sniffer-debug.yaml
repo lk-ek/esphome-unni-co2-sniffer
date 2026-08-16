@@ -71,9 +71,9 @@ co2_monitor_0601:
   # Wi-Fi still switches to MIN_MODEM on battery; only automatic Light-sleep is removed.
   light_sleep: false
   debug_metrics: true
-  # Experimental battery diagnostic: while the native bus is quiet LOW/LOW,
-  # briefly enable only the ESP32-C3's weak internal I2C pull-ups through the
-  # existing 10 kOhm series resistors and try an SCD4x-compatible transaction.
+  # Aggressive battery diagnostic: while the native bus is quiet LOW/LOW,
+  # drive the ESP side of SDA/SCL at 3.3 V through the existing 10 kOhm series
+  # resistors and try an SCD4x-compatible transaction. SDA is released for ACK/read.
   active_i2c_probe: true
   active_i2c_probe_interval: 60s
   debug_capture: true
