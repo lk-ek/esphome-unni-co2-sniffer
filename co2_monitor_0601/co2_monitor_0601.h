@@ -34,8 +34,6 @@ class BlePairingModeSwitch : public switch_::Switch {
   void write_state(bool state) override;
   CO2Monitor0601 *parent_{nullptr};
 };
-
-};
 #endif
 
 class WifiHaSwitch : public switch_::Switch {
