@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Receive Unni CO2 sniffer UDP debug captures and archive them on macOS/Linux."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime as dt
+import socket
+import struct
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, Tuple
+
+MAGIC = b"UND1"
+VERSION = 1
+HEADER = struct.Struct("<4sBBHIHHHH")
+TYPE_I2C_LA02 = 1
+TYPE_RTRH_RAW = 2
+TYPE_RTRH_TIMING = 3
+TIMING = struct.Struct("<IBBBB I ffffff HHHH BBBB")
+
+TYPE_NAMES = {
+    TYPE_I2C_LA02: "i2c",
+    TYPE_RTRH_RAW: "rtrh",
+    TYPE_RTRH_TIMING: "timing",
+}
+
+
+@dataclass
+class PendingCapture:
+    packet_count: int
+    flags: int
+    first_seen: dt.datetime
+    packets: Dict[int, bytes] = field(default_factory=dict)
+
+    def complete(self) -> bool:
+        return len(self.packets) == self.packet_count
+
+    def payload(self) -> bytes:
+        return b"".join(self.packets[i] for i in range(self.packet_count))
+
+
+def stamp() -> str:
+    return dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S.%f")[:-3]
+
+
+def day_dir(root: Path) -> Path:
+    target = root / dt.date.today().isoformat()
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def write_i2c(root: Path, capture_id: int, data: bytes) -> Path:
+    target = day_dir(root)
+    base = f"i2c-{capture_id:08d}-{stamp()}"
+    la_path = target / f"{base}.la"
+    la_path.write_bytes(data)
+
+    if len(data) < 10 or data[:4] != b"LA02":
+        raise ValueError("invalid LA02 payload")
+    count = struct.unpack_from("<I", data, 4)[0]
+    overflow = data[8]
+    initial = data[9]
+    expected = 10 + count * 5
+    if len(data) != expected:
+        raise ValueError(f"LA02 length mismatch: got {len(data)}, expected {expected}")
+
+    csv_path = target / f"{base}.csv"
+    with csv_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["sequence", "t_us", "scl", "sda", "state", "initial_state", "overflow"])
+        off = 10
+        for _ in range(count):
+            t_us = struct.unpack_from("<I", data, off)[0]
+            value = data[off + 4]
+            off += 5
+            w.writerow([
+                capture_id,
+                t_us,
+                1 if value & 0x01 else 0,
+                1 if value & 0x02 else 0,
+                f"0x{value:02X}",
+                f"0x{initial:02X}",
+                1 if overflow else 0,
+            ])
+    return csv_path
+
+
+def write_rtrh(root: Path, capture_id: int, data: bytes) -> Path:
+    if len(data) < 4:
+        raise ValueError("RT/RH payload too short")
+    count, overflow, _reserved = struct.unpack_from("<HBB", data, 0)
+    expected = 4 + count * 7
+    if len(data) != expected:
+        raise ValueError(f"RT/RH length mismatch: got {len(data)}, expected {expected}")
+
+    target = day_dir(root)
+    path = target / f"rtrh-{capture_id:08d}-{stamp()}.csv"
+    with path.open("w", newline="") as f:
+        w = csv.writer(f)
+        # Keep historical gpio10/gpio13 column names out of the new transport.
+        w.writerow(["sequence", "t_us", "edge_no", "rt_gpio3", "rh_gpio4", "state", "overflow"])
+        off = 4
+        for _ in range(count):
+            t_us, edge_no, value = struct.unpack_from("<IHB", data, off)
+            off += 7
+            w.writerow([
+                capture_id,
+                t_us,
+                edge_no,
+                1 if value & 0x01 else 0,
+                1 if value & 0x08 else 0,
+                f"0x{value:02X}",
+                1 if overflow else 0,
+            ])
+    return path
+
+
+def write_timing(root: Path, data: bytes) -> Path:
+    if len(data) != TIMING.size:
+        raise ValueError(f"timing payload length {len(data)} != {TIMING.size}")
+    (
+        sequence, valid, reject_reason, rh_samples, flags, rh_seen,
+        quality, ref_us, rt_us, rh_us, temp_c, humidity,
+        rh_min, rh_p25, rh_p75, rh_max, near220, near440, other, _reserved,
+    ) = TIMING.unpack(data)
+
+    target = day_dir(root)
+    path = target / "rtrh_timing.csv"
+    new = not path.exists()
+    with path.open("a", newline="") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow([
+                "received_at", "sequence", "valid", "reject_reason", "quality_percent",
+                "ref_period_us", "rt_period_us", "rh_state_us", "temperature_c",
+                "humidity_percent", "rh_state_samples", "rh_state_seen", "rh_min_us",
+                "rh_p25_us", "rh_p75_us", "rh_max_us", "near_220", "near_440", "other",
+                "thermal_transient", "temperature_extrapolation", "humidity_extrapolation",
+                "calibration_extrapolation",
+            ])
+        w.writerow([
+            dt.datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            sequence, valid, reject_reason, f"{quality:.3f}", f"{ref_us:.3f}",
+            f"{rt_us:.3f}", f"{rh_us:.3f}", f"{temp_c:.3f}", f"{humidity:.3f}",
+            rh_samples, rh_seen, rh_min, rh_p25, rh_p75, rh_max, near220, near440, other,
+            1 if flags & 0x01 else 0, 1 if flags & 0x02 else 0,
+            1 if flags & 0x04 else 0, 1 if flags & 0x08 else 0,
+        ])
+    return path
+
+
+def expire_old(pending: Dict[Tuple[str, int, int], PendingCapture], timeout_s: float) -> None:
+    now = dt.datetime.now().astimezone()
+    for key, cap in list(pending.items()):
+        age = (now - cap.first_seen).total_seconds()
+        if age < timeout_s:
+            continue
+        missing = [str(i + 1) for i in range(cap.packet_count) if i not in cap.packets]
+        src, ptype, capture_id = key
+        print(f"[{now:%H:%M:%S}] INCOMPLETE {TYPE_NAMES.get(ptype, ptype)} #{capture_id} "
+              f"from {src}: missing packet(s) {','.join(missing)}")
+        del pending[key]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--listen", default="10.0.42.149", help="local IPv4 address (default: 10.0.42.149)")
+    parser.add_argument("--port", type=int, default=45678)
+    parser.add_argument("--output", type=Path, default=Path("unni-debug"))
+    parser.add_argument("--incomplete-timeout", type=float, default=5.0)
+    args = parser.parse_args()
+
+    args.output.mkdir(parents=True, exist_ok=True)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((args.listen, args.port))
+    sock.settimeout(1.0)
+    pending: Dict[Tuple[str, int, int], PendingCapture] = {}
+    print(f"Listening on udp://{args.listen}:{args.port} -> {args.output.resolve()}")
+
+    while True:
+        try:
+            datagram, addr = sock.recvfrom(2048)
+        except socket.timeout:
+            expire_old(pending, args.incomplete_timeout)
+            continue
+        except KeyboardInterrupt:
+            print("\nStopped.")
+            return
+
+        now = dt.datetime.now().astimezone()
+        if len(datagram) < HEADER.size:
+            print(f"[{now:%H:%M:%S}] short datagram from {addr[0]}")
+            continue
+        magic, version, ptype, flags, capture_id, index, count, payload_len, _ = HEADER.unpack_from(datagram)
+        payload = datagram[HEADER.size:]
+        if magic != MAGIC or version != VERSION or payload_len != len(payload) or count == 0 or index >= count:
+            print(f"[{now:%H:%M:%S}] invalid datagram from {addr[0]}")
+            continue
+
+        key = (addr[0], ptype, capture_id)
+        cap = pending.get(key)
+        if cap is None or cap.packet_count != count:
+            cap = PendingCapture(count, flags, now)
+            pending[key] = cap
+        cap.packets[index] = payload
+        if not cap.complete():
+            continue
+
+        data = cap.payload()
+        del pending[key]
+        try:
+            if ptype == TYPE_I2C_LA02:
+                path = write_i2c(args.output, capture_id, data)
+            elif ptype == TYPE_RTRH_RAW:
+                path = write_rtrh(args.output, capture_id, data)
+            elif ptype == TYPE_RTRH_TIMING:
+                path = write_timing(args.output, data)
+            else:
+                print(f"[{now:%H:%M:%S}] unknown packet type {ptype} from {addr[0]}")
+                continue
+            print(f"[{now:%H:%M:%S}] {TYPE_NAMES.get(ptype, ptype)} #{capture_id} "
+                  f"complete ({count}/{count} packets) -> {path}")
+        except Exception as exc:
+            print(f"[{now:%H:%M:%S}] failed to decode {TYPE_NAMES.get(ptype, ptype)} #{capture_id}: {exc}")
+
+        expire_old(pending, args.incomplete_timeout)
+
+
+if __name__ == "__main__":
+    main()

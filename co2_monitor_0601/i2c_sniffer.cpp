@@ -1,11 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "i2c_sniffer.h"
+#include "debug_udp.h"
 
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
@@ -631,9 +633,70 @@ static bool last_capture_frozen = false;
 static uint32_t last_capture_sequence = 0;
 static uint32_t next_capture_sequence = 0;
 
+static uint8_t la02_stream_byte(const volatile Sample *data, uint16_t count,
+                                uint8_t initial_value, bool overflow, uint32_t base,
+                                size_t offset) {
+  if (offset < 4U) return static_cast<uint8_t>("LA02"[offset]);
+  if (offset < 8U) return static_cast<uint8_t>((static_cast<uint32_t>(count) >> ((offset - 4U) * 8U)) & 0xFFU);
+  if (offset == 8U) return overflow ? 1U : 0U;
+  if (offset == 9U) return initial_value;
+  offset -= 10U;
+  const size_t sample_index = offset / 5U;
+  const size_t field_byte = offset % 5U;
+  if (sample_index >= count) return 0;
+  if (field_byte < 4U) {
+    const uint32_t timestamp = static_cast<uint32_t>(data[sample_index].t - base);
+    return static_cast<uint8_t>((timestamp >> (field_byte * 8U)) & 0xFFU);
+  }
+  return data[sample_index].value;
+}
+
+static bool udp_export_raw_capture(const volatile Sample *data, uint16_t count,
+                                   uint8_t initial_value, bool overflow, uint32_t sequence) {
+  if (!debug_udp::enabled() || !count) return false;
+  const size_t total_bytes = 10U + static_cast<size_t>(count) * 5U;
+  const uint16_t packet_count = static_cast<uint16_t>(
+      (total_bytes + debug_udp::MAX_PAYLOAD - 1U) / debug_udp::MAX_PAYLOAD);
+  const uint32_t base = data[0].t;
+  static uint8_t payload[debug_udp::MAX_PAYLOAD];
+  bool complete = true;
+  for (uint16_t packet = 0; packet < packet_count; packet++) {
+    const size_t offset = static_cast<size_t>(packet) * debug_udp::MAX_PAYLOAD;
+    const uint16_t len = static_cast<uint16_t>(
+        std::min<size_t>(debug_udp::MAX_PAYLOAD, total_bytes - offset));
+    for (uint16_t i = 0; i < len; i++)
+      payload[i] = la02_stream_byte(data, count, initial_value, overflow, base, offset + i);
+    if (!debug_udp::send_packet(debug_udp::PacketType::I2C_LA02, sequence, packet,
+                                packet_count, payload, len, overflow ? 1U : 0U)) {
+      complete = false;
+      break;
+    }
+  }
+  if (complete) {
+    ESP_LOGD(TAG, "UDP exported raw I2C capture #%lu (%u samples, %u packets)",
+             static_cast<unsigned long>(sequence), static_cast<unsigned>(count),
+             static_cast<unsigned>(packet_count));
+  } else {
+    ESP_LOGW(TAG, "UDP raw I2C capture #%lu incomplete; collector will mark missing packets",
+             static_cast<unsigned long>(sequence));
+  }
+  return true;
+}
+
 static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
                                   uint8_t initial_value, bool overflow) {
   if (!count || !last_capture_mutex) return 0;
+
+  if (debug_udp::enabled()) {
+    uint32_t sequence = 0;
+    if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      sequence = ++next_capture_sequence;
+      last_capture_sequence = sequence;
+      xSemaphoreGive(last_capture_mutex);
+    }
+    if (sequence != 0) udp_export_raw_capture(data, count, initial_value, overflow, sequence);
+    return sequence;
+  }
 
   // Do not serialize and allocate ~20 KiB every cycle while an earlier
   // suspicious capture is intentionally being preserved.
@@ -748,13 +811,19 @@ void register_debug_handler() {
     ESP_LOGW(TAG, "web_server_base unavailable");
   }
 #else
-  ESP_LOGD(TAG, "Raw I2C capture instrumentation enabled without HTTP endpoint");
+  ESP_LOGD(TAG, debug_udp::enabled() ? "Raw I2C capture instrumentation enabled with UDP export"
+                                  : "Raw I2C capture instrumentation enabled without network export");
 #endif
 }
 
 bool freeze_last_capture(uint32_t sequence, const char *reason) {
-  (void) reason;
-  if (!last_capture_mutex || sequence == 0) return false;
+  if (sequence == 0) return false;
+  if (debug_udp::enabled()) {
+    ESP_LOGD(TAG, "Suspicious raw I2C capture #%lu already exported via UDP (%s)",
+             static_cast<unsigned long>(sequence), reason ? reason : "unknown reason");
+    return true;
+  }
+  if (!last_capture_mutex) return false;
 
   bool frozen = false;
   if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {

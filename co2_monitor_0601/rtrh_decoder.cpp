@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rtrh_decoder.h"
+#include "debug_udp.h"
 
 #include "calibration.h"
 #include "power_save.h"
@@ -8,6 +9,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -285,6 +287,57 @@ struct DebugCaptureState {
   volatile uint32_t sequence{0};
 };
 static DebugCaptureState debug;
+static uint16_t debug_udp_packet_index = 0;
+
+static uint8_t rtrh_stream_byte(size_t offset, uint16_t count, bool overflow) {
+  // Stream prefix: sample_count LE16, overflow U8, reserved U8.
+  if (offset == 0) return static_cast<uint8_t>(count & 0xFFU);
+  if (offset == 1) return static_cast<uint8_t>((count >> 8) & 0xFFU);
+  if (offset == 2) return overflow ? 1U : 0U;
+  if (offset == 3) return 0U;
+  offset -= 4;
+  const size_t sample_index = offset / 7U;
+  const size_t field_byte = offset % 7U;
+  if (sample_index >= count) return 0;
+  const uint32_t t = debug.samples[sample_index].t_us;
+  const uint16_t edge = debug.samples[sample_index].edge_no;
+  const uint8_t value = debug.samples[sample_index].value;
+  if (field_byte < 4U) return static_cast<uint8_t>((t >> (field_byte * 8U)) & 0xFFU);
+  if (field_byte < 6U) return static_cast<uint8_t>((edge >> ((field_byte - 4U) * 8U)) & 0xFFU);
+  return value;
+}
+
+static void debug_udp_loop() {
+  if (!debug_udp::enabled() || !debug.ready || !debug.sample_count) return;
+  const uint16_t count = debug.sample_count;
+  const bool overflow = debug.overflow;
+  const size_t total_bytes = 4U + static_cast<size_t>(count) * 7U;
+  const uint16_t packet_count = static_cast<uint16_t>(
+      (total_bytes + debug_udp::MAX_PAYLOAD - 1U) / debug_udp::MAX_PAYLOAD);
+  if (debug_udp_packet_index >= packet_count) debug_udp_packet_index = 0;
+
+  const size_t offset = static_cast<size_t>(debug_udp_packet_index) * debug_udp::MAX_PAYLOAD;
+  const uint16_t payload_len = static_cast<uint16_t>(
+      std::min<size_t>(debug_udp::MAX_PAYLOAD, total_bytes - offset));
+  static uint8_t payload[debug_udp::MAX_PAYLOAD];
+  for (uint16_t i = 0; i < payload_len; i++)
+    payload[i] = rtrh_stream_byte(offset + i, count, overflow);
+
+  if (!debug_udp::send_packet(debug_udp::PacketType::RTRH_RAW, debug.sequence,
+                              debug_udp_packet_index, packet_count, payload, payload_len,
+                              overflow ? 1U : 0U))
+    return;
+
+  debug_udp_packet_index++;
+  if (debug_udp_packet_index >= packet_count) {
+    ESP_LOGD(TAG, "UDP exported RT/RH raw capture #%lu (%u samples, %u packets)",
+             static_cast<unsigned long>(debug.sequence), static_cast<unsigned>(count),
+             static_cast<unsigned>(packet_count));
+    debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+    debug.overflow = debug.ready = debug.capturing = false;
+    debug_udp_packet_index = 0;
+  }
+}
 #endif
 
 static void IRAM_ATTR gpio_isr(void *arg) {
@@ -427,8 +480,10 @@ void loop() {
       ESP_LOGI(TAG, "RT/RH edge capture ready: %u events, sequence %lu%s",
                debug.sample_count, static_cast<unsigned long>(debug.sequence),
                debug.overflow ? " OVERFLOW" : "");
+      debug_udp_packet_index = 0;
     }
   }
+  debug_udp_loop();
 #endif
 }
 
@@ -518,11 +573,68 @@ static Measurement derive(const Snapshot &s) {
   return m;
 }
 
+#if RTRH_DEBUG_CAPTURE
+struct __attribute__((packed)) TimingPayload {
+  uint32_t sequence;
+  uint8_t valid;
+  uint8_t reject_reason;
+  uint8_t rh_state_samples;
+  uint8_t flags;
+  uint32_t rh_state_seen;
+  float quality_percent;
+  float ref_period_us;
+  float rt_period_us;
+  float rh_state_us;
+  float temperature_c;
+  float humidity_percent;
+  uint16_t rh_min_us;
+  uint16_t rh_p25_us;
+  uint16_t rh_p75_us;
+  uint16_t rh_max_us;
+  uint8_t near_220;
+  uint8_t near_440;
+  uint8_t other;
+  uint8_t reserved;
+};
+
+static void send_timing_udp(const Measurement &m) {
+  if (!debug_udp::enabled()) return;
+  TimingPayload payload{};
+  payload.sequence = m.sequence;
+  payload.valid = m.valid ? 1U : 0U;
+  payload.reject_reason = static_cast<uint8_t>(m.reject_reason);
+  payload.rh_state_samples = m.rh_state_samples;
+  payload.flags = (m.thermal_transient ? 0x01U : 0U) |
+                  (m.temperature_extrapolation ? 0x02U : 0U) |
+                  (m.humidity_extrapolation ? 0x04U : 0U) |
+                  (m.calibration_extrapolation ? 0x08U : 0U);
+  payload.rh_state_seen = m.rh_state_seen;
+  payload.quality_percent = m.quality_percent;
+  payload.ref_period_us = m.ref_period_us;
+  payload.rt_period_us = m.rt_period_us;
+  payload.rh_state_us = m.rh_state_us;
+  payload.temperature_c = m.temperature_c;
+  payload.humidity_percent = m.humidity_percent;
+  payload.rh_min_us = m.rh_state_min_us;
+  payload.rh_p25_us = m.rh_state_p25_us;
+  payload.rh_p75_us = m.rh_state_p75_us;
+  payload.rh_max_us = m.rh_state_max_us;
+  payload.near_220 = m.rh_state_near_220;
+  payload.near_440 = m.rh_state_near_440;
+  payload.other = m.rh_state_other;
+  debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, m.sequence, 0, 1,
+                         reinterpret_cast<const uint8_t *>(&payload), sizeof(payload));
+}
+#endif
+
 bool poll(Measurement &measurement) {
   if (!decoder.snapshot_ready || decoder.snapshot.sequence == decoder.last_polled_sequence) return false;
   measurement = derive(decoder.snapshot);
   decoder.latest_measurement = measurement;
   decoder.last_polled_sequence = measurement.sequence;
+#if RTRH_DEBUG_CAPTURE
+  send_timing_udp(measurement);
+#endif
   return true;
 }
 

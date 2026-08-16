@@ -44,6 +44,8 @@ CONF_RTRH_DECODE_ONLY = "rtrh_decode_only"
 CONF_SNIFFER_START_DELAY = "sniffer_start_delay"
 CONF_DEBUG_METRICS = "debug_metrics"
 CONF_DEBUG_CAPTURE = "debug_capture"
+CONF_DEBUG_UDP_HOST = "debug_udp_host"
+CONF_DEBUG_UDP_PORT = "debug_udp_port"
 CONF_LIGHT_SLEEP = "light_sleep"
 CONF_LIGHT_SLEEP_MAX_AWAKE = "light_sleep_max_awake"
 CONF_RT_PIN = "rt_pin"
@@ -257,6 +259,8 @@ _SCHEMA = {
     cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
+    cv.Optional(CONF_DEBUG_UDP_HOST, default=""): cv.string_strict,
+    cv.Optional(CONF_DEBUG_UDP_PORT, default=45678): cv.int_range(min=1, max=65535),
     cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_RT_PIN, default=3): cv.int_range(min=0, max=21),
@@ -411,6 +415,8 @@ async def to_code(config):
     cg.add(var.set_rtrh_decode_only(config[CONF_RTRH_DECODE_ONLY]))
     cg.add(var.set_sniffer_start_delay(config[CONF_SNIFFER_START_DELAY]))
     cg.add(var.set_debug_metrics(config[CONF_DEBUG_METRICS]))
+    cg.add(var.set_debug_udp_host(config[CONF_DEBUG_UDP_HOST]))
+    cg.add(var.set_debug_udp_port(config[CONF_DEBUG_UDP_PORT]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))
     cg.add(var.set_light_sleep_max_awake(config[CONF_LIGHT_SLEEP_MAX_AWAKE]))
     cg.add(var.set_rtrh_pins(config[CONF_RT_PIN], config[CONF_RH_PIN]))

@@ -11,11 +11,8 @@ external_components:
       path: .
 
 logger:
-  level: VERBOSE
+  level: DEBUG
   initial_level: DEBUG
-  logs:
-    api: VERBOSE
-    api.connection: VERBOSE
 
 api:
   encryption:
@@ -43,8 +40,6 @@ wifi:
 
 captive_portal:
 
-web_server:
-  port: 80
 
 # Match the SHT43 DemoBoard security model closely enough to probe
 # MyAmbience pairing and Device Settings behavior.
@@ -69,3 +64,5 @@ co2_monitor_0601:
   sniffer_start_delay: 10s
   debug_metrics: true
   debug_capture: true
+  debug_udp_host: 10.0.42.149
+  debug_udp_port: 45678

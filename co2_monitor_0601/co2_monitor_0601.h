@@ -9,6 +9,7 @@
 #include "esphome/core/component.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
+#include <string>
 #if UNNI_BLE_ENABLED
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include <esp_gap_ble_api.h>
@@ -62,6 +63,8 @@ class CO2Monitor0601 : public Component {
   void set_rtrh_gpio_setup(bool value) { this->rtrh_gpio_setup_ = value; }
   void set_sniffer_start_delay(uint32_t value) { this->start_delay_ms_ = value; }
   void set_debug_metrics(bool value) { this->debug_metrics_ = value; }
+  void set_debug_udp_host(const std::string &value) { this->debug_udp_host_ = value; }
+  void set_debug_udp_port(uint16_t value) { this->debug_udp_port_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
   void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
   void set_rtrh_pins(uint8_t rt, uint8_t rh) { this->rt_pin_ = rt; this->rh_pin_ = rh; }
@@ -233,6 +236,8 @@ class CO2Monitor0601 : public Component {
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
   bool debug_metrics_{false};
+  std::string debug_udp_host_;
+  uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
   uint32_t ble_usb_advertising_interval_ms_{2000};

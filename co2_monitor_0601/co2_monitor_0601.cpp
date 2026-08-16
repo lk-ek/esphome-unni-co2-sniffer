@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "co2_monitor_0601.h"
+#include "debug_udp.h"
 
 #include "ble_options.h"
 #include "co2_decoder.h"
@@ -562,6 +563,12 @@ void CO2Monitor0601::setup() {
 
   this->setup_usb_power_();
   this->setup_battery_adc_();
+#if RTRH_DEBUG_CAPTURE
+  if (!this->debug_udp_host_.empty() && this->debug_udp_port_ != 0) {
+    if (!debug_udp::setup(this->debug_udp_host_.c_str(), this->debug_udp_port_))
+      ESP_LOGW(TAG, "UDP debug export configuration failed; continuing without network capture export");
+  }
+#endif
   this->boot_ms_ = millis();
   if (this->sniffer_enabled_) {
     if (this->start_delay_ms_ == 0) {
@@ -574,8 +581,17 @@ void CO2Monitor0601::setup() {
 #if RTRH_DEBUG_CAPTURE
     i2c_sniffer::register_debug_handler();
     if (this->rtrh_enabled_) rtrh_decoder::register_debug_handlers();
-    ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: /capture, /rt_rh_capture.csv, /rt_rh_timing.csv"
-                                     : "Raw debug: /capture (RT/RH capture disabled)");
+    if (debug_udp::enabled()) {
+      ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: UDP I2C + RT/RH capture export enabled"
+                                       : "Raw debug: UDP I2C capture export enabled");
+    } else {
+#if defined(USE_WEB_SERVER_BASE)
+      ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: HTTP /capture, /rt_rh_capture.csv, /rt_rh_timing.csv"
+                                       : "Raw debug: HTTP /capture (RT/RH capture disabled)");
+#else
+      ESP_LOGD(TAG, "Raw capture instrumentation enabled; no network export configured");
+#endif
+    }
 #else
     if (this->rtrh_enabled_)
       ESP_LOGD(TAG, "RT/RH time-phase decoder active; debug capture disabled");
