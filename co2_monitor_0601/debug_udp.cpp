@@ -7,6 +7,7 @@
 #include "lwip/inet.h"
 #include "lwip/sockets.h"
 #include "esp_wifi.h"
+#include "esp_netif.h"
 #include "esphome/core/hal.h"
 
 #include <cerrno>
@@ -89,12 +90,15 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
       packet_index >= packet_count)
     return false;
 
-  // Do not touch lwIP until the station is actually associated. During boot the
-  // sniffer can finish its first capture a few hundred milliseconds before DHCP
-  // completes; keeping the capture pending is cheaper and safer than provoking a
-  // send on a half-initialized network path.
-  wifi_ap_record_t ap{};
-  if (esp_wifi_sta_get_ap_info(&ap) != ESP_OK) return false;
+  // Do not touch the UDP socket until the STA has a real IPv4 address.
+  // Association alone is not sufficient: esp_wifi_sta_get_ap_info() can already
+  // succeed while DHCP is still running, and sendto() in that window can block
+  // the single-core ESP32-C3 for hundreds of milliseconds. Keep the capture
+  // pending until the ESP-NETIF station interface reports a non-zero address.
+  esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+  if (sta == nullptr || !esp_netif_is_netif_up(sta)) return false;
+  esp_netif_ip_info_t ip_info{};
+  if (esp_netif_get_ip_info(sta, &ip_info) != ESP_OK || ip_info.ip.addr == 0) return false;
 
   // One datagram at a time. This deliberately back-pressures the capture
   // exporters instead of filling lwIP pbuf/mailbox queues and hitting ENOMEM.

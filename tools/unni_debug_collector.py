@@ -179,6 +179,7 @@ def main() -> None:
     sock.bind((args.listen, args.port))
     sock.settimeout(1.0)
     pending: Dict[Tuple[str, int, int], PendingCapture] = {}
+    completed_timing: Dict[Tuple[str, int, int], dt.datetime] = {}
     print(f"Listening on udp://{args.listen}:{args.port} -> {args.output.resolve()}")
 
     while True:
@@ -202,6 +203,14 @@ def main() -> None:
             continue
 
         key = (addr[0], ptype, capture_id)
+        if ptype == TYPE_RTRH_TIMING:
+            # Firmware intentionally sends every timing record twice, 20 ms apart.
+            # Keep only the first completed copy while still allowing a later
+            # capture-id reuse after the dedupe window expires.
+            cutoff = now - dt.timedelta(seconds=60)
+            completed_timing = {k: t for k, t in completed_timing.items() if t >= cutoff}
+            if key in completed_timing:
+                continue
         cap = pending.get(key)
         if cap is None or cap.packet_count != count:
             cap = PendingCapture(count, flags, now)
@@ -219,6 +228,7 @@ def main() -> None:
                 path = write_rtrh(args.output, capture_id, data)
             elif ptype == TYPE_RTRH_TIMING:
                 path = write_timing(args.output, data)
+                completed_timing[key] = now
             else:
                 print(f"[{now:%H:%M:%S}] unknown packet type {ptype} from {addr[0]}")
                 continue

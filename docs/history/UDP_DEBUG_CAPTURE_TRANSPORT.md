@@ -61,3 +61,8 @@ associated, spaces datagrams by at least 5 ms, keeps multi-packet I2C captures
 frozen in the existing ISR buffer until all fragments have been sent, and keeps
 RT/RH timing payloads pending until they can be transmitted. No UDP send occurs
 from an ISR.
+
+
+## Runtime gating and timing redundancy
+
+The sender does not open or use the UDP socket until the Wi-Fi station interface has a non-zero IPv4 address. Association alone is intentionally not treated as network readiness because DHCP may still be in progress. RT/RH timing records are transmitted twice with a 20 ms spacing; the collector deduplicates them by source, packet type, and capture sequence. Raw captures remain single-copy and use the existing packet-loss detection.

@@ -289,6 +289,8 @@ struct DebugCaptureState {
 static DebugCaptureState debug;
 static uint16_t debug_udp_packet_index = 0;
 static bool debug_udp_timing_pending = false;
+static uint8_t debug_udp_timing_copies_remaining = 0;
+static uint32_t debug_udp_timing_next_send_ms = 0;
 
 static uint8_t rtrh_stream_byte(size_t offset, uint16_t count, bool overflow) {
   // Stream prefix: sample_count LE16, overflow U8, reserved U8.
@@ -607,11 +609,27 @@ struct __attribute__((packed)) TimingPayload {
 static TimingPayload debug_udp_timing_payload{};
 
 static void debug_udp_timing_loop() {
-  if (!debug_udp::enabled() || !debug_udp_timing_pending) return;
+  if (!debug_udp::enabled() || !debug_udp_timing_pending || debug_udp_timing_copies_remaining == 0) return;
+
+  const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  if (debug_udp_timing_next_send_ms != 0 &&
+      static_cast<int32_t>(now_ms - debug_udp_timing_next_send_ms) < 0)
+    return;
+
   const auto &payload = debug_udp_timing_payload;
-  if (debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, payload.sequence, 0, 1,
-                             reinterpret_cast<const uint8_t *>(&payload), sizeof(payload)))
+  if (!debug_udp::send_packet(debug_udp::PacketType::RTRH_TIMING, payload.sequence, 0, 1,
+                              reinterpret_cast<const uint8_t *>(&payload), sizeof(payload)))
+    return;
+
+  debug_udp_timing_copies_remaining--;
+  if (debug_udp_timing_copies_remaining == 0) {
     debug_udp_timing_pending = false;
+    debug_udp_timing_next_send_ms = 0;
+  } else {
+    // Timing records are tiny and especially valuable for diagnostics. Send one
+    // redundant copy after a short gap; the collector deduplicates by sequence.
+    debug_udp_timing_next_send_ms = now_ms + 20U;
+  }
 }
 
 static void send_timing_udp(const Measurement &m) {
@@ -641,6 +659,8 @@ static void send_timing_udp(const Measurement &m) {
   payload.other = m.rh_state_other;
   debug_udp_timing_payload = payload;
   debug_udp_timing_pending = true;
+  debug_udp_timing_copies_remaining = 2;
+  debug_udp_timing_next_send_ms = 0;
 }
 
 #endif
