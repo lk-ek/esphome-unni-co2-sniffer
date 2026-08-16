@@ -67,6 +67,9 @@ co2_monitor_0601:
   # Keep HA/API reachable briefly before Light-sleep may drop native USB serial.
   energy_save_grace: 3s
   sniffer_start_delay: 10s
+  # A/B diagnostic: keep battery/USB policy intact but disable MCU Light-sleep.
+  # Wi-Fi still switches to MIN_MODEM on battery; only automatic Light-sleep is removed.
+  light_sleep: false
   debug_metrics: true
   debug_capture: true
   debug_udp_host: 10.0.42.149

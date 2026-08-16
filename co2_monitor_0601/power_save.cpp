@@ -57,7 +57,10 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   pin_rh = static_cast<gpio_num_t>(rh_pin);
   pin_co2_sda = static_cast<gpio_num_t>(co2_sda_pin);
   pin_co2_scl = static_cast<gpio_num_t>(co2_scl_pin);
-  if (!enabled_value) return true;
+  if (!enabled_value) {
+    ESP_LOGW(TAG, "A/B diagnostic: automatic Light-sleep disabled; battery WiFi/publish policy remains active");
+    return true;
+  }
   max_awake_ms = max_awake_value_ms;
 
   esp_pm_config_t config{};
