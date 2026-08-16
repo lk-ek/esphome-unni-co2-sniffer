@@ -15,7 +15,11 @@ enum class PacketType : uint8_t {
   RTRH_TIMING = 3,
 };
 
-static constexpr size_t MAX_PAYLOAD = 1000;
+// Keep debug datagrams comfortably below a full Ethernet MTU and, more
+// importantly on ESP32-C3, reduce the transient lwIP pbuf allocation needed
+// by sendto(). Captures are already packetized, so smaller packets only trade
+// a few extra datagrams for substantially lower allocation pressure.
+static constexpr size_t MAX_PAYLOAD = 512;
 
 bool setup(const char *host, uint16_t port);
 bool enabled();

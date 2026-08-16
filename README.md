@@ -617,6 +617,13 @@ the debug web server exposes:
 
 The first suspicious I²C transaction is frozen until successfully downloaded.
 
+UDP debug export uses 512-byte payload chunks. If lwIP reports `ENOMEM`, the
+export remains pending and retries after a short backoff instead of repeatedly
+calling `sendto()` on every component loop. The warning includes free/largest
+8-bit heap, minimum free heap, internal heap, and the cumulative ENOMEM count.
+This instrumentation is intended to distinguish general heap exhaustion from
+lwIP/pbuf pressure while preserving the raw capture for a later retry.
+
 Interesting conditions include:
 
 - malformed framing

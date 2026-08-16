@@ -8,6 +8,7 @@
 #include "lwip/sockets.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_heap_caps.h"
 #include "esphome/core/hal.h"
 
 #include <cerrno>
@@ -23,6 +24,9 @@ static sockaddr_in destination{};
 static bool configured = false;
 static uint32_t last_send_ms = 0;
 static constexpr uint32_t MIN_SEND_GAP_MS = 5;
+static constexpr uint32_t ENOMEM_RETRY_BACKOFF_MS = 50;
+static uint32_t retry_not_before_ms = 0;
+static uint32_t enomem_count = 0;
 
 struct __attribute__((packed)) PacketHeader {
   char magic[4];          // "UND1"
@@ -103,6 +107,8 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   // One datagram at a time. This deliberately back-pressures the capture
   // exporters instead of filling lwIP pbuf/mailbox queues and hitting ENOMEM.
   const uint32_t now_ms = millis();
+  if (retry_not_before_ms != 0 && static_cast<int32_t>(now_ms - retry_not_before_ms) < 0)
+    return false;
   if (last_send_ms != 0 && static_cast<uint32_t>(now_ms - last_send_ms) < MIN_SEND_GAP_MS)
     return false;
 
@@ -118,15 +124,39 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   const int sent = sendto(udp_socket, datagram, total, MSG_DONTWAIT,
                           reinterpret_cast<const sockaddr *>(&destination), sizeof(destination));
   if (sent != static_cast<int>(total)) {
+    const int send_errno = errno;
+    if (send_errno == ENOMEM) {
+      enomem_count++;
+      // A failed nonblocking send can itself mean lwIP had no pbuf/mailbox
+      // resources available. Do not hammer sendto() again every component loop;
+      // leave the exporter pending and let the network stack recover first.
+      retry_not_before_ms = now_ms + ENOMEM_RETRY_BACKOFF_MS;
+    }
+
     static uint32_t last_error_log_ms = 0;
     if (last_error_log_ms == 0 || static_cast<uint32_t>(now_ms - last_error_log_ms) >= 1000U) {
       last_error_log_ms = now_ms;
-      ESP_LOGW(TAG, "UDP send deferred for type=%u capture=%lu packet=%u/%u: sent=%d errno=%d",
+      const size_t free_8 = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+      const size_t largest_8 = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+      const size_t min_8 = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+      const size_t free_internal =
+          heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      const size_t largest_internal =
+          heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+      ESP_LOGW(TAG,
+               "UDP send deferred type=%u capture=%lu packet=%u/%u: sent=%d errno=%d "
+               "heap8=%u/%u min=%u internal=%u/%u enomem=%lu backoff=%u ms",
                static_cast<unsigned>(type), static_cast<unsigned long>(capture_id),
-               static_cast<unsigned>(packet_index + 1), static_cast<unsigned>(packet_count), sent, errno);
+               static_cast<unsigned>(packet_index + 1), static_cast<unsigned>(packet_count),
+               sent, send_errno, static_cast<unsigned>(free_8),
+               static_cast<unsigned>(largest_8), static_cast<unsigned>(min_8),
+               static_cast<unsigned>(free_internal), static_cast<unsigned>(largest_internal),
+               static_cast<unsigned long>(enomem_count),
+               send_errno == ENOMEM ? static_cast<unsigned>(ENOMEM_RETRY_BACKOFF_MS) : 0U);
     }
     return false;
   }
+  retry_not_before_ms = 0;
   last_send_ms = now_ms;
   return true;
 }
