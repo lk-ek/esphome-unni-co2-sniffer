@@ -267,8 +267,19 @@ uint16_t sensirion_ble_get_device_id() {
 }
 
 static void build_advertisement() {
-  if (!sample.complete())
+  if (!sample.complete()) {
+    static uint32_t last_incomplete_log_ms = 0;
+    const uint32_t now = millis();
+    if (now - last_incomplete_log_ms >= 10000) {
+      last_incomplete_log_ms = now;
+      ESP_LOGI(TAG,
+               "Sensirion live sample incomplete: T=%s RH=%s CO2=%s; advertisement payload not built",
+               sample.have_temperature ? "yes" : "no",
+               sample.have_humidity ? "yes" : "no",
+               sample.have_co2 ? "yes" : "no");
+    }
     return;
+  }
 
   const auto encoded = sample.encoded();
   const uint16_t id = sensirion_ble_get_device_id();

@@ -282,8 +282,8 @@ class CO2Monitor0601 : public Component {
   uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
-  uint32_t ble_usb_advertising_interval_ms_{2000};
-  uint32_t ble_battery_advertising_interval_ms_{5000};
+  uint32_t ble_usb_advertising_interval_ms_{1000};
+  uint32_t ble_battery_advertising_interval_ms_{1000};
 #endif
   bool light_sleep_enabled_{true};
   bool energy_save_mode_{false};

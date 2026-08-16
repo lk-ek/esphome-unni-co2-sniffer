@@ -1126,6 +1126,12 @@ void CO2Monitor0601::process_co2_() {
   const uint16_t ppm = result.co2_ppm;
 #if UNNI_BLE_ENABLED
   sensirion_ble_set_co2(ppm);
+#if UNNI_BLE_LIVE_ENABLED
+  // A CO2 frame can arrive well after the first RT/RH sample, especially in
+  // battery operation. Refresh immediately once the sample becomes complete
+  // instead of waiting for the next ~30 s RT/RH cycle.
+  sensirion_ble_commit_live_advertisement();
+#endif
 #endif
 
   this->ha_.co2 = static_cast<float>(ppm);
