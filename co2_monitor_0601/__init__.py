@@ -482,11 +482,10 @@ async def to_code(config):
         energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
         cg.add(energy_save.set_parent(var))
         cg.add(var.set_energy_save_mode_switch(energy_save))
-        # A/B diagnostic: the SHT43 identity probe intentionally omits the
-        # BLE Pairing Mode ESPHome switch. This keeps all BLE identity, GATT,
-        # security and Device Settings code active while restoring the HA
-        # switch registry to the known-good single-switch shape.
-        if ble_enabled and not sht43_identity_probe and CONF_BLE_PAIRING_MODE in config:
+        # The flash-backed history removed the RAM pressure that motivated the
+        # earlier SHT43 A/B omission, so pairing authorization is available in
+        # both the production identity and the SHT43 compatibility probe.
+        if ble_enabled and CONF_BLE_PAIRING_MODE in config:
             pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
             cg.add(pairing.set_parent(var))
             cg.add(var.set_ble_pairing_mode_switch(pairing))

@@ -11,6 +11,7 @@ namespace esphome {
 namespace co2_monitor_0601 {
 
 void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server);
+void sensirion_settings_loop();
 void sensirion_settings_gatts_event_handler(esp_gatts_cb_event_t event,
                                             esp_gatt_if_t gatts_if,
                                             esp_ble_gatts_cb_param_t *param);

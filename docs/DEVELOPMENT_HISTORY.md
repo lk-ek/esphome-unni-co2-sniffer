@@ -481,3 +481,12 @@ reintroduction advances one step. The SHT43 probe now exposes its serial,
 temperature, and humidity services again while the experimental Device Settings
 service (`0x8100`) remains disabled. Heap diagnostics stay enabled so the memory
 impact can be compared directly with the serial-only build.
+
+
+## 2026-08-16 — Flash-backed BLE history and secure Device Settings
+
+The persistent 4096-sample Sensirion history previously kept a redundant 32 KiB RAM mirror in addition to the `senshist` flash partition. Replacing that mirror with a 64-sample (512-byte) pending ring raised free runtime heap from roughly 18 KiB to about 50 KiB and made two simultaneous native ESPHome API clients practical again. The debug build therefore returns to `api.max_connections: 2`.
+
+With the RAM bottleneck removed, the experimental Sensirion Device Settings service was restored to the SHT43 identity probe and reworked to match the security model documented by Sensirion's SHT43 DemoBoard firmware. Service 0x8100 and characteristics 0x81FF, 0x81FE, 0x8130 and 0x8120 are now created through the raw ESP-IDF GATTS API with encrypted MITM read/write permissions. This avoids relying on ESPHome's BLECharacteristic wrapper, whose GATT permission field is not publicly configurable. Settings are persisted in NVS; the advertise-data privacy flag suppresses measurement manufacturer data at runtime, while the alternative name is stored without changing the compatibility-sensitive GAP identity.
+
+The Home Assistant BLE Pairing Mode remains a 60-second authorization gate for Numeric Comparison. Pairing now also works when the authorization switch is opened before connection; a connection established during the window immediately requests MITM-authenticated encryption.

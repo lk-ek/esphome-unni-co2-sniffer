@@ -484,43 +484,34 @@ The 4096-sample history is flash-backed. Only a small pending write ring is kept
 
 This part of the project is under active reverse engineering and is not required for normal sensor operation.
 
-The firmware can expose a Sensirion-compatible Device Settings service:
+The firmware exposes a Sensirion-compatible Device Settings service:
 
 ```text
 Service   0x8100
 ```
 
-The current probe includes the known SHT43 DemoBoard setting characteristics:
+with the known SHT43 DemoBoard characteristics:
 
 ```text
-0x81FF  Settings Version
-0x81FE  IsLogEnabled
-0x8130  IsAdvertiseDataEnabled / Privacy
-0x8120  AlternativeDeviceName
+0x81FF  Settings Version                   read
+0x81FE  IsLogEnabled                       read/write
+0x8130  IsAdvertiseDataEnabled / Privacy   read/write
+0x8120  AlternativeDeviceName              read/write, max 31 bytes
 ```
 
-The ESP32 BLE stack is configured for:
+The service is created directly with the ESP-IDF GATT server API rather than the ESPHome characteristic wrapper. This is intentional: all four characteristics require encrypted MITM-authenticated access, matching the security flags used by Sensirion's SHT43 DemoBoard firmware. The BLE stack is configured for LE Secure Connections, bonding, Numeric Comparison and 10–16 byte encryption keys.
 
-- LE Secure Connections
-- bonding
-- MITM-capable Numeric Comparison
-- 10–16 byte encryption keys
+Settings are persisted in ESPHome NVS. `IsAdvertiseDataEnabled` is applied at runtime: when disabled, the device remains connectable but measurement manufacturer data is omitted from advertising. `AlternativeDeviceName` is retained as the MyAmbience setting while the GAP identity remains unchanged so the compatibility classification is not accidentally altered. `IsLogEnabled` is persisted and reported to MyAmbience but intentionally does not override the ESPHome logger policy.
 
-Because the ESP installation has neither a dedicated display nor a physical confirmation button, pairing authorization is currently provided through Home Assistant.
-
-Enable:
+Because the ESP installation has neither a dedicated display nor a physical confirmation button, pairing authorization is provided through Home Assistant. Enable:
 
 ```text
 BLE Pairing Mode
 ```
 
-immediately before pairing in MyAmbience.
+immediately before pairing in MyAmbience. The authorization window defaults to 60 seconds. If MyAmbience is already connected when the switch is enabled, the firmware immediately requests authenticated encryption for that peer; connections established during the window do the same on connect. Numeric Comparison is accepted only while the authorization window is open. After successful authentication, or when the timeout expires, Pairing Mode is switched off.
 
-The authorization window defaults to 60 seconds.
-
-During that window an incoming Numeric Comparison request may be accepted automatically by the ESP. After successful authentication, or when the timeout expires, Pairing Mode is switched off.
-
-This is not equivalent to the original SHT43 DemoBoard's physical numeric-comparison confirmation and should be regarded as an experimental ownership gate.
+This is not equivalent to the original SHT43 DemoBoard's physical numeric-comparison confirmation and should be regarded as an experimental ownership gate. Existing bonded peers may resume encrypted sessions without reopening the pairing window.
 
 ---
 
@@ -815,7 +806,7 @@ The `rtrh_gpio_setup` option is a diagnostic A/B switch. When enabled with `rtrh
 
 ## Diagnostic build: RT/RH publication A/B
 
-The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and publication path again while retaining the RAM-headroom test baseline: web server and captive portal remain disabled, SHT43 serial/T/RH GATT remains enabled, Device Settings 0x8100 remains disabled, and Wi-Fi uses normal scanning with post-connect roaming disabled. This isolates the effect of ESPHome/BLE publication after the ISR and decoder-only stages proved stable.
+The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and publication path again. The earlier Device Settings omission was an A/B diagnostic during the RAM investigation; after converting the 4096-sample history to flash-backed storage, the secure 0x8100 service and BLE Pairing Mode switch are enabled again.
 
 
 ## Diagnostic build: known-good RT/RH restore

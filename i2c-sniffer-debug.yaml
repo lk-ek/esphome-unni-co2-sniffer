@@ -15,8 +15,8 @@ logger:
   initial_level: DEBUG
 
 api:
-  # Debug builds are RAM constrained; Home Assistant must be the only native API client.
-  # Use USB serial for live logs while raw UDP capture is enabled.
+  # Flash-backed BLE history leaves enough RAM for Home Assistant plus one
+  # temporary native API client (for example `esphome logs`).
   max_connections: 2
   encryption:
     key: !secret i2csniffer__encryption_key

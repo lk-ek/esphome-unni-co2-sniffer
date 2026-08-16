@@ -280,6 +280,8 @@ class CO2Monitor0601 : public Component {
   BlePairingModeSwitch *ble_pairing_switch_{nullptr};
   bool ble_pairing_mode_{false};
   uint32_t ble_pairing_started_ms_{0};
+  bool ble_peer_connected_{false};
+  esp_bd_addr_t ble_peer_bda_{};
   uint32_t ble_pairing_window_ms_{60000};
 #endif
   uint32_t light_sleep_max_awake_ms_{10000};

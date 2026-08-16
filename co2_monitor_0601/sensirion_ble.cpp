@@ -49,6 +49,7 @@ static SensirionSample sample;
 static uint16_t device_id = 0;
 static bool device_id_ready = false;
 static uint32_t advertising_interval_ms = 2000;
+static bool advertise_data_enabled = true;
 
 // Maximum legacy advertising payload; actual length depends on identity mode.
 static std::array<uint8_t, 31> advertisement{};
@@ -96,6 +97,13 @@ static void configure_advertisement() {
     ESP_LOGW(TAG, "adv data setup failed: %s", esp_err_to_name(err));
     adv_state = AdvState::IDLE;
   }
+}
+
+void sensirion_ble_set_advertise_data_enabled(bool enabled) {
+  if (advertise_data_enabled == enabled) return;
+  advertise_data_enabled = enabled;
+  ESP_LOGI(TAG, "manufacturer sample advertising: %s", enabled ? "enabled" : "disabled");
+  if (sample.complete()) build_advertisement();
 }
 
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms) {
@@ -208,6 +216,27 @@ static void build_advertisement() {
   advertisement[p++] = 0x02;
   advertisement[p++] = ESP_BLE_AD_TYPE_FLAG;
   advertisement[p++] = ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT;
+
+  // Sensirion Device Settings 0x8130 acts as a privacy switch. Keep the
+  // connectable local-name advertisement available, but omit measurement
+  // manufacturer data while sample advertising is disabled.
+  if (!advertise_data_enabled) {
+#if UNNI_SHT43_IDENTITY_PROBE
+    static constexpr char PRIVATE_NAME[] = "SHT43 DB";
+    advertisement[p++] = sizeof(PRIVATE_NAME);
+    advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
+    for (size_t i = 0; i < sizeof(PRIVATE_NAME) - 1; ++i) advertisement[p++] = PRIVATE_NAME[i];
+#else
+    advertisement[p++] = 0x02;
+    advertisement[p++] = ESP_BLE_AD_TYPE_NAME_CMPL;
+    advertisement[p++] = 'S';
+#endif
+    advertisement_length = p;
+    advertisement_ready = true;
+    ++payload_version;
+    request_refresh();
+    return;
+  }
 
 #if UNNI_SHT43_IDENTITY_PROBE
   // Official SHT43 DemoBoard advertisement identity: Sensirion manufacturer

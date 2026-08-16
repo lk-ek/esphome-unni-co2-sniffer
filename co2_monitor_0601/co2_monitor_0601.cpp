@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <string>
 
 namespace esphome {
@@ -111,11 +112,15 @@ void CO2Monitor0601::gatts_event_handler(esp_gatts_cb_event_t event,
   }
 #endif
   sensirion_ble_gatts_event_handler(event, param);
-#if !UNNI_SHT43_IDENTITY_PROBE
   sensirion_settings_gatts_event_handler(event, gatts_if, param);
-#endif
-  if (event == ESP_GATTS_CONNECT_EVT && param != nullptr && this->ble_pairing_mode_)
-    this->begin_ble_security_(param->connect.remote_bda);
+  if (event == ESP_GATTS_CONNECT_EVT && param != nullptr) {
+    this->ble_peer_connected_ = true;
+    std::memcpy(this->ble_peer_bda_, param->connect.remote_bda, sizeof(esp_bd_addr_t));
+    if (this->ble_pairing_mode_) this->begin_ble_security_(this->ble_peer_bda_);
+  } else if (event == ESP_GATTS_DISCONNECT_EVT) {
+    this->ble_peer_connected_ = false;
+    std::memset(this->ble_peer_bda_, 0, sizeof(esp_bd_addr_t));
+  }
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_gatts_event_handler(event, gatts_if, param);
 #else
@@ -259,10 +264,14 @@ void CO2Monitor0601::set_ble_pairing_mode(bool enabled) {
   this->ble_pairing_mode_ = enabled;
   this->ble_pairing_started_ms_ = enabled ? millis() : 0;
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(enabled);
-  if (enabled)
+  if (enabled) {
     ESP_LOGW(TAG, "BLE Pairing Mode: ON (%lu ms authorization window; connect with MyAmbience now)",
              static_cast<unsigned long>(this->ble_pairing_window_ms_));
-  else
+    // MyAmbience may already have the single supported GATT connection open
+    // when the HA switch is enabled. Initiate MITM encryption immediately in
+    // that case instead of requiring a disconnect/reconnect.
+    if (this->ble_peer_connected_) this->begin_ble_security_(this->ble_peer_bda_);
+  } else
     ESP_LOGW(TAG, "BLE Pairing Mode: OFF");
 }
 
@@ -642,13 +651,12 @@ void CO2Monitor0601::setup() {
 #endif
 #if UNNI_SHT43_IDENTITY_PROBE
     sensirion_sht43_probe_configure_gatt(this->gatt_server_);
-    ESP_LOGW(TAG, "SHT43 staged GATT restore: serial + T/RH services enabled; Device Settings 0x8100 disabled");
+    ESP_LOGW(TAG, "SHT43 GATT probe: serial + T/RH + secure Device Settings 0x8100 enabled");
     ESP_LOGI(TAG, "Heap before BLE enable: free=%u B, largest_8bit=%u B",
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
-#else
-    sensirion_settings_configure_gatt(this->gatt_server_);
 #endif
+    sensirion_settings_configure_gatt(this->gatt_server_);
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }
@@ -1094,6 +1102,9 @@ void CO2Monitor0601::loop() {
     this->initialize_sniffer_io_();
 
   uint64_t stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#if UNNI_BLE_ENABLED
+  sensirion_settings_loop();
+#endif
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
 #endif
