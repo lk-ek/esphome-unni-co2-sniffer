@@ -264,7 +264,6 @@ bool CO2Monitor0601::run_capture_regression_tests_() {
 
     tested++;
   }
-  }
 
   if (tested < 100) {
     ESP_LOGE(TAG, "capture regression: only %u archived captures tested", static_cast<unsigned>(tested));
