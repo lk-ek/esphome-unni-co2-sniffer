@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#ifdef USE_HOST
+
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
@@ -206,3 +208,5 @@ class CO2Monitor0601 : public Component {
 
 }  // namespace co2_monitor_0601
 }  // namespace esphome
+
+#endif  // USE_HOST
