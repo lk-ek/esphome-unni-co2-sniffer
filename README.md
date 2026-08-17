@@ -708,7 +708,7 @@ Temperature is now exposed as three deliberately separate views so different cal
 
 - **`RT Temperature`** keeps the existing v2 RT/REF conversion and remains the temperature used internally by the carrier-RH compensation and BLE/history path. Keeping it stable avoids changing the already-working RH calibration at the same time.
 - **`Unni Display Temperature`** is an independent quadratic fit to annotated LCD values. It extends the display emulation down to the stationary ~15 °C points observed at `RT/REF ~= 2.29..2.31`.
-- **`Air Temperature`** is a provisional physical-air estimate fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.33` (roughly the normal ~18..25 °C region). Outside that envelope the component deliberately retains the last supported HA value instead of pretending the heated-sweep data provide a physical-air calibration.
+- **`Air Temperature`** is a provisional physical-air estimate fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.35` (roughly the normal ~18..25 °C region). The upper ratio bound was extended after the 2026-08-17 high-airflow cold run produced externally checked points through about `RT/REF ~= 2.34`. Outside that envelope the component deliberately retains the last supported HA value instead of pretending the heated-sweep data provide a physical-air calibration.
 
 The display and air curves are therefore intentionally not interchangeable. The LCD emulation answers “what would the Unni display show?”, while the air estimate answers “what air temperature is most consistent with the nearby external references?”.
 

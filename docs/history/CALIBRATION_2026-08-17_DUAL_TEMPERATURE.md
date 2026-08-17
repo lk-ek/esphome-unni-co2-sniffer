@@ -30,10 +30,10 @@ T_air = 48.673890*x^2 - 231.233824*x + 292.655856
 Supported ratio envelope:
 
 ```text
-1.98 <= RT/REF <= 2.33
+1.98 <= RT/REF <= 2.35
 ```
 
-Representative reference anchors include the earlier same-airflow ~25.15 °C AHT21 point, the ~19.5 °C nearby-reference point, and the 2026-08-17 cold stationary point with the AHT21 positioned about 2 cm from the Unni sensor area (~18.38 °C while RT/REF was about 2.29). Because the external references did not accompany the full heat-gun sweep, the air curve must not be treated as calibrated outside this envelope.
+Representative reference anchors include the earlier same-airflow ~25.15 °C AHT21 point, the ~19.5 °C nearby-reference point, and the 2026-08-17 cold stationary point with the AHT21 positioned about 2 cm from the Unni sensor area (~18.38 °C while RT/REF was about 2.29). A later high-airflow cold run provided additional external checks through roughly `RT/REF ~= 2.34`, with `Air Temperature` remaining in the AHT21/BME280 range, so the supported upper bound was extended to 2.35 without refitting the curve. Because the external references did not accompany the full heat-gun sweep, the air curve must not be treated as calibrated outside this envelope.
 
 ## Publication policy
 

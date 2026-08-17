@@ -54,15 +54,16 @@ inline constexpr float DISPLAY_TEMP_RATIO_MAX = 2.33f;
 // The external AHT21/BME references do not support a trustworthy fit over the
 // full heated sweep. This curve is therefore deliberately constrained to the
 // normal-temperature interval actually backed by nearby/same-airflow reference
-// points (~18..25 degC). Callers should publish it only inside the ratio
-// envelope below and retain the last value outside it.
+// points (~18..25 degC). Follow-up cold-air measurements with stronger airflow
+// extended the externally checked ratio envelope to about 2.34. Callers should
+// publish it only inside the ratio envelope below and retain the last value outside it.
 //
 //   T_air [degC] = A*x^2 + B*x + C
 inline constexpr float AIR_TEMP_RATIO2_A = 48.673890f;
 inline constexpr float AIR_TEMP_RATIO_B = -231.233824f;
 inline constexpr float AIR_TEMP_RATIO_C = 292.655856f;
 inline constexpr float AIR_TEMP_RATIO_MIN = 1.98f;
-inline constexpr float AIR_TEMP_RATIO_MAX = 2.33f;
+inline constexpr float AIR_TEMP_RATIO_MAX = 2.35f;
 
 // Relative-humidity calibration (carrier v1, 2026-08-17):
 //   r  = RH_carrier_period / REF_period
