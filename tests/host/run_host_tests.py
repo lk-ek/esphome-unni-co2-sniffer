@@ -25,6 +25,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 GENERATED_PREFIX = ".host-test-"
 PASS_MARKER = "UNNI HOST SELF-TEST PASSED"
+FAIL_MARKER = "UNNI HOST SELF-TEST FAILED"
 
 VARIANTS = (
     "i2c-sniffer.yaml",
@@ -371,12 +372,17 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
                 line = proc.stdout.readline()
                 if line:
                     print(line, end="", flush=True)
+                    if FAIL_MARKER in line:
+                        print("Host binary reported a self-test failure", file=sys.stderr)
+                        break
                     if PASS_MARKER in line:
                         passed = True
                         break
             if proc.poll() is not None:
                 for line in proc.stdout:
                     print(line, end="", flush=True)
+                    if FAIL_MARKER in line:
+                        print("Host binary reported a self-test failure", file=sys.stderr)
                     if PASS_MARKER in line:
                         passed = True
                 break

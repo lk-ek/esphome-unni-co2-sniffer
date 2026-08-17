@@ -37,26 +37,44 @@ std::vector<std::string> split_csv_line(const std::string &line) {
   return fields;
 }
 
+std::string trim_ascii_whitespace(const std::string &value) {
+  size_t begin = 0;
+  while (begin < value.size()) {
+    const char c = value[begin];
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+    begin++;
+  }
+  size_t end = value.size();
+  while (end > begin) {
+    const char c = value[end - 1];
+    if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+    end--;
+  }
+  return value.substr(begin, end - begin);
+}
+
 bool parse_int(const std::string &value, int &out) {
-  if (value.empty()) return false;
+  const std::string trimmed = trim_ascii_whitespace(value);
+  if (trimmed.empty()) return false;
   errno = 0;
   char *end = nullptr;
-  const long parsed = std::strtol(value.c_str(), &end, 10);
-  if (errno != 0 || end == value.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX) return false;
+  const long parsed = std::strtol(trimmed.c_str(), &end, 10);
+  if (errno != 0 || end == trimmed.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX) return false;
   out = static_cast<int>(parsed);
   return true;
 }
 
 bool parse_float(const std::string &value, float &out) {
-  if (value == "nan") {
+  const std::string trimmed = trim_ascii_whitespace(value);
+  if (trimmed == "nan") {
     out = NAN;
     return true;
   }
-  if (value.empty()) return false;
+  if (trimmed.empty()) return false;
   errno = 0;
   char *end = nullptr;
-  const float parsed = std::strtof(value.c_str(), &end);
-  if (errno != 0 || end == value.c_str() || *end != '\0') return false;
+  const float parsed = std::strtof(trimmed.c_str(), &end);
+  if (errno != 0 || end == trimmed.c_str() || *end != '\0') return false;
   out = parsed;
   return true;
 }
@@ -321,20 +339,39 @@ void CO2Monitor0601::publish_fixture_values_() {
 }
 
 void CO2Monitor0601::setup() {
+  // Use stderr for phase markers so host-test diagnostics remain visible even
+  // when the ESPHome logger or stdout is buffered or not initialized yet.
+  std::fprintf(stderr, "UNNI HOST SELF-TEST START\n");
+  std::fflush(stderr);
+
   ESP_LOGI(TAG,
            "host smoke target: sniffer=%s rtrh=%s debug_metrics=%s light_sleep=%s BLE=%d BLE history=%d HA=%d",
            YESNO(this->sniffer_enabled_), YESNO(this->rtrh_enabled_), YESNO(this->debug_metrics_), YESNO(this->light_sleep_),
            UNNI_BLE_ENABLED, UNNI_BLE_HISTORY_ENABLED, UNNI_HOME_ASSISTANT_ENABLED);
 
-  if (!this->run_portable_self_test_() || !this->run_capture_regression_tests_()) {
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE portable\n");
+  std::fflush(stderr);
+  if (!this->run_portable_self_test_()) {
+    std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED portable\n");
+    std::fflush(stderr);
     this->mark_failed();
     return;
   }
 
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE captures\n");
+  std::fflush(stderr);
+  if (!this->run_capture_regression_tests_()) {
+    std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED captures\n");
+    std::fflush(stderr);
+    this->mark_failed();
+    return;
+  }
+
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE publish\n");
+  std::fflush(stderr);
   this->publish_fixture_values_();
+
   ESP_LOGI(TAG, "UNNI HOST SELF-TEST PASSED");
-  // The native host process is long-lived. Emit an explicitly flushed marker
-  // so automated test runners do not depend on logger/stdout buffering.
   std::fprintf(stderr, "UNNI HOST SELF-TEST PASSED\n");
   std::fflush(stderr);
 }
