@@ -18,3 +18,4 @@ For the current implementation, use these sources in this order:
 Do not copy code or configuration from a historical note without checking it against the current source tree.
 
 - `CALIBRATION_2026-08-17_DUAL_TEMPERATURE.md` — separates RT, physical-air, and Unni LCD temperature views.
+- `CALIBRATION_2026-08-17_DISPLAY_HUMIDITY.md` — keeps Unni LCD humidity emulation separate from physical carrier RH.

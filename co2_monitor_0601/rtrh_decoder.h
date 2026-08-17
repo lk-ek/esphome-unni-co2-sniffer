@@ -90,6 +90,7 @@ struct Measurement {
   float air_temperature_c{NAN};
   float display_temperature_c{NAN};
   float humidity_percent{NAN};
+  float display_humidity_percent{NAN};
   float quality_percent{0.0f};
   RejectReason reject_reason{RejectReason::NONE};
 

@@ -557,3 +557,10 @@ state recurrence and direct phase measurements remain diagnostics.
 ### 2026-08-17 — Make the MyCO2 display name configurable
 
 The normal MyCO2 Gadget name is now configurable through `co2_monitor_0601.ble_device_name`, defaulting to `Unni CO2 Monitor`. The option updates the Device Information model name and the default Sensirion `AlternativeDeviceName` while deliberately keeping the GAP/local identity `S` unchanged for MyAmbience classification compatibility. Persisted user-selected alternative names are preserved; the historical built-in default `MyCO2 Gadget` is migrated to the YAML-configured default.
+
+
+## 2026-08-17 — Canonical air temperature and display-humidity split
+
+Cold stationary measurements with the AHT21 placed within about 2 cm of the open Unni sensor area confirmed that the dedicated `Air Temperature` view tracks external references much better than the internal RT-model temperature, while the separately fitted `Unni Display Temperature` tracks the LCD. Sensirion live advertisements and persistent history therefore use `Air Temperature` when it is inside its validated ratio envelope, with the RT model retained only as an out-of-envelope fallback.
+
+The Unni LCD humidity also diverged systematically from the physical carrier-based humidity at the cold/high-humidity end. A separate provisional `Unni Display Humidity` entity was added from annotated LCD points. It is display emulation only and does not alter `RH Humidity`, BLE humidity, or the carrier-RH compensation model.

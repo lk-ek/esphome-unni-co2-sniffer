@@ -90,7 +90,7 @@ Unni signal ---- 10 kΩ ---- XIAO GPIO
 
 The resistors belong only in the ESP branches; do not insert them into the original Unni signal path. The RT/RH calibration is hardware-dependent, so calibration data collected with earlier direct or three/four-wire tap arrangements must not be mixed with the current two-wire/10 kΩ setup.
 
-The RT/RH decoder now keeps separate temperature views: the existing RT calibration used by RH/BLE, a dedicated Unni LCD-emulation curve, and a provisional external-reference air-temperature curve. RH uses the RH-phase carrier period normalized by REF with temperature compensation. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
+The RT/RH decoder now keeps separate temperature views: a diagnostic RT-model temperature, a dedicated Unni LCD-emulation curve, and a provisional external-reference Air Temperature curve. RH uses the RH-phase carrier period normalized by REF with temperature compensation. Air Temperature is the canonical temperature exported through Sensirion BLE/history when it is inside its validated envelope; the RT model is retained as a fallback outside that envelope. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
 
 ---
 
@@ -236,6 +236,7 @@ Normal builds create:
 - `Air Temperature`
 - `Unni Display Temperature`
 - `RH Humidity`
+- `Unni Display Humidity`
 - `Battery Voltage`
 - `Battery Level`
 - `Battery Runtime Estimate`
@@ -263,6 +264,9 @@ co2_monitor_0601:
 
   rh_humidity:
     name: "Humidity"
+
+  unni_display_humidity:
+    name: "Unni Display Humidity"
 ```
 
 With `debug_metrics: true`, additional timing, quality and decoder diagnostic entities are created.
@@ -454,6 +458,7 @@ Avoid running `ping`, `esphome logs`, an actively polling web UI or other unnece
 # Sensirion / MyAmbience compatibility
 
 The normal firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format.
+For the temperature field it uses `Air Temperature` inside the externally validated air-temperature envelope, falling back to the diagnostic RT model only when that physical-air estimate is unavailable. BLE humidity remains the physical carrier-based `RH Humidity`; the Unni display-emulation values are never advertised as physical measurements.
 
 The name shown for the normal MyCO2 gadget can be configured in the component YAML:
 
@@ -706,9 +711,11 @@ co2_monitor_0601/calibration.h
 
 Temperature is now exposed as three deliberately separate views so different calibration goals are not mixed:
 
-- **`RT Temperature`** keeps the existing v2 RT/REF conversion and remains the temperature used internally by the carrier-RH compensation and BLE/history path. Keeping it stable avoids changing the already-working RH calibration at the same time.
+- **`RT Temperature`** keeps the existing v2 RT/REF conversion as a diagnostic/raw-model temperature and remains the internal temperature input to the already-fitted carrier-RH compensation.
 - **`Unni Display Temperature`** is an independent quadratic fit to annotated LCD values. It extends the display emulation down to the stationary ~15 °C points observed at `RT/REF ~= 2.29..2.31`.
-- **`Air Temperature`** is a provisional physical-air estimate fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.35` (roughly the normal ~18..25 °C region). The upper ratio bound was extended after the 2026-08-17 high-airflow cold run produced externally checked points through about `RT/REF ~= 2.34`. Outside that envelope the component deliberately retains the last supported HA value instead of pretending the heated-sweep data provide a physical-air calibration.
+- **`Air Temperature`** is the preferred physical-air estimate, fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.35`. Sensirion BLE live data and persistent history use this physical-air value inside the supported envelope and fall back to the RT model only outside it.
+- **`RH Humidity`** remains the physical carrier-based humidity estimate.
+- **`Unni Display Humidity`** is a separate provisional LCD-emulation fit using carrier/REF plus the independently reconstructed Unni display temperature. It does not feed back into the physical RH path.
 
 The display and air curves are therefore intentionally not interchangeable. The LCD emulation answers “what would the Unni display show?”, while the air estimate answers “what air temperature is most consistent with the nearby external references?”.
 

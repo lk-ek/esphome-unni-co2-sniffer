@@ -7,7 +7,7 @@ The stable cold-air measurements showed that one RT/REF conversion cannot simult
 
 ## RT Temperature
 
-`RT Temperature` remains the existing v2 decoder temperature. It is intentionally left unchanged because carrier-RH v1 was fitted using this value as its temperature-compensation input. BLE/history also continue to use this value for now.
+`RT Temperature` remains the existing v2 decoder temperature. It is intentionally left unchanged because carrier-RH v1 was fitted using this value as its temperature-compensation input. It is now treated as a diagnostic/raw-model view rather than the preferred exported air temperature.
 
 ## Unni Display Temperature
 
@@ -37,4 +37,4 @@ Representative reference anchors include the earlier same-airflow ~25.15 °C AHT
 
 ## Publication policy
 
-`Air Temperature` is published only when its ratio is inside the supported envelope. Outside it, the last supported Home Assistant value is retained. `Unni Display Temperature` follows its own wider display-fit envelope. Neither changes the production RH calculation in this revision.
+`Air Temperature` is published only when its ratio is inside the supported envelope. Outside it, the last supported Home Assistant value is retained. Sensirion BLE live advertisements and persistent history use `Air Temperature` when available, falling back to `RT Temperature` only outside the externally validated air-temperature envelope. `RT Temperature` continues to drive carrier-RH temperature compensation so this change does not silently refit physical humidity. `Unni Display Temperature` remains display emulation only.

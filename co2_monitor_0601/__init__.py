@@ -29,6 +29,7 @@ CONF_RT_TEMPERATURE = "rt_temperature"
 CONF_AIR_TEMPERATURE = "air_temperature"
 CONF_UNNI_DISPLAY_TEMPERATURE = "unni_display_temperature"
 CONF_RH_HUMIDITY = "rh_humidity"
+CONF_UNNI_DISPLAY_HUMIDITY = "unni_display_humidity"
 CONF_BLE = "ble"
 CONF_BLE_LIVE = "ble_live"
 CONF_BLE_HISTORY = "ble_history"
@@ -130,7 +131,7 @@ SENSOR_OUTPUTS = {
         "set_frame_errors_sensor",
     ),
     CONF_RT_TEMPERATURE: (
-        _sensor_schema(
+        _diagnostic_sensor(
             unit_of_measurement="°C",
             accuracy_decimals=1,
             device_class="temperature",
@@ -164,6 +165,15 @@ SENSOR_OUTPUTS = {
             state_class="measurement",
         ),
         "set_rh_humidity_sensor",
+    ),
+    CONF_UNNI_DISPLAY_HUMIDITY: (
+        _sensor_schema(
+            unit_of_measurement="%",
+            accuracy_decimals=1,
+            device_class="humidity",
+            state_class="measurement",
+        ),
+        "set_unni_display_humidity_sensor",
     ),
     CONF_BATTERY_VOLTAGE: (
         _sensor_schema(
@@ -361,6 +371,7 @@ PRIMARY_SENSOR_DEFAULTS = {
     CONF_AIR_TEMPERATURE: {"name": "Air Temperature", "icon": "mdi:thermometer"},
     CONF_UNNI_DISPLAY_TEMPERATURE: {"name": "Unni Display Temperature", "icon": "mdi:thermometer-lines"},
     CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
+    CONF_UNNI_DISPLAY_HUMIDITY: {"name": "Unni Display Humidity", "icon": "mdi:water-percent"},
     CONF_BATTERY_VOLTAGE: {"name": "Battery Voltage", "icon": "mdi:battery"},
     CONF_BATTERY_LEVEL: {"name": "Battery Level", "icon": "mdi:battery"},
     CONF_BATTERY_RUNTIME_ESTIMATE: {"name": "Battery Runtime Estimate"},

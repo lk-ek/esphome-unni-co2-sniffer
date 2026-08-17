@@ -85,6 +85,26 @@ inline constexpr float RH_LOG_B = -22.589341f;
 inline constexpr float RH_TEMP_C = -0.461345f;
 inline constexpr float RH_OFFSET = 83.515272f;
 
+
+// Unni LCD display-humidity emulation (provisional v1, 2026-08-17).
+//
+// The LCD humidity follows a visibly different scale from the physical carrier
+// RH estimate at the cold/high-humidity end. This model is intentionally kept
+// separate from RH_LOG2_A/... above so display emulation cannot perturb the
+// physical RH path.
+//
+//   r = RH_carrier_period / REF_period
+//   x = ln(r)
+//   RH_display = A*x^2 + B*x + C*T_display + D
+//
+// The initial fit uses annotated LCD points spanning roughly 30..82 %RH. The
+// cold stationary points around 80..82 %RH are weighted more strongly than the
+// deliberately heated transient points.
+inline constexpr float DISPLAY_RH_LOG2_A = 8.119886f;
+inline constexpr float DISPLAY_RH_LOG_B = -37.449698f;
+inline constexpr float DISPLAY_RH_TEMP_C = -0.579144f;
+inline constexpr float DISPLAY_RH_OFFSET = 94.451022f;
+
 // Approximate stationary calibration envelope currently backed by measurements.
 // Values outside this envelope are still converted; the caller may expose the
 // extrapolation flag diagnostically.
@@ -137,6 +157,22 @@ inline float humidity_from_ratio_temperature(float rh_ratio,
   else if (rh > 100.0f)
     rh = 100.0f;
 
+  return rh;
+}
+
+
+inline float display_humidity_from_ratio_temperature(float rh_ratio,
+                                                      float display_temperature_c) {
+  const float x = log_rh_ratio(rh_ratio);
+  if (!std::isfinite(x) || !std::isfinite(display_temperature_c))
+    return std::numeric_limits<float>::quiet_NaN();
+
+  float rh = DISPLAY_RH_LOG2_A * x * x + DISPLAY_RH_LOG_B * x +
+             DISPLAY_RH_TEMP_C * display_temperature_c + DISPLAY_RH_OFFSET;
+  if (rh < 0.0f)
+    rh = 0.0f;
+  else if (rh > 100.0f)
+    rh = 100.0f;
   return rh;
 }
 

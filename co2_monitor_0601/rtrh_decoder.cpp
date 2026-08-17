@@ -826,6 +826,8 @@ static Measurement derive(const Snapshot &s) {
   m.quality_percent = quality_score(m);
   m.rh_log = calibration::log_rh_ratio(m.rh_ratio);
   m.humidity_percent = calibration::humidity_from_ratio_temperature(m.rh_ratio, m.temperature_c);
+  m.display_humidity_percent = calibration::display_humidity_from_ratio_temperature(
+      m.rh_ratio, m.display_temperature_c);
   m.humidity_extrapolation = m.rh_ratio < calibration::CAL_RH_RATIO_MIN ||
                              m.rh_ratio > calibration::CAL_RH_RATIO_MAX;
   m.calibration_extrapolation = m.temperature_extrapolation || m.humidity_extrapolation;

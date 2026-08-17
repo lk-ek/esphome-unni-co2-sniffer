@@ -876,6 +876,11 @@ void CO2Monitor0601::publish_cached_ha_now_() {
     this->ha_.initial_humidity_published = true;
     published = true;
   }
+  if (this->ha_.have_display_humidity && this->out_.display_humidity) {
+    this->out_.display_humidity->publish_state(this->ha_.display_humidity);
+    this->ha_.initial_display_humidity_published = true;
+    published = true;
+  }
   if (published) this->ha_.last_publish_ms = millis();
 }
 
@@ -913,6 +918,11 @@ void CO2Monitor0601::maybe_publish_ha_() {
   if (this->ha_.have_humidity && this->out_.humidity &&
       this->ha_.initial_humidity_published) {
     this->out_.humidity->publish_state(this->ha_.humidity);
+    published = true;
+  }
+  if (this->ha_.have_display_humidity && this->out_.display_humidity &&
+      this->ha_.initial_display_humidity_published) {
+    this->out_.display_humidity->publish_state(this->ha_.display_humidity);
     published = true;
   }
   if (published) this->ha_.last_publish_ms = now;
@@ -1090,6 +1100,9 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
            "RT/RH measurement %lu RH: carrier %.3f / REF %.3f us = %.6f -> %.1f %%",
            static_cast<unsigned long>(m.sequence), m.rh_carrier_period_us, m.ref_period_us,
            m.rh_ratio, m.humidity_percent);
+  ESP_LOGI(TAG, "RT/RH humidity views %lu: air=%.1f %%, Unni-display=%.1f %%",
+           static_cast<unsigned long>(m.sequence), m.humidity_percent,
+           m.display_humidity_percent);
 
   if (this->debug_metrics_) {
     ESP_LOGI(TAG,
@@ -1115,7 +1128,12 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
     publish(this->out_.calibration_extrapolation, m.calibration_extrapolation);
 
 #if UNNI_BLE_ENABLED
-    sensirion_ble_set_temperature_humidity(m.temperature_c, m.humidity_percent);
+    // MyAmbience/History expose the physical-air view. Outside the externally
+    // validated Air Temperature ratio envelope, retain compatibility by
+    // falling back to the RT model rather than publishing NaN.
+    const float sensirion_temperature_c =
+        std::isfinite(m.air_temperature_c) ? m.air_temperature_c : m.temperature_c;
+    sensirion_ble_set_temperature_humidity(sensirion_temperature_c, m.humidity_percent);
 #if UNNI_BLE_LIVE_ENABLED
     sensirion_ble_commit_live_advertisement();
 #endif
@@ -1131,6 +1149,10 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       this->ha_.have_display_temperature = true;
     }
     this->ha_.humidity = m.humidity_percent;
+    if (std::isfinite(m.display_humidity_percent)) {
+      this->ha_.display_humidity = m.display_humidity_percent;
+      this->ha_.have_display_humidity = true;
+    }
     this->ha_.have_temperature = true;
     this->ha_.have_humidity = true;
 
@@ -1143,12 +1165,16 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       if (this->out_.display_temperature && std::isfinite(m.display_temperature_c))
         this->out_.display_temperature->publish_state(m.display_temperature_c);
       if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
+      if (this->out_.display_humidity && std::isfinite(m.display_humidity_percent))
+        this->out_.display_humidity->publish_state(m.display_humidity_percent);
       this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
       this->ha_.initial_air_temperature_published =
           this->out_.air_temperature != nullptr && std::isfinite(m.air_temperature_c);
       this->ha_.initial_display_temperature_published =
           this->out_.display_temperature != nullptr && std::isfinite(m.display_temperature_c);
       this->ha_.initial_humidity_published = this->out_.humidity != nullptr;
+      this->ha_.initial_display_humidity_published =
+          this->out_.display_humidity != nullptr && std::isfinite(m.display_humidity_percent);
       this->ha_.last_publish_ms = millis();
     } else {
       if (!this->ha_.initial_temperature_published && this->out_.temperature) {
@@ -1171,6 +1197,12 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       if (!this->ha_.initial_humidity_published && this->out_.humidity) {
         this->out_.humidity->publish_state(m.humidity_percent);
         this->ha_.initial_humidity_published = true;
+        this->ha_.last_publish_ms = millis();
+      }
+      if (!this->ha_.initial_display_humidity_published && this->out_.display_humidity &&
+          std::isfinite(m.display_humidity_percent)) {
+        this->out_.display_humidity->publish_state(m.display_humidity_percent);
+        this->ha_.initial_display_humidity_published = true;
         this->ha_.last_publish_ms = millis();
       }
     }
