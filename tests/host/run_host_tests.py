@@ -307,9 +307,23 @@ def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
     return generated
 
 
+def _default_esphome_executable() -> str:
+    # Prefer the ESPHome console script installed next to the Python interpreter
+    # running this test harness. This keeps venv/container execution self-contained
+    # even when that venv's bin directory is not present in PATH.
+    sibling = Path(sys.executable).resolve().with_name("esphome")
+    if sibling.is_file() and os.access(sibling, os.X_OK):
+        return str(sibling)
+    return shutil.which("esphome") or "esphome"
+
+
 def _run_command(command: list[str], env: dict[str, str]) -> int:
     print("+", " ".join(command), flush=True)
-    return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
+    try:
+        return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
+    except FileNotFoundError as err:
+        print(f"Command not found: {command[0]} ({err})", file=sys.stderr)
+        return 127
 
 
 def _host_binary_path(variant: str) -> Path:
@@ -391,7 +405,7 @@ def main() -> int:
     )
     parser.add_argument("--timeout", type=int, default=10, help="runtime seconds to wait for each host self-test marker")
     parser.add_argument("--keep-generated", action="store_true")
-    parser.add_argument("--esphome", default=shutil.which("esphome") or "esphome")
+    parser.add_argument("--esphome", default=_default_esphome_executable())
     args = parser.parse_args()
 
     toolchain, toolchain_error = _select_native_toolchain()

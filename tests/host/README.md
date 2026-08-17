@@ -32,6 +32,12 @@ With ESPHome 2026.7.4 (or a newer compatible release) installed:
 python3 tests/host/run_host_tests.py
 ```
 
+The runner first looks for an `esphome` console script next to the Python
+interpreter executing the test harness (for example `/opt/esphome/bin/esphome`
+when invoked as `/opt/esphome/bin/python ...`). It falls back to `PATH` only if
+no interpreter-adjacent executable exists. `--esphome /path/to/esphome` remains
+available as an explicit override.
+
 The default mode first runs `esphome compile`, then starts the resulting native
 binary directly and terminates it as soon as the self-test success marker is
 observed. It deliberately does not use `esphome run`, because host targets are
