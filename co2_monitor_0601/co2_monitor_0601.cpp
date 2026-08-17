@@ -861,6 +861,16 @@ void CO2Monitor0601::publish_cached_ha_now_() {
     this->ha_.initial_temperature_published = true;
     published = true;
   }
+  if (this->ha_.have_air_temperature && this->out_.air_temperature) {
+    this->out_.air_temperature->publish_state(this->ha_.air_temperature);
+    this->ha_.initial_air_temperature_published = true;
+    published = true;
+  }
+  if (this->ha_.have_display_temperature && this->out_.display_temperature) {
+    this->out_.display_temperature->publish_state(this->ha_.display_temperature);
+    this->ha_.initial_display_temperature_published = true;
+    published = true;
+  }
   if (this->ha_.have_humidity && this->out_.humidity) {
     this->out_.humidity->publish_state(this->ha_.humidity);
     this->ha_.initial_humidity_published = true;
@@ -888,6 +898,16 @@ void CO2Monitor0601::maybe_publish_ha_() {
   if (this->ha_.have_temperature && this->out_.temperature &&
       this->ha_.initial_temperature_published) {
     this->out_.temperature->publish_state(this->ha_.temperature);
+    published = true;
+  }
+  if (this->ha_.have_air_temperature && this->out_.air_temperature &&
+      this->ha_.initial_air_temperature_published) {
+    this->out_.air_temperature->publish_state(this->ha_.air_temperature);
+    published = true;
+  }
+  if (this->ha_.have_display_temperature && this->out_.display_temperature &&
+      this->ha_.initial_display_temperature_published) {
+    this->out_.display_temperature->publish_state(this->ha_.display_temperature);
     published = true;
   }
   if (this->ha_.have_humidity && this->out_.humidity &&
@@ -994,15 +1014,45 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
         publish(this->out_.thermal_transient, m.thermal_transient);
 
         this->ha_.temperature = m.temperature_c;
+        if (std::isfinite(m.air_temperature_c)) {
+          this->ha_.air_temperature = m.air_temperature_c;
+          this->ha_.have_air_temperature = true;
+        }
+        if (std::isfinite(m.display_temperature_c)) {
+          this->ha_.display_temperature = m.display_temperature_c;
+          this->ha_.have_display_temperature = true;
+        }
         this->ha_.have_temperature = true;
         if (this->external_powered_()) {
           if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
+          if (this->out_.air_temperature && std::isfinite(m.air_temperature_c))
+            this->out_.air_temperature->publish_state(m.air_temperature_c);
+          if (this->out_.display_temperature && std::isfinite(m.display_temperature_c))
+            this->out_.display_temperature->publish_state(m.display_temperature_c);
           this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
+          this->ha_.initial_air_temperature_published =
+              this->out_.air_temperature != nullptr && std::isfinite(m.air_temperature_c);
+          this->ha_.initial_display_temperature_published =
+              this->out_.display_temperature != nullptr && std::isfinite(m.display_temperature_c);
           this->ha_.last_publish_ms = millis();
-        } else if (!this->ha_.initial_temperature_published && this->out_.temperature) {
-          this->out_.temperature->publish_state(m.temperature_c);
-          this->ha_.initial_temperature_published = true;
-          this->ha_.last_publish_ms = millis();
+        } else {
+          if (!this->ha_.initial_temperature_published && this->out_.temperature) {
+            this->out_.temperature->publish_state(m.temperature_c);
+            this->ha_.initial_temperature_published = true;
+            this->ha_.last_publish_ms = millis();
+          }
+          if (!this->ha_.initial_air_temperature_published && this->out_.air_temperature &&
+              std::isfinite(m.air_temperature_c)) {
+            this->out_.air_temperature->publish_state(m.air_temperature_c);
+            this->ha_.initial_air_temperature_published = true;
+            this->ha_.last_publish_ms = millis();
+          }
+          if (!this->ha_.initial_display_temperature_published && this->out_.display_temperature &&
+              std::isfinite(m.display_temperature_c)) {
+            this->out_.display_temperature->publish_state(m.display_temperature_c);
+            this->ha_.initial_display_temperature_published = true;
+            this->ha_.last_publish_ms = millis();
+          }
         }
 
         ESP_LOGI(TAG,
@@ -1030,6 +1080,12 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   ESP_LOGI(TAG, "RT/RH measurement %lu RT: %.3f / REF %.3f us = %.6f -> %.2f C",
            static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
            m.rt_ratio, m.temperature_c);
+  ESP_LOGI(TAG,
+           "RT/RH temperature views %lu: air=%s%.2f C, Unni-display=%.2f C",
+           static_cast<unsigned long>(m.sequence),
+           std::isfinite(m.air_temperature_c) ? "" : "unsupported/",
+           std::isfinite(m.air_temperature_c) ? m.air_temperature_c : 0.0f,
+           m.display_temperature_c);
   ESP_LOGI(TAG,
            "RT/RH measurement %lu RH: carrier %.3f / REF %.3f us = %.6f -> %.1f %%",
            static_cast<unsigned long>(m.sequence), m.rh_carrier_period_us, m.ref_period_us,
@@ -1066,6 +1122,14 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
 #endif
 
     this->ha_.temperature = m.temperature_c;
+    if (std::isfinite(m.air_temperature_c)) {
+      this->ha_.air_temperature = m.air_temperature_c;
+      this->ha_.have_air_temperature = true;
+    }
+    if (std::isfinite(m.display_temperature_c)) {
+      this->ha_.display_temperature = m.display_temperature_c;
+      this->ha_.have_display_temperature = true;
+    }
     this->ha_.humidity = m.humidity_percent;
     this->ha_.have_temperature = true;
     this->ha_.have_humidity = true;
@@ -1074,14 +1138,34 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       // USB policy: publish every fresh RT/RH measurement (the Unni cycle is
       // roughly 30 s), rather than repeating cached values on a timer.
       if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
+      if (this->out_.air_temperature && std::isfinite(m.air_temperature_c))
+        this->out_.air_temperature->publish_state(m.air_temperature_c);
+      if (this->out_.display_temperature && std::isfinite(m.display_temperature_c))
+        this->out_.display_temperature->publish_state(m.display_temperature_c);
       if (this->out_.humidity) this->out_.humidity->publish_state(m.humidity_percent);
       this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
+      this->ha_.initial_air_temperature_published =
+          this->out_.air_temperature != nullptr && std::isfinite(m.air_temperature_c);
+      this->ha_.initial_display_temperature_published =
+          this->out_.display_temperature != nullptr && std::isfinite(m.display_temperature_c);
       this->ha_.initial_humidity_published = this->out_.humidity != nullptr;
       this->ha_.last_publish_ms = millis();
     } else {
       if (!this->ha_.initial_temperature_published && this->out_.temperature) {
         this->out_.temperature->publish_state(m.temperature_c);
         this->ha_.initial_temperature_published = true;
+        this->ha_.last_publish_ms = millis();
+      }
+      if (!this->ha_.initial_air_temperature_published && this->out_.air_temperature &&
+          std::isfinite(m.air_temperature_c)) {
+        this->out_.air_temperature->publish_state(m.air_temperature_c);
+        this->ha_.initial_air_temperature_published = true;
+        this->ha_.last_publish_ms = millis();
+      }
+      if (!this->ha_.initial_display_temperature_published && this->out_.display_temperature &&
+          std::isfinite(m.display_temperature_c)) {
+        this->out_.display_temperature->publish_state(m.display_temperature_c);
+        this->ha_.initial_display_temperature_published = true;
         this->ha_.last_publish_ms = millis();
       }
       if (!this->ha_.initial_humidity_published && this->out_.humidity) {

@@ -26,6 +26,8 @@ CONF_CO2 = "co2"
 CONF_CRC_ERRORS = "crc_errors"
 CONF_FRAME_ERRORS = "frame_errors"
 CONF_RT_TEMPERATURE = "rt_temperature"
+CONF_AIR_TEMPERATURE = "air_temperature"
+CONF_UNNI_DISPLAY_TEMPERATURE = "unni_display_temperature"
 CONF_RH_HUMIDITY = "rh_humidity"
 CONF_BLE = "ble"
 CONF_BLE_LIVE = "ble_live"
@@ -135,6 +137,24 @@ SENSOR_OUTPUTS = {
             state_class="measurement",
         ),
         "set_rt_temperature_sensor",
+    ),
+    CONF_AIR_TEMPERATURE: (
+        _sensor_schema(
+            unit_of_measurement="°C",
+            accuracy_decimals=1,
+            device_class="temperature",
+            state_class="measurement",
+        ),
+        "set_air_temperature_sensor",
+    ),
+    CONF_UNNI_DISPLAY_TEMPERATURE: (
+        _sensor_schema(
+            unit_of_measurement="°C",
+            accuracy_decimals=1,
+            device_class="temperature",
+            state_class="measurement",
+        ),
+        "set_unni_display_temperature_sensor",
     ),
     CONF_RH_HUMIDITY: (
         _sensor_schema(
@@ -338,6 +358,8 @@ _SCHEMA = {
 PRIMARY_SENSOR_DEFAULTS = {
     CONF_CO2: {"name": "CO2", "icon": "mdi:molecule-co2"},
     CONF_RT_TEMPERATURE: {"name": "RT Temperature", "icon": "mdi:thermometer"},
+    CONF_AIR_TEMPERATURE: {"name": "Air Temperature", "icon": "mdi:thermometer"},
+    CONF_UNNI_DISPLAY_TEMPERATURE: {"name": "Unni Display Temperature", "icon": "mdi:thermometer-lines"},
     CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
     CONF_BATTERY_VOLTAGE: {"name": "Battery Voltage", "icon": "mdi:battery"},
     CONF_BATTERY_LEVEL: {"name": "Battery Level", "icon": "mdi:battery"},

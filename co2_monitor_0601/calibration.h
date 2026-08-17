@@ -36,6 +36,34 @@ inline constexpr float TEMP_RATIO2_A = 26.151839f;
 inline constexpr float TEMP_RATIO_B = -126.906498f;
 inline constexpr float TEMP_RATIO_C = 170.744526f;
 
+// Unni LCD display-temperature emulation (2026-08-17).
+//   x = RT_period / REF_period
+//   T_display [degC] = A*x^2 + B*x + C
+//
+// This is intentionally separate from the production RT temperature used by
+// RH compensation. It is fit to annotated Unni LCD readings, including the
+// newly stable low-temperature ~15 degC points around RT/REF ~= 2.29..2.31.
+inline constexpr float DISPLAY_TEMP_RATIO2_A = 17.185556f;
+inline constexpr float DISPLAY_TEMP_RATIO_B = -94.771485f;
+inline constexpr float DISPLAY_TEMP_RATIO_C = 142.237151f;
+inline constexpr float DISPLAY_TEMP_RATIO_MIN = 1.54f;
+inline constexpr float DISPLAY_TEMP_RATIO_MAX = 2.33f;
+
+// Provisional local-air temperature calibration (2026-08-17).
+//
+// The external AHT21/BME references do not support a trustworthy fit over the
+// full heated sweep. This curve is therefore deliberately constrained to the
+// normal-temperature interval actually backed by nearby/same-airflow reference
+// points (~18..25 degC). Callers should publish it only inside the ratio
+// envelope below and retain the last value outside it.
+//
+//   T_air [degC] = A*x^2 + B*x + C
+inline constexpr float AIR_TEMP_RATIO2_A = 48.673890f;
+inline constexpr float AIR_TEMP_RATIO_B = -231.233824f;
+inline constexpr float AIR_TEMP_RATIO_C = 292.655856f;
+inline constexpr float AIR_TEMP_RATIO_MIN = 1.98f;
+inline constexpr float AIR_TEMP_RATIO_MAX = 2.33f;
+
 // Relative-humidity calibration (carrier v1, 2026-08-17):
 //   r  = RH_carrier_period / REF_period
 //   x  = ln(r)
@@ -67,6 +95,25 @@ inline constexpr float CAL_RH_RATIO_MAX = 9.20f;
 inline float temperature_from_ratio(float rt_ratio) {
   return TEMP_RATIO2_A * rt_ratio * rt_ratio +
          TEMP_RATIO_B * rt_ratio + TEMP_RATIO_C;
+}
+
+inline float display_temperature_from_ratio(float rt_ratio) {
+  if (!std::isfinite(rt_ratio))
+    return std::numeric_limits<float>::quiet_NaN();
+  return DISPLAY_TEMP_RATIO2_A * rt_ratio * rt_ratio +
+         DISPLAY_TEMP_RATIO_B * rt_ratio + DISPLAY_TEMP_RATIO_C;
+}
+
+inline bool air_temperature_ratio_supported(float rt_ratio) {
+  return std::isfinite(rt_ratio) && rt_ratio >= AIR_TEMP_RATIO_MIN &&
+         rt_ratio <= AIR_TEMP_RATIO_MAX;
+}
+
+inline float air_temperature_from_ratio(float rt_ratio) {
+  if (!air_temperature_ratio_supported(rt_ratio))
+    return std::numeric_limits<float>::quiet_NaN();
+  return AIR_TEMP_RATIO2_A * rt_ratio * rt_ratio +
+         AIR_TEMP_RATIO_B * rt_ratio + AIR_TEMP_RATIO_C;
 }
 
 inline float log_rh_ratio(float rh_ratio) {

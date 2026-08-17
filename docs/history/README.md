@@ -16,3 +16,5 @@ For the current implementation, use these sources in this order:
 5. These historical notes — detailed experiment records and superseded implementations.
 
 Do not copy code or configuration from a historical note without checking it against the current source tree.
+
+- `CALIBRATION_2026-08-17_DUAL_TEMPERATURE.md` — separates RT, physical-air, and Unni LCD temperature views.

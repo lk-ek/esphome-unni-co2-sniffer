@@ -804,10 +804,14 @@ static Measurement derive(const Snapshot &s) {
 
   if (m.temperature_valid) {
     m.temperature_c = calibration::temperature_from_ratio(m.rt_ratio);
+    m.air_temperature_c = calibration::air_temperature_from_ratio(m.rt_ratio);
+    m.display_temperature_c = calibration::display_temperature_from_ratio(m.rt_ratio);
     m.temperature_extrapolation = m.temperature_c < calibration::CAL_TEMP_MIN_C ||
                                   m.temperature_c > calibration::CAL_TEMP_MAX_C;
   } else {
     m.temperature_c = NAN;
+    m.air_temperature_c = NAN;
+    m.display_temperature_c = NAN;
     m.temperature_extrapolation = true;
   }
 

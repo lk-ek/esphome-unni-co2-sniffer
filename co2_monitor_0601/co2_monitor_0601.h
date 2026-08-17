@@ -113,6 +113,8 @@ class CO2Monitor0601 : public Component {
   void set_crc_errors_sensor(sensor::Sensor *s) { this->out_.crc_errors = s; }
   void set_frame_errors_sensor(sensor::Sensor *s) { this->out_.frame_errors = s; }
   void set_rt_temperature_sensor(sensor::Sensor *s) { this->out_.temperature = s; }
+  void set_air_temperature_sensor(sensor::Sensor *s) { this->out_.air_temperature = s; }
+  void set_unni_display_temperature_sensor(sensor::Sensor *s) { this->out_.display_temperature = s; }
   void set_rh_humidity_sensor(sensor::Sensor *s) { this->out_.humidity = s; }
   void set_battery_voltage_sensor(sensor::Sensor *s) { this->out_.battery_voltage = s; }
   void set_battery_level_sensor(sensor::Sensor *s) { this->out_.battery_level = s; }
@@ -139,6 +141,8 @@ class CO2Monitor0601 : public Component {
     sensor::Sensor *crc_errors{nullptr};
     sensor::Sensor *frame_errors{nullptr};
     sensor::Sensor *temperature{nullptr};
+    sensor::Sensor *air_temperature{nullptr};
+    sensor::Sensor *display_temperature{nullptr};
     sensor::Sensor *humidity{nullptr};
     sensor::Sensor *battery_voltage{nullptr};
     sensor::Sensor *battery_level{nullptr};
@@ -165,12 +169,18 @@ class CO2Monitor0601 : public Component {
     uint32_t last_publish_ms{0};
     bool have_co2{false};
     bool have_temperature{false};
+    bool have_air_temperature{false};
+    bool have_display_temperature{false};
     bool have_humidity{false};
     bool initial_co2_published{false};
     bool initial_temperature_published{false};
+    bool initial_air_temperature_published{false};
+    bool initial_display_temperature_published{false};
     bool initial_humidity_published{false};
     float co2{0.0f};
     float temperature{0.0f};
+    float air_temperature{0.0f};
+    float display_temperature{0.0f};
     float humidity{0.0f};
   } ha_;
 

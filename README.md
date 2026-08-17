@@ -90,7 +90,7 @@ Unni signal ---- 10 kΩ ---- XIAO GPIO
 
 The resistors belong only in the ESP branches; do not insert them into the original Unni signal path. The RT/RH calibration is hardware-dependent, so calibration data collected with earlier direct or three/four-wire tap arrangements must not be mixed with the current two-wire/10 kΩ setup.
 
-The current temperature calibration for this hardware is quadratic in `RT/REF` and is based on the 2026-08-17 heated/cooling sweep (roughly 17.6–36.6 °C display range). RH uses the RH-phase carrier period normalized by REF with temperature compensation. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
+The RT/RH decoder now keeps separate temperature views: the existing RT calibration used by RH/BLE, a dedicated Unni LCD-emulation curve, and a provisional external-reference air-temperature curve. RH uses the RH-phase carrier period normalized by REF with temperature compensation. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
 
 ---
 
@@ -233,6 +233,8 @@ Normal builds create:
 
 - `CO2`
 - `RT Temperature`
+- `Air Temperature`
+- `Unni Display Temperature`
 - `RH Humidity`
 - `Battery Voltage`
 - `Battery Level`
@@ -251,7 +253,13 @@ co2_monitor_0601:
     name: "Living Room CO2"
 
   rt_temperature:
-    name: "Temperature"
+    name: "RT Temperature"
+
+  air_temperature:
+    name: "Air Temperature"
+
+  unni_display_temperature:
+    name: "Unni Display Temperature"
 
   rh_humidity:
     name: "Humidity"
@@ -696,7 +704,13 @@ The active calibration is defined in:
 co2_monitor_0601/calibration.h
 ```
 
-The current temperature fit is provisional and is being refined from stable Unni-display reference points collected across a wider temperature range.
+Temperature is now exposed as three deliberately separate views so different calibration goals are not mixed:
+
+- **`RT Temperature`** keeps the existing v2 RT/REF conversion and remains the temperature used internally by the carrier-RH compensation and BLE/history path. Keeping it stable avoids changing the already-working RH calibration at the same time.
+- **`Unni Display Temperature`** is an independent quadratic fit to annotated LCD values. It extends the display emulation down to the stationary ~15 °C points observed at `RT/REF ~= 2.29..2.31`.
+- **`Air Temperature`** is a provisional physical-air estimate fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.33` (roughly the normal ~18..25 °C region). Outside that envelope the component deliberately retains the last supported HA value instead of pretending the heated-sweep data provide a physical-air calibration.
+
+The display and air curves are therefore intentionally not interchangeable. The LCD emulation answers “what would the Unni display show?”, while the air estimate answers “what air temperature is most consistent with the nearby external references?”.
 
 ## Humidity
 
