@@ -867,7 +867,5 @@ See:
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - `LICENSES/`
 
-### OTA persistence
 
-Before an ESPHome OTA update starts, the firmware force-checkpoints the active battery-runtime learning session and flushes all pending Sensirion history samples to flash. This complements the normal periodic persistence and prevents an OTA reboot from discarding the most recent learning interval or history samples.
-
+Battery-learning flash writes are logged after a successful synchronous commit. Periodic checkpoints are labeled `periodic`, OTA-triggered force-saves are labeled `OTA`, and end-of-session commits are labeled `session-end`, together with the persisted SOC/session runtime/progress and learned-runtime state.

@@ -607,3 +607,9 @@ The normal Home Assistant entity defaults were shortened from `Air Temperature` 
 - In debug-capture builds, defer gating until the final useful raw UDP capture has drained so the debug transport cannot become stuck.
 
 - 2026-08-17: Force persistent-state flush at OTA start. ESPHome `ota.on_begin` now calls the component before the updater blocks the main loop; the active battery-learning session is checkpointed with its latest elapsed time and pending Sensirion history samples are synchronously flushed to the `senshist` partition.
+
+### 2026-08-17: Log battery-learning flash checkpoints
+
+- Log every successful battery-learning preference checkpoint after the synchronous flash commit.
+- Include the checkpoint reason (`periodic`, `OTA`, or `session-end`), current persisted SOC, accumulated session runtime, learning progress, learned full-runtime value and completed learning-cycle count.
+- Log the checkpoint reason on save failures as well, so OTA and periodic persistence failures are distinguishable in field logs.

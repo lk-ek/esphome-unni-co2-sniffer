@@ -218,7 +218,7 @@ void CO2Monitor0601::prepare_for_ota() {
   }
 
   ESP_LOGI(TAG, "OTA starting: flushing persistent runtime state");
-  this->save_battery_learning_(true);
+  this->save_battery_learning_(true, "OTA");
 
 #if UNNI_BLE_HISTORY_ENABLED
   if (!sensirion_history_flush())
@@ -244,7 +244,7 @@ void CO2Monitor0601::publish_battery_learning_() {
   publish(this->out_.battery_learning_progress, progress_pct);
 }
 
-void CO2Monitor0601::save_battery_learning_(bool force) {
+void CO2Monitor0601::save_battery_learning_(bool force, const char *reason) {
   if (!this->battery_.learning_pref_ready) return;
   const uint32_t now = millis();
   if (!force && this->battery_.learning_last_save_ms != 0 &&
@@ -265,8 +265,32 @@ void CO2Monitor0601::save_battery_learning_(bool force) {
     // each one to flash rather than leaving an overnight calibration only in
     // the deferred preference cache.
     if (global_preferences != nullptr) global_preferences->sync();
+
+    float progress_pct = 0.0f;
+    if (this->battery_.learning_session_active &&
+        std::isfinite(this->battery_.learning_session_start_progress) &&
+        std::isfinite(this->battery_.learning_session_last_progress)) {
+      const float drop = std::max(0.0f, this->battery_.learning_session_start_progress -
+                                        this->battery_.learning_session_last_progress);
+      const float time_factor = std::min(1.0f, this->battery_.learning_session_elapsed_ms /
+                                                  (2.0f * 3600000.0f));
+      const float drop_factor = std::min(1.0f, drop / 8.0f);
+      progress_pct = 100.0f * std::min(time_factor, drop_factor);
+    }
+
+    const char *checkpoint_kind = reason != nullptr ? reason : "periodic";
+    ESP_LOGI(TAG,
+             "Battery learning: %s checkpoint saved: SOC %.1f %%, elapsed %.2f h, progress %.0f %%, "
+             "learned %.1f h, cycles %u",
+             checkpoint_kind,
+             this->battery_.learning_session_last_progress,
+             this->battery_.learning_session_elapsed_ms / 3600000.0f,
+             progress_pct,
+             this->battery_.learned_full_runtime_h,
+             static_cast<unsigned>(this->battery_.learned_cycles));
   } else {
-    ESP_LOGW(TAG, "Battery learning: failed to save checkpoint");
+    ESP_LOGW(TAG, "Battery learning: failed to save %s checkpoint",
+             reason != nullptr ? reason : "periodic");
   }
 }
 
@@ -298,7 +322,7 @@ void CO2Monitor0601::finalize_battery_learning_(bool completed_session) {
   this->battery_.learning_session_last_progress = NAN;
   this->battery_.learning_last_tick_ms = 0;
   this->publish_battery_learning_();
-  this->save_battery_learning_(true);
+  this->save_battery_learning_(true, "session-end");
 }
 
 void CO2Monitor0601::update_battery_learning_(float progress, uint32_t now) {

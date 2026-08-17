@@ -329,7 +329,7 @@ class CO2Monitor0601 : public Component {
   void setup_battery_learning_();
   void update_battery_learning_(float progress, uint32_t now);
   void finalize_battery_learning_(bool completed_session);
-  void save_battery_learning_(bool force = false);
+  void save_battery_learning_(bool force = false, const char *reason = nullptr);
   void publish_battery_learning_();
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
