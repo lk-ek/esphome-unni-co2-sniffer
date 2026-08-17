@@ -576,3 +576,11 @@ The Unni LCD humidity also diverged systematically from the physical carrier-bas
 ### 2026-08-17: Simplify production temperature/humidity entity names
 
 The normal Home Assistant entity defaults were shortened from `Air Temperature` / `RH Humidity` to `Temperature` / `Humidity`. Internal option names and calibration terminology remain unchanged, so debug and documentation can still distinguish the physical-air and raw/display models unambiguously.
+
+
+### 2026-08-17: Reject-safe battery wake handling
+
+- Set the default battery BLE advertising interval to 3 s.
+- Treat RT/RH capture completion separately from measurement validity so a rejected capture can close the light-sleep awake window instead of waiting for the 10 s timeout.
+- Stop publishing temperature views from full-capture rejects such as `RH_DURATION`. Temperature retention is now limited to RH-local reject reasons and requires RT/REF to remain within 0.10 of the last accepted ratio.
+- This specifically prevents the observed battery-mode wake glitches (`RT/REF` jumping from about 2.26 to 2.02) from producing false `Temperature` jumps around 24 C.

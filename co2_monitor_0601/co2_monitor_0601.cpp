@@ -959,7 +959,7 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
 
   rtrh_decoder::Measurement m;
   if (!rtrh_decoder::poll(m)) return;
-  power_save::on_rtrh_complete(m.valid);
+  power_save::on_rtrh_complete();
 
   ESP_LOGI(TAG,
            "RT/RH measurement %lu quality: REF %.3f us / %.3f ms / %u, "
@@ -1014,10 +1014,27 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       publish(this->out_.humidity_extrapolation, true);
       publish(this->out_.calibration_extrapolation, true);
 
-      // REF+RT are independently useful. An RH-only failure must not leave HA
-      // showing a stale temperature for another native cycle. BLE/history stay
-      // pair-consistent and are updated only by fully valid T/RH measurements.
-      if (m.temperature_valid && std::isfinite(m.temperature_c)) {
+      // A rejected capture may retain temperature only when the reject is
+      // strictly RH-local and RT/REF remains continuous with the last accepted
+      // measurement. Full-capture failures such as RH_DURATION must not feed
+      // Temperature/Air Temperature/Display Temperature. This prevents wake
+      // capture glitches from producing large false temperature jumps.
+      const bool rh_local_reject =
+          m.reject_reason == rtrh_decoder::RejectReason::RH_TOO_FEW_SAMPLES ||
+          m.reject_reason == rtrh_decoder::RejectReason::RH_STATE_PERIOD ||
+          m.reject_reason == rtrh_decoder::RejectReason::RH_RATIO_IMPLAUSIBLE ||
+          m.reject_reason == rtrh_decoder::RejectReason::RH_CARRIER_COUNT ||
+          m.reject_reason == rtrh_decoder::RejectReason::RH_CARRIER_PERIOD;
+      constexpr float MAX_REJECT_RT_RATIO_STEP = 0.10f;
+      const bool rt_ratio_continuous =
+          this->rt_validity_.have_last_accepted_ratio && std::isfinite(m.rt_ratio) &&
+          std::fabs(m.rt_ratio - this->rt_validity_.last_accepted_ratio) <=
+              MAX_REJECT_RT_RATIO_STEP;
+      const bool retain_rejected_temperature =
+          rh_local_reject && m.temperature_valid && std::isfinite(m.temperature_c) &&
+          rt_ratio_continuous;
+
+      if (retain_rejected_temperature) {
         const float temperature_rate = this->update_thermal_transient_(m.temperature_c);
         (void) temperature_rate;
         m.thermal_transient = this->thermal_.active;
@@ -1065,11 +1082,26 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
           }
         }
 
+        this->rt_validity_.last_accepted_ratio = m.rt_ratio;
+        this->rt_validity_.have_last_accepted_ratio = true;
+
         ESP_LOGI(TAG,
-                 "RT/RH measurement %lu temperature retained despite RH reject: "
+                 "RT/RH measurement %lu temperature retained despite RH-local reject: "
                  "%.3f / REF %.3f us = %.6f -> %.2f C",
                  static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
                  m.rt_ratio, m.temperature_c);
+      } else if (publish_outputs && m.temperature_valid && std::isfinite(m.temperature_c)) {
+        const float ratio_step = this->rt_validity_.have_last_accepted_ratio &&
+                                         std::isfinite(m.rt_ratio)
+                                     ? std::fabs(m.rt_ratio - this->rt_validity_.last_accepted_ratio)
+                                     : NAN;
+        ESP_LOGW(TAG,
+                 "RT/RH measurement %lu rejected temperature discarded: REJECT=%s, "
+                 "RT/REF=%.6f, step=%s%.6f",
+                 static_cast<unsigned long>(m.sequence),
+                 rtrh_decoder::reject_reason_to_string(m.reject_reason), m.rt_ratio,
+                 std::isfinite(ratio_step) ? "" : "n/a ",
+                 std::isfinite(ratio_step) ? ratio_step : 0.0f);
       }
     }
 
@@ -1086,6 +1118,8 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
 
   const float temperature_rate = this->update_thermal_transient_(m.temperature_c);
   m.thermal_transient = this->thermal_.active;
+  this->rt_validity_.last_accepted_ratio = m.rt_ratio;
+  this->rt_validity_.have_last_accepted_ratio = true;
 
   ESP_LOGI(TAG, "RT/RH measurement %lu RT: %.3f / REF %.3f us = %.6f -> %.2f C",
            static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
@@ -1608,7 +1642,7 @@ void CO2Monitor0601::loop() {
     rtrh_decoder::loop();
     rtrh_decoder::Measurement discarded;
     if (rtrh_decoder::poll(discarded)) {
-      power_save::on_rtrh_complete(discarded.valid);
+      power_save::on_rtrh_complete();
       ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
                static_cast<unsigned long>(discarded.sequence),
                discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);

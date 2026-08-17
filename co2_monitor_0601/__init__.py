@@ -325,7 +325,7 @@ _SCHEMA = {
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
-    cv.Optional(CONF_BLE_BATTERY_ADVERTISING_INTERVAL, default="1s"): cv.All(
+    cv.Optional(CONF_BLE_BATTERY_ADVERTISING_INTERVAL, default="3s"): cv.All(
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),

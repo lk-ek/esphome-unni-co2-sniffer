@@ -198,6 +198,11 @@ class CO2Monitor0601 : public Component {
     uint32_t previous_ms{0};
   } thermal_;
 
+  struct RtValidityState {
+    bool have_last_accepted_ratio{false};
+    float last_accepted_ratio{NAN};
+  } rt_validity_;
+
   struct Co2State {
     bool have_last_ppm{false};
     uint16_t last_ppm{0};
@@ -317,7 +322,7 @@ class CO2Monitor0601 : public Component {
 #if UNNI_BLE_ENABLED
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
   uint32_t ble_usb_advertising_interval_ms_{1000};
-  uint32_t ble_battery_advertising_interval_ms_{1000};
+  uint32_t ble_battery_advertising_interval_ms_{3000};
   std::string ble_device_name_{"Unni CO2 Monitor"};
 #endif
   bool light_sleep_enabled_{true};

@@ -283,7 +283,7 @@ co2_monitor_0601:
   ble_live: true
   ble_history: true
   ble_advertising_interval: 2s
-  ble_battery_advertising_interval: 5s
+  ble_battery_advertising_interval: 3s
 
   # Power management
   light_sleep: true
@@ -365,7 +365,7 @@ co2_monitor_0601:
   light_sleep_max_awake: 10s
   ha_publish_interval: 60s
   ble_advertising_interval: 2s
-  ble_battery_advertising_interval: 5s
+  ble_battery_advertising_interval: 3s
 ```
 
 ---

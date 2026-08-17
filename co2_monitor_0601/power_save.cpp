@@ -291,8 +291,8 @@ void IRAM_ATTR on_rtrh_edge_from_isr() {
 
 uint32_t wake_generation() { return wake_gen; }
 
-void on_rtrh_complete(bool valid) {
-  if (!configured || !lock_held || !valid) return;
+void on_rtrh_complete() {
+  if (!configured || !lock_held) return;
   rtrh_complete = true;
   if (co2_powered_down) co2_after_rtrh = true;
 }

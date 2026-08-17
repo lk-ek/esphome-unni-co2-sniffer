@@ -23,8 +23,10 @@ void on_rtrh_edge_from_isr();
 // passive GPIO state outside ISR context.
 uint32_t wake_generation();
 
-// Called once the corresponding decoders have produced complete data.
-void on_rtrh_complete(bool valid);
+// Called once the RT/RH decoder has consumed a complete capture. Validation is
+// separate: even a rejected capture closes the wake window so battery mode does
+// not remain awake until the timeout.
+void on_rtrh_complete();
 void on_valid_co2();
 
 // Track the Unni CO2 power window. In battery mode, a quiet LOW/LOW bus arms
