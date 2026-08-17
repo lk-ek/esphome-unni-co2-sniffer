@@ -515,8 +515,8 @@ void CO2Monitor0601::open_wifi_recovery_window_(uint32_t now, const char *reason
            static_cast<unsigned long>(this->wifi_recovery_window_ms_), reason);
 }
 
-void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
 #if UNNI_BLE_ENABLED
+void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
   const bool enabled = !sensirion_settings_ha_disabled();
   if (enabled == this->wifi_ha_enabled_) return;
   ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi Home Assistant -> %s",
@@ -539,8 +539,8 @@ void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
     this->wifi_recovery_until_ms_ = 0;
     ESP_LOGW(TAG, "MyAmbience requested HA/WiFi disable; WiFi will stop in 1500 ms");
   }
-#endif
 }
+#endif
 
 void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
 #if UNNI_BLE_ENABLED
@@ -1920,7 +1920,9 @@ void CO2Monitor0601::loop() {
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   this->process_usb_power_();
   this->process_energy_save_grace_();
+#if UNNI_BLE_ENABLED
   this->sync_wifi_ha_from_sensirion_settings_();
+#endif
   this->process_wifi_ha_control_();
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
