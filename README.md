@@ -846,6 +846,11 @@ decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
 ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
 out of scope and still require hardware testing. See `tests/host/README.md`.
 
+On macOS the runner also handles native C++20 standard-library selection. If
+the active Apple libc++ lacks ESPHome's required concepts support and Homebrew
+LLVM is installed, the generated host builds are automatically pointed at the
+Homebrew libc++ headers and runtime; no manual `CXX=...` wrapper is required.
+
 Historical documents may describe earlier pin assignments, names or implementations. The current source, README and active documentation are authoritative.
 
 ---

@@ -51,12 +51,20 @@ Host preferences are isolated below `.esphome/host-test-prefs` using
 
 ## Native compiler requirement
 
-ESPHome 2026.7.x host builds require C++20. The test runner performs a small
-compiler preflight before generating/building the matrix and stops immediately
-with a focused diagnostic if the selected native compiler cannot provide C++20
-concepts and `std::span`. Generated host YAMLs also request `-std=gnu++20`
-explicitly, even though ESPHome's `host:` platform sets the same flag itself.
+ESPHome 2026.7.x host builds require C++20, including standard-library
+features such as concepts and `std::span`. The runner performs a native
+compiler + standard-library preflight before building the matrix and injects
+the exact tested C++ flags into every generated host configuration.
 
-On macOS, PlatformIO's native platform normally uses the Apple Command Line
-Tools compiler. If the preflight fails, update/select the Command Line Tools or
-set `CXX` to a C++20-capable compiler before running the tests.
+On macOS the compiler binary and libc++ are treated separately. Some Apple
+Command Line Tools combinations accept `-std=gnu++20` while their selected
+libc++ does not expose the C++20 concepts required by ESPHome. When Homebrew
+LLVM is installed, the runner automatically tries the system compiler against
+Homebrew LLVM's libc++ headers/runtime using `-nostdinc++`, an explicit libc++
+include path, library path, and runtime rpath. This matches PlatformIO
+`native` more reliably than setting `CXX` alone, because PlatformIO may still
+invoke the system compiler internally.
+
+If Homebrew LLVM is unavailable or unsuitable, the runner falls back to the
+default native toolchain. If neither combination passes the same C++20 probe
+used for the generated build flags, the matrix stops with a focused diagnostic.
