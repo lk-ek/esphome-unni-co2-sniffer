@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # RH carrier calibration v1 — 2026-08-17
 
 The production humidity observable was changed from recurrence of the combined
@@ -6,7 +9,7 @@ The production humidity observable was changed from recurrence of the combined
 ```text
 r = rh_carrier_period_us / ref_period_us
 x = ln(r)
-RH = 3.470*x^2 - 24.495*x - 0.4357*T + 83.245
+RH = 2.666914*x^2 - 22.589341*x - 0.461345*T + 83.515272
 ```
 
 ## Why
@@ -28,7 +31,13 @@ about 8.7..9.1 near 30..35 %RH, 4.4..4.8 near 43..44 %RH, 3.48 near 47 %RH,
 1.84 near 61 %RH, and about 1.37 near 68 %RH. Temperature compensation remains
 part of the model.
 
-This is a provisional v1 production calibration. Additional stationary points
+The coefficients above were refit after the 2026-08-17 quadratic temperature
+calibration replaced the provisional linear RT calibration.  They are fit against
+the temperature value that the production decoder now supplies, avoiding a
+systematic RH shift caused solely by changing the temperature model.  On the
+currently annotated carrier points the refit has about 0.26 %-point RMS residual.
+
+This remains a provisional v1 production calibration. Additional stationary points
 should be used for a later refit.
 
 ## Validation

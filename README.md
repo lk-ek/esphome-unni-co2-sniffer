@@ -89,6 +89,8 @@ Unni signal ---- 10 kΩ ---- XIAO GPIO
 
 The resistors belong only in the ESP branches; do not insert them into the original Unni signal path. The RT/RH calibration is hardware-dependent, so calibration data collected with earlier direct or three/four-wire tap arrangements must not be mixed with the current two-wire/10 kΩ setup.
 
+The current temperature calibration for this hardware is quadratic in `RT/REF` and is based on the 2026-08-17 heated/cooling sweep (roughly 17.6–36.6 °C display range). RH uses the RH-phase carrier period normalized by REF with temperature compensation. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
+
 ---
 
 ## Battery voltage measurement

@@ -23,18 +23,18 @@ namespace calibration {
  * here means a future refit only changes this file, not the timing decoder.
  */
 
-// Temperature calibration.
-//   T [degC] = M * rt_ratio + C
+// Temperature calibration (two-wire/10 kOhm v2, 2026-08-17).
+//   x = rt_ratio = RT_period / REF_period
+//   T [degC] = A*x^2 + B*x + C
 //
-// The slope is retained from the 2026-08-11 fit.  The intercept is
-// provisionally re-anchored for the final two-wire RT/RH hookup with 10 kOhm
-// series resistors, using the 2026-08-16 stationary captures #6..#8:
-//   mean(rt_ratio) = 1.992839 -> Unni display = 24.0 degC
-//
-// This is deliberately a one-point correction until a new temperature sweep
-// is available; changing the slope from a single point would be unjustified.
-inline constexpr float TEMP_RATIO_M = -23.024269f;
-inline constexpr float TEMP_RATIO_C = 69.883663f;
+// A deliberately heated/cooling sweep on the final two-wire/10 kOhm hardware
+// produced annotated display points from about 17.6 to 36.6 degC.  A quadratic
+// fit is required: the linear one-point re-anchor used on 2026-08-16 leaves
+// systematic errors of several degrees across that range.  The quadratic fit
+// has about 0.29 degC RMS residual on the current annotated sweep points.
+inline constexpr float TEMP_RATIO2_A = 26.151839f;
+inline constexpr float TEMP_RATIO_B = -126.906498f;
+inline constexpr float TEMP_RATIO_C = 170.744526f;
 
 // Relative-humidity calibration (carrier v1, 2026-08-17):
 //   r  = RH_carrier_period / REF_period
@@ -51,21 +51,22 @@ inline constexpr float TEMP_RATIO_C = 69.883663f;
 // temperature, including both ordinary and deliberately heated captures. This
 // is a provisional v1 fit and should be refined with additional stationary
 // measurements.
-inline constexpr float RH_LOG2_A = 3.470f;
-inline constexpr float RH_LOG_B = -24.495f;
-inline constexpr float RH_TEMP_C = -0.4357f;
-inline constexpr float RH_OFFSET = 83.245f;
+inline constexpr float RH_LOG2_A = 2.666914f;
+inline constexpr float RH_LOG_B = -22.589341f;
+inline constexpr float RH_TEMP_C = -0.461345f;
+inline constexpr float RH_OFFSET = 83.515272f;
 
 // Approximate stationary calibration envelope currently backed by measurements.
 // Values outside this envelope are still converted; the caller may expose the
 // extrapolation flag diagnostically.
-inline constexpr float CAL_TEMP_MIN_C = 18.0f;
-inline constexpr float CAL_TEMP_MAX_C = 35.0f;
+inline constexpr float CAL_TEMP_MIN_C = 17.5f;
+inline constexpr float CAL_TEMP_MAX_C = 37.0f;
 inline constexpr float CAL_RH_RATIO_MIN = 1.30f;
 inline constexpr float CAL_RH_RATIO_MAX = 9.20f;
 
 inline float temperature_from_ratio(float rt_ratio) {
-  return TEMP_RATIO_M * rt_ratio + TEMP_RATIO_C;
+  return TEMP_RATIO2_A * rt_ratio * rt_ratio +
+         TEMP_RATIO_B * rt_ratio + TEMP_RATIO_C;
 }
 
 inline float log_rh_ratio(float rh_ratio) {
