@@ -229,14 +229,14 @@ co2_monitor_0601:
 
 In that build the local ESPHome entity objects remain registered internally so ESPHome 2026.8 can derive its entity-vector sizes correctly, but the supplied YAML contains no `wifi:` or `api:` component, so they are not exposed to Home Assistant and cause no network traffic.
 
-Normal builds create:
+The normal `i2c-sniffer.yaml` build intentionally exposes only the production
+measurement set plus operational power/battery controls:
+
+The default Home Assistant names are intentionally concise: the physical-air `air_temperature` entity is shown as `Temperature`, and the physical carrier-based `rh_humidity` entity as `Humidity`.
 
 - `CO2`
-- `RT Temperature`
-- `Air Temperature`
-- `Unni Display Temperature`
-- `RH Humidity`
-- `Unni Display Humidity`
+- `Temperature` (physical-air estimate)
+- `Humidity` (physical carrier-based estimate)
 - `Battery Voltage`
 - `Battery Level`
 - `Battery Runtime Estimate`
@@ -253,23 +253,18 @@ co2_monitor_0601:
   co2:
     name: "Living Room CO2"
 
-  rt_temperature:
-    name: "RT Temperature"
-
   air_temperature:
-    name: "Air Temperature"
-
-  unni_display_temperature:
-    name: "Unni Display Temperature"
+    name: "Temperature"
 
   rh_humidity:
     name: "Humidity"
-
-  unni_display_humidity:
-    name: "Unni Display Humidity"
 ```
 
-With `debug_metrics: true`, additional timing, quality and decoder diagnostic entities are created.
+The shipped `i2c-sniffer-debug.yaml` sets `debug_metrics: true` and creates the
+complete entity set as well: `RT Temperature`, both `Unni Display ...`
+emulation entities, protocol error counters, raw timing/ratio metrics, battery
+charge/discharge rates, quality and calibration/extrapolation flags. These are
+not instantiated by the normal build.
 
 ---
 
@@ -709,13 +704,13 @@ The active calibration is defined in:
 co2_monitor_0601/calibration.h
 ```
 
-Temperature is now exposed as three deliberately separate views so different calibration goals are not mixed:
+Temperature is maintained as three deliberately separate views so different calibration goals are not mixed:
 
-- **`RT Temperature`** keeps the existing v2 RT/REF conversion as a diagnostic/raw-model temperature and remains the internal temperature input to the already-fitted carrier-RH compensation.
-- **`Unni Display Temperature`** is an independent quadratic fit to annotated LCD values. It extends the display emulation down to the stationary ~15 °C points observed at `RT/REF ~= 2.29..2.31`.
-- **`Air Temperature`** is the preferred physical-air estimate, fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.35`. Sensirion BLE live data and persistent history use this physical-air value inside the supported envelope and fall back to the RT model only outside it.
-- **`RH Humidity`** remains the physical carrier-based humidity estimate.
-- **`Unni Display Humidity`** is a separate provisional LCD-emulation fit using carrier/REF plus the independently reconstructed Unni display temperature. It does not feed back into the physical RH path.
+- **`Air Temperature`** is the production physical-air estimate, fitted only to nearby/same-airflow AHT21/BME280 reference points. Its current supported ratio envelope is `1.98..2.35`. Sensirion BLE live data and persistent history use this physical-air value inside the supported envelope and fall back internally to the RT model only outside it. This is the only temperature entity created by the normal build.
+- **`RT Temperature`** keeps the existing v2 RT/REF conversion as an internal/diagnostic raw-model temperature and remains the temperature input to the already-fitted carrier-RH compensation. It is exposed only with `debug_metrics: true`.
+- **`Unni Display Temperature`** is an independent quadratic LCD-emulation fit and is exposed only with `debug_metrics: true`.
+- **`RH Humidity`** remains the production physical carrier-based humidity estimate.
+- **`Unni Display Humidity`** is a separate provisional LCD-emulation fit using carrier/REF plus the independently reconstructed Unni display temperature. It does not feed back into the physical RH path and is exposed only with `debug_metrics: true`.
 
 The display and air curves are therefore intentionally not interchangeable. The LCD emulation answers “what would the Unni display show?”, while the air estimate answers “what air temperature is most consistent with the nearby external references?”.
 
@@ -742,7 +737,7 @@ Debug builds also report:
 
 For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 35 µs. Phase is diagnostic only; the production humidity observable is the carrier period.
 
-With `debug_metrics: true`, Home Assistant exposes additional timing, quality, temperature-rate and calibration/extrapolation diagnostics. With `debug_capture: true`, raw and timing data are available over UDP and the debug HTTP endpoints.
+With `debug_metrics: true`, Home Assistant exposes the complete diagnostic entity set: RT-model and Unni-display values, protocol error counters, timing/ratio metrics, battery-rate metrics, quality, temperature-rate and calibration/extrapolation flags. With `debug_capture: true`, raw and timing data are available over UDP and the debug HTTP endpoints.
 
 ---
 

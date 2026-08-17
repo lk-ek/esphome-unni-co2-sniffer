@@ -149,7 +149,7 @@ SENSOR_OUTPUTS = {
         "set_air_temperature_sensor",
     ),
     CONF_UNNI_DISPLAY_TEMPERATURE: (
-        _sensor_schema(
+        _diagnostic_sensor(
             unit_of_measurement="°C",
             accuracy_decimals=1,
             device_class="temperature",
@@ -167,7 +167,7 @@ SENSOR_OUTPUTS = {
         "set_rh_humidity_sensor",
     ),
     CONF_UNNI_DISPLAY_HUMIDITY: (
-        _sensor_schema(
+        _diagnostic_sensor(
             unit_of_measurement="%",
             accuracy_decimals=1,
             device_class="humidity",
@@ -365,13 +365,13 @@ _SCHEMA = {
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
 
+# Production builds expose only physical measurements and operational battery data.
+# Decoder internals and Unni LCD emulation are created only when debug_metrics is
+# enabled (the shipped i2c-sniffer-debug.yaml does this).
 PRIMARY_SENSOR_DEFAULTS = {
     CONF_CO2: {"name": "CO2", "icon": "mdi:molecule-co2"},
-    CONF_RT_TEMPERATURE: {"name": "RT Temperature", "icon": "mdi:thermometer"},
-    CONF_AIR_TEMPERATURE: {"name": "Air Temperature", "icon": "mdi:thermometer"},
-    CONF_UNNI_DISPLAY_TEMPERATURE: {"name": "Unni Display Temperature", "icon": "mdi:thermometer-lines"},
-    CONF_RH_HUMIDITY: {"name": "RH Humidity", "icon": "mdi:water-percent"},
-    CONF_UNNI_DISPLAY_HUMIDITY: {"name": "Unni Display Humidity", "icon": "mdi:water-percent"},
+    CONF_AIR_TEMPERATURE: {"name": "Temperature", "icon": "mdi:thermometer"},
+    CONF_RH_HUMIDITY: {"name": "Humidity", "icon": "mdi:water-percent"},
     CONF_BATTERY_VOLTAGE: {"name": "Battery Voltage", "icon": "mdi:battery"},
     CONF_BATTERY_LEVEL: {"name": "Battery Level", "icon": "mdi:battery"},
     CONF_BATTERY_RUNTIME_ESTIMATE: {"name": "Battery Runtime Estimate"},
@@ -379,6 +379,9 @@ PRIMARY_SENSOR_DEFAULTS = {
 }
 
 DEBUG_SENSOR_DEFAULTS = {
+    CONF_RT_TEMPERATURE: {"name": "RT Temperature", "icon": "mdi:thermometer"},
+    CONF_UNNI_DISPLAY_TEMPERATURE: {"name": "Unni Display Temperature", "icon": "mdi:thermometer-lines"},
+    CONF_UNNI_DISPLAY_HUMIDITY: {"name": "Unni Display Humidity", "icon": "mdi:water-percent"},
     CONF_CRC_ERRORS: {"name": "CO2 Sniffer CRC Errors"},
     CONF_FRAME_ERRORS: {"name": "CO2 Sniffer Frame Errors"},
     CONF_REF_PERIOD: {"name": "RT RH REF Period"},

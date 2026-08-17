@@ -63,5 +63,7 @@ co2_monitor_0601:
   # Keep HA/API reachable briefly before Light-sleep may drop native USB serial.
   energy_save_grace: 3s
   sniffer_start_delay: 10s
+  # Production entity set: CO2, Temperature, Humidity and power/battery state.
+  # RT-model, Unni-display and protocol/timing entities are debug-build only.
   debug_metrics: false
   debug_capture: false

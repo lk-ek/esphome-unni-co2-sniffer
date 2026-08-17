@@ -72,6 +72,8 @@ co2_monitor_0601:
   # source; when the CO2 bus is quiet LOW/LOW, SCL HIGH is armed as an
   # additional wake source for the next native CO2 power window.
   light_sleep: true
+  # Expose the complete entity set, including RT-model, Unni-display,
+  # protocol error, timing, quality and extrapolation diagnostics.
   debug_metrics: true
   # Active bus takeover was diagnostic-only; normal battery operation is fully passive.
   active_i2c_probe: false

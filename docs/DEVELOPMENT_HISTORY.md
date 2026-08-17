@@ -564,3 +564,15 @@ The normal MyCO2 Gadget name is now configurable through `co2_monitor_0601.ble_d
 Cold stationary measurements with the AHT21 placed within about 2 cm of the open Unni sensor area confirmed that the dedicated `Air Temperature` view tracks external references much better than the internal RT-model temperature, while the separately fitted `Unni Display Temperature` tracks the LCD. Sensirion live advertisements and persistent history therefore use `Air Temperature` when it is inside its validated ratio envelope, with the RT model retained only as an out-of-envelope fallback.
 
 The Unni LCD humidity also diverged systematically from the physical carrier-based humidity at the cold/high-humidity end. A separate provisional `Unni Display Humidity` entity was added from annotated LCD points. It is display emulation only and does not alter `RH Humidity`, BLE humidity, or the carrier-RH compensation model.
+
+## 2026-08-17: production/debug entity split
+
+- Normal `i2c-sniffer.yaml` now instantiates only physical measurement and operational power/battery entities.
+- `RT Temperature`, `Unni Display Temperature`, `Unni Display Humidity`, protocol/timing/quality metrics, extrapolation flags and battery-rate diagnostics are instantiated only when `debug_metrics: true`.
+- The shipped `i2c-sniffer-debug.yaml` enables `debug_metrics`, so it retains the complete reverse-engineering/diagnostic entity set.
+- The runtime calibration and decoding paths are unchanged; this is an entity-surface cleanup only.
+
+
+### 2026-08-17: Simplify production temperature/humidity entity names
+
+The normal Home Assistant entity defaults were shortened from `Air Temperature` / `RH Humidity` to `Temperature` / `Humidity`. Internal option names and calibration terminology remain unchanged, so debug and documentation can still distinguish the physical-air and raw/display models unambiguously.
