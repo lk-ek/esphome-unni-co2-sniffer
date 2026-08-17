@@ -355,39 +355,67 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+        # Keep the pipe binary and unbuffered. Combining selectors with a
+        # buffered TextIOWrapper/readline() can hide already-prefetched lines
+        # from select(), causing a false timeout even after the PASS marker was
+        # emitted by the child.
+        bufsize=0,
     )
     deadline = time.monotonic() + timeout_s
     passed = False
+    failed = False
     timed_out = False
+    output = bytearray()
+    pass_marker = PASS_MARKER.encode()
+    fail_marker = FAIL_MARKER.encode()
+
     try:
         assert proc.stdout is not None
+        fd = proc.stdout.fileno()
         selector = selectors.DefaultSelector()
-        selector.register(proc.stdout, selectors.EVENT_READ)
-        while time.monotonic() < deadline:
-            remaining = max(0.0, deadline - time.monotonic())
-            events = selector.select(timeout=min(0.25, remaining))
-            if events:
-                line = proc.stdout.readline()
-                if line:
-                    print(line, end="", flush=True)
-                    if FAIL_MARKER in line:
+        selector.register(fd, selectors.EVENT_READ)
+        try:
+            while time.monotonic() < deadline:
+                remaining = max(0.0, deadline - time.monotonic())
+                events = selector.select(timeout=min(0.25, remaining))
+                if events:
+                    chunk = os.read(fd, 65536)
+                    if not chunk:
+                        break
+                    sys.stdout.buffer.write(chunk)
+                    sys.stdout.buffer.flush()
+                    output.extend(chunk)
+                    if fail_marker in output:
+                        failed = True
                         print("Host binary reported a self-test failure", file=sys.stderr)
                         break
-                    if PASS_MARKER in line:
+                    if pass_marker in output:
                         passed = True
                         break
-            if proc.poll() is not None:
-                for line in proc.stdout:
-                    print(line, end="", flush=True)
-                    if FAIL_MARKER in line:
-                        print("Host binary reported a self-test failure", file=sys.stderr)
-                    if PASS_MARKER in line:
+                    # Markers are short. Bound retained history while still
+                    # allowing a marker split across two reads.
+                    if len(output) > 4096:
+                        del output[:-4096]
+                elif proc.poll() is not None:
+                    # Drain anything that became available between poll() and
+                    # process exit. os.read() returns b'' at EOF.
+                    while True:
+                        chunk = os.read(fd, 65536)
+                        if not chunk:
+                            break
+                        sys.stdout.buffer.write(chunk)
+                        sys.stdout.buffer.flush()
+                        output.extend(chunk)
+                    if fail_marker in output:
+                        failed = True
+                    if pass_marker in output:
                         passed = True
-                break
-        if not passed and proc.poll() is None and time.monotonic() >= deadline:
-            timed_out = True
+                    break
+
+            if not passed and not failed and proc.poll() is None and time.monotonic() >= deadline:
+                timed_out = True
+        finally:
+            selector.close()
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -399,7 +427,7 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
 
     if timed_out:
         print(f"Host binary did not emit {PASS_MARKER!r} within {timeout_s}s", file=sys.stderr)
-    return passed
+    return passed and not failed
 
 
 def _run_smoke(esphome: str, config: Path, variant: str, env: dict[str, str], timeout_s: int) -> bool:
