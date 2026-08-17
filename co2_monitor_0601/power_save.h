@@ -3,7 +3,6 @@
 #pragma once
 
 #include <cstdint>
-#include "esp_attr.h"
 
 namespace esphome {
 namespace co2_monitor_0601 {

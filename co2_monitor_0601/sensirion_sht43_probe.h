@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "ble_options.h"
-#if UNNI_BLE_ENABLED && UNNI_SHT43_IDENTITY_PROBE
+#if UNNI_BLE_ENABLED && UNNI_SHT43_IDENTITY_PROBE && !defined(USE_HOST)
 
 #include "esphome/components/esp32_ble_server/ble_server.h"
 

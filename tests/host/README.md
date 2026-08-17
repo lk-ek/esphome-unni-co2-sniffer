@@ -68,3 +68,8 @@ invoke the system compiler internally.
 If Homebrew LLVM is unavailable or unsuitable, the runner falls back to the
 default native toolchain. If neither combination passes the same C++20 probe
 used for the generated build flags, the matrix stops with a focused diagnostic.
+
+## Host/ESP32 header boundary
+
+ESPHome's generated `esphome.h` includes component headers even when their ESP32-only `.cpp` files are filtered out. Public component headers therefore remain parseable on `host:`: ESP-IDF-only includes live behind platform guards, while the native shim supplies the codegen-facing component API. This keeps the host matrix useful without pretending to emulate GPIO/ISR/PM/BLE hardware.
+

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "ble_options.h"
-#if UNNI_BLE_ENABLED
+#if UNNI_BLE_ENABLED && !defined(USE_HOST)
 
 #include "sensirion_sample.h"
 

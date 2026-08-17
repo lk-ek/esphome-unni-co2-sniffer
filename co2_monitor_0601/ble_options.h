@@ -13,15 +13,27 @@
 // Fallbacks are only for building the component sources outside ESPHome
 // codegen.  ESPHome-generated builds already have the three defines above.
 #ifndef UNNI_BLE_ENABLED
+#ifdef USE_HOST
+#define UNNI_BLE_ENABLED 0
+#else
 #define UNNI_BLE_ENABLED 1
+#endif
 #endif
 
 #ifndef UNNI_BLE_LIVE_ENABLED
+#ifdef USE_HOST
+#define UNNI_BLE_LIVE_ENABLED 0
+#else
 #define UNNI_BLE_LIVE_ENABLED UNNI_BLE_ENABLED
+#endif
 #endif
 
 #ifndef UNNI_BLE_HISTORY_ENABLED
+#ifdef USE_HOST
+#define UNNI_BLE_HISTORY_ENABLED 0
+#else
 #define UNNI_BLE_HISTORY_ENABLED UNNI_BLE_ENABLED
+#endif
 #endif
 
 #if UNNI_BLE_LIVE_ENABLED && !UNNI_BLE_ENABLED
