@@ -60,7 +60,9 @@ struct Measurement {
   float rh_phase_rise_us{NAN};
   float rh_phase_fall_us{NAN};
   float rh_phase_mean_us{NAN};
-  float rh_phase_carrier_ratio{NAN};
+  // Primary phase diagnostic for future RH calibration: rising-edge RH-RT
+  // offset normalized by the RH carrier period.
+  float rh_phase_rise_carrier_ratio{NAN};
   uint8_t rh_phase_rise_samples{0};
   uint8_t rh_phase_fall_samples{0};
 

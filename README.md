@@ -698,7 +698,7 @@ Debug builds therefore also measure, without yet using these values for RH publi
 - normalized phase separation relative to the RH carrier period;
 - the historical combined-state timing and distribution.
 
-For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 70 µs. The metric is logged and exported to `rtrh_timing.csv` so a more robust humidity mapping can be calibrated before replacing the existing decoder.
+For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 35 µs, which avoids joining a neighboring carrier cycle. The rising-edge median is treated as the primary calibration diagnostic and is also exported normalized by the RH carrier period; falling-edge and combined-mean values remain secondary diagnostics. All phase metrics are logged and exported to `rtrh_timing.csv` so a more robust humidity mapping can be calibrated before replacing the existing decoder.
 
 With `debug_metrics: true`, Home Assistant exposes additional timing, quality, temperature-rate and calibration/extrapolation diagnostics. With `debug_capture: true`, raw and timing data are available over UDP and the debug HTTP endpoints.
 

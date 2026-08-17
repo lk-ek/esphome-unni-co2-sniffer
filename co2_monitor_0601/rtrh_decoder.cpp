@@ -39,7 +39,7 @@ static constexpr uint32_t CYCLE_MAX_US = 20000;
 static constexpr uint16_t RT_TEMP_CYCLES = 880;
 static constexpr uint8_t RH_STATE_PERIOD_SAMPLES = 96;
 static constexpr uint8_t RH_PHASE_DELTA_SAMPLES = 96;
-static constexpr uint32_t RH_PHASE_PAIR_MAX_US = 70;
+static constexpr uint32_t RH_PHASE_PAIR_MAX_US = 35;
 
 struct Accum {
   uint32_t period_sum{0};
@@ -766,9 +766,14 @@ static Measurement derive(const Snapshot &s) {
     m.rh_phase_mean_us = m.rh_phase_rise_us;
   else if (std::isfinite(m.rh_phase_fall_us))
     m.rh_phase_mean_us = m.rh_phase_fall_us;
-  m.rh_phase_carrier_ratio = std::isfinite(m.rh_phase_mean_us) &&
-                             std::isfinite(m.rh_carrier_period_us) && m.rh_carrier_period_us > 0.0f
-                                 ? m.rh_phase_mean_us / m.rh_carrier_period_us : NAN;
+  // Rising-edge phase is the primary RH calibration diagnostic. Falling-edge
+  // phase and the combined mean remain secondary observability because near
+  // phase wrap they can pair to a neighboring cycle or reflect duty-cycle
+  // asymmetry.
+  m.rh_phase_rise_carrier_ratio = std::isfinite(m.rh_phase_rise_us) &&
+                                  std::isfinite(m.rh_carrier_period_us) &&
+                                  m.rh_carrier_period_us > 0.0f
+                                      ? m.rh_phase_rise_us / m.rh_carrier_period_us : NAN;
   m.rh_state_us = rh_state_period_median(s.rh_state);
   derive_rh_distribution(s.rh_state, m);
   m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
@@ -838,7 +843,7 @@ struct __attribute__((packed)) TimingPayload {
   float rh_phase_rise_us;
   float rh_phase_fall_us;
   float rh_phase_mean_us;
-  float rh_phase_carrier_ratio;
+  float rh_phase_rise_carrier_ratio;
   uint8_t rh_phase_rise_samples;
   uint8_t rh_phase_fall_samples;
   uint16_t reserved2;
@@ -914,7 +919,7 @@ static void send_timing_udp(const Measurement &m) {
   payload.rh_phase_rise_us = m.rh_phase_rise_us;
   payload.rh_phase_fall_us = m.rh_phase_fall_us;
   payload.rh_phase_mean_us = m.rh_phase_mean_us;
-  payload.rh_phase_carrier_ratio = m.rh_phase_carrier_ratio;
+  payload.rh_phase_rise_carrier_ratio = m.rh_phase_rise_carrier_ratio;
   payload.rh_phase_rise_samples = m.rh_phase_rise_samples;
   payload.rh_phase_fall_samples = m.rh_phase_fall_samples;
   debug_udp_timing_payload = payload;
@@ -1058,7 +1063,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     format_fixed(rh_phase_rise, sizeof(rh_phase_rise), have ? d.rh_phase_rise_us : NAN, 3);
     format_fixed(rh_phase_fall, sizeof(rh_phase_fall), have ? d.rh_phase_fall_us : NAN, 3);
     format_fixed(rh_phase_mean, sizeof(rh_phase_mean), have ? d.rh_phase_mean_us : NAN, 3);
-    format_fixed(rh_phase_ratio, sizeof(rh_phase_ratio), have ? d.rh_phase_carrier_ratio : NAN, 6);
+    format_fixed(rh_phase_ratio, sizeof(rh_phase_ratio), have ? d.rh_phase_rise_carrier_ratio : NAN, 6);
     format_fixed(rt_ratio, sizeof(rt_ratio), have ? d.rt_ratio : NAN, 6);
     format_fixed(rh_ratio, sizeof(rh_ratio), have ? d.rh_ratio : NAN, 6);
     format_fixed(temperature, sizeof(temperature), have ? d.temperature_c : NAN, 3);
@@ -1071,7 +1076,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "measurement,phase,count,period_mean_us,duration_ms,rh_carrier_ref_ratio,rh_rt_rise_edges,rh_rt_fall_edges,rh_rh_rise_edges,rh_rh_fall_edges,rh_phase_rise_us,rh_phase_fall_us,rh_phase_mean_us,rh_phase_carrier_ratio,rh_phase_rise_samples,rh_phase_fall_samples,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
+        "measurement,phase,count,period_mean_us,duration_ms,rh_carrier_ref_ratio,rh_rt_rise_edges,rh_rt_fall_edges,rh_rh_rise_edges,rh_rh_fall_edges,rh_phase_rise_us,rh_phase_fall_us,rh_phase_mean_us,rh_phase_rise_carrier_ratio,rh_phase_rise_samples,rh_phase_fall_samples,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     char line[384];
 
