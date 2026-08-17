@@ -75,3 +75,19 @@ used for the generated build flags, the matrix stops with a focused diagnostic.
 
 ESPHome's generated `esphome.h` includes component headers even when their ESP32-only `.cpp` files are filtered out. Public component headers therefore remain parseable on `host:`: ESP-IDF-only includes live behind platform guards, while the native shim supplies the codegen-facing component API. This keeps the host matrix useful without pretending to emulate GPIO/ISR/PM/BLE hardware.
 
+
+## Archived RT/RH capture regression
+
+The runtime smoke test also loads `tests/host/fixtures/rtrh_legacy_260811.csv`.
+It contains 135 normalized timing records extracted from the existing
+`rh_th_260811*.zip` and `rh_th_nod3_260811-1.zip` capture sets. The host test
+checks the measured count/period/duration relationships, reconstructs RT/REF and
+RH-carrier/REF ratios from those measurements, and runs every recorded point
+through the production calibration functions. Golden engineering-unit outputs
+are intentionally frozen in the fixture, so a calibration change is visible as
+an explicit regression that must be reviewed and accepted.
+
+The archived 2026-08-11 captures predate the final two-wire/10 kOhm sensor
+loading and therefore are not treated as current physical calibration truth.
+They are used as a broad real-world timing/input corpus. Current calibration
+coefficients remain documented separately under `docs/history/`.

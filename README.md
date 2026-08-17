@@ -894,3 +894,11 @@ See:
 
 
 Battery-learning flash writes are logged after a successful synchronous commit. Periodic checkpoints are labeled `periodic`, OTA-triggered force-saves are labeled `OTA`, and end-of-session commits are labeled `session-end`, together with the persisted SOC/session runtime/progress and learned-runtime state.
+
+### Host regression corpus
+
+The native host suite includes 135 RT/RH timing records extracted from the
+existing August 11 capture archives. These real measured timing points are used
+to regression-test normalization and all portable temperature/humidity
+calibration paths across a much wider range than the synthetic smoke fixture.
+See `tests/host/README.md` for scope and limitations.
