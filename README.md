@@ -824,7 +824,27 @@ docs/
 
 tools/
   reverse-engineering and capture utilities
+
+tests/host/
+  native ESPHome host-platform smoke tests for all shipped YAML variants
 ```
+
+## Native host test matrix
+
+The repository includes a hardware-free smoke-test layer based on ESPHome's
+official `host:` platform. The runner derives a temporary host configuration
+from each shipped YAML variant, compiles it natively, starts it, and waits for
+the portable component self-test to pass:
+
+```sh
+python3 -m pip install -r requirements-test.txt
+python3 tests/host/run_host_tests.py
+```
+
+The host shim exercises the real component schema/code-generation surface, CO₂
+decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
+ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
+out of scope and still require hardware testing. See `tests/host/README.md`.
 
 Historical documents may describe earlier pin assignments, names or implementations. The current source, README and active documentation are authoritative.
 

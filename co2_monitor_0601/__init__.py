@@ -8,8 +8,9 @@ from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
 )
-from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC
-from esphome.core import TimePeriod
+from esphome.config_helpers import filter_source_files_from_platform
+from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC, PlatformFramework
+from esphome.core import CORE, TimePeriod
 
 # BLE is deliberately NOT a hard dependency. A real `ble: false` build therefore
 # does not need esp32_ble / esp32_ble_server in the YAML at all.
@@ -18,9 +19,30 @@ DEPENDENCIES = []
 
 def AUTO_LOAD(config):
     loads = ["sensor", "binary_sensor", "switch"]
-    if config.get(CONF_BLE, True):
+    # The host test target exercises the component schema, entity wiring and
+    # portable protocol/calibration code without pulling ESP32-only BLE code.
+    if config.get(CONF_BLE, True) and not CORE.is_host:
         loads.append("esp32_ble_server")
     return loads
+
+
+# Keep the production ESP-IDF sources completely out of native host builds.
+# The host implementation intentionally compiles only the portable decoder plus
+# a small ESPHome Component shim that performs deterministic startup smoke tests.
+FILTER_SOURCE_FILES = filter_source_files_from_platform(
+    {
+        "co2_monitor_0601.cpp": {PlatformFramework.ESP32_IDF},
+        "debug_udp.cpp": {PlatformFramework.ESP32_IDF},
+        "i2c_sniffer.cpp": {PlatformFramework.ESP32_IDF},
+        "power_save.cpp": {PlatformFramework.ESP32_IDF},
+        "rtrh_decoder.cpp": {PlatformFramework.ESP32_IDF},
+        "sensirion_ble.cpp": {PlatformFramework.ESP32_IDF},
+        "sensirion_history.cpp": {PlatformFramework.ESP32_IDF},
+        "sensirion_settings.cpp": {PlatformFramework.ESP32_IDF},
+        "sensirion_sht43_probe.cpp": {PlatformFramework.ESP32_IDF},
+        "co2_monitor_0601_host.cpp": {PlatformFramework.HOST_NATIVE},
+    }
+)
 
 CONF_CO2 = "co2"
 CONF_CRC_ERRORS = "crc_errors"
@@ -321,6 +343,13 @@ def _validate_features(config):
     if config.get(CONF_SHT43_IDENTITY_PROBE, False) and not config[CONF_BLE]:
         raise cv.Invalid("sht43_identity_probe: true requires ble: true")
 
+    # Host builds deliberately simulate BLE feature selection instead of loading
+    # the ESP32 BLE stack. Remove generated BLE IDs so the same component schema
+    # can validate all shipped feature variants on the native platform.
+    if CORE.is_host:
+        config.pop(CONF_BLE_ID, None)
+        config.pop(CONF_BLE_SERVER_ID, None)
+
     if not config[CONF_BLE]:
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
@@ -478,28 +507,29 @@ async def to_code(config):
     home_assistant_enabled = config[CONF_HOME_ASSISTANT]
     sht43_identity_probe = config.get(CONF_SHT43_IDENTITY_PROBE, False)
 
-    # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
-    # Keep that platform detail out of user YAML.
-    add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
-    add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
-    # RT/RH and I2C GPIO ISRs call gpio_get_level(). Keep the GPIO control
-    # functions in IRAM so an edge arriving while the flash cache is disabled
-    # (for example during NVS/history writes) cannot trigger a cache panic.
-    add_idf_sdkconfig_option("CONFIG_GPIO_CTRL_FUNC_IN_IRAM", True)
+    if not CORE.is_host:
+        # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
+        # Keep that platform detail out of user YAML.
+        add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
+        add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
+        # RT/RH and I2C GPIO ISRs call gpio_get_level(). Keep the GPIO control
+        # functions in IRAM so an edge arriving while the flash cache is disabled
+        # (for example during NVS/history writes) cannot trigger a cache panic.
+        add_idf_sdkconfig_option("CONFIG_GPIO_CTRL_FUNC_IN_IRAM", True)
 
-    if config[CONF_BLE_HISTORY]:
-        add_partition("senshist", "data", "spiffs", 0x10000)
+        if config[CONF_BLE_HISTORY]:
+            add_partition("senshist", "data", "spiffs", 0x10000)
 
-    if config[CONF_LIGHT_SLEEP]:
-        add_idf_sdkconfig_option("CONFIG_PM_ENABLE", True)
-        add_idf_sdkconfig_option("CONFIG_FREERTOS_USE_TICKLESS_IDLE", True)
-        add_idf_sdkconfig_option("CONFIG_ESP_PHY_MAC_BB_PD", True)
+        if config[CONF_LIGHT_SLEEP]:
+            add_idf_sdkconfig_option("CONFIG_PM_ENABLE", True)
+            add_idf_sdkconfig_option("CONFIG_FREERTOS_USE_TICKLESS_IDLE", True)
+            add_idf_sdkconfig_option("CONFIG_ESP_PHY_MAC_BB_PD", True)
 
-    if ble_enabled:
-        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP", True)
-        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1", True)
-        add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
-        add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
+        if ble_enabled:
+            add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP", True)
+            add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1", True)
+            add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
+            add_idf_sdkconfig_option("CONFIG_BT_CTRL_MAIN_XTAL_PU_DURING_LIGHT_SLEEP", True)
 
     # Child sensor entities are created from this component schema rather than
     # from a top-level `sensor:` platform entry. Ensure the core/API/web-server
@@ -531,19 +561,21 @@ async def to_code(config):
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
 
     if ble_enabled:
-        ble = await cg.get_variable(config[CONF_BLE_ID])
-        # Set the Sensirion GAP/local name on ESPHome's BLE component itself.
-        # This runs before component setup and prevents ESP32BLE from falling
-        # back to the ESPHome node name (for example "i2csniffer").
-        cg.add(ble.set_name("SHT43 DB" if sht43_identity_probe else "S"))
-        esp32_ble.register_gatts_event_handler(ble, var)
-        esp32_ble.register_gap_event_handler(ble, var)
-
-        server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
-        cg.add(var.set_gatt_server(server))
         cg.add(var.set_ble_device_name(config[CONF_BLE_DEVICE_NAME]))
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
         cg.add(var.set_ble_battery_advertising_interval(config[CONF_BLE_BATTERY_ADVERTISING_INTERVAL]))
+
+        if not CORE.is_host:
+            ble = await cg.get_variable(config[CONF_BLE_ID])
+            # Set the Sensirion GAP/local name on ESPHome's BLE component itself.
+            # This runs before component setup and prevents ESP32BLE from falling
+            # back to the ESPHome node name (for example "i2csniffer").
+            cg.add(ble.set_name("SHT43 DB" if sht43_identity_probe else "S"))
+            esp32_ble.register_gatts_event_handler(ble, var)
+            esp32_ble.register_gap_event_handler(ble, var)
+
+            server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
+            cg.add(var.set_gatt_server(server))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
     cg.add(var.set_sniffer_enabled(config[CONF_SNIFFER_ENABLED]))
