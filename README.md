@@ -833,8 +833,8 @@ tests/host/
 
 The repository includes a hardware-free smoke-test layer based on ESPHome's
 official `host:` platform. The runner derives a temporary host configuration
-from each shipped YAML variant, compiles it natively, starts it, and waits for
-the portable component self-test to pass:
+from each shipped YAML variant, compiles it natively, starts the resulting host
+binary directly, and waits for the portable component self-test to pass:
 
 ```sh
 python3 -m pip install -r requirements-test.txt

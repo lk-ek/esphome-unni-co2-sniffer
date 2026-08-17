@@ -76,8 +76,12 @@ def _set_logger_debug(text: str) -> str:
     raise RuntimeError("could not force logger.level=DEBUG for host smoke test")
 
 
+def _host_name(variant: str) -> str:
+    return "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
+
+
 def _set_host_name(text: str, variant: str) -> str:
-    name = "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
+    name = _host_name(variant)
     lines = text.splitlines()
     in_esphome = False
     replaced = False
@@ -308,8 +312,17 @@ def _run_command(command: list[str], env: dict[str, str]) -> int:
     return subprocess.run(command, cwd=ROOT, env=env, check=False).returncode
 
 
-def _run_smoke(esphome: str, config: Path, env: dict[str, str], timeout_s: int) -> bool:
-    command = [esphome, "run", config.name]
+def _host_binary_path(variant: str) -> Path:
+    name = _host_name(variant)
+    return ROOT / ".esphome" / "build" / name / ".pioenvs" / name / "program"
+
+
+def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
+    if not binary.is_file():
+        print(f"Host binary not found after successful compile: {binary}", file=sys.stderr)
+        return False
+
+    command = [str(binary)]
     print("+", " ".join(command), flush=True)
     proc = subprocess.Popen(
         command,
@@ -322,6 +335,7 @@ def _run_smoke(esphome: str, config: Path, env: dict[str, str], timeout_s: int) 
     )
     deadline = time.monotonic() + timeout_s
     passed = False
+    timed_out = False
     try:
         assert proc.stdout is not None
         selector = selectors.DefaultSelector()
@@ -332,26 +346,39 @@ def _run_smoke(esphome: str, config: Path, env: dict[str, str], timeout_s: int) 
             if events:
                 line = proc.stdout.readline()
                 if line:
-                    print(line, end="")
+                    print(line, end="", flush=True)
                     if PASS_MARKER in line:
                         passed = True
                         break
             if proc.poll() is not None:
-                # Drain any final buffered lines before deciding the marker was absent.
                 for line in proc.stdout:
-                    print(line, end="")
+                    print(line, end="", flush=True)
                     if PASS_MARKER in line:
                         passed = True
                 break
+        if not passed and proc.poll() is None and time.monotonic() >= deadline:
+            timed_out = True
     finally:
         if proc.poll() is None:
             proc.terminate()
             try:
-                proc.wait(timeout=5)
+                proc.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 proc.kill()
-                proc.wait(timeout=5)
+                proc.wait(timeout=2)
+
+    if timed_out:
+        print(f"Host binary did not emit {PASS_MARKER!r} within {timeout_s}s", file=sys.stderr)
     return passed
+
+
+def _run_smoke(esphome: str, config: Path, variant: str, env: dict[str, str], timeout_s: int) -> bool:
+    # `esphome run` is intentionally interactive and keeps a host target alive
+    # indefinitely. For automation, compile first and execute the native binary
+    # ourselves so we control its lifetime and output capture.
+    if _run_command([esphome, "compile", config.name], env) != 0:
+        return False
+    return _run_host_binary(_host_binary_path(variant), env, timeout_s)
 
 
 def main() -> int:
@@ -362,7 +389,7 @@ def main() -> int:
         default="run",
         help="validate, native-compile, or compile+execute each host variant (default: run)",
     )
-    parser.add_argument("--timeout", type=int, default=300, help="seconds per host run")
+    parser.add_argument("--timeout", type=int, default=10, help="runtime seconds to wait for each host self-test marker")
     parser.add_argument("--keep-generated", action="store_true")
     parser.add_argument("--esphome", default=shutil.which("esphome") or "esphome")
     args = parser.parse_args()
@@ -408,7 +435,7 @@ def main() -> int:
             elif args.mode == "compile":
                 ok = _run_command([args.esphome, "compile", generated.name], env) == 0
             else:
-                ok = _run_smoke(args.esphome, generated, env, args.timeout)
+                ok = _run_smoke(args.esphome, generated, variant, env, args.timeout)
 
             if not ok:
                 failures.append(f"{variant}: {args.mode} failed")

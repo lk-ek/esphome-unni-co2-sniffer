@@ -17,8 +17,8 @@ setter surface as the ESP32 implementation. At startup it:
 - exercises the shared RT/RH calibration functions and range invariants;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
-- prints `UNNI HOST SELF-TEST PASSED` on success and marks the component failed
-  otherwise.
+- prints `UNNI HOST SELF-TEST PASSED` on success (including an explicitly flushed
+  native stderr marker for the runner) and marks the component failed otherwise.
 
 It intentionally does **not** emulate GPIO edges, ISR timing, ADC, light sleep,
 ESP power-management locks, BLE radio/GATT behavior, Wi-Fi, or flash partition
@@ -32,8 +32,10 @@ With ESPHome 2026.7.4 (or a newer compatible release) installed:
 python3 tests/host/run_host_tests.py
 ```
 
-The default mode performs a native compile and starts every resulting host
-binary long enough to observe the self-test success marker.
+The default mode first runs `esphome compile`, then starts the resulting native
+binary directly and terminates it as soon as the self-test success marker is
+observed. It deliberately does not use `esphome run`, because host targets are
+long-lived processes and `run` is intended for interactive foreground use.
 
 Faster validation-only modes are also available:
 

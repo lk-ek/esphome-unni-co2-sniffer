@@ -7,6 +7,7 @@
 #include "esphome/core/log.h"
 
 #include <cmath>
+#include <cstdio>
 
 namespace esphome {
 namespace co2_monitor_0601 {
@@ -159,6 +160,10 @@ void CO2Monitor0601::setup() {
 
   this->publish_fixture_values_();
   ESP_LOGI(TAG, "UNNI HOST SELF-TEST PASSED");
+  // The native host process is long-lived. Emit an explicitly flushed marker
+  // so automated test runners do not depend on logger/stdout buffering.
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PASSED\n");
+  std::fflush(stderr);
 }
 
 }  // namespace co2_monitor_0601
