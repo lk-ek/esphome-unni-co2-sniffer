@@ -867,3 +867,7 @@ See:
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - `LICENSES/`
 
+### OTA persistence
+
+Before an ESPHome OTA update starts, the firmware force-checkpoints the active battery-runtime learning session and flushes all pending Sensirion history samples to flash. This complements the normal periodic persistence and prevents an OTA reboot from discarding the most recent learning interval or history samples.
+

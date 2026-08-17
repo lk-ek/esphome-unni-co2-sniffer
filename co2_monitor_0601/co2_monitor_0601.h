@@ -59,6 +59,7 @@ class CO2Monitor0601 : public Component {
  public:
   void setup() override;
   void loop() override;
+  void prepare_for_ota();
 
 #if UNNI_BLE_ENABLED
   void set_gatt_server(esp32_ble_server::BLEServer *server) { this->gatt_server_ = server; }

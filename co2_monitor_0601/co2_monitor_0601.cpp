@@ -206,6 +206,26 @@ void CO2Monitor0601::setup_battery_learning_() {
   this->publish_battery_learning_();
 }
 
+void CO2Monitor0601::prepare_for_ota() {
+  // OTA blocks the normal application loop. Capture the time since the last
+  // battery-learning tick before forcing the preference checkpoint so an OTA
+  // update does not lose the tail of the current discharge session.
+  if (this->battery_.learning_session_active && this->battery_.learning_last_tick_ms != 0) {
+    const uint32_t now = millis();
+    this->battery_.learning_session_elapsed_ms +=
+        static_cast<uint32_t>(now - this->battery_.learning_last_tick_ms);
+    this->battery_.learning_last_tick_ms = now;
+  }
+
+  ESP_LOGI(TAG, "OTA starting: flushing persistent runtime state");
+  this->save_battery_learning_(true);
+
+#if UNNI_BLE_HISTORY_ENABLED
+  if (!sensirion_history_flush())
+    ESP_LOGW(TAG, "OTA starting: Sensirion history flash flush failed");
+#endif
+}
+
 void CO2Monitor0601::publish_battery_learning_() {
   publish(this->out_.battery_learned_full_runtime, this->battery_.learned_full_runtime_h);
   publish(this->out_.battery_learning_cycles, static_cast<float>(this->battery_.learned_cycles));

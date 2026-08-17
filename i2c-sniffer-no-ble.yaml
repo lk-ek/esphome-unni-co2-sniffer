@@ -22,6 +22,9 @@ ota:
   - platform: esphome
     password: !secret i2csniffer__ota
     allow_partition_access: true
+    on_begin:
+      then:
+        - lambda: id(unni_co2_monitor).prepare_for_ota();
 
 wifi:
   reboot_timeout: 0s
@@ -48,6 +51,7 @@ esp32:
 # BLE deliberately omitted for timing A/B test.
 
 co2_monitor_0601:
+  id: unni_co2_monitor
   home_assistant: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.

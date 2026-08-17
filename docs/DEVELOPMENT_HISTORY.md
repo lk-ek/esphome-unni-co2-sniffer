@@ -605,3 +605,5 @@ The normal Home Assistant entity defaults were shortened from `Air Temperature` 
 - On the next real bus power-up, disarm the GPIO7 wake source and restore passive ANYEDGE I2C capture before the native CO2 transaction.
 - Keep USB policy continuously sniffing. If a battery CO2 window does not yield two plausible observations, retain a conservative quiet-LOW/LOW fallback so recovery is not sacrificed for the optimization.
 - In debug-capture builds, defer gating until the final useful raw UDP capture has drained so the debug transport cannot become stuck.
+
+- 2026-08-17: Force persistent-state flush at OTA start. ESPHome `ota.on_begin` now calls the component before the updater blocks the main loop; the active battery-learning session is checkpointed with its latest elapsed time and pending Sensirion history samples are synchronously flushed to the `senshist` partition.

@@ -562,6 +562,10 @@ void sensirion_history_setup() {
            static_cast<unsigned>(PENDING_CAPACITY * SAMPLE_SIZE));
 }
 
+bool sensirion_history_flush() {
+  return flush_flash();
+}
+
 void sensirion_history_loop() {
   sampling_tick();
   download_tick();

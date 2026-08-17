@@ -26,6 +26,9 @@ ota:
   - platform: esphome
     password: !secret i2csniffer__ota
     allow_partition_access: true
+    on_begin:
+      then:
+        - lambda: id(unni_co2_monitor).prepare_for_ota();
 
 wifi:
   reboot_timeout: 0s
@@ -60,6 +63,7 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  id: unni_co2_monitor
   ble_device_name: "Unni CO2 Monitor"
   home_assistant: true
   # Force battery-style runtime policy while physically powered by USB.
