@@ -308,12 +308,22 @@ def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
 
 
 def _default_esphome_executable() -> str:
-    # Prefer the ESPHome console script installed next to the Python interpreter
-    # running this test harness. This keeps venv/container execution self-contained
-    # even when that venv's bin directory is not present in PATH.
-    sibling = Path(sys.executable).resolve().with_name("esphome")
-    if sibling.is_file() and os.access(sibling, os.X_OK):
-        return str(sibling)
+    # Prefer the ESPHome console script from the active Python environment.
+    # Do NOT resolve sys.executable here: venv Python binaries are commonly
+    # symlinks to the system interpreter, and resolving that symlink would make
+    # us search next to the system Python instead of inside the venv.
+    candidates = [
+        Path(sys.executable).with_name("esphome"),
+        Path(sys.prefix) / "bin" / "esphome",
+    ]
+    virtual_env = os.environ.get("VIRTUAL_ENV")
+    if virtual_env:
+        candidates.append(Path(virtual_env) / "bin" / "esphome")
+
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+
     return shutil.which("esphome") or "esphome"
 
 
