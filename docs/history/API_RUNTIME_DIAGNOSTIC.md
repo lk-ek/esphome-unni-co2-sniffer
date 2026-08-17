@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # Native API runtime diagnostic
 
 Temporary instrumentation for the intermittent state where Wi-Fi/IP remain

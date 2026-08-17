@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Sensirion-compatible Device Settings service (0x8100).
+// Selected UUID topology, settings semantics, and the authenticated/encrypted
+// GATT security model are implemented with reference to the Sensirion SHT43
+// DemoBoard BLE Firmware (Copyright (c) 2023, Sensirion AG, BSD-3-Clause).
+// See THIRD_PARTY_NOTICES.md and LICENSES/.
 // Sensirion documents 0x8120 for DIY gadgets; 0x81FE/0x8130 are SHT43
 // DemoBoard settings. They remain here for direct GATT experiments, without
 // assuming that MyAmbience renders them for a MyCO2 advertisement identity.

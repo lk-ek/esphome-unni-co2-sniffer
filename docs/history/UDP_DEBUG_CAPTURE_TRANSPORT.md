@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # UDP debug capture transport
 
 The debug build can export raw capture data to a lightweight UDP collector instead of requiring ESPHome's `web_server`.

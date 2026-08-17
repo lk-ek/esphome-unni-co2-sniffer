@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Experimental MyAmbience identity probe. UUID topology follows the official
-// Sensirion SHT43 DemoBoard firmware (BSD-3-Clause); see THIRD_PARTY_NOTICES.md.
+// Experimental MyAmbience identity probe. UUID topology is implemented with
+// reference to the Sensirion SHT43 DemoBoard BLE Firmware
+// (Copyright (c) 2023, Sensirion AG, BSD-3-Clause).
+// See THIRD_PARTY_NOTICES.md and LICENSES/.
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED && UNNI_SHT43_IDENTITY_PROBE
 #include "sensirion_sht43_probe.h"

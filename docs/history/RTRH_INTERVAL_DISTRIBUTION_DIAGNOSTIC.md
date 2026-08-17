@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+
 # RT/RH interval distribution diagnostic
 
 Temporary diagnostic added while investigating intermittent RH decoding where the retained
