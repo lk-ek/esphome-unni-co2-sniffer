@@ -595,3 +595,13 @@ The normal Home Assistant entity defaults were shortened from `Air Temperature` 
 - Blend the learned full-runtime model with the recent discharge-rate ETA for the production `Battery Runtime Estimate`; fall back to the recent estimator until learning data exists.
 - Add debug entities for learned full runtime, current learning progress and completed learning cycles.
 - The model deliberately learns effective runtime, not mAh capacity, because battery voltage alone is not a coulomb counter.
+
+
+### 2026-08-17: Gate CO2 I2C capture across sensor power-down
+
+- In battery policy, count plausible passive CO2 observations within each powered native window and gate the I2C edge sniffer after the second observation has produced an accepted reading.
+- Disable SDA/SCL edge interrupts before the CO2 rail-collapse phase that previously generated tens of thousands of meaningless ISR entries, multi-kilobyte raw captures and occasional capture overflow.
+- While capture is gated, poll only the passive pin levels. Require LOW/LOW to remain stable for `co2_wake_idle_stable` (500 ms by default), then wait `co2_wake_guard_time` (500 ms by default) before arming GPIO7/SCL HIGH as a Light-sleep wake source.
+- On the next real bus power-up, disarm the GPIO7 wake source and restore passive ANYEDGE I2C capture before the native CO2 transaction.
+- Keep USB policy continuously sniffing. If a battery CO2 window does not yield two plausible observations, retain a conservative quiet-LOW/LOW fallback so recovery is not sacrificed for the optimization.
+- In debug-capture builds, defer gating until the final useful raw UDP capture has drained so the debug transport cannot become stuck.

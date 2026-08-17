@@ -84,6 +84,8 @@ class CO2Monitor0601 : public Component {
   void set_debug_udp_port(uint16_t value) { this->debug_udp_port_ = value; }
   void set_light_sleep(bool value) { this->light_sleep_enabled_ = value; }
   void set_light_sleep_max_awake(uint32_t value) { this->light_sleep_max_awake_ms_ = value; }
+  void set_co2_wake_idle_stable(uint32_t value) { this->co2_wake_idle_stable_ms_ = value; }
+  void set_co2_wake_guard_time(uint32_t value) { this->co2_wake_guard_time_ms_ = value; }
   void set_rtrh_pins(uint8_t rt, uint8_t rh) { this->rt_pin_ = rt; this->rh_pin_ = rh; }
   void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
   void set_battery_pin(uint8_t pin) { this->battery_.pin = pin; }
@@ -313,6 +315,9 @@ class CO2Monitor0601 : public Component {
   void process_co2_();
   void process_active_i2c_probe_();
   void accept_co2_ppm_(uint16_t ppm, const char *source);
+  void reset_co2_capture_gate_();
+  void gate_co2_capture_after_window_();
+  void process_co2_capture_gate_();
   bool setup_battery_adc_();
   void process_battery_();
   bool setup_usb_power_();
@@ -346,6 +351,19 @@ class CO2Monitor0601 : public Component {
   uint32_t active_i2c_probe_due_ms_{0};
   enum class ActiveProbePhase : uint8_t { Idle, WaitPeriodic };
   ActiveProbePhase active_i2c_probe_phase_{ActiveProbePhase::Idle};
+
+  // Battery-only CO2 capture gating. After a completed native measurement
+  // window, passive I2C edge capture is disabled before the sensor rail
+  // collapses. GPIO7 wake is armed only after LOW/LOW has remained stable and
+  // an additional guard interval has elapsed.
+  enum class Co2CaptureGatePhase : uint8_t { Active, WaitIdleStable, Guard, WakeArmed };
+  Co2CaptureGatePhase co2_capture_gate_phase_{Co2CaptureGatePhase::Active};
+  uint8_t co2_window_observations_{0};
+  bool co2_gate_requested_{false};
+  uint32_t co2_idle_since_ms_{0};
+  uint32_t co2_guard_since_ms_{0};
+  uint32_t co2_wake_idle_stable_ms_{500};
+  uint32_t co2_wake_guard_time_ms_{500};
   std::string debug_udp_host_;
   uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED

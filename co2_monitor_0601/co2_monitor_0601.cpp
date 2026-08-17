@@ -635,12 +635,11 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
   this->power_policy_external_power_ = external;
   power_save::set_external_power(external);
 
-  // Keep the passive CO2 I2C sniffer armed continuously. GPIO6/GPIO7 are
-  // intentionally not light-sleep wake sources, so this does not change wake
-  // policy; it only prevents battery-policy transitions from discarding CO2
-  // frames that happen while the MCU is already awake.
+  // A policy transition starts a fresh CO2 observation window. USB keeps the
+  // passive sniffer continuously active; battery mode may gate it again after
+  // the native CO2 measurement window has been satisfied.
   if (this->io_initialized_)
-    i2c_sniffer::set_capture_enabled(true);
+    this->reset_co2_capture_gate_();
 
 #if UNNI_BLE_ENABLED
   const uint32_t adv_ms = external ? this->ble_usb_advertising_interval_ms_
@@ -1417,6 +1416,136 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   rtrh_decoder::update_latest(m);
 }
 
+void CO2Monitor0601::reset_co2_capture_gate_() {
+  this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
+  this->co2_window_observations_ = 0;
+  this->co2_gate_requested_ = false;
+  this->co2_idle_since_ms_ = 0;
+  this->co2_guard_since_ms_ = 0;
+  i2c_sniffer::set_capture_enabled(true);
+}
+
+void CO2Monitor0601::gate_co2_capture_after_window_() {
+  if (this->external_powered_() || this->co2_capture_gate_phase_ != Co2CaptureGatePhase::Active)
+    return;
+
+  this->co2_gate_requested_ = true;
+#if RTRH_DEBUG_CAPTURE
+  // Let the small raw capture containing the final useful CO2 frame finish its
+  // UDP export before disabling poll(); otherwise debug_export_pending() could
+  // remain stuck forever with capture disabled. Production builds skip this.
+  if (i2c_sniffer::debug_export_pending()) return;
+#endif
+
+  this->co2_gate_requested_ = false;
+
+  // We already have the useful native measurements from this powered CO2
+  // window. Stop edge capture before the sensor rail collapses; the slow GPIO
+  // decay otherwise creates tens of thousands of meaningless ISR entries and
+  // very large debug captures.
+  i2c_sniffer::set_capture_enabled(false);
+  this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WaitIdleStable;
+  this->co2_idle_since_ms_ = 0;
+  this->co2_guard_since_ms_ = 0;
+  ESP_LOGI(TAG,
+           "CO2 measurement window satisfied after %u plausible reading(s): passive I2C sniffer gated until next power-up",
+           static_cast<unsigned>(this->co2_window_observations_));
+}
+
+void CO2Monitor0601::process_co2_capture_gate_() {
+  if (!this->io_initialized_) return;
+
+  if (this->external_powered_()) {
+    if (this->co2_capture_gate_phase_ != Co2CaptureGatePhase::Active || power_save::co2_bus_powered_down()) {
+      power_save::set_co2_bus_powered_down(false);
+      this->reset_co2_capture_gate_();
+    }
+    return;
+  }
+
+  const uint32_t now = millis();
+  const bool low_low = i2c_sniffer::bus_is_low_low();
+
+  switch (this->co2_capture_gate_phase_) {
+    case Co2CaptureGatePhase::Active: {
+      if (this->co2_gate_requested_) {
+        this->gate_co2_capture_after_window_();
+        if (this->co2_capture_gate_phase_ != Co2CaptureGatePhase::Active) break;
+#if RTRH_DEBUG_CAPTURE
+        if (i2c_sniffer::debug_export_pending()) break;
+#endif
+      }
+
+      // Keep the native CO2 window awake while the powered bus is active.
+      if (!low_low && !power_save::co2_bus_powered_down())
+        power_save::set_co2_bus_powered_down(false);
+
+      // Fallback for a window in which we could not obtain two plausible CO2
+      // observations. Once the bus is already quiet LOW/LOW for a full second,
+      // the shutdown storm is over and it is safe to use the legacy wake arm.
+      const bool quiet_power_down = low_low && i2c_sniffer::last_edge_age_us() >= 1000000U;
+      if (quiet_power_down) {
+        i2c_sniffer::set_capture_enabled(false);
+        power_save::set_co2_bus_powered_down(true);
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WakeArmed;
+        this->co2_window_observations_ = 0;
+        ESP_LOGI(TAG, "CO2 bus quiet fallback: passive sniffer off; GPIO7 wake armed");
+      }
+      break;
+    }
+
+    case Co2CaptureGatePhase::WaitIdleStable:
+      if (!low_low) {
+        this->co2_idle_since_ms_ = 0;
+        break;
+      }
+      if (this->co2_idle_since_ms_ == 0) {
+        this->co2_idle_since_ms_ = now;
+        break;
+      }
+      if (static_cast<uint32_t>(now - this->co2_idle_since_ms_) >= this->co2_wake_idle_stable_ms_) {
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Guard;
+        this->co2_guard_since_ms_ = now;
+        ESP_LOGI(TAG, "CO2 bus LOW/LOW stable for %lu ms; starting %lu ms wake guard",
+                 static_cast<unsigned long>(this->co2_wake_idle_stable_ms_),
+                 static_cast<unsigned long>(this->co2_wake_guard_time_ms_));
+      }
+      break;
+
+    case Co2CaptureGatePhase::Guard:
+      if (!low_low) {
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WaitIdleStable;
+        this->co2_idle_since_ms_ = 0;
+        this->co2_guard_since_ms_ = 0;
+        ESP_LOGD(TAG, "CO2 wake guard reset: bus left LOW/LOW");
+        break;
+      }
+      if (static_cast<uint32_t>(now - this->co2_guard_since_ms_) >= this->co2_wake_guard_time_ms_) {
+        power_save::set_co2_bus_powered_down(true);
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WakeArmed;
+        this->co2_window_observations_ = 0;
+        ESP_LOGI(TAG, "CO2 shutdown blanking complete: GPIO7 HIGH wake armed; I2C sniffer remains off");
+      }
+      break;
+
+    case Co2CaptureGatePhase::WakeArmed:
+      // The powered-down bus idles LOW/LOW. Its next power-up raises one or
+      // both lines; GPIO7 HIGH wakes the ESP before the useful transaction.
+      if (!low_low) {
+        power_save::set_co2_bus_powered_down(false);
+        i2c_sniffer::set_capture_enabled(true);
+        i2c_sniffer::rearm_after_light_sleep();
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
+        this->co2_window_observations_ = 0;
+        this->co2_gate_requested_ = false;
+        this->co2_idle_since_ms_ = 0;
+        this->co2_guard_since_ms_ = 0;
+        ESP_LOGI(TAG, "CO2 bus power-up detected: GPIO7 wake disarmed and passive sniffer re-enabled");
+      }
+      break;
+  }
+}
+
 void CO2Monitor0601::process_co2_() {
   static i2c_sniffer::Capture capture;
   if (!i2c_sniffer::poll(capture, co2_decoder::validate_measurement_capture)) return;
@@ -1512,6 +1641,10 @@ void CO2Monitor0601::process_co2_() {
     return;
   }
 
+  if (!this->external_powered_() && this->co2_capture_gate_phase_ == Co2CaptureGatePhase::Active &&
+      this->co2_window_observations_ < 0xFF)
+    this->co2_window_observations_++;
+
   if (this->co2_.confirmation_required) {
     if (!this->co2_.have_confirmation_candidate) {
       this->co2_.confirmation_candidate_ppm = ppm;
@@ -1553,6 +1686,12 @@ void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
 
   this->ha_.co2 = static_cast<float>(ppm);
   this->ha_.have_co2 = true;
+
+  // Two plausible passive observations are enough to identify the end of the
+  // useful native CO2 window. Gate before the subsequent rail-collapse storm.
+  const bool passive_sniffer = source && std::strcmp(source, "passive sniffer") == 0;
+  if (passive_sniffer && !this->external_powered_() && this->co2_window_observations_ >= 2)
+    this->gate_co2_capture_after_window_();
 
   // An explicitly requested active probe is a fresh measurement, so publish it
   // immediately even under the normal battery throttling policy.
@@ -1772,32 +1911,11 @@ void CO2Monitor0601::loop() {
     i2c_sniffer::rearm_after_light_sleep();
   }
 
-  // Battery CO2 state machine: after the native shutdown storm the Unni bus
-  // settles at LOW/LOW. Once it has remained there for 1 s, arm SCL HIGH as a
-  // Light-sleep wake source and release the CO2-window awake lock. When Unni
-  // powers the bus again, the rising SCL level wakes the ESP; immediately drop
-  // that level wake source, keep the CPU awake for the native measurement
-  // window, and restore the passive ANYEDGE sniffer before 21B1 arrives.
-  if (!this->external_powered_()) {
-    const bool low_low = i2c_sniffer::bus_is_low_low();
-    const bool quiet_power_down = low_low && i2c_sniffer::last_edge_age_us() >= 1000000U;
-    if (quiet_power_down) {
-      power_save::set_co2_bus_powered_down(true);
-    } else if (power_save::co2_bus_powered_down() && !low_low) {
-      power_save::set_co2_bus_powered_down(false);
-      i2c_sniffer::rearm_after_light_sleep();
-      ESP_LOGI(TAG, "CO2 bus wake detected: passive sniffer rearmed for native measurement window");
-    } else if (!power_save::co2_bus_powered_down() && !low_low) {
-      // Initializes/maintains the CO2 active-window lock after boot or a
-      // USB->battery transition while the native bus is already powered.
-      power_save::set_co2_bus_powered_down(false);
-    }
-  } else {
-    power_save::set_co2_bus_powered_down(false);
-  }
-
-  // CO2 capture remains armed independently of the RT/RH awake window.
-  i2c_sniffer::set_capture_enabled(true);
+  // Battery CO2 gating: stop passive edge capture as soon as the useful native
+  // measurement window is complete, ignore the analog rail-collapse storm,
+  // then arm GPIO7 only after the dead LOW/LOW bus has been stable plus a guard
+  // interval. USB keeps the sniffer continuously active.
+  this->process_co2_capture_gate_();
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
   if (this->rtrh_enabled_) {
@@ -1837,11 +1955,6 @@ void CO2Monitor0601::loop() {
   if (rtrh_power_path) power_save::loop();
   runtime_diag_update_max_(this->runtime_diag_.max_power_save_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
-
-  // Do not gate CO2 capture when the RT/RH awake window closes. GPIO6/GPIO7
-  // remain excluded from light-sleep wakeup, but keeping the ISR armed avoids
-  // losing the next CO2 transaction after an RT/RH-triggered wake.
-  i2c_sniffer::set_capture_enabled(true);
 
   this->runtime_diag_loop_end_();
 }

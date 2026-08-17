@@ -54,6 +54,8 @@ CONF_DEBUG_UDP_HOST = "debug_udp_host"
 CONF_DEBUG_UDP_PORT = "debug_udp_port"
 CONF_LIGHT_SLEEP = "light_sleep"
 CONF_LIGHT_SLEEP_MAX_AWAKE = "light_sleep_max_awake"
+CONF_CO2_WAKE_IDLE_STABLE = "co2_wake_idle_stable"
+CONF_CO2_WAKE_GUARD_TIME = "co2_wake_guard_time"
 CONF_RT_PIN = "rt_pin"
 CONF_RH_PIN = "rh_pin"
 CONF_CO2_SDA_PIN = "co2_sda_pin"
@@ -376,6 +378,8 @@ _SCHEMA = {
     cv.Optional(CONF_DEBUG_UDP_PORT, default=45678): cv.int_range(min=1, max=65535),
     cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
     cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_CO2_WAKE_IDLE_STABLE, default="500ms"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_CO2_WAKE_GUARD_TIME, default="500ms"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_RT_PIN, default=3): cv.int_range(min=0, max=21),
     cv.Optional(CONF_RH_PIN, default=4): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
@@ -555,6 +559,8 @@ async def to_code(config):
     cg.add(var.set_debug_udp_port(config[CONF_DEBUG_UDP_PORT]))
     cg.add(var.set_light_sleep(config[CONF_LIGHT_SLEEP]))
     cg.add(var.set_light_sleep_max_awake(config[CONF_LIGHT_SLEEP_MAX_AWAKE]))
+    cg.add(var.set_co2_wake_idle_stable(config[CONF_CO2_WAKE_IDLE_STABLE]))
+    cg.add(var.set_co2_wake_guard_time(config[CONF_CO2_WAKE_GUARD_TIME]))
     cg.add(var.set_rtrh_pins(config[CONF_RT_PIN], config[CONF_RH_PIN]))
     cg.add(var.set_co2_pins(config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]))
     cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))

@@ -292,6 +292,8 @@ co2_monitor_0601:
   # Power management
   light_sleep: true
   light_sleep_max_awake: 10s
+  co2_wake_idle_stable: 500ms
+  co2_wake_guard_time: 500ms
   energy_save_mode_default: false
   energy_save_grace: 3s
 
@@ -356,8 +358,11 @@ Battery operation prioritizes low average power:
 - automatic Light Sleep is enabled
 - GPIO3/GPIO4 RT/RH activity wakes the ESP
 - CPU frequency is temporarily raised to 80 MHz while measurements are captured
-- the passive CO₂ sniffer stays armed whenever the MCU is awake; GPIO6/GPIO7 are not Light-Sleep wake sources
-- after the RT/RH wake window is complete, the ESP may return to Light Sleep; CO₂ traffic alone does not wake it
+- during a powered CO₂ measurement window the passive sniffer is active; after two plausible CO₂ observations it is gated off before the sensor rail collapses
+- the expected slow SCL/SDA shutdown decay is ignored with the I²C interrupts disabled, avoiding large garbage captures and ISR storms
+- after the dead bus has remained LOW/LOW for `co2_wake_idle_stable` (default `500ms`) plus `co2_wake_guard_time` (default `500ms`), GPIO7/SCL HIGH is armed as the next CO₂ power-up wake source
+- a real CO₂ power-up disarms GPIO7 wake and re-enables the passive sniffer before the native measurement transaction; GPIO6 remains passive
+- after the RT/RH wake window is complete, the ESP may return to Light Sleep
 - Wi-Fi uses `WIFI_PS_MIN_MODEM`
 - Home Assistant publication is throttled to the latest values, default once per minute
 - BLE advertisements use the battery interval, default `3s`
@@ -368,6 +373,8 @@ The corresponding options are:
 co2_monitor_0601:
   light_sleep: true
   light_sleep_max_awake: 10s
+  co2_wake_idle_stable: 500ms
+  co2_wake_guard_time: 500ms
   ha_publish_interval: 60s
   ble_advertising_interval: 2s
   ble_battery_advertising_interval: 3s
