@@ -60,6 +60,7 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  ble_device_name: "Unni CO2 Monitor"
   home_assistant: true
   # Force battery-style runtime policy while physically powered by USB.
   # Toggle the Energy Save Mode switch in Home Assistant for power measurements.

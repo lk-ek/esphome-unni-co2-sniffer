@@ -5,12 +5,13 @@
 #if UNNI_BLE_ENABLED
 
 #include "esphome/components/esp32_ble_server/ble_server.h"
+#include <string>
 #include <esp_gatts_api.h>
 
 namespace esphome {
 namespace co2_monitor_0601 {
 
-void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server);
+void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server, const std::string &default_name);
 void sensirion_settings_loop();
 bool sensirion_settings_advertise_data_enabled();
 void sensirion_settings_set_advertise_data_enabled(bool enabled);

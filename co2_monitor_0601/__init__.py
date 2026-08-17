@@ -34,6 +34,7 @@ CONF_BLE_ID = "ble_id"
 CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
+CONF_BLE_DEVICE_NAME = "ble_device_name"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_HOME_ASSISTANT = "home_assistant"
 CONF_SNIFFER_ENABLED = "sniffer_enabled"
@@ -285,6 +286,9 @@ _SCHEMA = {
     cv.Optional(CONF_BLE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
+    cv.Optional(CONF_BLE_DEVICE_NAME, default="Unni CO2 Monitor"): cv.All(
+        cv.string_strict, cv.Length(min=1, max=31)
+    ),
     cv.GenerateID(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
     cv.GenerateID(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
     cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="1s"): cv.All(
@@ -463,6 +467,7 @@ async def to_code(config):
 
         server = await cg.get_variable(config[CONF_BLE_SERVER_ID])
         cg.add(var.set_gatt_server(server))
+        cg.add(var.set_ble_device_name(config[CONF_BLE_DEVICE_NAME]))
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
         cg.add(var.set_ble_battery_advertising_interval(config[CONF_BLE_BATTERY_ADVERTISING_INTERVAL]))
 

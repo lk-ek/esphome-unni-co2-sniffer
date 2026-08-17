@@ -23,6 +23,7 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  ble_device_name: "Unni CO2 Monitor"
   home_assistant: false
   ble: true
   ble_live: true

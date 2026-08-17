@@ -66,6 +66,7 @@ class CO2Monitor0601 : public Component {
                            esp_ble_gatts_cb_param_t *param);
   void set_ble_advertising_interval(uint32_t interval_ms);
   void set_ble_battery_advertising_interval(uint32_t interval_ms) { this->ble_battery_advertising_interval_ms_ = interval_ms; }
+  void set_ble_device_name(const std::string &name) { this->ble_device_name_ = name; }
 #endif
 
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
@@ -302,6 +303,7 @@ class CO2Monitor0601 : public Component {
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
   uint32_t ble_usb_advertising_interval_ms_{1000};
   uint32_t ble_battery_advertising_interval_ms_{1000};
+  std::string ble_device_name_{"Unni CO2 Monitor"};
 #endif
   bool light_sleep_enabled_{true};
   bool energy_save_mode_{false};

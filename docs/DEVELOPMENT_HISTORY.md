@@ -553,3 +553,7 @@ when the legacy `RT=0, RH=1` recurrence state vanished. RH publication was moved
 to `RH carrier period / REF period` with a new temperature-compensated carrier-v1
 fit. Carrier count/period and edge balance now drive RH validity/quality; the old
 state recurrence and direct phase measurements remain diagnostics.
+
+### 2026-08-17 — Make the MyCO2 display name configurable
+
+The normal MyCO2 Gadget name is now configurable through `co2_monitor_0601.ble_device_name`, defaulting to `Unni CO2 Monitor`. The option updates the Device Information model name and the default Sensirion `AlternativeDeviceName` while deliberately keeping the GAP/local identity `S` unchanged for MyAmbience classification compatibility. Persisted user-selected alternative names are preserved; the historical built-in default `MyCO2 Gadget` is migrated to the YAML-configured default.

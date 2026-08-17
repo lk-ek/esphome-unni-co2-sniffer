@@ -767,7 +767,7 @@ void CO2Monitor0601::setup() {
       if (auto *manufacturer = info->get_characteristic(0x2A29))
         manufacturer->set_value(std::string("Gadget"));
       if (auto *model = info->get_characteristic(0x2A24))
-        model->set_value(std::string("MyCO2 Gadget"));
+        model->set_value(this->ble_device_name_);
       if (auto *firmware = info->get_characteristic(0x2A26))
         firmware->set_value(std::string("1.0.1"));
 #endif
@@ -782,7 +782,7 @@ void CO2Monitor0601::setup() {
              static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_8BIT)),
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
 #endif
-    sensirion_settings_configure_gatt(this->gatt_server_);
+    sensirion_settings_configure_gatt(this->gatt_server_, this->ble_device_name_);
     // 0x81FE (shown by MyAmbience as IsLogEnabled) doubles as our HA/WiFi
     // disable switch. This gives BLE a recovery/control path while WiFi is off.
     this->wifi_ha_enabled_ = !sensirion_settings_ha_disabled();

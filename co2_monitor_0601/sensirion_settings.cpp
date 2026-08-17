@@ -96,18 +96,18 @@ struct SettingsGatt {
   bool preference_ready{false};
 } gatt;
 
-void load_settings() {
+void load_settings(const std::string &configured_default_name) {
 #if UNNI_SHT43_IDENTITY_PROBE
-  static constexpr const char *DEFAULT_NAME = "SHT43 DB";
+  const std::string default_name = "SHT43 DB";
 #else
-  static constexpr const char *DEFAULT_NAME = "MyCO2 Gadget";
+  const std::string &default_name = configured_default_name;
 #endif
   gatt.version = 1;
   gatt.log_enabled = 0;
   gatt.advertise_data_enabled = 1;
   gatt.alternative_name.fill(0);
-  gatt.alternative_name_len = std::min(std::strlen(DEFAULT_NAME), MAX_NAME_LENGTH);
-  std::memcpy(gatt.alternative_name.data(), DEFAULT_NAME, gatt.alternative_name_len);
+  gatt.alternative_name_len = std::min(default_name.size(), MAX_NAME_LENGTH);
+  std::memcpy(gatt.alternative_name.data(), default_name.data(), gatt.alternative_name_len);
 
   if (global_preferences == nullptr) return;
   gatt.preference = global_preferences->make_preference<PersistedSettings>(SETTINGS_PREF_KEY, true);
@@ -125,9 +125,22 @@ void load_settings() {
   gatt.advertise_data_enabled = 1;
 #endif
   const size_t len = strnlen(saved.alternative_name, MAX_NAME_LENGTH);
-  gatt.alternative_name.fill(0);
-  gatt.alternative_name_len = len;
-  if (len != 0) std::memcpy(gatt.alternative_name.data(), saved.alternative_name, len);
+#if !UNNI_SHT43_IDENTITY_PROBE
+  // Migrate the historical built-in default to the YAML-configured default.
+  // User-chosen AlternativeDeviceName values remain persistent.
+  static constexpr const char *LEGACY_DEFAULT_NAME = "MyCO2 Gadget";
+  const bool legacy_default = len == std::strlen(LEGACY_DEFAULT_NAME) &&
+                              std::memcmp(saved.alternative_name, LEGACY_DEFAULT_NAME, len) == 0;
+  if (!legacy_default) {
+#endif
+    gatt.alternative_name.fill(0);
+    gatt.alternative_name_len = len;
+    if (len != 0) std::memcpy(gatt.alternative_name.data(), saved.alternative_name, len);
+#if !UNNI_SHT43_IDENTITY_PROBE
+  } else {
+    ESP_LOGI(TAG, "migrated legacy AlternativeDeviceName default to YAML name '%s'", default_name.c_str());
+  }
+#endif
   ESP_LOGI(TAG, "restored Device Settings: ha_disable=%u advertise_data=%u name_len=%u",
            static_cast<unsigned>(gatt.log_enabled),
            static_cast<unsigned>(gatt.advertise_data_enabled),
@@ -358,12 +371,12 @@ void sensirion_settings_set_advertise_data_enabled(bool enabled) {
            enabled ? "live manufacturer data enabled" : "privacy mode");
 }
 
-void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server) {
+void sensirion_settings_configure_gatt(esp32_ble_server::BLEServer *server, const std::string &default_name) {
   if (gatt.configured || server == nullptr) return;
   // Component setup runs before the Bluedroid application registration has
   // necessarily completed. Arm the service here and create it on the first
   // GATTS event that supplies a valid gatts_if.
-  load_settings();
+  load_settings(default_name);
   sensirion_ble_set_advertise_data_enabled(gatt.advertise_data_enabled != 0);
   gatt.server = server;
   gatt.gatts_if = server->get_gatts_if();

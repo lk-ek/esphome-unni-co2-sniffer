@@ -17,6 +17,7 @@ The tested monitor is sold as **CO2 Monitor Carbon Dioxide Detector 0601**, henc
 
 ```yaml
 co2_monitor_0601:
+  ble_device_name: "Unni CO2 Monitor"
 ```
 
 This project was developed against one specific hardware revision. Other revisions should be verified before connecting the ESP.
@@ -445,6 +446,15 @@ Avoid running `ping`, `esphome logs`, an actively polling web UI or other unnece
 # Sensirion / MyAmbience compatibility
 
 The normal firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format.
+
+The name shown for the normal MyCO2 gadget can be configured in the component YAML:
+
+```yaml
+co2_monitor_0601:
+  ble_device_name: "Unni CO2 Monitor"
+```
+
+`ble_device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option.
 
 The GAP name used by the normal compatibility mode is:
 
