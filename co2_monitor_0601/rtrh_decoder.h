@@ -46,6 +46,13 @@ struct Measurement {
   float rt_period_us{NAN};
   uint16_t rt_count{0};
   float rh_duration_ms{NAN};
+  float rh_carrier_period_us{NAN};
+  uint16_t rh_carrier_count{0};
+  float rh_carrier_ref_ratio{NAN};
+  uint16_t rh_rt_rise_edges{0};
+  uint16_t rh_rt_fall_edges{0};
+  uint16_t rh_rh_rise_edges{0};
+  uint16_t rh_rh_fall_edges{0};
   float rh_state_us{NAN};
   uint8_t rh_state_samples{0};
   uint32_t rh_state_seen{0};

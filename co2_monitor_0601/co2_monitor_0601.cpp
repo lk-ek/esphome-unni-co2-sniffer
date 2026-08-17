@@ -940,6 +940,14 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
            static_cast<unsigned>(m.rh_state_samples), static_cast<unsigned long>(m.rh_state_seen),
            m.valid ? "VALID" : "REJECT");
 
+  ESP_LOGI(TAG,
+           "RT/RH RH carrier %lu: %.3f us / %u cycles, carrier/REF=%.6f; "
+           "edges RT +%u/-%u RH +%u/-%u",
+           static_cast<unsigned long>(m.sequence), m.rh_carrier_period_us,
+           static_cast<unsigned>(m.rh_carrier_count), m.rh_carrier_ref_ratio,
+           static_cast<unsigned>(m.rh_rt_rise_edges), static_cast<unsigned>(m.rh_rt_fall_edges),
+           static_cast<unsigned>(m.rh_rh_rise_edges), static_cast<unsigned>(m.rh_rh_fall_edges));
+
   if (m.rh_state_samples > 0) {
     ESP_LOGI(TAG,
              "RT/RH RH intervals %lu: min=%u p25=%u median=%.1f p75=%u max=%u us; "

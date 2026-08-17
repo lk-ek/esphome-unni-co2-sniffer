@@ -59,6 +59,10 @@ struct Snapshot {
   uint32_t rt_temp_period_sum{0};
   uint16_t rt_temp_count{0};
   RhStateStats rh_state;
+  uint16_t rh_rt_rise_edges{0};
+  uint16_t rh_rt_fall_edges{0};
+  uint16_t rh_rh_rise_edges{0};
+  uint16_t rh_rh_fall_edges{0};
   uint32_t sequence{0};
 };
 
@@ -113,6 +117,10 @@ struct DecoderState {
   volatile uint32_t rt_temperature_period_sum{0};
   volatile uint16_t rt_temperature_count{0};
   RhStateStats rh_state;
+  volatile uint16_t rh_rt_rise_edges{0};
+  volatile uint16_t rh_rt_fall_edges{0};
+  volatile uint16_t rh_rh_rise_edges{0};
+  volatile uint16_t rh_rh_fall_edges{0};
 
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
@@ -160,6 +168,10 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   clear_accum(decoder.rh);
   decoder.rt_temperature_period_sum = 0;
   decoder.rt_temperature_count = 0;
+  decoder.rh_rt_rise_edges = 0;
+  decoder.rh_rt_fall_edges = 0;
+  decoder.rh_rh_rise_edges = 0;
+  decoder.rh_rh_fall_edges = 0;
   clear_rh_state();
 }
 
@@ -262,6 +274,10 @@ static void finalize_measurement() {
   next.rt_temp_period_sum = decoder.rt_temperature_period_sum;
   next.rt_temp_count = decoder.rt_temperature_count;
   next.rh_state = decoder.rh_state;
+  next.rh_rt_rise_edges = decoder.rh_rt_rise_edges;
+  next.rh_rt_fall_edges = decoder.rh_rt_fall_edges;
+  next.rh_rh_rise_edges = decoder.rh_rh_rise_edges;
+  next.rh_rh_fall_edges = decoder.rh_rh_fall_edges;
   next.sequence = decoder.snapshot.sequence + 1;
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
@@ -374,6 +390,18 @@ static void IRAM_ATTR gpio_isr(void *arg) {
   if (!decoder.collecting) reset_measurement(now, state);
   else decoder.last_edge_us = now;
   update_phase(now);
+
+  // Count physical edges during the RH phase independently of the combined
+  // GPIO state. This remains useful when RT and RH switch almost in phase and
+  // the historical RT=0/RH=1 state becomes too short to observe reliably.
+  if (decoder.phase == Phase::RH) {
+    volatile uint16_t *counter = nullptr;
+    if (pin_index == 0)
+      counter = level ? &decoder.rh_rt_rise_edges : &decoder.rh_rt_fall_edges;
+    else
+      counter = level ? &decoder.rh_rh_rise_edges : &decoder.rh_rh_fall_edges;
+    if (*counter != 0xFFFF) (*counter)++;
+  }
 
   // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
   // errors when several sensor lines change almost simultaneously.
@@ -620,6 +648,14 @@ static Measurement derive(const Snapshot &s) {
   m.rt_duration_ms = float(s.rt.period_sum) / 1000.0f;
   m.rt_period_us = s.rt_temp_count ? float(s.rt_temp_period_sum) / s.rt_temp_count : 0.0f;
   m.rh_duration_ms = float(s.rh_timing.period_sum) / 1000.0f;
+  m.rh_carrier_count = s.rh_timing.count;
+  m.rh_carrier_period_us = s.rh_timing.count ? float(s.rh_timing.period_sum) / s.rh_timing.count : NAN;
+  m.rh_carrier_ref_ratio = m.ref_period_us > 0.0f && std::isfinite(m.rh_carrier_period_us)
+                               ? m.rh_carrier_period_us / m.ref_period_us : NAN;
+  m.rh_rt_rise_edges = s.rh_rt_rise_edges;
+  m.rh_rt_fall_edges = s.rh_rt_fall_edges;
+  m.rh_rh_rise_edges = s.rh_rh_rise_edges;
+  m.rh_rh_fall_edges = s.rh_rh_fall_edges;
   m.rh_state_us = rh_state_period_median(s.rh_state);
   derive_rh_distribution(s.rh_state, m);
   m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
@@ -668,6 +704,8 @@ struct __attribute__((packed)) TimingPayload {
   float quality_percent;
   float ref_period_us;
   float rt_period_us;
+  float rh_carrier_period_us;
+  float rh_carrier_ref_ratio;
   float rh_state_us;
   float temperature_c;
   float humidity_percent;
@@ -679,6 +717,11 @@ struct __attribute__((packed)) TimingPayload {
   uint8_t near_440;
   uint8_t other;
   uint8_t reserved;
+  uint16_t rh_carrier_count;
+  uint16_t rh_rt_rise_edges;
+  uint16_t rh_rt_fall_edges;
+  uint16_t rh_rh_rise_edges;
+  uint16_t rh_rh_fall_edges;
 };
 
 static TimingPayload debug_udp_timing_payload{};
@@ -731,6 +774,8 @@ static void send_timing_udp(const Measurement &m) {
   payload.quality_percent = m.quality_percent;
   payload.ref_period_us = m.ref_period_us;
   payload.rt_period_us = m.rt_period_us;
+  payload.rh_carrier_period_us = m.rh_carrier_period_us;
+  payload.rh_carrier_ref_ratio = m.rh_carrier_ref_ratio;
   payload.rh_state_us = m.rh_state_us;
   payload.temperature_c = m.temperature_c;
   payload.humidity_percent = m.humidity_percent;
@@ -741,6 +786,11 @@ static void send_timing_udp(const Measurement &m) {
   payload.near_220 = m.rh_state_near_220;
   payload.near_440 = m.rh_state_near_440;
   payload.other = m.rh_state_other;
+  payload.rh_carrier_count = m.rh_carrier_count;
+  payload.rh_rt_rise_edges = m.rh_rt_rise_edges;
+  payload.rh_rt_fall_edges = m.rh_rt_fall_edges;
+  payload.rh_rh_rise_edges = m.rh_rh_rise_edges;
+  payload.rh_rh_fall_edges = m.rh_rh_fall_edges;
   debug_udp_timing_payload = payload;
   debug_udp_timing_pending = true;
   debug_udp_timing_copies_remaining = 2;
@@ -867,7 +917,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     // HTTP server task.  Convert floats to short fixed-point strings first,
     // then serialize the CSV using integer/string printf only.
     char ref_period[20], ref_duration[20], rt_period[20], rt_duration[20];
-    char rh_period[20], rh_duration[20], rh_state[20];
+    char rh_period[20], rh_duration[20], rh_carrier_ratio[24], rh_state[20];
     char rt_ratio[24], rh_ratio[24], temperature[20], humidity[20], quality[16];
     format_fixed(ref_period, sizeof(ref_period), ref_us, 3);
     format_fixed(ref_duration, sizeof(ref_duration), float(s.ref.period_sum) / 1000.0f, 3);
@@ -875,6 +925,8 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     format_fixed(rt_duration, sizeof(rt_duration), float(s.rt.period_sum) / 1000.0f, 3);
     format_fixed(rh_period, sizeof(rh_period), rh_us, 3);
     format_fixed(rh_duration, sizeof(rh_duration), float(s.rh_timing.period_sum) / 1000.0f, 3);
+    format_fixed(rh_carrier_ratio, sizeof(rh_carrier_ratio),
+                 ref_us > 0.0f && s.rh_timing.count ? rh_us / ref_us : NAN, 6);
     format_fixed(rh_state, sizeof(rh_state), rh_state_us, 3);
     format_fixed(rt_ratio, sizeof(rt_ratio), have ? d.rt_ratio : NAN, 6);
     format_fixed(rh_ratio, sizeof(rh_ratio), have ? d.rh_ratio : NAN, 6);
@@ -888,19 +940,19 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "measurement,phase,count,period_mean_us,duration_ms,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
+        "measurement,phase,count,period_mean_us,duration_ms,rh_carrier_ref_ratio,rh_rt_rise_edges,rh_rt_fall_edges,rh_rh_rise_edges,rh_rh_fall_edges,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     char line[384];
 
     if (err == ESP_OK) {
-      const int n = snprintf(line, sizeof(line), "%lu,ref,%u,%s,%s,,,,,,,,,,,,,,,\n",
+      const int n = snprintf(line, sizeof(line), "%lu,ref,%u,%s,%s,,,,,,,,,,,,,,,,,,,,\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.ref.count),
           ref_period, ref_duration);
       if (n <= 0 || static_cast<size_t>(n) >= sizeof(line)) err = ESP_FAIL;
       else err = httpd_resp_send_chunk(req, line, n);
     }
     if (err == ESP_OK) {
-      const int n = snprintf(line, sizeof(line), "%lu,rt,%u,%s,%s,,,,,,,,,,,,,,,\n",
+      const int n = snprintf(line, sizeof(line), "%lu,rt,%u,%s,%s,,,,,,,,,,,,,,,,,,,,\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.rt.count),
           rt_period, rt_duration);
       if (n <= 0 || static_cast<size_t>(n) >= sizeof(line)) err = ESP_FAIL;
@@ -908,9 +960,12 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     }
     if (err == ESP_OK) {
       const int n = snprintf(line, sizeof(line),
-          "%lu,rh,%u,%s,%s,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
+          "%lu,rh,%u,%s,%s,%s,%u,%u,%u,%u,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.rh_timing.count),
-          rh_period, rh_duration, rh_state, static_cast<unsigned>(s.rh_state.sample_count),
+          rh_period, rh_duration, rh_carrier_ratio,
+          static_cast<unsigned>(s.rh_rt_rise_edges), static_cast<unsigned>(s.rh_rt_fall_edges),
+          static_cast<unsigned>(s.rh_rh_rise_edges), static_cast<unsigned>(s.rh_rh_fall_edges),
+          rh_state, static_cast<unsigned>(s.rh_state.sample_count),
           static_cast<unsigned long>(s.rh_state.seen), have && d.valid ? 1U : 0U, rt_ratio, rh_ratio, temperature, humidity, quality,
           have ? reject_reason_to_string(d.reject_reason) : "UNKNOWN",
           have && d.thermal_transient ? 1U : 0U, have && d.temperature_extrapolation ? 1U : 0U,
