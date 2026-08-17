@@ -6,8 +6,11 @@
 #include "co2_decoder.h"
 #include "esphome/core/log.h"
 
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <climits>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -34,9 +37,28 @@ std::vector<std::string> split_csv_line(const std::string &line) {
   return fields;
 }
 
-float parse_float(const std::string &value) {
-  if (value == "nan") return NAN;
-  return std::stof(value);
+bool parse_int(const std::string &value, int &out) {
+  if (value.empty()) return false;
+  errno = 0;
+  char *end = nullptr;
+  const long parsed = std::strtol(value.c_str(), &end, 10);
+  if (errno != 0 || end == value.c_str() || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX) return false;
+  out = static_cast<int>(parsed);
+  return true;
+}
+
+bool parse_float(const std::string &value, float &out) {
+  if (value == "nan") {
+    out = NAN;
+    return true;
+  }
+  if (value.empty()) return false;
+  errno = 0;
+  char *end = nullptr;
+  const float parsed = std::strtof(value.c_str(), &end);
+  if (errno != 0 || end == value.c_str() || *end != '\0') return false;
+  out = parsed;
+  return true;
 }
 
 }  // namespace
@@ -163,79 +185,85 @@ bool CO2Monitor0601::run_capture_regression_tests_() {
       return false;
     }
 
-    try {
-      const std::string &source = f[0];
-      const int ref_count = std::stoi(f[1]);
-      const float ref_period = parse_float(f[2]);
-      const float ref_duration = parse_float(f[3]);
-      const int rt_count = std::stoi(f[4]);
-      const float rt_period = parse_float(f[5]);
-      const float rt_duration = parse_float(f[6]);
-      const int rh_count = std::stoi(f[7]);
-      const float rh_period = parse_float(f[8]);
-      const float rh_duration = parse_float(f[9]);
-      const float expected_rt_ratio = parse_float(f[10]);
-      const float expected_rh_ratio = parse_float(f[11]);
-      const float expected_temperature = parse_float(f[12]);
-      const float expected_display_temperature = parse_float(f[13]);
-      const float expected_air_temperature = parse_float(f[14]);
-      const float expected_humidity = parse_float(f[15]);
-      const float expected_display_humidity = parse_float(f[16]);
+    const std::string &source = f[0];
+    int ref_count = 0;
+    float ref_period = NAN;
+    float ref_duration = NAN;
+    int rt_count = 0;
+    float rt_period = NAN;
+    float rt_duration = NAN;
+    int rh_count = 0;
+    float rh_period = NAN;
+    float rh_duration = NAN;
+    float expected_rt_ratio = NAN;
+    float expected_rh_ratio = NAN;
+    float expected_temperature = NAN;
+    float expected_display_temperature = NAN;
+    float expected_air_temperature = NAN;
+    float expected_humidity = NAN;
+    float expected_display_humidity = NAN;
 
-      // Preserve the raw timing relationship from the archived capture. This
-      // catches accidental fixture corruption and documents that these values
-      // really originate from measured periods/counts rather than fabricated
-      // calibration points.
-      if (ref_count <= 0 || rt_count <= 0 || rh_count <= 0 ||
-          std::fabs(ref_period * ref_count / 1000.0f - ref_duration) > 0.003f ||
-          std::fabs(rt_period * rt_count / 1000.0f - rt_duration) > 0.003f ||
-          std::fabs(rh_period * rh_count / 1000.0f - rh_duration) > 0.003f) {
-        ESP_LOGE(TAG, "capture regression: timing/count mismatch in %s", source.c_str());
-        return false;
-      }
-
-      const float rt_ratio = rt_period / ref_period;
-      const float rh_ratio = rh_period / ref_period;
-      if (!nearly_equal(rt_ratio, expected_rt_ratio, 0.00002f) ||
-          !nearly_equal(rh_ratio, expected_rh_ratio, 0.00002f)) {
-        ESP_LOGE(TAG, "capture regression: normalized timing ratio changed for %s", source.c_str());
-        return false;
-      }
-
-      // Run every archived timing point through the *production* calibration
-      // functions. This gives us broad regression coverage over real observed
-      // RT/RH ratios rather than one representative synthetic point.
-      const float temperature = calibration::temperature_from_ratio(rt_ratio);
-      const float display_temperature = calibration::display_temperature_from_ratio(rt_ratio);
-      const float humidity = calibration::humidity_from_ratio_temperature(rh_ratio, temperature);
-      const float display_humidity =
-          calibration::display_humidity_from_ratio_temperature(rh_ratio, display_temperature);
-      if (!nearly_equal(temperature, expected_temperature, 0.002f) ||
-          !nearly_equal(display_temperature, expected_display_temperature, 0.002f) ||
-          !nearly_equal(humidity, expected_humidity, 0.003f) ||
-          !nearly_equal(display_humidity, expected_display_humidity, 0.003f)) {
-        ESP_LOGE(TAG, "capture regression: calibration output changed for %s", source.c_str());
-        return false;
-      }
-
-      const float air_temperature = calibration::air_temperature_from_ratio(rt_ratio);
-      if (std::isfinite(expected_air_temperature)) {
-        air_supported++;
-        if (!nearly_equal(air_temperature, expected_air_temperature, 0.002f)) {
-          ESP_LOGE(TAG, "capture regression: air-temperature output changed for %s", source.c_str());
-          return false;
-        }
-      } else if (std::isfinite(air_temperature)) {
-        ESP_LOGE(TAG, "capture regression: air-temperature envelope changed for %s", source.c_str());
-        return false;
-      }
-
-      tested++;
-    } catch (const std::exception &err) {
-      ESP_LOGE(TAG, "capture regression: parse error on line %u: %s",
-               static_cast<unsigned>(line_no), err.what());
+    if (!parse_int(f[1], ref_count) || !parse_float(f[2], ref_period) || !parse_float(f[3], ref_duration) ||
+        !parse_int(f[4], rt_count) || !parse_float(f[5], rt_period) || !parse_float(f[6], rt_duration) ||
+        !parse_int(f[7], rh_count) || !parse_float(f[8], rh_period) || !parse_float(f[9], rh_duration) ||
+        !parse_float(f[10], expected_rt_ratio) || !parse_float(f[11], expected_rh_ratio) ||
+        !parse_float(f[12], expected_temperature) || !parse_float(f[13], expected_display_temperature) ||
+        !parse_float(f[14], expected_air_temperature) || !parse_float(f[15], expected_humidity) ||
+        !parse_float(f[16], expected_display_humidity)) {
+      ESP_LOGE(TAG, "capture regression: parse error on line %u", static_cast<unsigned>(line_no));
       return false;
     }
+
+    // Preserve the raw timing relationship from the archived capture. This
+    // catches accidental fixture corruption and documents that these values
+    // really originate from measured periods/counts rather than fabricated
+    // calibration points.
+    if (ref_count <= 0 || rt_count <= 0 || rh_count <= 0 ||
+        std::fabs(ref_period * ref_count / 1000.0f - ref_duration) > 0.003f ||
+        std::fabs(rt_period * rt_count / 1000.0f - rt_duration) > 0.003f ||
+        std::fabs(rh_period * rh_count / 1000.0f - rh_duration) > 0.003f) {
+      ESP_LOGE(TAG, "capture regression: timing/count mismatch in %s", source.c_str());
+      return false;
+    }
+
+    const float rt_ratio = rt_period / ref_period;
+    const float rh_ratio = rh_period / ref_period;
+    if (!nearly_equal(rt_ratio, expected_rt_ratio, 0.00002f) ||
+        !nearly_equal(rh_ratio, expected_rh_ratio, 0.00002f)) {
+      ESP_LOGE(TAG, "capture regression: normalized timing ratio changed for %s", source.c_str());
+      return false;
+    }
+
+    // Run every archived timing point through the *production* calibration
+    // functions. This gives us broad regression coverage over real observed
+    // RT/RH ratios rather than one representative synthetic point.
+    const float temperature = calibration::temperature_from_ratio(rt_ratio);
+    const float display_temperature = calibration::display_temperature_from_ratio(rt_ratio);
+    const float humidity = calibration::humidity_from_ratio_temperature(rh_ratio, temperature);
+    const float display_humidity =
+        calibration::display_humidity_from_ratio_temperature(rh_ratio, display_temperature);
+    if (!nearly_equal(temperature, expected_temperature, 0.002f) ||
+        !nearly_equal(display_temperature, expected_display_temperature, 0.002f) ||
+        !nearly_equal(humidity, expected_humidity, 0.003f) ||
+        !nearly_equal(display_humidity, expected_display_humidity, 0.003f)) {
+      ESP_LOGE(TAG, "capture regression: calibration output changed for %s", source.c_str());
+      return false;
+    }
+
+    const float air_temperature = calibration::air_temperature_from_ratio(rt_ratio);
+    if (std::isfinite(expected_air_temperature)) {
+      air_supported++;
+      if (!nearly_equal(air_temperature, expected_air_temperature, 0.002f)) {
+        ESP_LOGE(TAG, "capture regression: air-temperature output changed for %s", source.c_str());
+        return false;
+      }
+    } else if (std::isfinite(air_temperature)) {
+      ESP_LOGE(TAG, "capture regression: air-temperature envelope changed for %s", source.c_str());
+      return false;
+    }
+
+    tested++;
+  }
   }
 
   if (tested < 100) {
