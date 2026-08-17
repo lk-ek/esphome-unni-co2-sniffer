@@ -53,6 +53,17 @@ struct Measurement {
   uint16_t rh_rt_fall_edges{0};
   uint16_t rh_rh_rise_edges{0};
   uint16_t rh_rh_fall_edges{0};
+
+  // Experimental direct phase timing between corresponding RT and RH edges
+  // during the RH phase. Positive values mean RH follows RT; negative values
+  // mean RH leads RT. These diagnostics do not affect RH publication yet.
+  float rh_phase_rise_us{NAN};
+  float rh_phase_fall_us{NAN};
+  float rh_phase_mean_us{NAN};
+  float rh_phase_carrier_ratio{NAN};
+  uint8_t rh_phase_rise_samples{0};
+  uint8_t rh_phase_fall_samples{0};
+
   float rh_state_us{NAN};
   uint8_t rh_state_samples{0};
   uint32_t rh_state_seen{0};

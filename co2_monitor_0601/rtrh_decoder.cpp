@@ -38,6 +38,8 @@ static constexpr uint32_t RT_PHASE_END_US = 252000;
 static constexpr uint32_t CYCLE_MAX_US = 20000;
 static constexpr uint16_t RT_TEMP_CYCLES = 880;
 static constexpr uint8_t RH_STATE_PERIOD_SAMPLES = 96;
+static constexpr uint8_t RH_PHASE_DELTA_SAMPLES = 96;
+static constexpr uint32_t RH_PHASE_PAIR_MAX_US = 70;
 
 struct Accum {
   uint32_t period_sum{0};
@@ -47,6 +49,13 @@ struct Accum {
 struct RhStateStats {
   uint32_t last_us{0};
   uint16_t samples[RH_STATE_PERIOD_SAMPLES]{};
+  uint8_t write_pos{0};
+  uint8_t sample_count{0};
+  uint32_t seen{0};
+};
+
+struct RhPhaseStats {
+  int16_t samples[RH_PHASE_DELTA_SAMPLES]{};
   uint8_t write_pos{0};
   uint8_t sample_count{0};
   uint32_t seen{0};
@@ -63,6 +72,8 @@ struct Snapshot {
   uint16_t rh_rt_fall_edges{0};
   uint16_t rh_rh_rise_edges{0};
   uint16_t rh_rh_fall_edges{0};
+  RhPhaseStats rh_phase_rise;
+  RhPhaseStats rh_phase_fall;
   uint32_t sequence{0};
 };
 
@@ -121,6 +132,12 @@ struct DecoderState {
   volatile uint16_t rh_rt_fall_edges{0};
   volatile uint16_t rh_rh_rise_edges{0};
   volatile uint16_t rh_rh_fall_edges{0};
+  RhPhaseStats rh_phase_rise;
+  RhPhaseStats rh_phase_fall;
+  volatile uint32_t rh_pending_rt_rise_us{0};
+  volatile uint32_t rh_pending_rh_rise_us{0};
+  volatile uint32_t rh_pending_rt_fall_us{0};
+  volatile uint32_t rh_pending_rh_fall_us{0};
 
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
@@ -155,6 +172,64 @@ static inline void IRAM_ATTR clear_rh_state() {
   clear_rh_state_stats(decoder.rh_state);
 }
 
+static inline void IRAM_ATTR clear_rh_phase_stats(RhPhaseStats &s) {
+  s.write_pos = 0;
+  s.sample_count = 0;
+  s.seen = 0;
+  for (uint8_t i = 0; i < RH_PHASE_DELTA_SAMPLES; i++) s.samples[i] = 0;
+}
+
+static inline void IRAM_ATTR add_rh_phase_delta(RhPhaseStats &s, int32_t delta_us) {
+  if (delta_us < -32768 || delta_us > 32767) return;
+  s.samples[s.write_pos] = static_cast<int16_t>(delta_us);
+  s.write_pos = static_cast<uint8_t>((s.write_pos + 1) % RH_PHASE_DELTA_SAMPLES);
+  if (s.sample_count < RH_PHASE_DELTA_SAMPLES) s.sample_count++;
+  s.seen++;
+}
+
+static inline void IRAM_ATTR reset_rh_phase_pairing() {
+  decoder.rh_pending_rt_rise_us = 0;
+  decoder.rh_pending_rh_rise_us = 0;
+  decoder.rh_pending_rt_fall_us = 0;
+  decoder.rh_pending_rh_fall_us = 0;
+}
+
+static inline void IRAM_ATTR observe_rh_phase_edge(uint32_t now, uint8_t pin_index, uint8_t level) {
+  if (decoder.phase != Phase::RH) return;
+
+  volatile uint32_t *own = nullptr;
+  volatile uint32_t *other = nullptr;
+  RhPhaseStats *stats = nullptr;
+  const bool rh_edge = pin_index == 1;
+
+  if (level) {
+    own = rh_edge ? &decoder.rh_pending_rh_rise_us : &decoder.rh_pending_rt_rise_us;
+    other = rh_edge ? &decoder.rh_pending_rt_rise_us : &decoder.rh_pending_rh_rise_us;
+    stats = &decoder.rh_phase_rise;
+  } else {
+    own = rh_edge ? &decoder.rh_pending_rh_fall_us : &decoder.rh_pending_rt_fall_us;
+    other = rh_edge ? &decoder.rh_pending_rt_fall_us : &decoder.rh_pending_rh_fall_us;
+    stats = &decoder.rh_phase_fall;
+  }
+
+  const uint32_t other_time = *other;
+  if (other_time != 0) {
+    const uint32_t separation = now >= other_time ? now - other_time : other_time - now;
+    if (separation <= RH_PHASE_PAIR_MAX_US) {
+      // Signed RH - RT edge separation. If the RH edge arrives second the
+      // delta is positive; if RT arrives second, RH led and the delta is negative.
+      const int32_t delta = rh_edge ? static_cast<int32_t>(now - other_time)
+                                    : -static_cast<int32_t>(now - other_time);
+      add_rh_phase_delta(*stats, delta);
+      *other = 0;
+      *own = 0;
+      return;
+    }
+  }
+
+  *own = now;
+}
+
 static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.collecting = true;
   decoder.measurement_start_us = now;
@@ -172,6 +247,9 @@ static inline void IRAM_ATTR reset_measurement(uint32_t now, uint8_t state) {
   decoder.rh_rt_fall_edges = 0;
   decoder.rh_rh_rise_edges = 0;
   decoder.rh_rh_fall_edges = 0;
+  clear_rh_phase_stats(decoder.rh_phase_rise);
+  clear_rh_phase_stats(decoder.rh_phase_fall);
+  reset_rh_phase_pairing();
   clear_rh_state();
 }
 
@@ -190,6 +268,7 @@ static inline void IRAM_ATTR update_phase(uint32_t now) {
   decoder.have_rt_rise = false;
   if (next == Phase::RH) {
     decoder.rh_state.last_us = 0;
+    reset_rh_phase_pairing();
   }
 }
 
@@ -261,6 +340,24 @@ static void derive_rh_distribution(const RhStateStats &s, Measurement &m) {
   }
 }
 
+static float rh_phase_median(const RhPhaseStats &s) {
+  const uint8_t n = s.sample_count;
+  if (!n) return NAN;
+  int16_t tmp[RH_PHASE_DELTA_SAMPLES];
+  for (uint8_t i = 0; i < n; i++) tmp[i] = s.samples[i];
+  for (uint8_t i = 1; i < n; i++) {
+    const int16_t value = tmp[i];
+    uint8_t j = i;
+    while (j > 0 && tmp[j - 1] > value) {
+      tmp[j] = tmp[j - 1];
+      j--;
+    }
+    tmp[j] = value;
+  }
+  if (n & 1) return static_cast<float>(tmp[n / 2]);
+  return 0.5f * (static_cast<float>(tmp[n / 2 - 1]) + static_cast<float>(tmp[n / 2]));
+}
+
 static void finalize_measurement() {
   if (!decoder.collecting) return;
   if (!decoder.ref.count || !decoder.rt.count || !decoder.rh.count) {
@@ -278,6 +375,8 @@ static void finalize_measurement() {
   next.rh_rt_fall_edges = decoder.rh_rt_fall_edges;
   next.rh_rh_rise_edges = decoder.rh_rh_rise_edges;
   next.rh_rh_fall_edges = decoder.rh_rh_fall_edges;
+  next.rh_phase_rise = decoder.rh_phase_rise;
+  next.rh_phase_fall = decoder.rh_phase_fall;
   next.sequence = decoder.snapshot.sequence + 1;
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
@@ -401,6 +500,7 @@ static void IRAM_ATTR gpio_isr(void *arg) {
     else
       counter = level ? &decoder.rh_rh_rise_edges : &decoder.rh_rh_fall_edges;
     if (*counter != 0xFFFF) (*counter)++;
+    observe_rh_phase_edge(now, pin_index, level);
   }
 
   // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
@@ -656,6 +756,19 @@ static Measurement derive(const Snapshot &s) {
   m.rh_rt_fall_edges = s.rh_rt_fall_edges;
   m.rh_rh_rise_edges = s.rh_rh_rise_edges;
   m.rh_rh_fall_edges = s.rh_rh_fall_edges;
+  m.rh_phase_rise_us = rh_phase_median(s.rh_phase_rise);
+  m.rh_phase_fall_us = rh_phase_median(s.rh_phase_fall);
+  m.rh_phase_rise_samples = s.rh_phase_rise.sample_count;
+  m.rh_phase_fall_samples = s.rh_phase_fall.sample_count;
+  if (std::isfinite(m.rh_phase_rise_us) && std::isfinite(m.rh_phase_fall_us))
+    m.rh_phase_mean_us = 0.5f * (m.rh_phase_rise_us + m.rh_phase_fall_us);
+  else if (std::isfinite(m.rh_phase_rise_us))
+    m.rh_phase_mean_us = m.rh_phase_rise_us;
+  else if (std::isfinite(m.rh_phase_fall_us))
+    m.rh_phase_mean_us = m.rh_phase_fall_us;
+  m.rh_phase_carrier_ratio = std::isfinite(m.rh_phase_mean_us) &&
+                             std::isfinite(m.rh_carrier_period_us) && m.rh_carrier_period_us > 0.0f
+                                 ? m.rh_phase_mean_us / m.rh_carrier_period_us : NAN;
   m.rh_state_us = rh_state_period_median(s.rh_state);
   derive_rh_distribution(s.rh_state, m);
   m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
@@ -722,6 +835,13 @@ struct __attribute__((packed)) TimingPayload {
   uint16_t rh_rt_fall_edges;
   uint16_t rh_rh_rise_edges;
   uint16_t rh_rh_fall_edges;
+  float rh_phase_rise_us;
+  float rh_phase_fall_us;
+  float rh_phase_mean_us;
+  float rh_phase_carrier_ratio;
+  uint8_t rh_phase_rise_samples;
+  uint8_t rh_phase_fall_samples;
+  uint16_t reserved2;
 };
 
 static TimingPayload debug_udp_timing_payload{};
@@ -791,6 +911,12 @@ static void send_timing_udp(const Measurement &m) {
   payload.rh_rt_fall_edges = m.rh_rt_fall_edges;
   payload.rh_rh_rise_edges = m.rh_rh_rise_edges;
   payload.rh_rh_fall_edges = m.rh_rh_fall_edges;
+  payload.rh_phase_rise_us = m.rh_phase_rise_us;
+  payload.rh_phase_fall_us = m.rh_phase_fall_us;
+  payload.rh_phase_mean_us = m.rh_phase_mean_us;
+  payload.rh_phase_carrier_ratio = m.rh_phase_carrier_ratio;
+  payload.rh_phase_rise_samples = m.rh_phase_rise_samples;
+  payload.rh_phase_fall_samples = m.rh_phase_fall_samples;
   debug_udp_timing_payload = payload;
   debug_udp_timing_pending = true;
   debug_udp_timing_copies_remaining = 2;
@@ -828,7 +954,7 @@ class CaptureHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_type(req, "text/csv");
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_capture.csv\"");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    static constexpr char HEADER[] = "sequence,t_us,edge_no,gpio10,gpio13,state,overflow\n";
+    static constexpr char HEADER[] = "sequence,t_us,edge_no,rt_gpio3,rh_gpio4,state,overflow\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     const uint16_t count = debug.sample_count;
     const uint32_t sequence = debug.sequence;
@@ -918,6 +1044,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     // then serialize the CSV using integer/string printf only.
     char ref_period[20], ref_duration[20], rt_period[20], rt_duration[20];
     char rh_period[20], rh_duration[20], rh_carrier_ratio[24], rh_state[20];
+    char rh_phase_rise[20], rh_phase_fall[20], rh_phase_mean[20], rh_phase_ratio[24];
     char rt_ratio[24], rh_ratio[24], temperature[20], humidity[20], quality[16];
     format_fixed(ref_period, sizeof(ref_period), ref_us, 3);
     format_fixed(ref_duration, sizeof(ref_duration), float(s.ref.period_sum) / 1000.0f, 3);
@@ -928,6 +1055,10 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     format_fixed(rh_carrier_ratio, sizeof(rh_carrier_ratio),
                  ref_us > 0.0f && s.rh_timing.count ? rh_us / ref_us : NAN, 6);
     format_fixed(rh_state, sizeof(rh_state), rh_state_us, 3);
+    format_fixed(rh_phase_rise, sizeof(rh_phase_rise), have ? d.rh_phase_rise_us : NAN, 3);
+    format_fixed(rh_phase_fall, sizeof(rh_phase_fall), have ? d.rh_phase_fall_us : NAN, 3);
+    format_fixed(rh_phase_mean, sizeof(rh_phase_mean), have ? d.rh_phase_mean_us : NAN, 3);
+    format_fixed(rh_phase_ratio, sizeof(rh_phase_ratio), have ? d.rh_phase_carrier_ratio : NAN, 6);
     format_fixed(rt_ratio, sizeof(rt_ratio), have ? d.rt_ratio : NAN, 6);
     format_fixed(rh_ratio, sizeof(rh_ratio), have ? d.rh_ratio : NAN, 6);
     format_fixed(temperature, sizeof(temperature), have ? d.temperature_c : NAN, 3);
@@ -940,7 +1071,7 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     httpd_resp_set_hdr(req, "Content-Disposition", "attachment; filename=\"rt_rh_timing.csv\"");
 
     static constexpr char HEADER[] =
-        "measurement,phase,count,period_mean_us,duration_ms,rh_carrier_ref_ratio,rh_rt_rise_edges,rh_rt_fall_edges,rh_rh_rise_edges,rh_rh_fall_edges,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
+        "measurement,phase,count,period_mean_us,duration_ms,rh_carrier_ref_ratio,rh_rt_rise_edges,rh_rt_fall_edges,rh_rh_rise_edges,rh_rh_fall_edges,rh_phase_rise_us,rh_phase_fall_us,rh_phase_mean_us,rh_phase_carrier_ratio,rh_phase_rise_samples,rh_phase_fall_samples,state_rh_median_us,state_rh_samples,state_rh_seen,valid,rt_ratio,rh_ratio,temperature_c,humidity_percent,quality_percent,reject_reason,thermal_transient,temperature_extrapolation,humidity_extrapolation,calibration_extrapolation\n";
     esp_err_t err = httpd_resp_send_chunk(req, HEADER, sizeof(HEADER) - 1);
     char line[384];
 
@@ -960,11 +1091,14 @@ class TimingHandler : public web_server_idf::AsyncWebHandler {
     }
     if (err == ESP_OK) {
       const int n = snprintf(line, sizeof(line),
-          "%lu,rh,%u,%s,%s,%s,%u,%u,%u,%u,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
+          "%lu,rh,%u,%s,%s,%s,%u,%u,%u,%u,%s,%s,%s,%s,%u,%u,%s,%u,%lu,%u,%s,%s,%s,%s,%s,%s,%u,%u,%u,%u\n",
           static_cast<unsigned long>(s.sequence), static_cast<unsigned>(s.rh_timing.count),
           rh_period, rh_duration, rh_carrier_ratio,
           static_cast<unsigned>(s.rh_rt_rise_edges), static_cast<unsigned>(s.rh_rt_fall_edges),
           static_cast<unsigned>(s.rh_rh_rise_edges), static_cast<unsigned>(s.rh_rh_fall_edges),
+          rh_phase_rise, rh_phase_fall, rh_phase_mean, rh_phase_ratio,
+          have ? static_cast<unsigned>(d.rh_phase_rise_samples) : 0U,
+          have ? static_cast<unsigned>(d.rh_phase_fall_samples) : 0U,
           rh_state, static_cast<unsigned>(s.rh_state.sample_count),
           static_cast<unsigned long>(s.rh_state.seen), have && d.valid ? 1U : 0U, rt_ratio, rh_ratio, temperature, humidity, quality,
           have ? reject_reason_to_string(d.reject_reason) : "UNKNOWN",

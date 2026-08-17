@@ -25,7 +25,7 @@ HEADER = struct.Struct("<4sBBHIHHHH")
 TYPE_I2C_LA02 = 1
 TYPE_RTRH_RAW = 2
 TYPE_RTRH_TIMING = 3
-TIMING = struct.Struct("<IBBBB I ffffffff HHHH BBBB HHHHH")
+TIMING = struct.Struct("<IBBBB I ffffffff HHHH BBBB HHHHH ffff BBH")
 
 TYPE_NAMES = {
     TYPE_I2C_LA02: "i2c",
@@ -132,6 +132,8 @@ def write_timing(root: Path, data: bytes) -> Tuple[Path, List[str], List[object]
         quality, ref_us, rt_us, rh_carrier_us, rh_carrier_ref_ratio, rh_us, temp_c, humidity,
         rh_min, rh_p25, rh_p75, rh_max, near220, near440, other, _reserved,
         rh_carrier_count, rh_rt_rise, rh_rt_fall, rh_rh_rise, rh_rh_fall,
+        rh_phase_rise_us, rh_phase_fall_us, rh_phase_mean_us, rh_phase_carrier_ratio,
+        rh_phase_rise_samples, rh_phase_fall_samples, _reserved2,
     ) = TIMING.unpack(data)
 
     target = day_dir(root)
@@ -141,7 +143,9 @@ def write_timing(root: Path, data: bytes) -> Tuple[Path, List[str], List[object]
         "received_at", "sequence", "valid", "reject_reason", "quality_percent",
         "ref_period_us", "rt_period_us", "rh_carrier_period_us", "rh_carrier_ref_ratio",
         "rh_carrier_count", "rh_rt_rise_edges", "rh_rt_fall_edges",
-        "rh_rh_rise_edges", "rh_rh_fall_edges", "rh_state_us", "temperature_c",
+        "rh_rh_rise_edges", "rh_rh_fall_edges", "rh_phase_rise_us",
+        "rh_phase_fall_us", "rh_phase_mean_us", "rh_phase_carrier_ratio",
+        "rh_phase_rise_samples", "rh_phase_fall_samples", "rh_state_us", "temperature_c",
         "humidity_percent", "rh_state_samples", "rh_state_seen", "rh_min_us",
         "rh_p25_us", "rh_p75_us", "rh_max_us", "near_220", "near_440", "other",
         "thermal_transient", "temperature_extrapolation", "humidity_extrapolation",
@@ -152,6 +156,9 @@ def write_timing(root: Path, data: bytes) -> Tuple[Path, List[str], List[object]
         sequence, valid, reject_reason, f"{quality:.3f}", f"{ref_us:.3f}",
         f"{rt_us:.3f}", f"{rh_carrier_us:.3f}", f"{rh_carrier_ref_ratio:.6f}",
         rh_carrier_count, rh_rt_rise, rh_rt_fall, rh_rh_rise, rh_rh_fall,
+        f"{rh_phase_rise_us:.3f}", f"{rh_phase_fall_us:.3f}",
+        f"{rh_phase_mean_us:.3f}", f"{rh_phase_carrier_ratio:.6f}",
+        rh_phase_rise_samples, rh_phase_fall_samples,
         f"{rh_us:.3f}", f"{temp_c:.3f}", f"{humidity:.3f}",
         rh_samples, rh_seen, rh_min, rh_p25, rh_p75, rh_max, near220, near440, other,
         1 if flags & 0x01 else 0, 1 if flags & 0x02 else 0,

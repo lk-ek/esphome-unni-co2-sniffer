@@ -81,13 +81,13 @@ Optional debug builds provide:
 
 The ESP must remain electrically passive with respect to the original signal paths.
 
-Optional series resistors can be added to the ESP branches:
+The current tested installation uses **10 kΩ series resistors on each passive ESP tap**:
 
 ```text
-Unni signal ---- 4.7–10 kΩ ---- XIAO GPIO
+Unni signal ---- 10 kΩ ---- XIAO GPIO
 ```
 
-Do not put these resistors in series with the signal path used by the original Unni controller.
+The resistors belong only in the ESP branches; do not insert them into the original Unni signal path. The RT/RH calibration is hardware-dependent, so calibration data collected with earlier direct or three/four-wire tap arrangements must not be mixed with the current two-wire/10 kΩ setup.
 
 ---
 
@@ -237,7 +237,8 @@ Normal builds create:
 - `Battery Charge Time Estimate`
 - `USB Power`
 - `Energy Save Mode`
-- `BLE Pairing Mode` while the experimental secure MyAmbience settings support is enabled
+- `WiFi Home Assistant` when the runtime connectivity control is enabled
+- `BLE Privacy` and `BLE Pairing Mode` while the experimental secure MyAmbience settings support is enabled
 
 Sensor definitions may be customized:
 
@@ -328,7 +329,7 @@ Normal USB operation prioritizes responsiveness and reliability:
 - Wi-Fi power saving is disabled at runtime with `WIFI_PS_NONE`
 - CO₂ I²C capture remains continuously enabled
 - valid CO₂ measurements are published immediately
-- valid RT/RH measurements are published immediately
+- valid RT temperature is published immediately; RH is published when its RH tail also validates
 - BLE advertisements use the USB interval, default `2s`
 
 Because USB power is available, reducing ESP consumption is not the priority in this mode.
@@ -340,8 +341,8 @@ Battery operation prioritizes low average power:
 - automatic Light Sleep is enabled
 - GPIO3/GPIO4 RT/RH activity wakes the ESP
 - CPU frequency is temporarily raised to 80 MHz while measurements are captured
-- CO₂ sniffing is enabled only for the active measurement window
-- after RT/RH and a valid CO₂ sample are obtained, the ESP may sleep again
+- the passive CO₂ sniffer stays armed whenever the MCU is awake; GPIO6/GPIO7 are not Light-Sleep wake sources
+- after the RT/RH wake window is complete, the ESP may return to Light Sleep; CO₂ traffic alone does not wake it
 - Wi-Fi uses `WIFI_PS_MIN_MODEM`
 - Home Assistant publication is throttled to the latest values, default once per minute
 - BLE advertisements use the battery interval, default `5s`
@@ -468,10 +469,9 @@ for attribution, provenance and upstream license texts.
 
 ---
 
-## BLE
+## BLE history
 
 Advertising after GATT disconnects is reasserted deterministically so ESPHome's automatic advertiser restart cannot replace the Sensirion manufacturer-data payload. The Device Settings privacy flag (`IsAdvertiseDataEnabled`) is persistent and is logged explicitly at startup.
- history
 
 With:
 
@@ -670,32 +670,37 @@ Captured transactions are normally well below 1 KiB and are sent synchronously b
 
 # RT/RH decoding
 
-Temperature and humidity are derived from timing relationships observed on the original Unni RT/RH circuitry.
+Temperature and humidity are reconstructed from timing signals already present in the original Unni RT/RH circuitry. The ESP is a passive observer; it does not drive either line.
 
-The decoder measures:
+The current hardware calibration applies to the **two-wire RT/RH tap with 10 kΩ series resistance on both ESP branches**. Earlier captures made with direct taps or additional connected signal lines remain useful for reverse engineering, but they are not calibration-compatible with the current installation.
 
-- reference timing
-- RT timing
-- RH state timing
-- signal counts and duration
-- derived timing ratios
+## Temperature
 
-Calibration is specific to the tested device family.
-
-Diagnostic builds expose additional information including:
-
-- measurement quality
-- timing ratios
-- logarithmic RH ratio
-- temperature rate of change
-- extrapolation flags
-- thermal-transient detection
+The decoder identifies fixed REF and RT phases by elapsed time and derives temperature from the ratio of the RT period to the reference period. REF/RT validation is independent from the RH tail, so a trustworthy temperature can still be published when humidity decoding fails.
 
 The active calibration is defined in:
 
 ```text
 co2_monitor_0601/calibration.h
 ```
+
+The current temperature fit is provisional and is being refined from stable Unni-display reference points collected across a wider temperature range.
+
+## Humidity
+
+The production RH decoder currently uses the recurrence of the combined `RT=0, RH=1` state during the RH phase. This worked over the originally calibrated range, but captures around 67–69 %RH show both RT and RH continuing to oscillate while that intermediate combined state becomes too short to observe reliably. In that case humidity is intentionally rejected rather than guessed.
+
+Debug builds therefore also measure, without yet using these values for RH publication:
+
+- RT-derived carrier period during the RH phase;
+- RT and RH rising/falling edge counts;
+- direct signed RT↔RH edge separation for corresponding rising and falling edges;
+- normalized phase separation relative to the RH carrier period;
+- the historical combined-state timing and distribution.
+
+For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 70 µs. The metric is logged and exported to `rtrh_timing.csv` so a more robust humidity mapping can be calibrated before replacing the existing decoder.
+
+With `debug_metrics: true`, Home Assistant exposes additional timing, quality, temperature-rate and calibration/extrapolation diagnostics. With `debug_capture: true`, raw and timing data are available over UDP and the debug HTTP endpoints.
 
 ---
 
@@ -776,6 +781,16 @@ Historical documents may describe earlier pin assignments, names or implementati
 
 ---
 
+# Runtime recovery and diagnostics
+
+`WiFi Home Assistant` can intentionally disable the ESPHome Wi-Fi interface. Because Home Assistant cannot reach the device while Wi-Fi is off, connecting USB opens a temporary recovery window in which the switch can be turned back on. The example Wi-Fi/API configurations use `reboot_timeout: 0s` so intentional offline operation is not treated as a fault.
+
+The passive CO₂ sniffer remains armed independently of the RT/RH Light-Sleep awake window. GPIO6/GPIO7 do not wake the ESP from Light Sleep, but CO₂ transactions can still be captured whenever the MCU is already awake. Debug builds periodically emit `I2C edge diag` messages to distinguish missing electrical activity from framing/decoder failures.
+
+Because an intermittent passive tap can produce malformed I²C captures, decoded CO₂ values below 350 ppm are rejected. After a CRC/framing error, publication resumes only after two plausible consecutive readings agree within 150 ppm.
+
+---
+
 # Safety
 
 Verify polarity, voltage levels and actual PCB connections before attaching the XIAO.
@@ -803,60 +818,3 @@ See:
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - `LICENSES/`
 
-
-### SHT43 sniffer-off A/B diagnostic
-
-The `i2c-sniffer-sht43-probe.yaml` variant in this diagnostic build sets `sniffer_enabled: false`. This keeps Wi-Fi, Home Assistant, BLE advertising, Sensirion history, and the SHT43 serial/T/RH GATT services active while completely skipping installation of the shared GPIO ISR service and all CO2/RT/RH capture/decoder GPIO setup. It is intended only to isolate BLE/GATT behavior from the passive sniffer ISR path.
-
-
-### RT/RH GPIO-without-ISR diagnostic
-
-The `rtrh_gpio_setup` option is a diagnostic A/B switch. When enabled with `rtrh_enabled: false`, the RT/RH pins and power-save wake configuration are initialized while the RT/RH edge ISR and decoder remain disabled. It is intended only for isolating ESP32-C3 radio/capture scheduling conflicts.
-
-
-## Diagnostic build: RT/RH publication A/B
-
-The `i2c-sniffer-sht43-probe.yaml` variant enables the normal RT/RH decode and publication path again. The earlier Device Settings omission was an A/B diagnostic during the RAM investigation; after converting the 4096-sample history to flash-backed storage, the secure 0x8100 service and BLE Pairing Mode switch are enabled again.
-
-
-## Diagnostic build: known-good RT/RH restore
-
-This A/B build restores `rtrh_decoder.cpp` and `rtrh_decoder.h` byte-for-byte from the known-good rebase that produced valid RT/RH measurements on 2026-08-15 around 16:05. The current full SHT43 GATT, Wi-Fi scan policy and RAM-headroom test configuration are retained. The purpose is to test the RT/RH GPIO/ISR initialization regression before changing the humidity decoding algorithm.
-
-### BLE privacy and Wi-Fi / Home Assistant switches
-
-Two runtime controls are exposed to Home Assistant when HA entities are enabled:
-
-- **WiFi Home Assistant** disables the ESPHome Wi-Fi interface after a short grace period. The state is restored by ESPHome's switch restore mode. Because HA cannot reach a device whose Wi-Fi is off, connecting USB power while the switch is OFF opens a 5-minute recovery window; turn the switch ON during that window to keep Wi-Fi enabled.
-
-The example Wi-Fi/API configurations set `reboot_timeout: 0s`, otherwise ESPHome's normal connectivity watchdog could reboot a device that intentionally has Wi-Fi disabled.
-
-
-### MyAmbience Device Settings compatibility
-
-Reviewing the bundled Sensirion repositories shows that MyAmbience settings are device-type specific rather than purely characteristic-driven.
-
-For the **SHT43 Demo Board**, Sensirion documents `0x81FE IsLogEnabled`, `0x8130 IsAdvertiseDataEnabled` (Privacy), `0x8120 AlternativeDeviceName`, and `0x81FF DeviceSettingsVersion`. For a **DIY Gadget**, the current Sensirion service specification and Arduino server instead list `0x8120 AlternativeDeviceName`, `0x8171 Wi-Fi SSID`, and `0x8172 Wi-Fi Password`.
-
-This matches the earlier identity probe: MyAmbience exposes Privacy when the device advertises as an SHT43 Demo Board, but that identity makes the app treat the history as T/RH-only and loses the desired MyCO2 presentation. Production therefore keeps the MyCO2-compatible identity.
-
-`0x8130` remains available for protocol experiments and direct GATT clients. Its privacy advertisement follows Sensirion's SHT43 implementation: the short Sensirion manufacturer header remains present with advertisement type `0xFF` and sample type `0x00`, while live measurement bytes are omitted.
-
-`0x81FE` remains an **experimental direct-BLE alias** for disabling WiFi/Home Assistant. MyAmbience is not expected to render this SHT43-only setting as a switch for the production MyCO2 identity. The Home Assistant `WiFi Home Assistant` switch and USB recovery window remain the supported UI for that function.
-
-The official DIY Wi-Fi credential characteristics (`0x8171`/`0x8172`) are not exposed yet: accepting credentials without safely integrating them into ESPHome's configured-network lifecycle would create a setting that appears functional but is not reliable.
-
-### CO₂ capture and light sleep
-
-While the native CO₂ bus is powered, the component now holds both `NO_LIGHT_SLEEP` and `CPU_FREQ_MAX`. The 80 MHz CPU lock is intentional: it reduces GPIO ISR latency/coalesced SDA/SCL samples during the short native measurement window. The lock is released again after the bus has been quiet LOW/LOW for 1 s.
-
-The passive CO₂ I²C sniffer stays armed independently of the RT/RH light-sleep awake window. GPIO6/GPIO7 are still excluded from light-sleep wake sources, so CO₂ traffic does not wake the ESP32-C3 by itself. Keeping the GPIO edge ISR armed prevents valid CO₂ transactions that occur while the MCU is already awake from being discarded by battery-policy transitions.
-
-
-### I2C edge diagnostics
-
-Debug builds periodically emit an `I2C edge diag` line with raw SCL/SDA edge counts and capture state. A report with zero SCL/SDA changes while the Unni CO2 bus should be active points to the electrical tap or GPIO/ISR setup; non-zero edges with no completed CO2 decode points further downstream at capture framing or protocol decoding.
-
-### CO2 plausibility guard
-
-Because this project passively sniffs an external I2C bus, intermittent contacts can create electrically malformed captures. Decoded CO2 values below 350 ppm are therefore rejected. After any CRC/framing error, CO2 publication pauses until two plausible consecutive readings agree within 150 ppm. This prevents transient bus glitches from propagating obviously false values into Home Assistant, BLE live data, or history.

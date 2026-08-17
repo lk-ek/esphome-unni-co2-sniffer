@@ -948,6 +948,14 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
            static_cast<unsigned>(m.rh_rt_rise_edges), static_cast<unsigned>(m.rh_rt_fall_edges),
            static_cast<unsigned>(m.rh_rh_rise_edges), static_cast<unsigned>(m.rh_rh_fall_edges));
 
+  ESP_LOGI(TAG,
+           "RT/RH RH phase %lu: rise RH-RT=%+.3f us (%u), fall=%+.3f us (%u), "
+           "mean=%+.3f us, mean/carrier=%+.6f",
+           static_cast<unsigned long>(m.sequence), m.rh_phase_rise_us,
+           static_cast<unsigned>(m.rh_phase_rise_samples), m.rh_phase_fall_us,
+           static_cast<unsigned>(m.rh_phase_fall_samples), m.rh_phase_mean_us,
+           m.rh_phase_carrier_ratio);
+
   if (m.rh_state_samples > 0) {
     ESP_LOGI(TAG,
              "RT/RH RH intervals %lu: min=%u p25=%u median=%.1f p75=%u max=%u us; "

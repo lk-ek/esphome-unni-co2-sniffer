@@ -536,3 +536,11 @@ After pairing, MyAmbience recognized the device as a CO2 Gadget and history down
 - Re-assert passive GPIO3/GPIO4 input, no-pull, ANYEDGE configuration after an RT/RH Light-sleep wake without restarting the in-flight timing phase.
 - Rejected RT/RH cycles no longer count as a completed power-save wake window.
 - REF/RT temperature validity is evaluated independently from the RH tail. A valid temperature is retained and published even when RH fails (for example `RH_TOO_FEW_SAMPLES`); BLE/history remain pair-consistent and require a fully valid T/RH cycle.
+
+### 2026-08-17: direct RT/RH phase diagnostics
+
+High-humidity captures showed nearly equal RT/RH edge counts while the combined
+`RT=0, RH=1` state disappeared. Added one-to-one rising/falling edge pairing in
+the RH phase and export of signed RH-minus-RT phase medians and carrier-normalized
+phase. The new metric is observational only until enough display-referenced
+captures exist to establish a robust humidity mapping.

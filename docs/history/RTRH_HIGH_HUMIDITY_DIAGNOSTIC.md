@@ -18,3 +18,21 @@ observability for the RH phase:
 The goal is to determine whether the RH carrier or relative edge timing remains
 stable when the combined `0x08` state becomes too short or disappears. No new
 RH calibration/fallback is enabled until captures establish a reliable mapping.
+
+## Direct RT↔RH phase timing follow-up
+
+The carrier/edge-count diagnostic showed that at about 69 %RH both RT and RH
+continue to toggle at almost identical rates even though the historical
+`RT=0, RH=1` state disappears. This points to loss of observable relative phase,
+not loss of the RH oscillator itself.
+
+The next diagnostic records corresponding rising and falling RT/RH edges as
+one-to-one pairs during the RH phase. For each polarity it retains signed
+`RH timestamp - RT timestamp` samples and reports their medians, a combined
+mean, and the mean normalized by the RH carrier period. Pairing is limited to
+70 us so unrelated neighboring carrier cycles are not joined. Positive values
+mean RH follows RT; negative values mean RH leads RT.
+
+These phase values are diagnostic only. They are exported in the UDP timing
+payload, collector `rtrh_timing.csv`, HTTP `/rt_rh_timing.csv`, and serial log,
+but they do not yet alter humidity validation, calibration, or publication.
