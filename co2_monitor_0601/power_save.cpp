@@ -292,10 +292,7 @@ void IRAM_ATTR on_rtrh_edge_from_isr() {
 uint32_t wake_generation() { return wake_gen; }
 
 void on_rtrh_complete(bool valid) {
-  if (!configured || !lock_held) return;
-  // Even a rejected complete cycle is enough to avoid being stuck awake; the
-  // validity is logged by CO2Monitor0601 and the next cycle gets another chance.
-  (void) valid;
+  if (!configured || !lock_held || !valid) return;
   rtrh_complete = true;
   if (co2_powered_down) co2_after_rtrh = true;
 }

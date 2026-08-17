@@ -33,6 +33,8 @@ const char *reject_reason_to_string(RejectReason reason);
 struct Measurement {
   uint32_t sequence{0};
   bool valid{false};
+  bool temperature_valid{false};
+  bool humidity_valid{false};
 
   // Timing diagnostics retained for optional ESPHome entities and CSV debug.
   float ref_period_us{NAN};
@@ -75,6 +77,7 @@ struct Measurement {
 
 // GPIO3/D1 = RT, GPIO4/D2 = RH. D3/GPIO5 is not required.
 bool setup(uint8_t rt_pin, uint8_t rh_pin);
+void rearm_after_light_sleep();
 void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);

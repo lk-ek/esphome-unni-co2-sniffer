@@ -529,3 +529,10 @@ After pairing, MyAmbience recognized the device as a CO2 Gadget and history down
 - Any CRC/framing error arms a recovery confirmation gate.
 - After such an error, require two plausible consecutive readings within 150 ppm before CO2 publication resumes.
 - Rename the ESPHome entity `WiFi / Home Assistant` to `WiFi Home Assistant` to avoid the reserved `/` path separator warning.
+
+
+## 2026-08-17: RT/RH Light-sleep recovery and split validity
+
+- Re-assert passive GPIO3/GPIO4 input, no-pull, ANYEDGE configuration after an RT/RH Light-sleep wake without restarting the in-flight timing phase.
+- Rejected RT/RH cycles no longer count as a completed power-save wake window.
+- REF/RT temperature validity is evaluated independently from the RH tail. A valid temperature is retained and published even when RH fails (for example `RH_TOO_FEW_SAMPLES`); BLE/history remain pair-consistent and require a fully valid T/RH cycle.

@@ -470,6 +470,36 @@ bool setup(uint8_t rt_pin, uint8_t rh_pin) {
   return true;
 }
 
+void rearm_after_light_sleep() {
+  // Re-assert the passive tap configuration after automatic Light-sleep.
+  // Do not restart an in-flight measurement: the first RT/RH edge is itself
+  // what woke the CPU, so resetting phase timing here would shift REF/RT/RH
+  // boundaries by task-loop latency.
+  for (gpio_num_t pin : pins) gpio_intr_disable(pin);
+
+  gpio_set_direction(pin_rt, GPIO_MODE_INPUT);
+  gpio_set_direction(pin_rh, GPIO_MODE_INPUT);
+  gpio_pullup_dis(pin_rt);
+  gpio_pullup_dis(pin_rh);
+  gpio_pulldown_dis(pin_rt);
+  gpio_pulldown_dis(pin_rh);
+
+  gpio_set_intr_type(pin_rt, GPIO_INTR_ANYEDGE);
+  gpio_set_intr_type(pin_rh, GPIO_INTR_ANYEDGE);
+
+  const uint8_t state = read_state();
+  decoder.gpio_state = state;
+  decoder.pin_level[0] = gpio_get_level(pin_rt);
+  decoder.pin_level[1] = gpio_get_level(pin_rh);
+#if RTRH_DEBUG_CAPTURE
+  debug.last_value = state;
+#endif
+
+  for (gpio_num_t pin : pins) gpio_intr_enable(pin);
+  ESP_LOGI(TAG, "RT/RH GPIOs re-armed after Light-sleep wake: RT=%d RH=%d",
+           gpio_get_level(pin_rt), gpio_get_level(pin_rh));
+}
+
 void loop() {
   // RH can legitimately contain periods up to 60 ms. 100 ms of silence therefore
   // terminates the ~383 ms RT/RH transaction safely without the former 15 s delay.
@@ -503,6 +533,35 @@ void loop() {
   }
   debug_udp_loop();
 #endif
+}
+
+static bool temperature_is_valid(const Measurement &m) {
+  if (!std::isfinite(m.ref_period_us) || m.ref_period_us < REF_PERIOD_MIN_US ||
+      m.ref_period_us > REF_PERIOD_MAX_US)
+    return false;
+  if (!std::isfinite(m.ref_duration_ms) || m.ref_duration_ms < REF_DURATION_MIN_MS ||
+      m.ref_duration_ms > REF_DURATION_MAX_MS)
+    return false;
+  if (!std::isfinite(m.rt_period_us) || m.rt_period_us < RT_PERIOD_MIN_US ||
+      m.rt_period_us > RT_PERIOD_MAX_US)
+    return false;
+  if (!std::isfinite(m.rt_duration_ms) || m.rt_duration_ms < RT_DURATION_MIN_MS ||
+      m.rt_duration_ms > RT_DURATION_MAX_MS)
+    return false;
+  return m.rt_count >= RT_COUNT_MIN;
+}
+
+static bool humidity_is_valid(const Measurement &m) {
+  if (!temperature_is_valid(m)) return false;
+  if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
+      m.rh_duration_ms > RH_DURATION_MAX_MS)
+    return false;
+  if (m.rh_state_samples < RH_STATE_SAMPLES_MIN) return false;
+  if (!std::isfinite(m.rh_state_us) || m.rh_state_us < RH_STATE_MIN_US ||
+      m.rh_state_us > RH_STATE_MAX_US)
+    return false;
+  return std::isfinite(m.rh_ratio) && m.rh_ratio > 0.0f &&
+         m.rh_ratio <= RH_RATIO_VALID_MAX;
 }
 
 static RejectReason reject_reason(const Measurement &m) {
@@ -567,24 +626,31 @@ static Measurement derive(const Snapshot &s) {
   m.rh_ratio = m.ref_period_us > 0.0f && m.rh_state_us > 0.0f
                    ? m.rh_state_us / m.ref_period_us : NAN;
 
+  m.temperature_valid = temperature_is_valid(m);
+  m.humidity_valid = humidity_is_valid(m);
   m.reject_reason = reject_reason(m);
-  m.valid = m.reject_reason == RejectReason::NONE;
-  if (!m.valid) {
-    // Preserve the old behaviour: rejected captures report 0% quality and
-    // expose a temperature estimate only when RT/REF itself is finite.
-    m.temperature_c = std::isfinite(m.rt_ratio) ? calibration::temperature_from_ratio(m.rt_ratio) : NAN;
+  m.valid = m.humidity_valid;  // Backward-compatible whole-cycle validity.
+
+  if (m.temperature_valid) {
+    m.temperature_c = calibration::temperature_from_ratio(m.rt_ratio);
+    m.temperature_extrapolation = m.temperature_c < calibration::CAL_TEMP_MIN_C ||
+                                  m.temperature_c > calibration::CAL_TEMP_MAX_C;
+  } else {
+    m.temperature_c = NAN;
     m.temperature_extrapolation = true;
+  }
+
+  if (!m.humidity_valid) {
+    // A broken RH tail must not discard an otherwise trustworthy REF/RT
+    // temperature. Humidity remains invalid and is not converted/published.
     m.humidity_extrapolation = true;
     m.calibration_extrapolation = true;
     return m;
   }
 
   m.quality_percent = quality_score(m);
-  m.temperature_c = calibration::temperature_from_ratio(m.rt_ratio);
   m.rh_log = calibration::log_rh_ratio(m.rh_ratio);
   m.humidity_percent = calibration::humidity_from_ratio_temperature(m.rh_ratio, m.temperature_c);
-  m.temperature_extrapolation = m.temperature_c < calibration::CAL_TEMP_MIN_C ||
-                                m.temperature_c > calibration::CAL_TEMP_MAX_C;
   m.humidity_extrapolation = m.rh_ratio < calibration::CAL_RH_RATIO_MIN ||
                              m.rh_ratio > calibration::CAL_RH_RATIO_MAX;
   m.calibration_extrapolation = m.temperature_extrapolation || m.humidity_extrapolation;

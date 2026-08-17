@@ -964,14 +964,45 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
       publish_positive(this->out_.rh_state_period, m.rh_state_us);
       publish_finite(this->out_.rt_ratio, m.rt_ratio);
       publish_finite(this->out_.rh_ratio, m.rh_ratio);
-      publish(this->out_.temperature_extrapolation, true);
+      publish(this->out_.temperature_extrapolation, m.temperature_extrapolation);
       publish(this->out_.humidity_extrapolation, true);
       publish(this->out_.calibration_extrapolation, true);
+
+      // REF+RT are independently useful. An RH-only failure must not leave HA
+      // showing a stale temperature for another native cycle. BLE/history stay
+      // pair-consistent and are updated only by fully valid T/RH measurements.
+      if (m.temperature_valid && std::isfinite(m.temperature_c)) {
+        const float temperature_rate = this->update_thermal_transient_(m.temperature_c);
+        (void) temperature_rate;
+        m.thermal_transient = this->thermal_.active;
+        publish(this->out_.thermal_transient, m.thermal_transient);
+
+        this->ha_.temperature = m.temperature_c;
+        this->ha_.have_temperature = true;
+        if (this->external_powered_()) {
+          if (this->out_.temperature) this->out_.temperature->publish_state(m.temperature_c);
+          this->ha_.initial_temperature_published = this->out_.temperature != nullptr;
+          this->ha_.last_publish_ms = millis();
+        } else if (!this->ha_.initial_temperature_published && this->out_.temperature) {
+          this->out_.temperature->publish_state(m.temperature_c);
+          this->ha_.initial_temperature_published = true;
+          this->ha_.last_publish_ms = millis();
+        }
+
+        ESP_LOGI(TAG,
+                 "RT/RH measurement %lu temperature retained despite RH reject: "
+                 "%.3f / REF %.3f us = %.6f -> %.2f C",
+                 static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
+                 m.rt_ratio, m.temperature_c);
+      }
     }
 
-    ESP_LOGW(TAG, "RT/RH measurement %lu values not published: REJECT=%s (quality %.0f%%)%s",
+    ESP_LOGW(TAG,
+             "RT/RH measurement %lu humidity not published: REJECT=%s "
+             "(temperature=%s, quality %.0f%%)%s",
              static_cast<unsigned long>(m.sequence),
-             rtrh_decoder::reject_reason_to_string(m.reject_reason), m.quality_percent,
+             rtrh_decoder::reject_reason_to_string(m.reject_reason),
+             m.temperature_valid ? "VALID" : "invalid", m.quality_percent,
              publish_outputs ? "" : " [decode-only A/B]");
     rtrh_decoder::update_latest(m);
     return;
@@ -1401,6 +1432,7 @@ void CO2Monitor0601::loop() {
   const uint32_t wake_generation = power_save::wake_generation();
   if (wake_generation != this->light_sleep_wake_generation_) {
     this->light_sleep_wake_generation_ = wake_generation;
+    rtrh_decoder::rearm_after_light_sleep();
     i2c_sniffer::rearm_after_light_sleep();
   }
 
