@@ -95,10 +95,78 @@ def _set_host_name(text: str, variant: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _ensure_cpp20_build_flag(text: str) -> str:
+    """Explicitly request C++20 for generated host configs.
+
+    ESPHome's host platform also adds -std=gnu++20 itself. Keeping the flag in
+    the generated test YAML makes the host test's compiler requirement explicit
+    and protects the test runner from native-toolchain/default-standard quirks.
+    """
+    lines = text.splitlines()
+    insert_at = None
+    in_esphome = False
+    for index, line in enumerate(lines):
+        if line.startswith("esphome:"):
+            in_esphome = True
+            continue
+        if in_esphome and line and not line.startswith((" ", "#")):
+            insert_at = index
+            break
+    if insert_at is None:
+        insert_at = len(lines)
+    lines[insert_at:insert_at] = [
+        "  # ESPHome host requires C++20 (concepts/std::span).",
+        "  build_flags:",
+        '    - "-std=gnu++20"',
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _compiler_preflight() -> tuple[bool, str]:
+    """Check that the native C++ compiler can actually compile C++20 concepts."""
+    compiler = os.environ.get("CXX") or shutil.which("c++") or shutil.which("clang++") or shutil.which("g++")
+    if not compiler:
+        return False, "no native C++ compiler found (CXX/c++/clang++/g++)"
+
+    probe = ROOT / ".esphome" / "host-cpp20-probe.cpp"
+    binary = ROOT / ".esphome" / "host-cpp20-probe"
+    probe.parent.mkdir(parents=True, exist_ok=True)
+    probe.write_text(
+        "#include <concepts>\n"
+        "#include <span>\n"
+        "template<std::integral T> constexpr T twice(T v) { return v * 2; }\n"
+        "int main() { int a[2] = {1, 2}; std::span<int> s(a); return twice(s[0]) == 2 ? 0 : 1; }\n",
+        encoding="utf-8",
+    )
+    try:
+        proc = subprocess.run(
+            [compiler, "-std=gnu++20", str(probe), "-o", str(binary)],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return False, f"{compiler} cannot compile the required C++20 features:\n{proc.stdout.strip()}"
+        version = subprocess.run(
+            [compiler, "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        ).stdout.splitlines()
+        return True, f"{compiler}: {version[0] if version else 'C++20 probe passed'}"
+    finally:
+        probe.unlink(missing_ok=True)
+        binary.unlink(missing_ok=True)
+
+
 def make_host_config(source: Path) -> Path:
     text = _drop_top_level_blocks(source.read_text(encoding="utf-8"))
     text = _set_host_name(text, source.name)
     text = _set_logger_debug(text)
+    text = _ensure_cpp20_build_flag(text)
     # Host networking is supplied by the OS; no wifi: block is valid/needed.
     text += "\nhost:\n  mac_address: \"02:00:00:00:06:01\"\n"
     generated = ROOT / f"{GENERATED_PREFIX}{source.name}"
@@ -169,6 +237,17 @@ def main() -> int:
     parser.add_argument("--keep-generated", action="store_true")
     parser.add_argument("--esphome", default=shutil.which("esphome") or "esphome")
     args = parser.parse_args()
+
+    ok, compiler_info = _compiler_preflight()
+    print(f"Native compiler preflight: {compiler_info}", flush=True)
+    if not ok:
+        print(
+            "\nHost tests require a native C++20 compiler. ESPHome 2026.7.x host "
+            "uses C++20 features such as std::integral, std::convertible_to and std::span. "
+            "Update/select the macOS Command Line Tools or set CXX to a C++20-capable compiler.",
+            file=sys.stderr,
+        )
+        return 2
 
     failures: list[str] = []
     generated_files: list[Path] = []

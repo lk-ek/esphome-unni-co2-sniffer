@@ -48,3 +48,15 @@ the run unless `--keep-generated` is supplied.
 
 Host preferences are isolated below `.esphome/host-test-prefs` using
 `ESPHOME_PREFDIR`.
+
+## Native compiler requirement
+
+ESPHome 2026.7.x host builds require C++20. The test runner performs a small
+compiler preflight before generating/building the matrix and stops immediately
+with a focused diagnostic if the selected native compiler cannot provide C++20
+concepts and `std::span`. Generated host YAMLs also request `-std=gnu++20`
+explicitly, even though ESPHome's `host:` platform sets the same flag itself.
+
+On macOS, PlatformIO's native platform normally uses the Apple Command Line
+Tools compiler. If the preflight fails, update/select the Command Line Tools or
+set `CXX` to a C++20-capable compiler before running the tests.
