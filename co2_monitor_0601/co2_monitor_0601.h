@@ -10,6 +10,7 @@
 #include "esphome/components/wifi/wifi_component.h"
 #endif
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
 #include <cmath>
@@ -123,6 +124,10 @@ class CO2Monitor0601 : public Component {
   void set_battery_charge_time_estimate_sensor(sensor::Sensor *s) { this->out_.battery_charge_time_estimate = s; }
   void set_battery_discharge_rate_sensor(sensor::Sensor *s) { this->out_.battery_discharge_rate = s; }
   void set_battery_charge_rate_sensor(sensor::Sensor *s) { this->out_.battery_charge_rate = s; }
+  void set_battery_learned_full_runtime_sensor(sensor::Sensor *s) { this->out_.battery_learned_full_runtime = s; }
+  void set_battery_learning_progress_sensor(sensor::Sensor *s) { this->out_.battery_learning_progress = s; }
+  void set_battery_learning_cycles_sensor(sensor::Sensor *s) { this->out_.battery_learning_cycles = s; }
+  void set_battery_learning_save_interval(uint32_t value) { this->battery_.learning_save_interval_ms = value; }
   void set_usb_power_sensor(binary_sensor::BinarySensor *s) { this->out_.usb_power = s; }
   void set_ref_period_sensor(sensor::Sensor *s) { this->out_.ref_period = s; }
   void set_rt_period_sensor(sensor::Sensor *s) { this->out_.rt_period = s; }
@@ -152,6 +157,9 @@ class CO2Monitor0601 : public Component {
     sensor::Sensor *battery_charge_time_estimate{nullptr};
     sensor::Sensor *battery_discharge_rate{nullptr};
     sensor::Sensor *battery_charge_rate{nullptr};
+    sensor::Sensor *battery_learned_full_runtime{nullptr};
+    sensor::Sensor *battery_learning_progress{nullptr};
+    sensor::Sensor *battery_learning_cycles{nullptr};
     binary_sensor::BinarySensor *usb_power{nullptr};
     sensor::Sensor *ref_period{nullptr};
     sensor::Sensor *rt_period{nullptr};
@@ -241,6 +249,22 @@ class CO2Monitor0601 : public Component {
     bool charge_rate_valid{false};
     float discharge_rate_pct_h{NAN};
     float charge_rate_pct_h{NAN};
+
+    // Flash-backed, self-learning runtime model. It learns equivalent full
+    // runtime from long battery sessions rather than pretending voltage-only
+    // SOC can measure true mAh capacity. Session state is checkpointed so a
+    // reboot does not throw away an overnight calibration run.
+    ESPPreferenceObject learning_pref{};
+    bool learning_pref_ready{false};
+    bool learning_session_active{false};
+    uint32_t learning_session_elapsed_ms{0};
+    uint32_t learning_last_tick_ms{0};
+    uint32_t learning_last_save_ms{0};
+    uint32_t learning_save_interval_ms{30UL * 60UL * 1000UL};
+    float learning_session_start_progress{NAN};
+    float learning_session_last_progress{NAN};
+    float learned_full_runtime_h{NAN};
+    uint16_t learned_cycles{0};
   } battery_;
 
   struct UsbPowerState {
@@ -296,6 +320,11 @@ class CO2Monitor0601 : public Component {
   static float battery_percent_from_voltage_(float voltage);
   void reset_battery_estimator_(bool usb_mode, uint32_t now);
   void update_battery_estimator_(float battery_voltage, bool usb_mode, uint32_t now);
+  void setup_battery_learning_();
+  void update_battery_learning_(float progress, uint32_t now);
+  void finalize_battery_learning_(bool completed_session);
+  void save_battery_learning_(bool force = false);
+  void publish_battery_learning_();
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
   void runtime_diag_loop_begin_();

@@ -125,7 +125,11 @@ Battery-related entities include:
 
 Debug builds intentionally limit the native ESPHome API to one simultaneous client while raw UDP capture is enabled. Home Assistant should keep that slot; use USB serial for live `esphome logs`. Additional native API log clients can consume enough heap on the ESP32-C3 to starve lwIP. If UDP export sees sustained `ENOMEM` pressure, the affected debug capture is dropped after repeated failures instead of retrying indefinitely and holding memory/network resources.
 
-The runtime and charge-time estimates are learned from the observed voltage trend rather than from a fixed assumed current draw. Each USB/battery transition starts a new learning session, followed by a two-minute settling period. The estimator then uses at least a five-minute observation window and exponentially smooths subsequent rate measurements. Until a meaningful trend is available, the corresponding estimate remains unavailable instead of publishing a speculative value.
+The runtime and charge-time estimates are learned from the observed voltage trend rather than from a fixed assumed current draw. Each USB/battery transition starts a new rate-estimator session, followed by a two-minute settling period. The short-term estimator then uses at least a five-minute observation window and exponentially smooths subsequent rate measurements. Until a meaningful trend is available, the corresponding estimate remains unavailable instead of publishing a speculative value.
+
+Battery runtime also has a persistent self-learning layer. During battery operation the component accumulates real elapsed time and voltage-derived SOC drop. Once a session contains at least 2 hours and 8 percentage points of discharge, it can estimate an equivalent full-runtime value. A completed qualifying battery session is folded into the persistent model with a conservative EMA (25% new session / 75% previous model). The active session and learned model are checkpointed to flash every `battery_learning_save_interval` (default `30min`) and on session completion, so an overnight run or reboot does not discard the calibration data. The production `Battery Runtime Estimate` blends the persistent model with the recent discharge-rate estimate; before a learned model exists it behaves like the original recent-rate estimator.
+
+With `debug_metrics: true`, `Battery Learned Full Runtime`, `Battery Learning Progress`, and `Battery Learning Cycles` expose the learning state. `Battery Learning Progress` reaches 100% when the current session has both at least 2 hours of data and at least 8 percentage points of SOC drop. The model intentionally learns effective runtime rather than claiming to measure true battery capacity in mAh; without a coulomb counter the voltage/SOC curve cannot provide that measurement reliably.
 
 On battery, the estimator uses the normal voltage-derived SOC curve. With USB present, `Battery Level` stays unavailable and the charge estimator uses the charger-influenced battery-node voltage only as a charge-progress proxy. The charge ETA is therefore inherently less accurate, especially in the constant-voltage/taper region near full charge.
 
@@ -299,6 +303,7 @@ co2_monitor_0601:
   battery_pin: 2
   battery_divider_ratio: 2.0
   battery_update_interval: 60s
+  battery_learning_save_interval: 30min
   usb_power_pin: 5
 
   # Startup
@@ -355,7 +360,7 @@ Battery operation prioritizes low average power:
 - after the RT/RH wake window is complete, the ESP may return to Light Sleep; CO₂ traffic alone does not wake it
 - Wi-Fi uses `WIFI_PS_MIN_MODEM`
 - Home Assistant publication is throttled to the latest values, default once per minute
-- BLE advertisements use the battery interval, default `5s`
+- BLE advertisements use the battery interval, default `3s`
 
 The corresponding options are:
 

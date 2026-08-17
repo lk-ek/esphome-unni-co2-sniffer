@@ -584,3 +584,14 @@ The normal Home Assistant entity defaults were shortened from `Air Temperature` 
 - Treat RT/RH capture completion separately from measurement validity so a rejected capture can close the light-sleep awake window instead of waiting for the 10 s timeout.
 - Stop publishing temperature views from full-capture rejects such as `RH_DURATION`. Temperature retention is now limited to RH-local reject reasons and requires RT/REF to remain within 0.10 of the last accepted ratio.
 - This specifically prevents the observed battery-mode wake glitches (`RT/REF` jumping from about 2.26 to 2.02) from producing false `Temperature` jumps around 24 C.
+
+
+### 2026-08-17: Persistent self-learning battery runtime
+
+- Add a flash-backed battery-runtime learning model on top of the existing short-term voltage/SOC discharge-rate estimator.
+- Accumulate real battery-session elapsed time and SOC drop; sessions become learning-qualified after at least 2 h and 8 percentage points of discharge.
+- Fold completed qualifying sessions into an equivalent full-runtime model using a 25% EMA contribution from the new session.
+- Checkpoint the active session and learned model to ESPHome preferences every 30 minutes by default (`battery_learning_save_interval`) and force-save on session completion.
+- Blend the learned full-runtime model with the recent discharge-rate ETA for the production `Battery Runtime Estimate`; fall back to the recent estimator until learning data exists.
+- Add debug entities for learned full runtime, current learning progress and completed learning cycles.
+- The model deliberately learns effective runtime, not mAh capacity, because battery voltage alone is not a coulomb counter.

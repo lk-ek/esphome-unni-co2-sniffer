@@ -67,6 +67,10 @@ CONF_BATTERY_RUNTIME_ESTIMATE = "battery_runtime_estimate"
 CONF_BATTERY_CHARGE_TIME_ESTIMATE = "battery_charge_time_estimate"
 CONF_BATTERY_DISCHARGE_RATE = "battery_discharge_rate"
 CONF_BATTERY_CHARGE_RATE = "battery_charge_rate"
+CONF_BATTERY_LEARNED_FULL_RUNTIME = "battery_learned_full_runtime"
+CONF_BATTERY_LEARNING_PROGRESS = "battery_learning_progress"
+CONF_BATTERY_LEARNING_CYCLES = "battery_learning_cycles"
+CONF_BATTERY_LEARNING_SAVE_INTERVAL = "battery_learning_save_interval"
 CONF_USB_POWER_PIN = "usb_power_pin"
 CONF_USB_POWER = "usb_power"
 CONF_ENERGY_SAVE_MODE = "energy_save_mode"
@@ -231,6 +235,32 @@ SENSOR_OUTPUTS = {
         ),
         "set_battery_charge_rate_sensor",
     ),
+    CONF_BATTERY_LEARNED_FULL_RUNTIME: (
+        _diagnostic_sensor(
+            unit_of_measurement="h",
+            accuracy_decimals=1,
+            state_class="measurement",
+            icon="mdi:battery-sync-outline",
+        ),
+        "set_battery_learned_full_runtime_sensor",
+    ),
+    CONF_BATTERY_LEARNING_PROGRESS: (
+        _diagnostic_sensor(
+            unit_of_measurement="%",
+            accuracy_decimals=0,
+            state_class="measurement",
+            icon="mdi:progress-clock",
+        ),
+        "set_battery_learning_progress_sensor",
+    ),
+    CONF_BATTERY_LEARNING_CYCLES: (
+        _diagnostic_sensor(
+            accuracy_decimals=0,
+            state_class="total_increasing",
+            icon="mdi:counter",
+        ),
+        "set_battery_learning_cycles_sensor",
+    ),
     CONF_REF_PERIOD: (
         _diagnostic_sensor(unit_of_measurement="µs", accuracy_decimals=3, state_class="measurement"),
         "set_ref_period_sensor",
@@ -353,6 +383,7 @@ _SCHEMA = {
     cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
     cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
+    cv.Optional(CONF_BATTERY_LEARNING_SAVE_INTERVAL, default="30min"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_USB_POWER_PIN, default=5): cv.int_range(min=0, max=21),
     cv.Optional(CONF_ENERGY_SAVE_MODE_DEFAULT, default=False): cv.boolean,
     cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
@@ -393,6 +424,9 @@ DEBUG_SENSOR_DEFAULTS = {
     CONF_MEASUREMENT_QUALITY: {"name": "RT RH Measurement Quality"},
     CONF_BATTERY_DISCHARGE_RATE: {"name": "Battery Discharge Rate"},
     CONF_BATTERY_CHARGE_RATE: {"name": "Battery Charge Rate"},
+    CONF_BATTERY_LEARNED_FULL_RUNTIME: {"name": "Battery Learned Full Runtime"},
+    CONF_BATTERY_LEARNING_PROGRESS: {"name": "Battery Learning Progress"},
+    CONF_BATTERY_LEARNING_CYCLES: {"name": "Battery Learning Cycles"},
 }
 
 DEBUG_BINARY_DEFAULTS = {
@@ -526,6 +560,7 @@ async def to_code(config):
     cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))
     cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))
     cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))
+    cg.add(var.set_battery_learning_save_interval(config[CONF_BATTERY_LEARNING_SAVE_INTERVAL]))
     cg.add(var.set_usb_power_pin(config[CONF_USB_POWER_PIN]))
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
     cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
