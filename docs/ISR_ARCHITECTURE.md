@@ -225,7 +225,7 @@ Important members are:
 - `phase`: REF, RT or RH
 - `ref`, `rt`, `rh`: accumulated RT period sums/counts
 - `rt_temperature_*`: first 880 RT periods used for temperature
-- `rh_state`: RH-state recurrence samples used for the RH median
+- `rh_state`: legacy RH-state recurrence samples retained for diagnostics; production RH uses the RH carrier period
 - `snapshot`: completed measurement handed to normal task context
 
 ## Phase selection is time-based

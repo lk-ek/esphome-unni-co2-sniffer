@@ -1030,13 +1030,14 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   ESP_LOGI(TAG, "RT/RH measurement %lu RT: %.3f / REF %.3f us = %.6f -> %.2f C",
            static_cast<unsigned long>(m.sequence), m.rt_period_us, m.ref_period_us,
            m.rt_ratio, m.temperature_c);
-  ESP_LOGI(TAG, "RT/RH measurement %lu RH: state %.3f / REF %.3f us = %.6f -> %.1f %%",
-           static_cast<unsigned long>(m.sequence), m.rh_state_us, m.ref_period_us,
+  ESP_LOGI(TAG,
+           "RT/RH measurement %lu RH: carrier %.3f / REF %.3f us = %.6f -> %.1f %%",
+           static_cast<unsigned long>(m.sequence), m.rh_carrier_period_us, m.ref_period_us,
            m.rh_ratio, m.humidity_percent);
 
   if (this->debug_metrics_) {
     ESP_LOGI(TAG,
-             "RT/RH diagnostics %lu: quality %.0f%%, ln(RH/REF)=%.6f, |dT/dt|=%.2f C/min, "
+             "RT/RH diagnostics %lu: quality %.0f%%, ln(RH carrier/REF)=%.6f, |dT/dt|=%.2f C/min, "
              "thermal_transient=%s, T_extrap=%s, RH_extrap=%s",
              static_cast<unsigned long>(m.sequence), m.quality_percent, m.rh_log,
              temperature_rate, m.thermal_transient ? "YES" : "no",

@@ -544,3 +544,12 @@ High-humidity captures showed nearly equal RT/RH edge counts while the combined
 the RH phase and export of signed RH-minus-RT phase medians and carrier-normalized
 phase. The new metric is observational only until enough display-referenced
 captures exist to establish a robust humidity mapping.
+
+
+## 2026-08-17 — Carrier-based RH production decoder
+
+High-humidity captures showed that both RT and RH carriers remained present even
+when the legacy `RT=0, RH=1` recurrence state vanished. RH publication was moved
+to `RH carrier period / REF period` with a new temperature-compensated carrier-v1
+fit. Carrier count/period and edge balance now drive RH validity/quality; the old
+state recurrence and direct phase measurements remain diagnostics.

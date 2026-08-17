@@ -17,7 +17,7 @@ namespace calibration {
  * It measures two normalized quantities:
  *
  *   rt_ratio = RT_period / REF_period
- *   rh_ratio = RH_state_period / REF_period
+ *   rh_ratio = RH_carrier_period / REF_period
  *
  * This module converts those ratios to engineering units.  Keeping the model
  * here means a future refit only changes this file, not the timing decoder.
@@ -36,23 +36,33 @@ namespace calibration {
 inline constexpr float TEMP_RATIO_M = -23.024269f;
 inline constexpr float TEMP_RATIO_C = 69.883663f;
 
-// Relative-humidity calibration (v4):
-//   x  = ln(rh_ratio)
+// Relative-humidity calibration (carrier v1, 2026-08-17):
+//   r  = RH_carrier_period / REF_period
+//   x  = ln(r)
 //   RH = A*x^2 + B*x + C*T + D
 //
-// These are intentionally unchanged from the validated v4 model.
-inline constexpr float RH_LOG2_A = 6.11947870f;
-inline constexpr float RH_LOG_B = -33.93748066f;
-inline constexpr float RH_TEMP_C = -0.48564674f;
-inline constexpr float RH_OFFSET = 93.38516444f;
+// The previous production decoder used recurrence of the combined RT=0/RH=1
+// state. That state disappears when RT and RH become nearly phase-aligned at
+// high humidity even though both carriers remain clean. The carrier period is
+// directly observable across the tested range and is now the production RH
+// quantity.
+//
+// Initial fit points cover approximately 30..68 %RH and 19..34 degC decoded
+// temperature, including both ordinary and deliberately heated captures. This
+// is a provisional v1 fit and should be refined with additional stationary
+// measurements.
+inline constexpr float RH_LOG2_A = 3.470f;
+inline constexpr float RH_LOG_B = -24.495f;
+inline constexpr float RH_TEMP_C = -0.4357f;
+inline constexpr float RH_OFFSET = 83.245f;
 
 // Approximate stationary calibration envelope currently backed by measurements.
 // Values outside this envelope are still converted; the caller may expose the
 // extrapolation flag diagnostically.
 inline constexpr float CAL_TEMP_MIN_C = 18.0f;
-inline constexpr float CAL_TEMP_MAX_C = 24.0f;
-inline constexpr float CAL_RH_RATIO_MIN = 3.20f;
-inline constexpr float CAL_RH_RATIO_MAX = 8.20f;
+inline constexpr float CAL_TEMP_MAX_C = 35.0f;
+inline constexpr float CAL_RH_RATIO_MIN = 1.30f;
+inline constexpr float CAL_RH_RATIO_MAX = 9.20f;
 
 inline float temperature_from_ratio(float rt_ratio) {
   return TEMP_RATIO_M * rt_ratio + TEMP_RATIO_C;

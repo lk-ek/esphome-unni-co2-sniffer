@@ -329,7 +329,7 @@ Normal USB operation prioritizes responsiveness and reliability:
 - Wi-Fi power saving is disabled at runtime with `WIFI_PS_NONE`
 - CO₂ I²C capture remains continuously enabled
 - valid CO₂ measurements are published immediately
-- valid RT temperature is published immediately; RH is published when its RH tail also validates
+- valid RT temperature is published immediately; RH is published when its carrier timing also validates
 - BLE advertisements use the USB interval, default `2s`
 
 Because USB power is available, reducing ESP consumption is not the priority in this mode.
@@ -688,17 +688,26 @@ The current temperature fit is provisional and is being refined from stable Unni
 
 ## Humidity
 
-The production RH decoder currently uses the recurrence of the combined `RT=0, RH=1` state during the RH phase. This worked over the originally calibrated range, but captures around 67–69 %RH show both RT and RH continuing to oscillate while that intermediate combined state becomes too short to observe reliably. In that case humidity is intentionally rejected rather than guessed.
+Humidity is decoded from the **RH-phase carrier period normalized by REF**:
 
-Debug builds therefore also measure, without yet using these values for RH publication:
+```text
+rh_ratio = rh_carrier_period / ref_period
+x = ln(rh_ratio)
+RH = A*x^2 + B*x + C*T + D
+```
 
-- RT-derived carrier period during the RH phase;
-- RT and RH rising/falling edge counts;
-- direct signed RT↔RH edge separation for corresponding rising and falling edges;
-- normalized phase separation relative to the RH carrier period;
-- the historical combined-state timing and distribution.
+This replaces the older recurrence-based `RT=0, RH=1` state decoder. Around 60–70 %RH the RT and RH carriers become nearly phase-aligned, making that short combined state disappear from GPIO sampling even though both physical carrier signals remain clean. The carrier period itself remains directly measurable across the tested range, including those high-humidity captures.
 
-For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 35 µs, which avoids joining a neighboring carrier cycle. The rising-edge median is treated as the primary calibration diagnostic and is also exported normalized by the RH carrier period; falling-edge and combined-mean values remain secondary diagnostics. All phase metrics are logged and exported to `rtrh_timing.csv` so a more robust humidity mapping can be calibrated before replacing the existing decoder.
+The initial carrier-v1 calibration is based on measurements spanning roughly 30–68 %RH and intentionally heated temperature sweeps. It is suitable for production testing but should still be refined with additional stationary calibration points. The old RH-state interval, its distribution, edge counts, and direct RT↔RH phase offsets remain available as diagnostics and no longer determine whether humidity is valid.
+
+Debug builds also report:
+
+- RH carrier period and `carrier/REF` ratio;
+- RT and RH rising/falling edge counts during the RH phase;
+- the legacy combined-state recurrence timing for comparison;
+- direct signed RT↔RH edge separation for corresponding rising and falling edges.
+
+For the direct phase diagnostic, positive `RH-RT` values mean the RH edge followed the corresponding RT edge; negative values mean RH led RT. Corresponding edges are paired only when they occur within 35 µs. Phase is diagnostic only; the production humidity observable is the carrier period.
 
 With `debug_metrics: true`, Home Assistant exposes additional timing, quality, temperature-rate and calibration/extrapolation diagnostics. With `debug_capture: true`, raw and timing data are available over UDP and the debug HTTP endpoints.
 

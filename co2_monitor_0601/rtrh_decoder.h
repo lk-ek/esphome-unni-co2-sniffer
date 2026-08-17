@@ -26,6 +26,8 @@ enum class RejectReason : uint8_t {
   RH_TOO_FEW_SAMPLES,
   RH_STATE_PERIOD,
   RH_RATIO_IMPLAUSIBLE,
+  RH_CARRIER_COUNT,
+  RH_CARRIER_PERIOD,
 };
 
 const char *reject_reason_to_string(RejectReason reason);
@@ -54,14 +56,13 @@ struct Measurement {
   uint16_t rh_rh_rise_edges{0};
   uint16_t rh_rh_fall_edges{0};
 
-  // Experimental direct phase timing between corresponding RT and RH edges
-  // during the RH phase. Positive values mean RH follows RT; negative values
-  // mean RH leads RT. These diagnostics do not affect RH publication yet.
+  // Direct phase diagnostics between corresponding RT and RH edges during the
+  // RH phase. Positive values mean RH follows RT; negative values mean RH leads
+  // RT. These remain diagnostics and do not affect RH publication.
   float rh_phase_rise_us{NAN};
   float rh_phase_fall_us{NAN};
   float rh_phase_mean_us{NAN};
-  // Primary phase diagnostic for future RH calibration: rising-edge RH-RT
-  // offset normalized by the RH carrier period.
+  // Rising-edge phase diagnostic normalized by the RH carrier period.
   float rh_phase_rise_carrier_ratio{NAN};
   uint8_t rh_phase_rise_samples{0};
   uint8_t rh_phase_fall_samples{0};
@@ -82,6 +83,7 @@ struct Measurement {
   uint8_t rh_state_other{0};
 
   float rt_ratio{NAN};
+  // Production RH ratio: RH carrier period / REF period.
   float rh_ratio{NAN};
   float rh_log{NAN};
   float temperature_c{NAN};

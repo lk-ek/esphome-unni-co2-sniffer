@@ -92,10 +92,15 @@ static constexpr float RT_DURATION_MAX_MS = 130.0f;
 static constexpr uint16_t RT_COUNT_MIN = 600;
 static constexpr float RH_DURATION_MIN_MS = 127.0f;
 static constexpr float RH_DURATION_MAX_MS = 134.0f;
-static constexpr uint8_t RH_STATE_SAMPLES_MIN = 32;
-static constexpr float RH_STATE_MIN_US = 40.0f;
-static constexpr float RH_STATE_MAX_US = 60000.0f;
-static constexpr float RH_RATIO_VALID_MAX = 20.0f;
+// RH production validity is carrier-based. State recurrence remains only as a
+// diagnostic for comparison with older captures. The observed carrier spans
+// roughly 100..700 us over the current calibration data, so keep deliberately
+// wider acceptance limits while rejecting obviously incomplete captures.
+static constexpr uint16_t RH_CARRIER_COUNT_MIN = 120;
+static constexpr float RH_CARRIER_PERIOD_MIN_US = 80.0f;
+static constexpr float RH_CARRIER_PERIOD_MAX_US = 1000.0f;
+static constexpr float RH_RATIO_VALID_MIN = 1.0f;
+static constexpr float RH_RATIO_VALID_MAX = 13.0f;
 
 const char *reject_reason_to_string(RejectReason reason) {
   switch (reason) {
@@ -109,6 +114,8 @@ const char *reject_reason_to_string(RejectReason reason) {
     case RejectReason::RH_TOO_FEW_SAMPLES: return "RH_TOO_FEW_SAMPLES";
     case RejectReason::RH_STATE_PERIOD: return "RH_STATE_PERIOD";
     case RejectReason::RH_RATIO_IMPLAUSIBLE: return "RH_RATIO_IMPLAUSIBLE";
+    case RejectReason::RH_CARRIER_COUNT: return "RH_CARRIER_COUNT";
+    case RejectReason::RH_CARRIER_PERIOD: return "RH_CARRIER_PERIOD";
   }
   return "UNKNOWN";
 }
@@ -684,12 +691,14 @@ static bool humidity_is_valid(const Measurement &m) {
   if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
       m.rh_duration_ms > RH_DURATION_MAX_MS)
     return false;
-  if (m.rh_state_samples < RH_STATE_SAMPLES_MIN) return false;
-  if (!std::isfinite(m.rh_state_us) || m.rh_state_us < RH_STATE_MIN_US ||
-      m.rh_state_us > RH_STATE_MAX_US)
+  if (m.rh_carrier_count < RH_CARRIER_COUNT_MIN) return false;
+  if (!std::isfinite(m.rh_carrier_period_us) ||
+      m.rh_carrier_period_us < RH_CARRIER_PERIOD_MIN_US ||
+      m.rh_carrier_period_us > RH_CARRIER_PERIOD_MAX_US)
     return false;
-  return std::isfinite(m.rh_ratio) && m.rh_ratio > 0.0f &&
-         m.rh_ratio <= RH_RATIO_VALID_MAX;
+  return std::isfinite(m.rh_carrier_ref_ratio) &&
+         m.rh_carrier_ref_ratio >= RH_RATIO_VALID_MIN &&
+         m.rh_carrier_ref_ratio <= RH_RATIO_VALID_MAX;
 }
 
 static RejectReason reject_reason(const Measurement &m) {
@@ -709,11 +718,14 @@ static RejectReason reject_reason(const Measurement &m) {
   if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
       m.rh_duration_ms > RH_DURATION_MAX_MS)
     return RejectReason::RH_DURATION;
-  if (m.rh_state_samples < RH_STATE_SAMPLES_MIN) return RejectReason::RH_TOO_FEW_SAMPLES;
-  if (!std::isfinite(m.rh_state_us) || m.rh_state_us < RH_STATE_MIN_US ||
-      m.rh_state_us > RH_STATE_MAX_US)
-    return RejectReason::RH_STATE_PERIOD;
-  if (!std::isfinite(m.rh_ratio) || m.rh_ratio <= 0.0f || m.rh_ratio > RH_RATIO_VALID_MAX)
+  if (m.rh_carrier_count < RH_CARRIER_COUNT_MIN) return RejectReason::RH_CARRIER_COUNT;
+  if (!std::isfinite(m.rh_carrier_period_us) ||
+      m.rh_carrier_period_us < RH_CARRIER_PERIOD_MIN_US ||
+      m.rh_carrier_period_us > RH_CARRIER_PERIOD_MAX_US)
+    return RejectReason::RH_CARRIER_PERIOD;
+  if (!std::isfinite(m.rh_carrier_ref_ratio) ||
+      m.rh_carrier_ref_ratio < RH_RATIO_VALID_MIN ||
+      m.rh_carrier_ref_ratio > RH_RATIO_VALID_MAX)
     return RejectReason::RH_RATIO_IMPLAUSIBLE;
   return RejectReason::NONE;
 }
@@ -721,16 +733,19 @@ static RejectReason reject_reason(const Measurement &m) {
 static float quality_score(const Measurement &m) {
   const float ref_score = std::fmax(0.0f, 1.0f - std::fabs(m.ref_period_us - 76.75f) / 2.0f);
   const float rt_score = std::fmin(1.0f, static_cast<float>(m.rt_count) / 880.0f);
-  const float rh_fill_score = std::fmin(1.0f, static_cast<float>(m.rh_state_samples) / 96.0f);
+  const float carrier_score = std::fmin(1.0f, static_cast<float>(m.rh_carrier_count) / 180.0f);
 
-  float rh_seen_score = 1.0f;
-  if (m.rh_state_seen > 0) {
-    const float ratio = static_cast<float>(m.rh_state_seen) / static_cast<float>(m.rh_state_samples);
-    rh_seen_score = std::fmin(1.0f, ratio / 2.0f);
+  const uint16_t rt_edges = m.rh_rt_rise_edges + m.rh_rt_fall_edges;
+  const uint16_t rh_edges = m.rh_rh_rise_edges + m.rh_rh_fall_edges;
+  float edge_balance_score = 0.0f;
+  if (rt_edges && rh_edges) {
+    const float hi = static_cast<float>(std::max(rt_edges, rh_edges));
+    const float lo = static_cast<float>(std::min(rt_edges, rh_edges));
+    edge_balance_score = lo / hi;
   }
 
   return 100.0f * (0.25f * ref_score + 0.30f * rt_score +
-                   0.30f * rh_fill_score + 0.15f * rh_seen_score);
+                   0.30f * carrier_score + 0.15f * edge_balance_score);
 }
 
 static Measurement derive(const Snapshot &s) {
@@ -777,8 +792,10 @@ static Measurement derive(const Snapshot &s) {
   m.rh_state_us = rh_state_period_median(s.rh_state);
   derive_rh_distribution(s.rh_state, m);
   m.rt_ratio = m.ref_period_us > 0.0f ? m.rt_period_us / m.ref_period_us : NAN;
-  m.rh_ratio = m.ref_period_us > 0.0f && m.rh_state_us > 0.0f
-                   ? m.rh_state_us / m.ref_period_us : NAN;
+  // Production RH observable: carrier period normalized by REF. The old
+  // state-recurrence value is intentionally retained only in rh_state_us and
+  // its distribution diagnostics.
+  m.rh_ratio = m.rh_carrier_ref_ratio;
 
   m.temperature_valid = temperature_is_valid(m);
   m.humidity_valid = humidity_is_valid(m);
@@ -795,7 +812,7 @@ static Measurement derive(const Snapshot &s) {
   }
 
   if (!m.humidity_valid) {
-    // A broken RH tail must not discard an otherwise trustworthy REF/RT
+    // A broken RH carrier must not discard an otherwise trustworthy REF/RT
     // temperature. Humidity remains invalid and is not converted/published.
     m.humidity_extrapolation = true;
     m.calibration_extrapolation = true;
