@@ -64,7 +64,7 @@ bool process_frame(const i2c_sniffer::Frame &frame, Result &result) {
 
   // Preserve the previous decoder behavior: every read from the observed CO2
   // address is treated as the measurement response candidate.
-  if (frame.length < 3) {
+  if (frame.length != 3 || frame.end_condition != i2c_sniffer::EndCondition::Stop) {
     result.frame_errors++;
     return true;
   }
@@ -83,6 +83,49 @@ bool process_frame(const i2c_sniffer::Frame &frame, Result &result) {
   result.co2_ppm = (static_cast<uint16_t>(msb) << 8) | lsb;
   result.have_co2 = true;
   return true;
+}
+
+
+bool process_capture(const i2c_sniffer::Capture &capture, Result &result) {
+  bool measurement_armed = false;
+  result.frame_errors += capture.frame_errors;
+
+  for (uint8_t i = 0; i < capture.frame_count; i++) {
+    const auto &frame = capture.frames[i];
+    if (!i2c_sniffer::frame_valid(frame)) {
+      // poll() already accounts structural failures in capture.frame_errors.
+      measurement_armed = false;
+      continue;
+    }
+    if (frame.address != CO2_I2C_ADDRESS) continue;
+
+    if (frame.direction == i2c_sniffer::Direction::Write) {
+      const bool valid_command =
+          frame.address_ack && frame.length == 2 &&
+          frame.data[0] == 0xEC && frame.data[1] == 0x05 &&
+          frame.ack[0] && frame.ack[1] &&
+          frame.end_condition == i2c_sniffer::EndCondition::Stop;
+      if (valid_command) {
+        measurement_armed = true;
+      } else {
+        // Only malformed frames that look like the observed measurement
+        // command are protocol errors. Other writes to 0x62 are unrelated.
+        if (frame.length >= 1 && frame.data[0] == 0xEC) result.frame_errors++;
+        measurement_armed = false;
+      }
+      continue;
+    }
+
+    // Never accept an arbitrary CRC-valid read from 0x62 as a CO2 sample.
+    if (!measurement_armed) {
+      result.frame_errors++;
+      continue;
+    }
+    measurement_armed = false;
+    process_frame(frame, result);
+  }
+
+  return result.have_co2;
 }
 
 }  // namespace co2_decoder

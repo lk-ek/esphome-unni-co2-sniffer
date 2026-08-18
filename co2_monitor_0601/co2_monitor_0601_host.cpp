@@ -305,6 +305,215 @@ bool CO2Monitor0601::run_battery_power_policy_tests_() {
 }
 
 
+
+bool CO2Monitor0601::run_co2_decoder_hardening_tests_() {
+  using namespace i2c_sniffer;
+
+  struct Sample {
+    std::string source;
+    uint16_t ppm;
+    uint8_t msb;
+    uint8_t lsb;
+    uint8_t crc;
+  };
+
+  const char *fixture_path = "tests/host/fixtures/co2_current_260817.csv";
+  std::ifstream input(fixture_path);
+  if (!input.is_open()) {
+    ESP_LOGE(TAG, "CO2 hardening: cannot open %s", fixture_path);
+    return false;
+  }
+
+  std::string line;
+  if (!std::getline(input, line)) return false;
+  std::vector<Sample> samples;
+  size_t line_no = 1;
+  while (std::getline(input, line)) {
+    line_no++;
+    if (line.empty()) continue;
+    const auto f = split_csv_line(line);
+    if (f.size() != 5) {
+      ESP_LOGE(TAG, "CO2 hardening: malformed corpus line %u", static_cast<unsigned>(line_no));
+      return false;
+    }
+    int ppm = 0, msb = 0, lsb = 0, crc = 0;
+    if (!parse_int(f[1], ppm) || !parse_int(f[2], msb) || !parse_int(f[3], lsb) || !parse_int(f[4], crc) ||
+        ppm < 0 || ppm > 65535 || msb < 0 || msb > 255 || lsb < 0 || lsb > 255 || crc < 0 || crc > 255 ||
+        ppm != ((msb << 8) | lsb)) {
+      ESP_LOGE(TAG, "CO2 hardening: invalid corpus line %u", static_cast<unsigned>(line_no));
+      return false;
+    }
+    samples.push_back({f[0], static_cast<uint16_t>(ppm), static_cast<uint8_t>(msb), static_cast<uint8_t>(lsb),
+                       static_cast<uint8_t>(crc)});
+  }
+  if (samples.size() < 50) {
+    ESP_LOGE(TAG, "CO2 hardening: only %u current I2C samples", static_cast<unsigned>(samples.size()));
+    return false;
+  }
+
+  auto make_capture = [](const Sample &sample) {
+    Capture capture{};
+    capture.frame_count = 2;
+    auto &command = capture.frames[0];
+    command.address = 0x62;
+    command.direction = Direction::Write;
+    command.address_ack = true;
+    command.length = 2;
+    command.data[0] = 0xEC;
+    command.data[1] = 0x05;
+    command.ack[0] = true;
+    command.ack[1] = true;
+    command.end_condition = EndCondition::Stop;
+
+    auto &response = capture.frames[1];
+    response.address = 0x62;
+    response.direction = Direction::Read;
+    response.address_ack = true;
+    response.length = 3;
+    response.data[0] = sample.msb;
+    response.data[1] = sample.lsb;
+    response.data[2] = sample.crc;
+    response.ack[0] = true;
+    response.ack[1] = true;
+    response.ack[2] = false;
+    response.end_condition = EndCondition::Stop;
+    return capture;
+  };
+
+  // Every independently recovered CRC-valid response from the current raw
+  // edge-capture archive must still decode when paired with the observed EC05
+  // command. This provides real-wire provenance without putting raw captures
+  // into the repository.
+  for (const auto &sample : samples) {
+    const Capture capture = make_capture(sample);
+    co2_decoder::Result result{};
+    if (!co2_decoder::validate_measurement_capture(capture) ||
+        !co2_decoder::process_capture(capture, result) || !result.have_co2 || result.co2_ppm != sample.ppm ||
+        result.crc_errors != 0 || result.frame_errors != 0) {
+      ESP_LOGE(TAG, "CO2 hardening: current capture rejected: %s", sample.source.c_str());
+      return false;
+    }
+  }
+
+  const Sample &base = samples.front();
+  const Capture pristine = make_capture(base);
+  auto expect_rejected = [&](Capture mutated, const char *label) {
+    co2_decoder::Result result{};
+    co2_decoder::process_capture(mutated, result);
+    if (result.have_co2) {
+      ESP_LOGE(TAG, "CO2 hardening: mutation accepted: %s", label);
+      return false;
+    }
+    // A bad capture must not poison a subsequent independent capture.
+    co2_decoder::Result recovered{};
+    if (!co2_decoder::process_capture(pristine, recovered) || !recovered.have_co2 || recovered.co2_ppm != base.ppm) {
+      ESP_LOGE(TAG, "CO2 hardening: failed to recover after mutation: %s", label);
+      return false;
+    }
+    return true;
+  };
+
+#define UNNI_EXPECT_REJECTED(expr, label) \
+  do {                                    \
+    Capture c = pristine;                 \
+    expr;                                 \
+    if (!expect_rejected(c, label)) return false; \
+  } while (0)
+
+  UNNI_EXPECT_REJECTED(c.frames[1].data[0] ^= 0x01, "response data bit flip");
+  UNNI_EXPECT_REJECTED(c.frames[1].data[1] ^= 0x80, "response data high-bit flip");
+  UNNI_EXPECT_REJECTED(c.frames[1].data[2] ^= 0x01, "CRC bit flip");
+  UNNI_EXPECT_REJECTED(c.frames[1].length = 2, "short response");
+  UNNI_EXPECT_REJECTED(c.frames[1].length = 4, "extra response byte");
+  UNNI_EXPECT_REJECTED(c.frames[1].address = 0x63, "wrong response address");
+  UNNI_EXPECT_REJECTED(c.frames[1].direction = Direction::Write, "wrong response direction");
+  UNNI_EXPECT_REJECTED(c.frames[1].address_ack = false, "response address NACK");
+  UNNI_EXPECT_REJECTED(c.frames[1].ack[0] = false, "response first data NACK");
+  UNNI_EXPECT_REJECTED(c.frames[1].ack[1] = false, "response second data NACK");
+  UNNI_EXPECT_REJECTED(c.frames[1].ack[2] = true, "response final ACK");
+  UNNI_EXPECT_REJECTED(c.frames[1].end_condition = EndCondition::CaptureEnd, "response without STOP");
+  UNNI_EXPECT_REJECTED(c.frames[0].data[0] = 0xED, "wrong command high byte");
+  UNNI_EXPECT_REJECTED(c.frames[0].data[1] = 0x04, "wrong command low byte");
+  UNNI_EXPECT_REJECTED(c.frames[0].length = 1, "short command");
+  UNNI_EXPECT_REJECTED(c.frames[0].length = 3, "extra command byte");
+  UNNI_EXPECT_REJECTED(c.frames[0].address = 0x63, "wrong command address");
+  UNNI_EXPECT_REJECTED(c.frames[0].direction = Direction::Read, "wrong command direction");
+  UNNI_EXPECT_REJECTED(c.frames[0].address_ack = false, "command address NACK");
+  UNNI_EXPECT_REJECTED(c.frames[0].ack[0] = false, "command first data NACK");
+  UNNI_EXPECT_REJECTED(c.frames[0].ack[1] = false, "command second data NACK");
+  UNNI_EXPECT_REJECTED(c.frames[0].end_condition = EndCondition::RepeatedStart, "command repeated START");
+  UNNI_EXPECT_REJECTED(c.frame_count = 1; c.frames[0] = c.frames[1], "read without EC05 command");
+  UNNI_EXPECT_REJECTED(c.frames[0].status = FrameStatus::IncompleteByte; c.frame_errors = 1,
+                       "structurally malformed command");
+  UNNI_EXPECT_REJECTED(c.frames[1].status = FrameStatus::Truncated; c.frame_errors = 1,
+                       "structurally malformed response");
+#undef UNNI_EXPECT_REJECTED
+
+  // Unrelated traffic may surround a valid exchange but must never itself
+  // arm a measurement response.
+  {
+    Capture c{};
+    c.frame_count = 3;
+    c.frames[0].address = 0x40;
+    c.frames[0].direction = Direction::Write;
+    c.frames[0].address_ack = true;
+    c.frames[0].length = 1;
+    c.frames[0].data[0] = 0xAA;
+    c.frames[0].ack[0] = true;
+    c.frames[0].end_condition = EndCondition::Stop;
+    c.frames[1] = pristine.frames[0];
+    c.frames[2] = pristine.frames[1];
+    co2_decoder::Result result{};
+    if (!co2_decoder::process_capture(c, result) || result.co2_ppm != base.ppm) {
+      ESP_LOGE(TAG, "CO2 hardening: unrelated traffic broke valid exchange");
+      return false;
+    }
+  }
+
+  // Deterministic structural mutation campaign. Every mutation is deliberately
+  // validity-destroying; the assertion is therefore stronger than "no crash":
+  // none may publish a CO2 value, and a clean frame must decode immediately
+  // afterwards. ASan/UBSan runs this same campaign.
+  uint32_t rng = 0x0601C02u;
+  constexpr uint32_t MUTATIONS = 20000;
+  for (uint32_t i = 0; i < MUTATIONS; i++) {
+    rng = rng * 1664525u + 1013904223u;
+    const Sample &sample = samples[(rng >> 8) % samples.size()];
+    Capture c = make_capture(sample);
+    switch (rng % 18u) {
+      case 0: c.frames[1].data[0] ^= static_cast<uint8_t>(1u << ((rng >> 16) & 7u)); break;
+      case 1: c.frames[1].data[1] ^= static_cast<uint8_t>(1u << ((rng >> 19) & 7u)); break;
+      case 2: c.frames[1].data[2] ^= static_cast<uint8_t>(1u << ((rng >> 22) & 7u)); break;
+      case 3: c.frames[1].length = 2; break;
+      case 4: c.frames[1].length = 4; c.frames[1].data[3] = static_cast<uint8_t>(rng >> 24); break;
+      case 5: c.frames[1].address ^= 0x01; break;
+      case 6: c.frames[1].direction = Direction::Write; break;
+      case 7: c.frames[1].address_ack = false; break;
+      case 8: c.frames[1].ack[(rng >> 12) & 1u] = false; break;
+      case 9: c.frames[1].ack[2] = true; break;
+      case 10: c.frames[1].end_condition = EndCondition::CaptureEnd; break;
+      case 11: c.frames[0].data[(rng >> 12) & 1u] ^= 0x01; break;
+      case 12: c.frames[0].length = 1; break;
+      case 13: c.frames[0].length = 3; c.frames[0].data[2] = 0; break;
+      case 14: c.frames[0].address ^= 0x01; break;
+      case 15: c.frames[0].address_ack = false; break;
+      case 16: c.frames[0].ack[(rng >> 12) & 1u] = false; break;
+      case 17: c.frames[0].end_condition = EndCondition::RepeatedStart; break;
+    }
+    co2_decoder::Result result{};
+    co2_decoder::process_capture(c, result);
+    if (result.have_co2) {
+      ESP_LOGE(TAG, "CO2 hardening: deterministic mutation %u published %u ppm",
+               static_cast<unsigned>(i), static_cast<unsigned>(result.co2_ppm));
+      return false;
+    }
+  }
+
+  ESP_LOGI(TAG, "CO2 hardening: %u current responses + %u deterministic mutations passed",
+           static_cast<unsigned>(samples.size()), static_cast<unsigned>(MUTATIONS));
+  return true;
+}
+
 bool CO2Monitor0601::run_capture_regression_tests_() {
   // Archived RT/RH timing captures from the 2026-08-11 reverse-engineering
   // sessions. These are intentionally kept as measured timing summaries rather
@@ -629,6 +838,15 @@ void CO2Monitor0601::setup() {
   std::fflush(stderr);
   if (!this->run_battery_power_policy_tests_()) {
     std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED battery-policy\n");
+    std::fflush(stderr);
+    this->mark_failed();
+    return;
+  }
+
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE co2-hardening\n");
+  std::fflush(stderr);
+  if (!this->run_co2_decoder_hardening_tests_()) {
+    std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED co2-hardening\n");
     std::fflush(stderr);
     this->mark_failed();
     return;

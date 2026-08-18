@@ -14,6 +14,7 @@ setter surface as the ESP32 implementation. At startup it:
 
 - verifies a known-good EC05/500 ppm capture;
 - verifies rejection/accounting of a bad Sensirion CRC;
+- runs a current-hardware CO2 corpus plus strict negative and deterministic mutation tests;
 - exercises the shared RT/RH calibration functions and range invariants;
 - runs both legacy and current-hardware measured RT/RH regression corpora;
 - publishes deterministic fixture values to any entities enabled by that YAML
@@ -82,6 +83,19 @@ used for the generated build flags, the matrix stops with a focused diagnostic.
 
 ESPHome's generated `esphome.h` includes component headers even when their ESP32-only `.cpp` files are filtered out. Public component headers therefore remain parseable on `host:`: ESP-IDF-only includes live behind platform guards, while the native shim supplies the codegen-facing component API. This keeps the host matrix useful without pretending to emulate GPIO/ISR/PM/BLE hardware.
 
+
+
+## Current-hardware CO2 I2C corpus and hardening tests
+
+`tests/host/fixtures/co2_current_260817.csv` contains 86 CRC-valid CO2 response frames independently recovered from 331 raw GPIO-edge I2C CSV captures in `unni-captures-20260817-141938-135658.zip`. The compact fixture stores source filename, decoded ppm and the three response bytes; it is a wire/protocol regression corpus rather than an independent CO2 accuracy reference.
+
+The `co2-hardening` host phase pairs every retained response with the observed EC05 command and feeds it through the production capture decoder. It then verifies rejection of malformed command/response lengths, addresses, directions, ACK/NACK patterns, missing STOP conditions, CRC/data corruption, structural frame failures and reads without a preceding EC05 command. A fixed-seed 20,000-case mutation campaign runs the same production decoder and is repeated under ASan/UBSan. Each rejected mutation is followed by a pristine capture check so decoder recovery is also covered.
+
+The fixture can be regenerated from the raw archive with:
+
+```sh
+python3 tests/host/extract_co2_corpus.py /path/to/unni-captures-20260817-141938-135658.zip
+```
 
 ## Archived RT/RH capture regression
 

@@ -25,6 +25,11 @@ bool validate_measurement_capture(const i2c_sniffer::Capture &capture);
 // observed CO2 protocol, even when it is malformed and only updates diagnostics.
 bool process_frame(const i2c_sniffer::Frame &frame, Result &result);
 
+// Consume one quiet-period-delimited capture with command/response pairing.
+// A CO2 value is accepted only after a structurally valid EC05 write command
+// in the same capture. Unrelated I2C traffic is ignored.
+bool process_capture(const i2c_sniffer::Capture &capture, Result &result);
+
 }  // namespace co2_decoder
 }  // namespace co2_monitor_0601
 }  // namespace esphome
