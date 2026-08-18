@@ -15,6 +15,7 @@ setter surface as the ESP32 implementation. At startup it:
 - verifies a known-good EC05/500 ppm capture;
 - verifies rejection/accounting of a bad Sensirion CRC;
 - exercises the shared RT/RH calibration functions and range invariants;
+- runs both legacy and current-hardware measured RT/RH regression corpora;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
 - prints `UNNI HOST SELF-TEST PASSED` on success (including an explicitly flushed
@@ -97,3 +98,29 @@ The archived 2026-08-11 captures predate the final two-wire/10 kOhm sensor
 loading and therefore are not treated as current physical calibration truth.
 They are used as a broad real-world timing/input corpus. Current calibration
 coefficients remain documented separately under `docs/history/`.
+
+
+## Current-hardware RT/RH capture regression
+
+The runtime test additionally loads `tests/host/fixtures/rtrh_current_260817.csv`.
+It contains 256 valid measurements selected deterministically from the 2227
+timing records in `unni-captures-20260817-141938-135658.zip`. The source batch
+was captured on 2026-08-17/18 with the current two-wire RT/RH wiring, 10 kOhm
+series resistors and carrier-based RH decoder.
+
+Selection combines evenly spaced samples over the complete ~24 h batch with
+nearest samples to observed 0/1/5/10/25/50/75/90/95/99/100 percentiles for the
+main timing and engineering-unit dimensions. This gives a compact corpus while
+preserving temporal coverage, tails and extrema.
+
+For every selected point the host test reconstructs RT/REF and RH-carrier/REF
+ratios from measured periods, checks the rounded engineering-unit values that
+were recorded by the capture-time firmware, runs the production calibration
+functions, checks the frozen higher-precision outputs, verifies the supported
+air-temperature envelope, and verifies calibration-extrapolation
+classification.
+
+This is a regression corpus rather than independent calibration truth: the
+capture-time temperature/humidity columns were produced by the firmware.
+External-reference calibration measurements remain separate. A source summary
+and observed envelope are in `tests/host/fixtures/rtrh_current_260817.md`.

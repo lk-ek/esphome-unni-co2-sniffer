@@ -293,6 +293,139 @@ bool CO2Monitor0601::run_capture_regression_tests_() {
   return true;
 }
 
+
+bool CO2Monitor0601::run_current_capture_regression_tests_() {
+  // Compact deterministic sample of the 2026-08-17/18 current-hardware
+  // capture batch (two-wire RT/RH, 10 kOhm series resistors, carrier RH).
+  // The raw archive contains 2227 timing records; this fixture keeps 256 valid
+  // points spanning the full batch plus observed extrema/quantiles.
+  const char *fixture_path = "tests/host/fixtures/rtrh_current_260817.csv";
+  std::ifstream input(fixture_path);
+  if (!input.is_open()) {
+    ESP_LOGE(TAG, "current capture regression: cannot open %s", fixture_path);
+    return false;
+  }
+
+  std::string line;
+  if (!std::getline(input, line)) {
+    ESP_LOGE(TAG, "current capture regression: empty fixture file");
+    return false;
+  }
+
+  size_t tested = 0;
+  size_t air_supported = 0;
+  size_t extrapolated = 0;
+  size_t line_no = 1;
+  while (std::getline(input, line)) {
+    line_no++;
+    if (line.empty()) continue;
+    const auto f = split_csv_line(line);
+    if (f.size() != 17) {
+      ESP_LOGE(TAG, "current capture regression: malformed line %u (%u fields)",
+               static_cast<unsigned>(line_no), static_cast<unsigned>(f.size()));
+      return false;
+    }
+
+    const std::string &received_at = f[0];
+    int sequence = 0;
+    float quality = NAN;
+    float ref_period = NAN;
+    float rt_period = NAN;
+    float rh_period = NAN;
+    int rh_count = 0;
+    float expected_rt_ratio = NAN;
+    float expected_rh_ratio = NAN;
+    float captured_temperature = NAN;
+    float captured_humidity = NAN;
+    float expected_temperature = NAN;
+    float expected_display_temperature = NAN;
+    float expected_air_temperature = NAN;
+    float expected_humidity = NAN;
+    float expected_display_humidity = NAN;
+    int expected_extrapolation = 0;
+
+    if (!parse_int(f[1], sequence) || !parse_float(f[2], quality) ||
+        !parse_float(f[3], ref_period) || !parse_float(f[4], rt_period) ||
+        !parse_float(f[5], rh_period) || !parse_int(f[6], rh_count) ||
+        !parse_float(f[7], expected_rt_ratio) || !parse_float(f[8], expected_rh_ratio) ||
+        !parse_float(f[9], captured_temperature) || !parse_float(f[10], captured_humidity) ||
+        !parse_float(f[11], expected_temperature) || !parse_float(f[12], expected_display_temperature) ||
+        !parse_float(f[13], expected_air_temperature) || !parse_float(f[14], expected_humidity) ||
+        !parse_float(f[15], expected_display_humidity) || !parse_int(f[16], expected_extrapolation)) {
+      ESP_LOGE(TAG, "current capture regression: parse error on line %u", static_cast<unsigned>(line_no));
+      return false;
+    }
+
+    if (received_at.empty() || sequence <= 0 || quality < 0.0f || quality > 100.0f ||
+        ref_period <= 0.0f || rt_period <= 0.0f || rh_period <= 0.0f || rh_count < 120) {
+      ESP_LOGE(TAG, "current capture regression: invalid measured input at %s seq=%d", received_at.c_str(), sequence);
+      return false;
+    }
+
+    const float rt_ratio = rt_period / ref_period;
+    const float rh_ratio = rh_period / ref_period;
+    if (!nearly_equal(rt_ratio, expected_rt_ratio, 0.00002f) ||
+        !nearly_equal(rh_ratio, expected_rh_ratio, 0.00002f)) {
+      ESP_LOGE(TAG, "current capture regression: normalized ratio changed at %s seq=%d", received_at.c_str(), sequence);
+      return false;
+    }
+
+    const float temperature = calibration::temperature_from_ratio(rt_ratio);
+    const float display_temperature = calibration::display_temperature_from_ratio(rt_ratio);
+    const float humidity = calibration::humidity_from_ratio_temperature(rh_ratio, temperature);
+    const float display_humidity =
+        calibration::display_humidity_from_ratio_temperature(rh_ratio, display_temperature);
+
+    // The capture-time firmware values are rounded to 0.001 in rtrh_timing.csv.
+    // Keep them as provenance checks in addition to the higher precision frozen
+    // golden values generated from the same production calibration path.
+    if (!nearly_equal(temperature, captured_temperature, 0.0011f) ||
+        !nearly_equal(humidity, captured_humidity, 0.0011f)) {
+      ESP_LOGE(TAG, "current capture regression: capture provenance mismatch at %s seq=%d", received_at.c_str(), sequence);
+      return false;
+    }
+    if (!nearly_equal(temperature, expected_temperature, 0.002f) ||
+        !nearly_equal(display_temperature, expected_display_temperature, 0.002f) ||
+        !nearly_equal(humidity, expected_humidity, 0.003f) ||
+        !nearly_equal(display_humidity, expected_display_humidity, 0.003f)) {
+      ESP_LOGE(TAG, "current capture regression: calibration output changed at %s seq=%d", received_at.c_str(), sequence);
+      return false;
+    }
+
+    const float air_temperature = calibration::air_temperature_from_ratio(rt_ratio);
+    if (std::isfinite(expected_air_temperature)) {
+      air_supported++;
+      if (!nearly_equal(air_temperature, expected_air_temperature, 0.002f)) {
+        ESP_LOGE(TAG, "current capture regression: air-temperature output changed at %s seq=%d", received_at.c_str(), sequence);
+        return false;
+      }
+    } else if (std::isfinite(air_temperature)) {
+      ESP_LOGE(TAG, "current capture regression: air-temperature envelope changed at %s seq=%d", received_at.c_str(), sequence);
+      return false;
+    }
+
+    const bool extrapolation = calibration::is_extrapolation(temperature, rh_ratio);
+    if (extrapolation != (expected_extrapolation != 0)) {
+      ESP_LOGE(TAG, "current capture regression: extrapolation classification changed at %s seq=%d",
+               received_at.c_str(), sequence);
+      return false;
+    }
+    if (extrapolation) extrapolated++;
+    tested++;
+  }
+
+  if (tested != 256) {
+    ESP_LOGE(TAG, "current capture regression: expected 256 selected captures, got %u",
+             static_cast<unsigned>(tested));
+    return false;
+  }
+
+  ESP_LOGI(TAG,
+           "current capture regression: %u current-hardware RT/RH captures passed (%u air-supported, %u extrapolated)",
+           static_cast<unsigned>(tested), static_cast<unsigned>(air_supported), static_cast<unsigned>(extrapolated));
+  return true;
+}
+
 void CO2Monitor0601::publish_fixture_values_() {
   constexpr float rt_ratio = 1.992783f;
   constexpr float rh_ratio = 4.056572f;
@@ -362,6 +495,15 @@ void CO2Monitor0601::setup() {
   std::fflush(stderr);
   if (!this->run_capture_regression_tests_()) {
     std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED captures\n");
+    std::fflush(stderr);
+    this->mark_failed();
+    return;
+  }
+
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE current-captures\n");
+  std::fflush(stderr);
+  if (!this->run_current_capture_regression_tests_()) {
+    std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED current-captures\n");
     std::fflush(stderr);
     this->mark_failed();
     return;
