@@ -7,6 +7,8 @@
 #else
 
 #include "ble_options.h"
+#include "battery_learning.h"
+#include "power_policy_logic.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
@@ -98,10 +100,10 @@ class CO2Monitor0601 : public Component {
   void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
   void set_usb_power_pin(uint8_t pin) { this->usb_power_.pin = pin; }
   void set_energy_save_mode_default(bool value) {
-    this->energy_save_mode_ = value;
-    this->energy_save_policy_active_ = value;
+    this->power_policy_.energy_save_mode = value;
+    this->power_policy_.policy_active = value;
   }
-  void set_energy_save_grace(uint32_t value) { this->energy_save_grace_ms_ = value; }
+  void set_energy_save_grace(uint32_t value) { this->power_policy_.grace_ms = value; }
   void set_energy_save_mode_switch(EnergySaveModeSwitch *s) { this->energy_save_switch_ = s; }
   void set_wifi_ha_switch(WifiHaSwitch *s) { this->wifi_ha_switch_ = s; }
   void set_wifi_recovery_window(uint32_t value) { this->wifi_recovery_window_ms_ = value; }
@@ -263,15 +265,9 @@ class CO2Monitor0601 : public Component {
     // reboot does not throw away an overnight calibration run.
     ESPPreferenceObject learning_pref{};
     bool learning_pref_ready{false};
-    bool learning_session_active{false};
-    uint32_t learning_session_elapsed_ms{0};
-    uint32_t learning_last_tick_ms{0};
+    battery_learning::State learning{};
     uint32_t learning_last_save_ms{0};
     uint32_t learning_save_interval_ms{30UL * 60UL * 1000UL};
-    float learning_session_start_progress{NAN};
-    float learning_session_last_progress{NAN};
-    float learned_full_runtime_h{NAN};
-    uint16_t learned_cycles{0};
   } battery_;
 
   struct UsbPowerState {
@@ -306,7 +302,7 @@ class CO2Monitor0601 : public Component {
   void maybe_publish_ha_();
   void publish_cached_ha_now_();
   bool usb_powered_() const { return this->usb_power_.have_state && this->usb_power_.state; }
-  bool external_powered_() const { return this->usb_powered_() && !this->energy_save_policy_active_; }
+  bool external_powered_() const { return power_policy_logic::external_powered(this->usb_powered_(), this->power_policy_); }
   void process_energy_save_grace_();
   void process_wifi_ha_control_();
   void open_wifi_recovery_window_(uint32_t now, const char *reason);
@@ -378,11 +374,7 @@ class CO2Monitor0601 : public Component {
   std::string ble_device_name_{"Unni CO2 Monitor"};
 #endif
   bool light_sleep_enabled_{true};
-  bool energy_save_mode_{false};
-  bool energy_save_policy_active_{false};
-  bool energy_save_grace_pending_{false};
-  uint32_t energy_save_grace_started_ms_{0};
-  uint32_t energy_save_grace_ms_{3000};
+  power_policy_logic::State power_policy_{};
   bool power_policy_have_state_{false};
   bool power_policy_external_power_{false};
   EnergySaveModeSwitch *energy_save_switch_{nullptr};

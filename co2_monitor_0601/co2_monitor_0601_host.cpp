@@ -3,6 +3,8 @@
 #include "co2_monitor_0601.h"
 
 #include "calibration.h"
+#include "battery_learning.h"
+#include "power_policy_logic.h"
 #include "co2_decoder.h"
 #include "esphome/core/log.h"
 
@@ -164,6 +166,138 @@ bool CO2Monitor0601::run_portable_self_test_() {
       !std::isfinite(display_temperature) || !std::isfinite(display_humidity) || display_humidity < 0.0f ||
       display_humidity > 100.0f) {
     ESP_LOGE(TAG, "portable self-test: calibration invariant failed");
+    return false;
+  }
+
+  return true;
+}
+
+
+bool CO2Monitor0601::run_battery_power_policy_tests_() {
+  using battery_learning::State;
+
+  // Learning progress is governed by both elapsed time and discharged SOC.
+  State learning{};
+  if (!nearly_equal(battery_learning::progress_percent(learning), 0.0f, 0.001f)) {
+    ESP_LOGE(TAG, "battery learning self-test: inactive progress is not zero");
+    return false;
+  }
+
+  battery_learning::update(learning, 80.0f, 1000U);
+  battery_learning::update(learning, 76.0f, 1000U + 3600000U);
+  if (!nearly_equal(battery_learning::progress_percent(learning), 50.0f, 0.01f)) {
+    ESP_LOGE(TAG, "battery learning self-test: qualification progress mismatch");
+    return false;
+  }
+  battery_learning::update(learning, 72.0f, 1000U + 7200000U);
+  if (!nearly_equal(battery_learning::progress_percent(learning), 100.0f, 0.01f)) {
+    ESP_LOGE(TAG, "battery learning self-test: qualified session did not reach 100%%");
+    return false;
+  }
+  auto finalized = battery_learning::finalize(learning, true);
+  if (!finalized.model_updated || !nearly_equal(finalized.observed_full_runtime_h, 25.0f, 0.001f) ||
+      !nearly_equal(learning.learned_full_runtime_h, 25.0f, 0.001f) || learning.learned_cycles != 1 ||
+      learning.session_active) {
+    ESP_LOGE(TAG, "battery learning self-test: first qualified session mismatch");
+    return false;
+  }
+
+  // The second qualified session must update the model using the production
+  // 25/75 EMA: 20 h observed -> 23.75 h learned from the previous 25 h model.
+  battery_learning::update(learning, 90.0f, 10000U);
+  battery_learning::update(learning, 80.0f, 10000U + 7200000U);
+  finalized = battery_learning::finalize(learning, true);
+  if (!finalized.model_updated || !nearly_equal(finalized.observed_full_runtime_h, 20.0f, 0.001f) ||
+      !nearly_equal(learning.learned_full_runtime_h, 23.75f, 0.001f) || learning.learned_cycles != 2) {
+    ESP_LOGE(TAG, "battery learning self-test: EMA update mismatch");
+    return false;
+  }
+
+  // Too-short, too-small and incomplete sessions must never alter the model.
+  const float learned_before_rejects = learning.learned_full_runtime_h;
+  const uint16_t cycles_before_rejects = learning.learned_cycles;
+  battery_learning::update(learning, 80.0f, 20000U);
+  battery_learning::update(learning, 70.0f, 20000U + 3600000U);
+  if (battery_learning::finalize(learning, true).model_updated ||
+      !nearly_equal(learning.learned_full_runtime_h, learned_before_rejects, 0.001f)) {
+    ESP_LOGE(TAG, "battery learning self-test: short session contaminated model");
+    return false;
+  }
+  battery_learning::update(learning, 80.0f, 30000U);
+  battery_learning::update(learning, 75.0f, 30000U + 3U * 3600000U);
+  if (battery_learning::finalize(learning, true).model_updated || learning.learned_cycles != cycles_before_rejects) {
+    ESP_LOGE(TAG, "battery learning self-test: low-drop session contaminated model");
+    return false;
+  }
+  battery_learning::update(learning, 80.0f, 40000U);
+  battery_learning::update(learning, 60.0f, 40000U + 3U * 3600000U);
+  if (battery_learning::finalize(learning, false).model_updated || learning.learned_cycles != cycles_before_rejects) {
+    ESP_LOGE(TAG, "battery learning self-test: incomplete session contaminated model");
+    return false;
+  }
+
+  // uint32_t millis() wrap-around must preserve elapsed time accounting.
+  State wrap{};
+  wrap.session_active = true;
+  wrap.last_tick_ms = 0xFFFFFFF0U;
+  battery_learning::advance_elapsed(wrap, 0x00000010U);
+  if (wrap.session_elapsed_ms != 32U || wrap.last_tick_ms != 0x00000010U) {
+    ESP_LOGE(TAG, "battery learning self-test: millis wrap accounting failed");
+    return false;
+  }
+
+  using namespace power_policy_logic;
+  power_policy_logic::State policy{};
+  if (!external_powered(true, policy) || external_powered(false, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: automatic USB/battery selection failed");
+    return false;
+  }
+
+  auto action = set_mode(policy, true, true, 1000U);
+  if (action != SetModeAction::StartGrace || !policy.grace_pending || policy.policy_active ||
+      !external_powered(true, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: USB grace start mismatch");
+    return false;
+  }
+  if (process_grace(policy, 3999U) || !external_powered(true, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: grace ended too early");
+    return false;
+  }
+  if (!process_grace(policy, 4000U) || policy.grace_pending || !policy.policy_active ||
+      external_powered(true, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: grace completion mismatch");
+    return false;
+  }
+
+  action = set_mode(policy, false, true, 5000U);
+  if (action != SetModeAction::ApplyUsbPolicy || policy.policy_active || policy.grace_pending ||
+      !external_powered(true, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: disabling override did not restore USB policy");
+    return false;
+  }
+
+  action = set_mode(policy, true, false, 6000U);
+  if (action != SetModeAction::ApplyBatteryPolicy || !policy.policy_active || policy.grace_pending ||
+      external_powered(false, policy)) {
+    ESP_LOGE(TAG, "power policy self-test: battery enable should apply immediately");
+    return false;
+  }
+  if (set_mode(policy, true, false, 7000U) != SetModeAction::NoChange) {
+    ESP_LOGE(TAG, "power policy self-test: unchanged mode produced an action");
+    return false;
+  }
+
+  power_policy_logic::State no_grace{};
+  no_grace.grace_ms = 0;
+  if (set_mode(no_grace, true, true, 1U) != SetModeAction::ApplyBatteryPolicy ||
+      !no_grace.policy_active || external_powered(true, no_grace)) {
+    ESP_LOGE(TAG, "power policy self-test: zero grace did not force battery policy immediately");
+    return false;
+  }
+
+  if (ble_advertising_interval(true, 1000U, 3000U) != 1000U ||
+      ble_advertising_interval(false, 1000U, 3000U) != 3000U) {
+    ESP_LOGE(TAG, "power policy self-test: BLE cadence selection mismatch");
     return false;
   }
 
@@ -486,6 +620,15 @@ void CO2Monitor0601::setup() {
   std::fflush(stderr);
   if (!this->run_portable_self_test_()) {
     std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED portable\n");
+    std::fflush(stderr);
+    this->mark_failed();
+    return;
+  }
+
+  std::fprintf(stderr, "UNNI HOST SELF-TEST PHASE battery-policy\n");
+  std::fflush(stderr);
+  if (!this->run_battery_power_policy_tests_()) {
+    std::fprintf(stderr, "UNNI HOST SELF-TEST FAILED battery-policy\n");
     std::fflush(stderr);
     this->mark_failed();
     return;

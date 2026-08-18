@@ -131,6 +131,7 @@ class CO2Monitor0601 : public Component {
 
  protected:
   bool run_portable_self_test_();
+  bool run_battery_power_policy_tests_();
   bool run_capture_regression_tests_();
   bool run_current_capture_regression_tests_();
   void publish_fixture_values_();

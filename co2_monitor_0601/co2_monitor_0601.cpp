@@ -4,6 +4,8 @@
 #include "debug_udp.h"
 
 #include "ble_options.h"
+#include "battery_learning.h"
+#include "power_policy_logic.h"
 #include "co2_decoder.h"
 #include "i2c_sniffer.h"
 #include "rtrh_decoder.h"
@@ -185,23 +187,23 @@ void CO2Monitor0601::setup_battery_learning_() {
 
   if (std::isfinite(saved.learned_full_runtime_h) && saved.learned_full_runtime_h >= 5.0f &&
       saved.learned_full_runtime_h <= 200.0f) {
-    this->battery_.learned_full_runtime_h = saved.learned_full_runtime_h;
+    this->battery_.learning.learned_full_runtime_h = saved.learned_full_runtime_h;
   }
-  this->battery_.learned_cycles = saved.learned_cycles;
+  this->battery_.learning.learned_cycles = saved.learned_cycles;
   if (saved.session_active && std::isfinite(saved.session_start_progress) &&
       std::isfinite(saved.session_last_progress)) {
-    this->battery_.learning_session_active = true;
-    this->battery_.learning_session_start_progress = saved.session_start_progress;
-    this->battery_.learning_session_last_progress = saved.session_last_progress;
-    this->battery_.learning_session_elapsed_ms = saved.session_elapsed_minutes * 60000UL;
+    this->battery_.learning.session_active = true;
+    this->battery_.learning.session_start_progress = saved.session_start_progress;
+    this->battery_.learning.session_last_progress = saved.session_last_progress;
+    this->battery_.learning.session_elapsed_ms = saved.session_elapsed_minutes * 60000UL;
     ESP_LOGI(TAG, "Battery learning: restored session %.1f -> %.1f %% after %.1f h",
              saved.session_start_progress, saved.session_last_progress,
-             this->battery_.learning_session_elapsed_ms / 3600000.0f);
+             this->battery_.learning.session_elapsed_ms / 3600000.0f);
   }
-  if (std::isfinite(this->battery_.learned_full_runtime_h)) {
+  if (std::isfinite(this->battery_.learning.learned_full_runtime_h)) {
     ESP_LOGI(TAG, "Battery learning: restored %.1f h full-runtime model from %u completed session(s)",
-             this->battery_.learned_full_runtime_h,
-             static_cast<unsigned>(this->battery_.learned_cycles));
+             this->battery_.learning.learned_full_runtime_h,
+             static_cast<unsigned>(this->battery_.learning.learned_cycles));
   }
   this->publish_battery_learning_();
 }
@@ -210,12 +212,8 @@ void CO2Monitor0601::prepare_for_ota() {
   // OTA blocks the normal application loop. Capture the time since the last
   // battery-learning tick before forcing the preference checkpoint so an OTA
   // update does not lose the tail of the current discharge session.
-  if (this->battery_.learning_session_active && this->battery_.learning_last_tick_ms != 0) {
-    const uint32_t now = millis();
-    this->battery_.learning_session_elapsed_ms +=
-        static_cast<uint32_t>(now - this->battery_.learning_last_tick_ms);
-    this->battery_.learning_last_tick_ms = now;
-  }
+  if (this->battery_.learning.session_active)
+    battery_learning::advance_elapsed(this->battery_.learning, millis());
 
   ESP_LOGI(TAG, "OTA starting: flushing persistent runtime state");
   this->save_battery_learning_(true, "OTA");
@@ -227,21 +225,9 @@ void CO2Monitor0601::prepare_for_ota() {
 }
 
 void CO2Monitor0601::publish_battery_learning_() {
-  publish(this->out_.battery_learned_full_runtime, this->battery_.learned_full_runtime_h);
-  publish(this->out_.battery_learning_cycles, static_cast<float>(this->battery_.learned_cycles));
-
-  float progress_pct = 0.0f;
-  if (this->battery_.learning_session_active &&
-      std::isfinite(this->battery_.learning_session_start_progress) &&
-      std::isfinite(this->battery_.learning_session_last_progress)) {
-    const float drop = std::max(0.0f, this->battery_.learning_session_start_progress -
-                                      this->battery_.learning_session_last_progress);
-    const float time_factor = std::min(1.0f, this->battery_.learning_session_elapsed_ms /
-                                                (2.0f * 3600000.0f));
-    const float drop_factor = std::min(1.0f, drop / 8.0f);
-    progress_pct = 100.0f * std::min(time_factor, drop_factor);
-  }
-  publish(this->out_.battery_learning_progress, progress_pct);
+  publish(this->out_.battery_learned_full_runtime, this->battery_.learning.learned_full_runtime_h);
+  publish(this->out_.battery_learning_cycles, static_cast<float>(this->battery_.learning.learned_cycles));
+  publish(this->out_.battery_learning_progress, battery_learning::progress_percent(this->battery_.learning));
 }
 
 void CO2Monitor0601::save_battery_learning_(bool force, const char *reason) {
@@ -253,12 +239,12 @@ void CO2Monitor0601::save_battery_learning_(bool force, const char *reason) {
 
   BatteryLearningPersisted saved{};
   saved.version = BATTERY_LEARNING_VERSION;
-  saved.learned_cycles = this->battery_.learned_cycles;
-  saved.learned_full_runtime_h = this->battery_.learned_full_runtime_h;
-  saved.session_active = this->battery_.learning_session_active ? 1 : 0;
-  saved.session_start_progress = this->battery_.learning_session_start_progress;
-  saved.session_last_progress = this->battery_.learning_session_last_progress;
-  saved.session_elapsed_minutes = this->battery_.learning_session_elapsed_ms / 60000UL;
+  saved.learned_cycles = this->battery_.learning.learned_cycles;
+  saved.learned_full_runtime_h = this->battery_.learning.learned_full_runtime_h;
+  saved.session_active = this->battery_.learning.session_active ? 1 : 0;
+  saved.session_start_progress = this->battery_.learning.session_start_progress;
+  saved.session_last_progress = this->battery_.learning.session_last_progress;
+  saved.session_elapsed_minutes = this->battery_.learning.session_elapsed_ms / 60000UL;
   if (this->battery_.learning_pref.save(&saved)) {
     this->battery_.learning_last_save_ms = now;
     // Checkpoints are intentionally infrequent (30 min by default), so commit
@@ -266,28 +252,16 @@ void CO2Monitor0601::save_battery_learning_(bool force, const char *reason) {
     // the deferred preference cache.
     if (global_preferences != nullptr) global_preferences->sync();
 
-    float progress_pct = 0.0f;
-    if (this->battery_.learning_session_active &&
-        std::isfinite(this->battery_.learning_session_start_progress) &&
-        std::isfinite(this->battery_.learning_session_last_progress)) {
-      const float drop = std::max(0.0f, this->battery_.learning_session_start_progress -
-                                        this->battery_.learning_session_last_progress);
-      const float time_factor = std::min(1.0f, this->battery_.learning_session_elapsed_ms /
-                                                  (2.0f * 3600000.0f));
-      const float drop_factor = std::min(1.0f, drop / 8.0f);
-      progress_pct = 100.0f * std::min(time_factor, drop_factor);
-    }
-
     const char *checkpoint_kind = reason != nullptr ? reason : "periodic";
     ESP_LOGI(TAG,
              "Battery learning: %s checkpoint saved: SOC %.1f %%, elapsed %.2f h, progress %.0f %%, "
              "learned %.1f h, cycles %u",
              checkpoint_kind,
-             this->battery_.learning_session_last_progress,
-             this->battery_.learning_session_elapsed_ms / 3600000.0f,
-             progress_pct,
-             this->battery_.learned_full_runtime_h,
-             static_cast<unsigned>(this->battery_.learned_cycles));
+             this->battery_.learning.session_last_progress,
+             this->battery_.learning.session_elapsed_ms / 3600000.0f,
+             battery_learning::progress_percent(this->battery_.learning),
+             this->battery_.learning.learned_full_runtime_h,
+             static_cast<unsigned>(this->battery_.learning.learned_cycles));
   } else {
     ESP_LOGW(TAG, "Battery learning: failed to save %s checkpoint",
              reason != nullptr ? reason : "periodic");
@@ -295,51 +269,29 @@ void CO2Monitor0601::save_battery_learning_(bool force, const char *reason) {
 }
 
 void CO2Monitor0601::finalize_battery_learning_(bool completed_session) {
-  if (!this->battery_.learning_session_active) return;
-  const float drop = this->battery_.learning_session_start_progress -
-                     this->battery_.learning_session_last_progress;
-  const float elapsed_h = this->battery_.learning_session_elapsed_ms / 3600000.0f;
+  if (!this->battery_.learning.session_active) return;
 
-  if (completed_session && elapsed_h >= 2.0f && drop >= 8.0f) {
-    const float observed_full_h = elapsed_h * 100.0f / drop;
-    if (std::isfinite(observed_full_h) && observed_full_h >= 5.0f && observed_full_h <= 200.0f) {
-      constexpr float LEARN_ALPHA = 0.25f;
-      this->battery_.learned_full_runtime_h =
-          std::isfinite(this->battery_.learned_full_runtime_h)
-              ? (LEARN_ALPHA * observed_full_h + (1.0f - LEARN_ALPHA) *
-                                               this->battery_.learned_full_runtime_h)
-              : observed_full_h;
-      if (this->battery_.learned_cycles < 65535U) this->battery_.learned_cycles++;
-      ESP_LOGI(TAG, "Battery learning: session %.1f h / %.1f %% -> %.1f h full runtime; learned=%.1f h (%u)",
-               elapsed_h, drop, observed_full_h, this->battery_.learned_full_runtime_h,
-               static_cast<unsigned>(this->battery_.learned_cycles));
-    }
+  const float drop = this->battery_.learning.session_start_progress -
+                     this->battery_.learning.session_last_progress;
+  const float elapsed_h = this->battery_.learning.session_elapsed_ms / 3600000.0f;
+  const auto result = battery_learning::finalize(this->battery_.learning, completed_session);
+  if (result.model_updated) {
+    ESP_LOGI(TAG, "Battery learning: session %.1f h / %.1f %% -> %.1f h full runtime; learned=%.1f h (%u)",
+             elapsed_h, drop, result.observed_full_runtime_h,
+             this->battery_.learning.learned_full_runtime_h,
+             static_cast<unsigned>(this->battery_.learning.learned_cycles));
   }
 
-  this->battery_.learning_session_active = false;
-  this->battery_.learning_session_elapsed_ms = 0;
-  this->battery_.learning_session_start_progress = NAN;
-  this->battery_.learning_session_last_progress = NAN;
-  this->battery_.learning_last_tick_ms = 0;
   this->publish_battery_learning_();
   this->save_battery_learning_(true, "session-end");
 }
 
 void CO2Monitor0601::update_battery_learning_(float progress, uint32_t now) {
-  if (!this->battery_.learning_session_active) {
-    this->battery_.learning_session_active = true;
-    this->battery_.learning_session_start_progress = progress;
-    this->battery_.learning_session_last_progress = progress;
-    this->battery_.learning_session_elapsed_ms = 0;
-    this->battery_.learning_last_tick_ms = now;
+  const bool starting = !this->battery_.learning.session_active;
+  battery_learning::update(this->battery_.learning, progress, now);
+  if (starting) {
     this->battery_.learning_last_save_ms = now;
     ESP_LOGI(TAG, "Battery learning: started session at %.1f %%", progress);
-  } else {
-    if (this->battery_.learning_last_tick_ms != 0)
-      this->battery_.learning_session_elapsed_ms +=
-          static_cast<uint32_t>(now - this->battery_.learning_last_tick_ms);
-    this->battery_.learning_last_tick_ms = now;
-    this->battery_.learning_session_last_progress = progress;
   }
 
   this->publish_battery_learning_();
@@ -347,7 +299,7 @@ void CO2Monitor0601::update_battery_learning_(float progress, uint32_t now) {
 }
 
 void CO2Monitor0601::reset_battery_estimator_(bool usb_mode, uint32_t now) {
-  if (usb_mode && this->battery_.learning_session_active)
+  if (usb_mode && this->battery_.learning.session_active)
     this->finalize_battery_learning_(true);
   this->battery_.estimator_mode_usb = usb_mode;
   this->battery_.estimator_have_mode = true;
@@ -433,13 +385,13 @@ void CO2Monitor0601::update_battery_estimator_(float battery_voltage, bool usb_m
     const float recent_eta_h = progress / rate;
 
     float session_full_h = NAN;
-    if (this->battery_.learning_session_active) {
-      const float drop = this->battery_.learning_session_start_progress - progress;
-      const float elapsed_h = this->battery_.learning_session_elapsed_ms / 3600000.0f;
+    if (this->battery_.learning.session_active) {
+      const float drop = this->battery_.learning.session_start_progress - progress;
+      const float elapsed_h = this->battery_.learning.session_elapsed_ms / 3600000.0f;
       if (elapsed_h >= 2.0f && drop >= 8.0f) session_full_h = elapsed_h * 100.0f / drop;
     }
 
-    float model_full_h = this->battery_.learned_full_runtime_h;
+    float model_full_h = this->battery_.learning.learned_full_runtime_h;
     if (std::isfinite(session_full_h) && session_full_h >= 5.0f && session_full_h <= 200.0f)
       model_full_h = std::isfinite(model_full_h) ? (0.7f * model_full_h + 0.3f * session_full_h)
                                                 : session_full_h;
@@ -614,53 +566,33 @@ void EnergySaveModeSwitch::write_state(bool state) {
 }
 
 void CO2Monitor0601::set_energy_save_mode(bool enabled) {
-  if (this->energy_save_mode_ == enabled) {
-    if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(enabled);
-    return;
-  }
-
-  this->energy_save_mode_ = enabled;
+  const uint32_t now = millis();
+  const auto action = power_policy_logic::set_mode(this->power_policy_, enabled, this->usb_powered_(), now);
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(enabled);
 
-  if (!enabled) {
-    this->energy_save_grace_pending_ = false;
-    this->energy_save_policy_active_ = false;
-    ESP_LOGI(TAG, "Energy Save Mode: OFF (automatic USB/battery policy)");
-    this->apply_power_policy_(true);
-    return;
+  switch (action) {
+    case power_policy_logic::SetModeAction::NoChange:
+      return;
+    case power_policy_logic::SetModeAction::ApplyUsbPolicy:
+      ESP_LOGI(TAG, "Energy Save Mode: OFF (automatic USB/battery policy)");
+      this->apply_power_policy_(true);
+      return;
+    case power_policy_logic::SetModeAction::StartGrace:
+      ESP_LOGI(TAG, "Energy Save Mode: ON; battery policy starts in %lu ms",
+               static_cast<unsigned long>(this->power_policy_.grace_ms));
+      ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect once Light-sleep becomes active");
+      this->apply_power_policy_(true);
+      return;
+    case power_policy_logic::SetModeAction::ApplyBatteryPolicy:
+      ESP_LOGI(TAG, "Energy Save Mode: ON (battery policy forced)");
+      ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect while Light-sleep is active");
+      this->apply_power_policy_(true);
+      return;
   }
-
-  if (this->usb_powered_() && this->energy_save_grace_ms_ > 0) {
-    // Keep the normal USB PM locks briefly so HA receives the switch update and
-    // final log messages before native USB Serial/JTAG may disappear in sleep.
-    this->energy_save_policy_active_ = false;
-    this->energy_save_grace_pending_ = true;
-    this->energy_save_grace_started_ms_ = millis();
-    ESP_LOGI(TAG, "Energy Save Mode: ON; battery policy starts in %lu ms",
-             static_cast<unsigned long>(this->energy_save_grace_ms_));
-    ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect once Light-sleep becomes active");
-    this->apply_power_policy_(true);
-    return;
-  }
-
-  this->energy_save_grace_pending_ = false;
-  this->energy_save_policy_active_ = true;
-  ESP_LOGI(TAG, "Energy Save Mode: ON (battery policy forced)");
-  ESP_LOGW(TAG, "Native USB Serial/JTAG may disconnect while Light-sleep is active");
-  this->apply_power_policy_(true);
 }
 
 void CO2Monitor0601::process_energy_save_grace_() {
-  if (!this->energy_save_grace_pending_) return;
-  if (!this->energy_save_mode_) {
-    this->energy_save_grace_pending_ = false;
-    return;
-  }
-  const uint32_t now = millis();
-  if (static_cast<uint32_t>(now - this->energy_save_grace_started_ms_) < this->energy_save_grace_ms_) return;
-
-  this->energy_save_grace_pending_ = false;
-  this->energy_save_policy_active_ = true;
+  if (!power_policy_logic::process_grace(this->power_policy_, millis())) return;
   ESP_LOGI(TAG, "Energy Save Mode grace period complete; enabling battery policy");
   ESP_LOGI(TAG, "WiFi modem sleep remains enabled; native USB Serial/JTAG may disconnect");
   this->apply_power_policy_(true);
@@ -686,8 +618,8 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
     this->reset_co2_capture_gate_();
 
 #if UNNI_BLE_ENABLED
-  const uint32_t adv_ms = external ? this->ble_usb_advertising_interval_ms_
-                                   : this->ble_battery_advertising_interval_ms_;
+  const uint32_t adv_ms = power_policy_logic::ble_advertising_interval(
+      external, this->ble_usb_advertising_interval_ms_, this->ble_battery_advertising_interval_ms_);
   sensirion_ble_set_advertising_interval(adv_ms);
   ESP_LOGI(TAG, "BLE advertising interval: %lu ms (%s policy)",
            static_cast<unsigned long>(adv_ms), external ? "USB" : "battery");
@@ -705,7 +637,7 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
   }
 
   ESP_LOGI(TAG, "Power policy: %s%s", external ? "USB" : "battery",
-           this->energy_save_policy_active_ ? " (Energy Save Mode override)" : "");
+           this->power_policy_.policy_active ? " (Energy Save Mode override)" : "");
 }
 
 bool CO2Monitor0601::setup_usb_power_() {
@@ -923,7 +855,7 @@ void CO2Monitor0601::setup() {
            static_cast<unsigned>(App.get_switches().size()));
 #endif
   ESP_LOGW(TAG, "API stall diagnostic enabled: 1 Hz main-loop timing + 10 s heap telemetry; ISR paths unchanged");
-  if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
+  if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->power_policy_.energy_save_mode);
   if (this->wifi_ha_switch_ != nullptr) {
 #if UNNI_BLE_ENABLED
     // The persistent Sensirion 0x81FE setting is the source of truth when BLE
