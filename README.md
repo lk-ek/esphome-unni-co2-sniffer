@@ -824,7 +824,32 @@ docs/
 
 tools/
   reverse-engineering and capture utilities
+
+tests/host/
+  native ESPHome host-platform smoke tests for all shipped YAML variants
 ```
+
+## Native host test matrix
+
+The repository includes a hardware-free smoke-test layer based on ESPHome's
+official `host:` platform. The runner derives a temporary host configuration
+from each shipped YAML variant, compiles it natively, starts the resulting host
+binary directly, and waits for the portable component self-test to pass:
+
+```sh
+python3 -m pip install -r requirements-test.txt
+python3 tests/host/run_host_tests.py
+```
+
+The host shim exercises the real component schema/code-generation surface, CO₂
+decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
+ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
+out of scope and still require hardware testing. See `tests/host/README.md`.
+
+On macOS the runner also handles native C++20 standard-library selection. If
+the active Apple libc++ lacks ESPHome's required concepts support and Homebrew
+LLVM is installed, the generated host builds are automatically pointed at the
+Homebrew libc++ headers and runtime; no manual `CXX=...` wrapper is required.
 
 Historical documents may describe earlier pin assignments, names or implementations. The current source, README and active documentation are authoritative.
 
@@ -869,3 +894,11 @@ See:
 
 
 Battery-learning flash writes are logged after a successful synchronous commit. Periodic checkpoints are labeled `periodic`, OTA-triggered force-saves are labeled `OTA`, and end-of-session commits are labeled `session-end`, together with the persisted SOC/session runtime/progress and learned-runtime state.
+
+### Host regression corpus
+
+The native host suite includes 135 RT/RH timing records extracted from the
+existing August 11 capture archives. These real measured timing points are used
+to regression-test normalization and all portable temperature/humidity
+calibration paths across a much wider range than the synthetic smoke fixture.
+See `tests/host/README.md` for scope and limitations.
