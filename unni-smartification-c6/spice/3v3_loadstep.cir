@@ -1,0 +1,12 @@
+.include ../models/TPS63031.lib
+VIN in 0 3.3
+VEN en 0 3.3
+XREG in en out 0 TPS63031_SYS
+COUT out 0 47u
+ILOAD out 0 PULSE(20m 300m 5m 20u 20u 5m 15m)
+.control
+set wr_singlescale
+tran 10u 50m
+wrdata results/3v3_loadstep.csv time v(in) v(out)
+.endc
+.end

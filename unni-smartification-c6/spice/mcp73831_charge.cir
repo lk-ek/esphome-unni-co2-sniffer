@@ -1,0 +1,20 @@
+* MCP73831 charger functional test
+.include ../models/MCP73831.lib
+VUSB vdd 0 5
+* Simple cell state approximation: voltage source stepped by test, plus resistance.
+VBAT0 b0 0 3.75
+RBAT b0 batt 0.18
+CBAT batt 0 2000u
+* External PROG switching mimics AO3400 enable
+RPROG prog qd 3.3k
+SEN qd 0 en 0 SWEN
+.MODEL SWEN SW(RON=0.05 ROFF=1e9 VT=1.5 VH=0.1)
+VEN en 0 PULSE(0 3.3 5m 1u 1u 60m 100m)
+XCHG stat 0 batt vdd prog MCP73831
+RSTATLOAD stat 0 100k
+.control
+set wr_singlescale
+tran 20u 100m
+wrdata results/mcp73831_charge.csv time v(en) v(batt) v(stat) i(vbat0) i(vusb)
+.endc
+.end

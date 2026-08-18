@@ -1,0 +1,21 @@
+* MCP73831T-2ACI/OT system-level behavioral model for ngspice/KiCad
+* Pins: 1 STAT, 2 VSS, 3 VBAT, 4 VDD, 5 PROG
+* Models CC/CV behavior, reverse blocking, PROG-open shutdown and STAT state.
+* Does NOT model thermal loop, exact preconditioning, timer-free termination latch,
+* silicon switching detail, or temperature-dependent accuracy.
+.SUBCKT MCP73831 STAT VSS VBAT VDD PROG
+* Datasheet programming node is approximately 1 V while charging.
+VPROG PROG_INT VSS 1.0
+RPROG_SENSE PROG_INT PROG 1m
+* Charge-current command: external R(PROG) current x1000. Taper starts near 4.05 V.
+* Disable naturally when PROG return is open because I(VPROG) tends to zero.
+BCHG VDD VBAT I={ (V(VDD,VSS)>V(VBAT,VSS)+0.08) ? min(0.5,1000*abs(I(VPROG)))*limit((4.20-V(VBAT,VSS))/0.15,0,1) : 0 }
+* Small leakage paths aid convergence and approximate shutdown leakage.
+RLEAKV VDD VSS 100Meg
+RLEAKB VBAT VSS 100Meg
+* STAT: low while appreciable charge current flows; otherwise high from VDD.
+* Real MCP73831 is high-Z on shutdown/no battery; this simplified system model
+* drives high when powered and not charging, which is sufficient for logic tests.
+BSTAT STAT VSS V={ (V(VDD,VSS)>3.0) ? ((V(VBAT,VSS)<4.15 && abs(I(VPROG))>1u) ? 0.05 : V(VDD,VSS)-0.1) : 0 }
+RSTAT STAT VSS 1Meg
+.ENDS MCP73831

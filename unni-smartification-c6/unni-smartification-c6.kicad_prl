@@ -129,6 +129,18 @@
           "size_x": 1512,
           "size_y": 948
         }
+      },
+      {
+        "name": "unni-smartification-c6.kicad_pro",
+        "open": false,
+        "window": {
+          "display": 0,
+          "maximized": false,
+          "pos_x": 136,
+          "pos_y": 80,
+          "size_x": 1084,
+          "size_y": 706
+        }
       }
     ]
   },
