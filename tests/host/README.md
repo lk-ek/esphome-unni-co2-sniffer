@@ -124,3 +124,37 @@ This is a regression corpus rather than independent calibration truth: the
 capture-time temperature/humidity columns were produced by the firmware.
 External-reference calibration measurements remain separate. A source summary
 and observed envelope are in `tests/host/fixtures/rtrh_current_260817.md`.
+
+## Unified test entry point and sanitizers
+
+For the normal local regression suite, run:
+
+```sh
+./tests/test.sh
+```
+
+This runs the complete five-variant host runtime matrix twice: first normally,
+then with AddressSanitizer and UndefinedBehaviorSanitizer enabled. The sanitizer
+builds use separate `-san` host names/build directories and add
+`-fsanitize=address,undefined`, frame pointers and non-recovering undefined-
+behavior checks. Runtime sanitizer failures are fatal. Leak detection is disabled because the long-lived ESPHome host process is intentionally terminated immediately after the PASS marker rather than exiting normally.
+
+For the full pre-release/pre-commit verification including every real ESP32-C3
+firmware configuration, run:
+
+```sh
+./tests/test.sh --full
+```
+
+The full mode runs the normal host matrix, the ASan/UBSan matrix, then compiles
+all five shipped device YAML files with ESPHome. Hardware-dependent behavior
+(GPIO/ISR/RMT, BLE radio/GATT, Wi-Fi, ADC and sleep behavior) is still outside
+this software-only test boundary.
+
+For focused diagnosis a single shipped variant can be selected, for example:
+
+```sh
+python3 tests/host/run_host_tests.py --sanitize --variant i2c-sniffer.yaml
+```
+
+`--variant` may be repeated.

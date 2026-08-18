@@ -838,13 +838,15 @@ binary directly, and waits for the portable component self-test to pass:
 
 ```sh
 python3 -m pip install -r requirements-test.txt
-python3 tests/host/run_host_tests.py
+./tests/test.sh
 ```
 
 The host shim exercises the real component schema/code-generation surface, CO₂
 decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
 ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
 out of scope and still require hardware testing. See `tests/host/README.md`.
+
+For a full local verification that additionally cross-compiles all five shipped ESP32-C3 YAML variants, run `./tests/test.sh --full`. The normal test entry point also reruns the complete host matrix under AddressSanitizer and UndefinedBehaviorSanitizer.
 
 On macOS the runner also handles native C++20 standard-library selection. If
 the active Apple libc++ lacks ESPHome's required concepts support and Homebrew

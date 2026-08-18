@@ -77,12 +77,13 @@ def _set_logger_debug(text: str) -> str:
     raise RuntimeError("could not force logger.level=DEBUG for host smoke test")
 
 
-def _host_name(variant: str) -> str:
-    return "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
+def _host_name(variant: str, sanitized: bool = False) -> str:
+    name = "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
+    return name + ("-san" if sanitized else "")
 
 
-def _set_host_name(text: str, variant: str) -> str:
-    name = _host_name(variant)
+def _set_host_name(text: str, variant: str, sanitized: bool = False) -> str:
+    name = _host_name(variant, sanitized)
     lines = text.splitlines()
     in_esphome = False
     replaced = False
@@ -296,9 +297,28 @@ def _select_native_toolchain() -> tuple[NativeToolchain | None, str]:
         diagnostics.append("no native C++ compiler found (CXX/c++/clang++/g++)")
     return None, "\n\n".join(diagnostics)
 
-def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
+SANITIZER_FLAGS = (
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "-fno-sanitize-recover=all",
+)
+
+
+def _with_sanitizers(toolchain: NativeToolchain) -> NativeToolchain:
+    flags = (*toolchain.compile_flags, *SANITIZER_FLAGS)
+    ok, error = _probe_compiler(toolchain.compiler, flags)
+    if not ok:
+        raise RuntimeError(f"sanitizer compiler preflight failed:\n{error}")
+    return NativeToolchain(
+        compiler=toolchain.compiler,
+        compile_flags=flags,
+        description=toolchain.description + " + ASan/UBSan",
+    )
+
+
+def make_host_config(source: Path, toolchain: NativeToolchain, sanitized: bool = False) -> Path:
     text = _drop_top_level_blocks(source.read_text(encoding="utf-8"))
-    text = _set_host_name(text, source.name)
+    text = _set_host_name(text, source.name, sanitized)
     text = _set_logger_debug(text)
     text = _inject_host_build_flags(text, toolchain.compile_flags)
     # Host networking is supplied by the OS; no wifi: block is valid/needed.
@@ -337,8 +357,8 @@ def _run_command(command: list[str], env: dict[str, str]) -> int:
         return 127
 
 
-def _host_binary_path(variant: str) -> Path:
-    name = _host_name(variant)
+def _host_binary_path(variant: str, sanitized: bool = False) -> Path:
+    name = _host_name(variant, sanitized)
     return ROOT / ".esphome" / "build" / name / ".pioenvs" / name / "program"
 
 
@@ -430,13 +450,13 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
     return passed and not failed
 
 
-def _run_smoke(esphome: str, config: Path, variant: str, env: dict[str, str], timeout_s: int) -> bool:
+def _run_smoke(esphome: str, config: Path, variant: str, env: dict[str, str], timeout_s: int, sanitized: bool = False) -> bool:
     # `esphome run` is intentionally interactive and keeps a host target alive
     # indefinitely. For automation, compile first and execute the native binary
     # ourselves so we control its lifetime and output capture.
     if _run_command([esphome, "compile", config.name], env) != 0:
         return False
-    return _run_host_binary(_host_binary_path(variant), env, timeout_s)
+    return _run_host_binary(_host_binary_path(variant, sanitized), env, timeout_s)
 
 
 def main() -> int:
@@ -449,6 +469,13 @@ def main() -> int:
     )
     parser.add_argument("--timeout", type=int, default=10, help="runtime seconds to wait for each host self-test marker")
     parser.add_argument("--keep-generated", action="store_true")
+    parser.add_argument("--sanitize", action="store_true", help="build and run host variants with AddressSanitizer and UndefinedBehaviorSanitizer")
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=VARIANTS,
+        help="run only this shipped YAML variant (may be repeated)",
+    )
     parser.add_argument("--esphome", default=_default_esphome_executable())
     args = parser.parse_args()
 
@@ -464,20 +491,28 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
+    if args.sanitize:
+        try:
+            toolchain = _with_sanitizers(toolchain)
+        except RuntimeError as err:
+            print(str(err), file=sys.stderr)
+            return 2
+
     print(f"Native compiler preflight: {toolchain.description}", flush=True)
     if len(toolchain.compile_flags) > 1:
         print("Native host build flags:", " ".join(toolchain.compile_flags), flush=True)
 
+    variants = tuple(args.variant) if args.variant else VARIANTS
     failures: list[str] = []
     generated_files: list[Path] = []
     try:
-        for variant in VARIANTS:
+        for variant in variants:
             source = ROOT / variant
             if not source.exists():
                 failures.append(f"{variant}: source YAML missing")
                 continue
 
-            generated = make_host_config(source, toolchain)
+            generated = make_host_config(source, toolchain, args.sanitize)
             generated_files.append(generated)
             print(f"\n=== {variant} -> host ===", flush=True)
 
@@ -487,13 +522,18 @@ def main() -> int:
             prefd = ROOT / ".esphome" / "host-test-prefs" / source.stem
             prefd.mkdir(parents=True, exist_ok=True)
             env["ESPHOME_PREFDIR"] = str(prefd)
+            if args.sanitize:
+                # The ESPHome host process is intentionally terminated by the runner after the PASS marker,
+                # so process-exit leak reporting is not meaningful here. Runtime memory violations remain enabled.
+                env.setdefault("ASAN_OPTIONS", "abort_on_error=1:detect_leaks=0:strict_string_checks=1")
+                env.setdefault("UBSAN_OPTIONS", "halt_on_error=1:print_stacktrace=1")
 
             if args.mode == "config":
                 ok = _run_command([args.esphome, "config", generated.name], env) == 0
             elif args.mode == "compile":
                 ok = _run_command([args.esphome, "compile", generated.name], env) == 0
             else:
-                ok = _run_smoke(args.esphome, generated, variant, env, args.timeout)
+                ok = _run_smoke(args.esphome, generated, variant, env, args.timeout, args.sanitize)
 
             if not ok:
                 failures.append(f"{variant}: {args.mode} failed")
@@ -504,7 +544,7 @@ def main() -> int:
                 print(f"  - {failure}", file=sys.stderr)
             return 1
 
-        print(f"\nPASS: all {len(VARIANTS)} YAML variants passed host {args.mode} tests")
+        print(f"\nPASS: all {len(variants)} selected YAML variants passed host {args.mode} tests")
         return 0
     finally:
         if not args.keep_generated:
