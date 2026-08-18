@@ -1,4 +1,4 @@
-# Unni CO2 Smartification — KiCad 10 Rev A v3
+# Unni CO2 Smartification — KiCad 10 Rev A v9 wired
 
 Target: KiCad 10.0.5.
 
