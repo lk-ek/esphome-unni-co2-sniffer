@@ -1,25 +1,13 @@
-# Unni CO2 Smartification — KiCad 10 Rev A v9 wired
+# Rev A v11 — low-cost power rework
 
-Target: KiCad 10.0.5.
+Replaced BQ24074 / TPS61023 / TPS2116 concept with:
 
-This revision is deliberately a **single flat schematic**. The previous hierarchical draft hid parser errors and contained placeholder symbols without meaningful wiring. v3 prioritizes a schematic that KiCad itself loads and exports before re-introducing hierarchy.
+- MCP73812T-420I/OT (~303 mA via 3.3 kΩ PROG), CE controlled by ESP and default-disabled by 100 kΩ pull-down.
+- Discrete load sharing: USB -> SS14 -> SYS; VBAT -> AO3401A -> SYS, gate controlled from USB.
+- TPS63031 retained as always-on 3.3 V buck-boost.
+- TPS613222ADBZ fixed 5 V boost, hard-switched with AO3401A/AO3400A.
+- Second AO3400A provides hardware USB-present inhibit.
+- Two AP22913 reverse-blocking load switches OR USB and boost into UNNI_AC.
+- Added GPIO-excited 10 k NTC battery temperature divider + 100 nF filter.
 
-## Implemented functional blocks
-
-- ESP32-C6-MINI-1 using the KiCad `RF_Module` symbol and footprint.
-- Native USB D-/D+ on GPIO12/GPIO13, with 22-ohm series resistors reserved close to the module.
-- Replacement USB-C daughterboard with 5.1-kohm Rd on CC1/CC2.
-- BQ24074 Li-ion charger / PowerPath.
-- TPS63031 fixed 3.3-V buck-boost.
-- TPS61023 switchable 5-V forced-awake boost.
-- TPS2116 USB-priority power mux feeding UNNI_AC.
-- Direct battery feed to UNNI_DC.
-- Passive CO2 and RT/RH taps through 10-kohm series resistors.
-- Touch-electrode emulator and backlight voltage sensing.
-- Battery and raw USB ADC dividers.
-
-Custom symbols are used only where KiCad 10.0.5 does not ship a suitable symbol (BQ24074, TPS61023, TPS2116).
-
-## Important
-
-This is still Rev A engineering work, not yet a fabrication release. Mechanical connector choices, charge current, boost load/current margin, and the real touch/backlight electrical measurements remain to be verified before layout.
+Important: AP22913 uses KiCad's AP22913CN4 logical symbol but value/footprint target AP22913W6-7 SOT-26. Pin mapping must be verified when assigning the final footprint.

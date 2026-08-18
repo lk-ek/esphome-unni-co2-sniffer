@@ -4,7 +4,7 @@
   (generator_version "10.0")
   (uuid "49e63354-f1ec-417f-b740-ba3e24475795")
   (paper "A3")
-  (title_block (title "Unni CO2 Smartification — ESP32-C6 Rev A") (date "2026-08-18") (rev "A-v9-wired") (company "Unni CO2 Smartification"))
+  (title_block (title "Unni CO2 Smartification — ESP32-C6 Rev A") (date "2026-08-18") (rev "A-v11-lowcost-power") (company "Unni CO2 Smartification"))
   (lib_symbols
 (symbol "RF_Module:ESP32-C6-MINI-1"
 		(exclude_from_sim no)
@@ -3497,8 +3497,1205 @@
   )
   (embedded_fonts no)
 )
+  
+    (symbol "Battery_Management:MCP73812T-420I-OT"
+    		(exclude_from_sim no)
+    		(in_bom yes)
+    		(on_board yes)
+    		(in_pos_files yes)
+    		(duplicate_pin_numbers_are_jumpers no)
+    		(property "Reference" "U"
+    			(at -6.35 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Value" "MCP73812T-420I-OT"
+    			(at 1.27 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+    			(at 1.27 -6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Datasheet" "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf"
+    			(at -6.35 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "Simple, Miniature Single-Cell, Fully Integrated Li-Ion / Li-Polymer Charge Management Controllers, 50mA-500mA, 4.2V, SOT23-5"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "Lithium-Ion Battery Charger"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_fp_filters" "SOT?23*"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(symbol "MCP73812T-420I-OT_0_1"
+    			(rectangle
+    				(start -7.62 5.08)
+    				(end 7.62 -5.08)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type background)
+    				)
+    			)
+    		)
+    		(symbol "MCP73812T-420I-OT_1_1"
+    			(pin input line
+    				(at -10.16 2.54 0)
+    				(length 2.54)
+    				(name "CE"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at 0 -7.62 90)
+    				(length 2.54)
+    				(name "V_{SS}"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_out line
+    				(at 10.16 2.54 180)
+    				(length 2.54)
+    				(name "V_{BAT}"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "3"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at 0 7.62 270)
+    				(length 2.54)
+    				(name "V_{DD}"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "4"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin input line
+    				(at -10.16 -2.54 0)
+    				(length 2.54)
+    				(name "PROG"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "5"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+    (symbol "Regulator_Switching:TPS613221ADBZ"
+    		(exclude_from_sim no)
+    		(in_bom yes)
+    		(on_board yes)
+    		(in_pos_files yes)
+    		(duplicate_pin_numbers_are_jumpers no)
+    		(property "Reference" "U"
+    			(at -7.62 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Value" "TPS613221ADBZ"
+    			(at 2.54 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+    			(at 0 -20.32 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/tps61322.pdf"
+    			(at 0 -3.81 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "1.2A Step-Up Converter, 3.3V Output Voltage, 0.9-5.5V Input Voltage, SOT-23"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "Boost converter"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_fp_filters" "SOT?23*"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(symbol "TPS613221ADBZ_0_1"
+    			(rectangle
+    				(start -7.62 5.08)
+    				(end 7.62 -5.08)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type background)
+    				)
+    			)
+    		)
+    		(symbol "TPS613221ADBZ_1_1"
+    			(pin power_out line
+    				(at 10.16 2.54 180)
+    				(length 2.54)
+    				(name "VOUT"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at -10.16 2.54 0)
+    				(length 2.54)
+    				(name "SW"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at 0 -7.62 90)
+    				(length 2.54)
+    				(name "GND"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "3"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+    (symbol "Regulator_Switching:TPS613222ADBZ"
+    		(extends "Regulator_Switching:TPS613221ADBZ")
+    		(property "Reference" "U"
+    			(at -7.62 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Value" "TPS613222ADBZ"
+    			(at 2.54 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+    			(at 0 -20.32 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/tps61322.pdf"
+    			(at 0 -3.81 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "Boost converter"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_fp_filters" "SOT?23*"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+    (symbol "Transistor_FET:Q_PMOS_GSD"
+    		(pin_names
+    			(offset 0)
+    			(hide yes)
+    		)
+    		(exclude_from_sim no)
+    		(in_bom yes)
+    		(on_board yes)
+    		(in_pos_files yes)
+    		(duplicate_pin_numbers_are_jumpers no)
+    		(property "Reference" "Q"
+    			(at 5.08 1.905 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Value" "Q_PMOS_GSD"
+    			(at 5.08 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Footprint" ""
+    			(at 5.08 2.54 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Datasheet" ""
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "P-MOSFET transistor, gate/source/drain"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "transistor PMOS P-MOS P-MOSFET"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(symbol "Q_PMOS_GSD_0_1"
+    			(polyline
+    				(pts
+    					(xy 0.254 1.905) (xy 0.254 -1.905)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.254 0) (xy -2.54 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 2.286) (xy 0.762 1.27)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 1.778) (xy 3.302 1.778) (xy 3.302 -1.778) (xy 0.762 -1.778)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 0.508) (xy 0.762 -0.508)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 -1.27) (xy 0.762 -2.286)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(circle
+    				(center 1.651 0)
+    				(radius 2.794)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.286 0) (xy 1.27 0.381) (xy 1.27 -0.381) (xy 2.286 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.54 2.54) (xy 2.54 1.778)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(circle
+    				(center 2.54 1.778)
+    				(radius 0.254)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(circle
+    				(center 2.54 -1.778)
+    				(radius 0.254)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.54 -2.54) (xy 2.54 0) (xy 0.762 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.921 -0.381) (xy 3.683 -0.381)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 3.302 -0.381) (xy 2.921 0.254) (xy 3.683 0.254) (xy 3.302 -0.381)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    		)
+    		(symbol "Q_PMOS_GSD_1_1"
+    			(pin input line
+    				(at -5.08 0 0)
+    				(length 2.54)
+    				(name "G"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin passive line
+    				(at 2.54 -5.08 90)
+    				(length 2.54)
+    				(name "S"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin passive line
+    				(at 2.54 5.08 270)
+    				(length 2.54)
+    				(name "D"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "3"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+    (symbol "Transistor_FET:Q_NMOS_GSD"
+    		(pin_names
+    			(offset 0)
+    			(hide yes)
+    		)
+    		(exclude_from_sim no)
+    		(in_bom yes)
+    		(on_board yes)
+    		(in_pos_files yes)
+    		(duplicate_pin_numbers_are_jumpers no)
+    		(property "Reference" "Q"
+    			(at 5.08 1.905 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Value" "Q_NMOS_GSD"
+    			(at 5.08 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Footprint" ""
+    			(at 5.08 2.54 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Datasheet" ""
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "N-MOSFET transistor, gate/source/drain"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "transistor NMOS N-MOS N-MOSFET"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(symbol "Q_NMOS_GSD_0_1"
+    			(polyline
+    				(pts
+    					(xy 0.254 1.905) (xy 0.254 -1.905)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.254 0) (xy -2.54 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 2.286) (xy 0.762 1.27)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 0.508) (xy 0.762 -0.508)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 -1.27) (xy 0.762 -2.286)
+    				)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 0.762 -1.778) (xy 3.302 -1.778) (xy 3.302 1.778) (xy 0.762 1.778)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 1.016 0) (xy 2.032 0.381) (xy 2.032 -0.381) (xy 1.016 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(circle
+    				(center 1.651 0)
+    				(radius 2.794)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.54 2.54) (xy 2.54 1.778)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(circle
+    				(center 2.54 1.778)
+    				(radius 0.254)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(circle
+    				(center 2.54 -1.778)
+    				(radius 0.254)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type outline)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.54 -2.54) (xy 2.54 0) (xy 0.762 0)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 2.921 0.381) (xy 3.683 0.381)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    			(polyline
+    				(pts
+    					(xy 3.302 0.381) (xy 2.921 -0.254) (xy 3.683 -0.254) (xy 3.302 0.381)
+    				)
+    				(stroke
+    					(width 0)
+    					(type default)
+    				)
+    				(fill
+    					(type none)
+    				)
+    			)
+    		)
+    		(symbol "Q_NMOS_GSD_1_1"
+    			(pin input line
+    				(at -5.08 0 0)
+    				(length 2.54)
+    				(name "G"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin passive line
+    				(at 2.54 -5.08 90)
+    				(length 2.54)
+    				(name "S"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin passive line
+    				(at 2.54 5.08 270)
+    				(length 2.54)
+    				(name "D"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "3"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
+    (symbol "Power_Management:AP22913CN4"
+    		(exclude_from_sim no)
+    		(in_bom yes)
+    		(on_board yes)
+    		(in_pos_files yes)
+    		(duplicate_pin_numbers_are_jumpers no)
+    		(property "Reference" "U"
+    			(at 0 8.255 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Value" "AP22913CN4"
+    			(at 0 6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Footprint" "Package_CSP:WLCSP-4_0.89x0.89mm_Layout2x2_P0.5mm"
+    			(at 1.27 -6.35 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    				(justify left)
+    			)
+    		)
+    		(property "Datasheet" "https://www.diodes.com/assets/Datasheets/AP22913.pdf"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "Description" "Slew rate controlled load switch, WLCSP-4"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_keywords" "Lead control switch slew rate"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(property "ki_fp_filters" "WLCSP*0.89x0.89mm*Layout2x2*P0.5mm*"
+    			(at 0 0 0)
+    			(show_name no)
+    			(do_not_autoplace no)
+    			(hide yes)
+    			(effects
+    				(font
+    					(size 1.27 1.27)
+    				)
+    			)
+    		)
+    		(symbol "AP22913CN4_0_1"
+    			(rectangle
+    				(start -7.62 5.08)
+    				(end 7.62 -5.08)
+    				(stroke
+    					(width 0.254)
+    					(type default)
+    				)
+    				(fill
+    					(type background)
+    				)
+    			)
+    		)
+    		(symbol "AP22913CN4_1_1"
+    			(pin power_out line
+    				(at 10.16 2.54 180)
+    				(length 2.54)
+    				(name "OUT"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "A1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at -10.16 2.54 0)
+    				(length 2.54)
+    				(name "IN"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "A2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin power_in line
+    				(at 0 -7.62 90)
+    				(length 2.54)
+    				(name "GND"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "B1"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    			(pin input line
+    				(at -10.16 -2.54 0)
+    				(length 2.54)
+    				(name "ON"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    				(number "B2"
+    					(effects
+    						(font
+    							(size 1.27 1.27)
+    						)
+    					)
+    				)
+    			)
+    		)
+    		(embedded_fonts no)
+    	)
   )
-  (text "UNNI CO2 SMARTIFICATION — REV A / ESP32-C6-MINI-1" (exclude_from_sim no) (at 20.00 18.00 0) (effects (font (size 2.2 2.2)) (justify left bottom)) (uuid "61636286-c0d3-4abe-ac0a-b5f9076726d1"))
+  (text "UNNI CO2 SMARTIFICATION — REV A / ESP32-C6-MINI-1 — LOW-COST POWER" (exclude_from_sim no) (at 20.00 18.00 0) (effects (font (size 2.2 2.2)) (justify left bottom)) (uuid "61636286-c0d3-4abe-ac0a-b5f9076726d1"))
   (text "Flat schematic intentionally used for Rev A validation. Functional blocks are separated visually; all inter-block nets use named global labels." (exclude_from_sim no) (at 20.00 23.00 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "36c30f28-88f9-41d5-854e-e9e234d9120a"))
   (text "REPLACEMENT USB-C DAUGHTERBOARD" (exclude_from_sim no) (at 20.00 35.00 0) (effects (font (size 1.6 1.6)) (justify left bottom)) (uuid "d8a59485-9f56-4088-8a2b-e865c78522f5"))
   (symbol (lib_id "Connector:USB_C_Receptacle_USB2.0_16P") (at 45.00 65.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "2af719e5-87f1-4c0e-b911-61c53da9d388")
@@ -3611,166 +4808,70 @@
   (wire (pts (xy 109.92 97.54) (xy 102.00 97.54)) (stroke (width 0) (type default)) (uuid "2945c9d9-f7e1-40ec-b0f3-82d4b7de14aa"))
   (global_label "GND" (shape passive) (at 102.00 97.54 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "eab7b595-37b1-412a-9747-3aa29533c0dc"))
   (text "Replacement daughterboard keeps the original case USB-C opening; smartification board returns muxed UNNI_AC here." (exclude_from_sim no) (at 20.00 112.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "7b9b12ac-7c6b-48ab-aad2-9ff69ff4f94b"))
-  (text "USB / LI-ION CHARGER + POWERPATH — BQ24074" (exclude_from_sim no) (at 135.00 35.00 0) (effects (font (size 1.6 1.6)) (justify left bottom)) (uuid "02c1f418-397f-4592-aef1-d73ca64cbc31"))
-  (symbol (lib_id "UNNI:BQ24074") (at 175.00 72.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "42ce33d5-feda-4b04-be1e-0f8f59dd7c89")
-    (property "Reference" "U2" (at 175.00 64.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "BQ24074" (at 175.00 80.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm" (at 175.00 72.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "https://www.ti.com/lit/ds/symlink/bq24074.pdf" (at 175.00 72.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 175.00 72.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "331a5ced-bd30-4363-8529-fddb6e7bc278"))
-    (pin "2" (uuid "e342d0ac-2ef6-497f-84fe-95afb33b3634"))
-    (pin "3" (uuid "abbe41d4-1395-4f16-a54d-67e50a2734c2"))
-    (pin "4" (uuid "8fb28ea0-95e9-4990-8bf3-b500459a6ddf"))
-    (pin "5" (uuid "7052137a-288a-4a9e-b960-f3b48d118861"))
-    (pin "6" (uuid "e98e0726-8dd4-49a4-b6e6-cc76f3fb9889"))
-    (pin "7" (uuid "69bd9035-f4f0-43dd-bdb4-f209aae65e86"))
-    (pin "8" (uuid "a36c2311-bf32-40f7-9d49-d974dc721309"))
-    (pin "9" (uuid "3b9b5cde-16c9-4946-a89b-f3c174eb7f92"))
-    (pin "10" (uuid "1395089e-a23b-434b-b42b-a3a8de0f3440"))
-    (pin "11" (uuid "09ad240f-b279-470b-885e-b87b9787abf0"))
-    (pin "12" (uuid "157e7c83-b63c-4c7b-999b-6e08908c2d3d"))
-    (pin "13" (uuid "e9c0d56c-5993-4bdd-b705-fb47ff49a7a0"))
-    (pin "14" (uuid "1eab4fcd-2015-4c9b-981f-b564a48ed5e3"))
-    (pin "15" (uuid "03eadca1-f516-46bf-9f5a-4788f989418a"))
-    (pin "16" (uuid "2e1465af-0c21-46e2-9b9a-7b5d080b1da5"))
-    (pin "17" (uuid "45b0e903-50d8-4b9f-9f18-2b13ca38e9c6"))
-    (instances (project "unni-smartification-c6" (path "/42ce33d5-feda-4b04-be1e-0f8f59dd7c89" (reference "U2") (unit 1))))
-  )
-  (global_label "USB_5V_RAW" (shape passive) (at 205.00 60.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "7476dc8a-c5c3-4d2b-853c-fb1c68f30849"))
-  (wire (pts (xy 205.00 60.00) (xy 198.00 60.00)) (stroke (width 0) (type default)) (uuid "b9a2ad8c-6872-4c0c-99fd-223b043f6ea3"))
-  (wire (pts (xy 198.00 60.00) (xy 198.00 80.24)) (stroke (width 0) (type default)) (uuid "4e5f4c0e-9c69-4c7d-a1e1-faa3a2fff8eb"))
-  (wire (pts (xy 198.00 80.24) (xy 192.78 80.24)) (stroke (width 0) (type default)) (uuid "3b1bb37c-9872-4edd-bd3e-c5b58de64e42"))
-  (symbol (lib_id "Device:C") (at 210.00 70.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "7fe797c2-d555-419d-b239-5dbceb1f0f8e")
-    (property "Reference" "C1" (at 210.00 62.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "4.7uF" (at 210.00 78.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 210.00 70.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 210.00 70.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 210.00 70.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "10ee9513-089f-490a-82cc-714d26808bca"))
-    (pin "2" (uuid "3b5f005c-3d79-4423-8dc8-1ee6b9f0bb04"))
-    (instances (project "unni-smartification-c6" (path "/7fe797c2-d555-419d-b239-5dbceb1f0f8e" (reference "C1") (unit 1))))
-  )
-  (wire (pts (xy 210.00 66.19) (xy 198.00 66.19)) (stroke (width 0) (type default)) (uuid "d788b9a9-246a-428d-9230-c469aecba740"))
-  (wire (pts (xy 210.00 73.81) (xy 210.00 96.00)) (stroke (width 0) (type default)) (uuid "171e0475-d094-4261-9ccf-8b280482ae73"))
-  (wire (pts (xy 157.22 83.43) (xy 151.00 83.43)) (stroke (width 0) (type default)) (uuid "f7bf3065-a2fa-408e-9c95-3246874fa38d"))
-  (wire (pts (xy 157.22 80.89) (xy 151.00 80.89)) (stroke (width 0) (type default)) (uuid "fd55a0c6-f5c8-4a2d-862a-c22755605fa1"))
-  (wire (pts (xy 151.00 80.89) (xy 151.00 83.43)) (stroke (width 0) (type default)) (uuid "d386be36-3749-4f36-b870-895bc2615e82"))
-  (wire (pts (xy 151.00 82.16) (xy 142.00 82.16)) (stroke (width 0) (type default)) (uuid "0ceab1b1-bbb8-4a2d-83e2-89792d91c230"))
-  (global_label "VBAT" (shape passive) (at 142.00 82.16 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "99ea655f-78e3-4c1e-af4c-b1583c2cb012"))
-  (symbol (lib_id "Device:C") (at 145.00 92.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c70959e2-5b5c-41d0-ae21-04bee6f5acd1")
-    (property "Reference" "C2" (at 145.00 84.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10uF" (at 145.00 100.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 145.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 145.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 145.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "0291448d-d71d-48a6-b957-d719107a3d06"))
-    (pin "2" (uuid "e478c253-dcd1-4a1b-a16b-c665eba77e32"))
-    (instances (project "unni-smartification-c6" (path "/c70959e2-5b5c-41d0-ae21-04bee6f5acd1" (reference "C2") (unit 1))))
-  )
-  (wire (pts (xy 145.00 88.19) (xy 151.00 88.19)) (stroke (width 0) (type default)) (uuid "119f965f-69bd-4756-87bc-b9fa59389ab6"))
-  (wire (pts (xy 151.00 88.19) (xy 151.00 82.16)) (stroke (width 0) (type default)) (uuid "250e68c5-cbe6-41cb-b589-92bc01cfbdf2"))
-  (wire (pts (xy 145.00 95.81) (xy 145.00 96.00)) (stroke (width 0) (type default)) (uuid "4e8335fc-7118-4b3c-bc1b-6e0bc2dc276d"))
-  (wire (pts (xy 192.78 73.27) (xy 202.00 73.27)) (stroke (width 0) (type default)) (uuid "6a225b08-81d2-4c02-9f19-a06f0b120d85"))
-  (wire (pts (xy 192.78 75.81) (xy 202.00 75.81)) (stroke (width 0) (type default)) (uuid "bbbcadb3-0322-47df-8597-57b886a42709"))
-  (wire (pts (xy 202.00 73.27) (xy 202.00 75.81)) (stroke (width 0) (type default)) (uuid "95991dce-9ec4-48fa-980d-90d6d349b751"))
-  (wire (pts (xy 202.00 74.54) (xy 212.00 74.54)) (stroke (width 0) (type default)) (uuid "102d205f-de77-45d2-a500-d89da6ef9648"))
-  (global_label "SYS" (shape passive) (at 212.00 74.54 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "92d275a5-4b54-4ce7-a1f7-1452aa389e32"))
-  (symbol (lib_id "Device:C") (at 220.00 82.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "76eacee4-4bd9-4280-867f-1d4b7a322fcc")
-    (property "Reference" "C3" (at 220.00 74.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10uF" (at 220.00 90.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 220.00 82.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 220.00 82.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 220.00 82.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "16efe897-e775-4e17-ad57-9e926185ab04"))
-    (pin "2" (uuid "b8753bea-acca-4e81-86ba-395606cf06aa"))
-    (instances (project "unni-smartification-c6" (path "/76eacee4-4bd9-4280-867f-1d4b7a322fcc" (reference "C3") (unit 1))))
-  )
-  (wire (pts (xy 220.00 78.19) (xy 202.00 78.19)) (stroke (width 0) (type default)) (uuid "320a64ea-d885-4507-9f5e-1d8755e661ed"))
-  (wire (pts (xy 202.00 78.19) (xy 202.00 74.54)) (stroke (width 0) (type default)) (uuid "64acc5ad-69c2-4630-8072-9056aa6b27eb"))
-  (wire (pts (xy 220.00 85.81) (xy 220.00 96.00)) (stroke (width 0) (type default)) (uuid "b1d90ce0-d3ff-4a01-b7d6-e87b9ab14694"))
-  (wire (pts (xy 157.22 78.35) (xy 136.00 78.35)) (stroke (width 0) (type default)) (uuid "af3b8085-db8f-48a6-b01f-5aeb7b4caf8a"))
-  (wire (pts (xy 157.22 75.81) (xy 136.00 75.81)) (stroke (width 0) (type default)) (uuid "7dca5bec-4964-4d80-9957-73e567b08b6d"))
-  (wire (pts (xy 136.00 75.81) (xy 136.00 96.00)) (stroke (width 0) (type default)) (uuid "7411d2db-e8d3-4026-b0c9-c42e07cafe22"))
-  (wire (pts (xy 157.22 73.27) (xy 148.00 73.27)) (stroke (width 0) (type default)) (uuid "95a1e914-b60c-4d74-bb5a-f59b99ef2a8c"))
-  (wire (pts (xy 148.00 73.27) (xy 148.00 60.00)) (stroke (width 0) (type default)) (uuid "48a78606-154c-43fa-8060-0f4d908bc186"))
-  (wire (pts (xy 148.00 60.00) (xy 198.00 60.00)) (stroke (width 0) (type default)) (uuid "e0a88601-7083-4484-9900-2c2a1ce4c208"))
-  (wire (pts (xy 168.65 92.32) (xy 168.65 96.00)) (stroke (width 0) (type default)) (uuid "9c9755b0-69d3-483c-a1fb-8759125090e0"))
-  (wire (pts (xy 176.27 92.32) (xy 176.27 96.00)) (stroke (width 0) (type default)) (uuid "50c3bbc4-94ae-412d-bb8a-ad676e650f9f"))
-  (wire (pts (xy 136.00 96.00) (xy 220.00 96.00)) (stroke (width 0) (type default)) (uuid "3b2a8858-3f49-414d-a971-a4eeab0fa136"))
-  (global_label "GND" (shape passive) (at 178.00 96.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "919a7adb-679f-4b85-8150-10c68071b17e"))
-  (symbol (lib_id "Device:R") (at 168.65 105.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "32267f3e-86ce-428d-aae2-2283828d2950")
-    (property "Reference" "R3" (at 168.65 97.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "3.0k" (at 168.65 113.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 168.65 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 168.65 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 168.65 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "077914c9-386d-4968-b545-f1cc91007a1e"))
-    (pin "2" (uuid "97ba1973-647e-4fa8-aa98-f262f3449fff"))
-    (instances (project "unni-smartification-c6" (path "/32267f3e-86ce-428d-aae2-2283828d2950" (reference "R3") (unit 1))))
-  )
-  (symbol (lib_id "Device:R") (at 215.00 92.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "1c39a2bb-c1f1-40e5-8e47-b3e01194b03a")
-    (property "Reference" "R4" (at 215.00 84.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1.18k" (at 215.00 100.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 215.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 215.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 215.00 92.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "a362ee68-6776-4167-953a-7b270d147f28"))
-    (pin "2" (uuid "1d11c617-bb41-4689-9643-f852b05d19bb"))
-    (instances (project "unni-smartification-c6" (path "/1c39a2bb-c1f1-40e5-8e47-b3e01194b03a" (reference "R4") (unit 1))))
-  )
-  (symbol (lib_id "Device:R") (at 140.00 86.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "ec92edef-51f1-4120-b5ec-513b45b0316f")
-    (property "Reference" "R5" (at 140.00 78.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10k" (at 140.00 94.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 140.00 86.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 140.00 86.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 140.00 86.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "edc2afe1-3711-4d52-a06c-2768b9a6af4d"))
-    (pin "2" (uuid "042cfcb7-d013-4852-bba5-97a77626b1e3"))
-    (instances (project "unni-smartification-c6" (path "/ec92edef-51f1-4120-b5ec-513b45b0316f" (reference "R5") (unit 1))))
-  )
-  (wire (pts (xy 168.65 97.00) (xy 168.65 101.19)) (stroke (width 0) (type default)) (uuid "afd823c1-28fd-4231-aa78-6997723c138a"))
-  (wire (pts (xy 168.65 108.81) (xy 168.65 112.00)) (stroke (width 0) (type default)) (uuid "0a6edf84-f512-481f-a02e-515f7495f6c7"))
-  (wire (pts (xy 168.65 112.00) (xy 178.00 112.00)) (stroke (width 0) (type default)) (uuid "4abea697-ea46-45e3-9bcf-ce09e1137090"))
-  (global_label "GND" (shape passive) (at 178.00 112.00 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "23d08b0c-bd3e-4a34-b629-e0c7b04af57a"))
-  (wire (pts (xy 192.78 78.35) (xy 211.19 78.35)) (stroke (width 0) (type default)) (uuid "8b247e6c-9497-46f4-8505-b7be5222ecd2"))
-  (wire (pts (xy 211.19 78.35) (xy 211.19 92.00)) (stroke (width 0) (type default)) (uuid "3088592a-571d-4a49-92a3-5e07430ea097"))
-  (wire (pts (xy 218.81 92.00) (xy 224.00 92.00)) (stroke (width 0) (type default)) (uuid "82a0e017-5fff-4652-960f-79fd3cca86b6"))
-  (global_label "GND" (shape passive) (at 224.00 92.00 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "8a61ee64-5070-4519-9465-97cc5abbb049"))
-  (wire (pts (xy 157.22 85.97) (xy 143.81 85.97)) (stroke (width 0) (type default)) (uuid "91237b14-4b0c-4334-96fc-27ae7fe5e1f1"))
-  (wire (pts (xy 136.19 86.00) (xy 132.00 86.00)) (stroke (width 0) (type default)) (uuid "f8dcfb5f-955f-42cc-b048-a56f1ec2f31c"))
-  (global_label "GND" (shape passive) (at 132.00 86.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "6b37a8a1-d589-4112-a0ad-e55737a9a264"))
-  (no_connect (at 192.78 83.43) (uuid "94a1729b-6b40-4673-83c8-0f833137d181"))
-  (no_connect (at 192.78 85.97) (uuid "320ef9d1-4ef8-4fcf-b85a-ef9803b47341"))
-  (symbol (lib_id "Connector_Generic:Conn_01x02") (at 145.00 105.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "347a98c3-1c28-4036-af0f-ff974e1ce748")
-    (property "Reference" "J1" (at 145.00 97.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "Li-ion battery" (at 145.00 113.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical" (at 145.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 145.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 145.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "44e8ea21-97a8-4d91-8974-3c8ea3159042"))
-    (pin "2" (uuid "c7ab1247-e183-4e83-9877-b836cceabc83"))
-    (instances (project "unni-smartification-c6" (path "/347a98c3-1c28-4036-af0f-ff974e1ce748" (reference "J1") (unit 1))))
-  )
-  (symbol (lib_id "Connector_Generic:Conn_01x02") (at 210.00 105.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "3b967f05-81f3-47de-aa5d-a4ba5d983a9c")
-    (property "Reference" "J2" (at 210.00 97.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "UNNI DC" (at 210.00 113.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical" (at 210.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 210.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 210.00 105.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "78ac5dbb-a3b7-41e2-8603-50456d3b8c4b"))
-    (pin "2" (uuid "1a3590ca-60fd-4a5f-a787-d6f91353c763"))
-    (instances (project "unni-smartification-c6" (path "/3b967f05-81f3-47de-aa5d-a4ba5d983a9c" (reference "J2") (unit 1))))
-  )
-  (wire (pts (xy 139.92 105.00) (xy 132.00 105.00)) (stroke (width 0) (type default)) (uuid "498b6310-6468-4a23-9d05-488832d44672"))
-  (global_label "VBAT" (shape passive) (at 132.00 105.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "f6e5aebc-db6c-4b48-81e6-d4b4f48cb20a"))
-  (wire (pts (xy 139.92 107.54) (xy 132.00 107.54)) (stroke (width 0) (type default)) (uuid "3badba40-0489-400f-ae0f-5a650ca1c1b5"))
-  (global_label "GND" (shape passive) (at 132.00 107.54 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "f3cff930-96b3-4f92-881c-fce83950f5ff"))
-  (wire (pts (xy 204.92 105.00) (xy 197.00 105.00)) (stroke (width 0) (type default)) (uuid "3e133cfe-addf-4ecc-add9-d9233fddc9d1"))
-  (global_label "VBAT" (shape passive) (at 197.00 105.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "9e8cce99-ea75-4019-b832-18d2f73a0042"))
-  (wire (pts (xy 204.92 107.54) (xy 197.00 107.54)) (stroke (width 0) (type default)) (uuid "dc4ec274-a0f0-4bfd-836f-57de671b6074"))
-  (global_label "GND" (shape passive) (at 197.00 107.54 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "24c674b8-ac43-4dd4-b63a-ac061f37f2f7"))
-  (text "VBAT is the battery node and is also routed directly to UNNI_DC." (exclude_from_sim no) (at 135.00 118.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "154b831b-03c3-4fbb-b098-2d2003ee7b8a"))
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   (text "3.3 V ESP SUPPLY — TPS63031 BUCK-BOOST" (exclude_from_sim no) (at 135.00 130.00 0) (effects (font (size 1.6 1.6)) (justify left bottom)) (uuid "e6b98d12-b767-4eb8-8af6-143bd965759e"))
   (symbol (lib_id "Regulator_Switching:TPS63031DSK") (at 180.00 155.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "643e04ce-c171-4e0b-9cd1-9b14bd3b855c")
     (property "Reference" "U3" (at 180.00 147.00 0) (effects (font (size 1.27 1.27))))
@@ -3960,10 +5061,10 @@
   (global_label "TOUCH_CTL" (shape passive) (at 363.24 92.54 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "da484b5c-bd8c-414b-8848-03ee156ca37b"))
   (wire (pts (xy 355.24 95.08) (xy 363.24 95.08)) (stroke (width 0) (type default)) (uuid "1db7d14f-0907-42e1-a3dd-9d501f143ada"))
   (global_label "BOOST_EN" (shape passive) (at 363.24 95.08 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "7bf6aeb6-cd5e-4b6c-bff7-5b76ce67daff"))
-  (wire (pts (xy 355.24 77.30) (xy 363.24 77.30)) (stroke (width 0) (type default)) (uuid "8cee2ed1-be3d-4c1e-b162-f35ce317cc1f"))
-  (global_label "USB_N" (shape passive) (at 363.24 77.30 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "8f6f5edd-1d77-4ace-b0e6-fca7852e0240"))
-  (wire (pts (xy 355.24 79.84) (xy 363.24 79.84)) (stroke (width 0) (type default)) (uuid "db6bfadc-2450-4de1-b64e-66e64a0aa35f"))
-  (global_label "USB_P" (shape passive) (at 363.24 79.84 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "bbdc12ef-73f8-49a5-940a-d4f282a56137"))
+  
+  
+  
+  
   (wire (pts (xy 355.24 72.22) (xy 363.24 72.22)) (stroke (width 0) (type default)) (uuid "bc7aa89c-4aa6-42cb-a5e1-4181fdcbc742"))
   (global_label "UART_RX" (shape passive) (at 363.24 72.22 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "a5037563-1251-4b24-91b1-a33ed0008f22"))
   (wire (pts (xy 355.24 69.68) (xy 363.24 69.68)) (stroke (width 0) (type default)) (uuid "4f7d39c6-75ae-4d09-84da-d23abf60d452"))
@@ -4033,160 +5134,68 @@
   (wire (pts (xy 332.62 133.73) (xy 337.00 133.73)) (stroke (width 0) (type default)) (uuid "9db5eb46-f960-4bb1-b8ab-eb5a5cacc02d"))
   (global_label "GND" (shape passive) (at 337.00 133.73 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "53caa651-c40a-4993-9eda-030170122006"))
   (text "GPIO4/5/8/9/15 are strapping pins; Rev A avoids them for Unni runtime signals except GPIO9 used only as BOOT." (exclude_from_sim no) (at 300.00 150.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "f0b1fe6c-5abd-4c7a-a4de-af550e584c2e"))
-  (text "FORCED-AWAKE 5 V + USB PRIORITY MUX" (exclude_from_sim no) (at 20.00 135.00 0) (effects (font (size 1.6 1.6)) (justify left bottom)) (uuid "60664beb-057a-42a4-8469-6caf7fd24dab"))
-  (symbol (lib_id "UNNI:TPS61023") (at 55.00 165.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "dbc98743-839b-4b8c-b019-76494ae2343e")
-    (property "Reference" "U4" (at 55.00 157.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "TPS61023" (at 55.00 173.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_SOT:SOT-563" (at 55.00 165.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps61023.pdf" (at 55.00 165.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 55.00 165.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "0c6290b5-4f0d-41e9-bca9-fe64e8cf6687"))
-    (pin "2" (uuid "7e3afb70-e296-4fc5-bf8b-e1630f33dd97"))
-    (pin "3" (uuid "74455faa-0de3-45ea-a152-f9263fc26833"))
-    (pin "4" (uuid "bd28a98a-d2af-489f-9d2c-ba02e3a07cdc"))
-    (pin "5" (uuid "2ae6112c-143d-45d7-aa58-43c2f22e9e9e"))
-    (pin "6" (uuid "1de01ff7-bbd2-4497-bb4d-eb710a0c3e0f"))
-    (instances (project "unni-smartification-c6" (path "/dbc98743-839b-4b8c-b019-76494ae2343e" (reference "U4") (unit 1))))
-  )
-  (global_label "VBAT" (shape passive) (at 20.00 166.27 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "6b10e27c-6217-4ddd-b83b-f7223ad54506"))
-  (wire (pts (xy 20.00 166.27) (xy 41.03 166.27)) (stroke (width 0) (type default)) (uuid "869cd635-f1a2-4e02-8794-f1cc16484bc0"))
-  (symbol (lib_id "Device:L") (at 82.00 166.27 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "36ff3b6d-ab96-40d2-b6f8-3c776f12e2c2")
-    (property "Reference" "L2" (at 82.00 158.27 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "1.0uH" (at 82.00 174.27 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Inductor_SMD:L_Changjiang_FNR3015S" (at 82.00 166.27 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 82.00 166.27 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 82.00 166.27 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "da2022f8-13ad-4824-ad84-358e9cf8116a"))
-    (pin "2" (uuid "2b59045e-8ead-47ac-8be4-a160b3226870"))
-    (instances (project "unni-smartification-c6" (path "/36ff3b6d-ab96-40d2-b6f8-3c776f12e2c2" (reference "L2") (unit 1))))
-  )
-  (symbol (lib_id "Device:C") (at 30.00 180.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "73962eb6-0dab-4b08-8e66-83c4a3f65289")
-    (property "Reference" "C8" (at 30.00 172.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "10uF" (at 30.00 188.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 30.00 180.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 30.00 180.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 30.00 180.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "6898b010-9cc3-4725-bcfa-6298ce91e05b"))
-    (pin "2" (uuid "988e98c4-c941-425b-9b39-3f798dbe2dd4"))
-    (instances (project "unni-smartification-c6" (path "/73962eb6-0dab-4b08-8e66-83c4a3f65289" (reference "C8") (unit 1))))
-  )
-  (wire (pts (xy 68.97 166.27) (xy 78.19 166.27)) (stroke (width 0) (type default)) (uuid "df11f907-c007-421c-be37-b52452a512fd"))
-  (wire (pts (xy 85.81 166.27) (xy 92.00 166.27)) (stroke (width 0) (type default)) (uuid "d1933a4f-945c-4e62-a0b5-677f309e1e3a"))
-  (wire (pts (xy 20.00 166.27) (xy 30.00 166.27)) (stroke (width 0) (type default)) (uuid "f50b7665-4f9b-4666-a59b-5dc937c2a570"))
-  (wire (pts (xy 30.00 166.27) (xy 30.00 176.19)) (stroke (width 0) (type default)) (uuid "4b4675f4-6f43-4929-b381-76acb87d57e7"))
-  (wire (pts (xy 30.00 183.81) (xy 30.00 196.00)) (stroke (width 0) (type default)) (uuid "120ef39d-510c-4bb6-858f-c030cb08d5fc"))
-  (wire (pts (xy 68.97 171.35) (xy 112.00 171.35)) (stroke (width 0) (type default)) (uuid "d42f11ff-77ae-494a-b847-1d73e5bf48c1"))
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   (global_label "BOOST_5V" (shape passive) (at 140.00 171.35 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "8f7e9deb-d6a3-4f59-af69-81b878a673f0"))
-  (wire (pts (xy 112.00 171.35) (xy 140.00 171.35)) (stroke (width 0) (type default)) (uuid "1551b243-41dc-4512-841f-ca2ea26ca3e5"))
-  (symbol (lib_id "Device:R") (at 100.00 182.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "4e6db8e5-a99f-495a-bf5c-9c8d429a0522")
-    (property "Reference" "R8" (at 100.00 174.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "732k" (at 100.00 190.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 100.00 182.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 100.00 182.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 100.00 182.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "c256101b-0760-4a7c-9850-2e6b27a2986d"))
-    (pin "2" (uuid "7e6d32e2-4620-434c-9cdb-5fcd12a6dbd8"))
-    (instances (project "unni-smartification-c6" (path "/4e6db8e5-a99f-495a-bf5c-9c8d429a0522" (reference "R8") (unit 1))))
-  )
-  (symbol (lib_id "Device:R") (at 100.00 196.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c60688a2-93ed-45c6-b607-5e436e65b90e")
-    (property "Reference" "R9" (at 100.00 188.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "100k" (at 100.00 204.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 100.00 196.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 100.00 196.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 100.00 196.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "b2d94b85-a5f5-4aee-91dd-1b3461f55957"))
-    (pin "2" (uuid "ea5841a8-238a-4fc0-b882-5b485fb36b19"))
-    (instances (project "unni-smartification-c6" (path "/c60688a2-93ed-45c6-b607-5e436e65b90e" (reference "R9") (unit 1))))
-  )
-  (wire (pts (xy 100.00 178.19) (xy 100.00 171.35)) (stroke (width 0) (type default)) (uuid "f04a767c-b60f-48ee-b032-152ed883a16b"))
-  (wire (pts (xy 100.00 185.81) (xy 100.00 192.19)) (stroke (width 0) (type default)) (uuid "bf32f951-69d4-4990-8054-e2e4de3b117d"))
-  (wire (pts (xy 100.00 189.00) (xy 78.00 189.00)) (stroke (width 0) (type default)) (uuid "af8ff2f1-e62c-4502-b327-2c6e4f7fcc21"))
-  (wire (pts (xy 78.00 189.00) (xy 78.00 171.35)) (stroke (width 0) (type default)) (uuid "b2cdaf89-ca0b-480c-8994-0c11ce135252"))
-  (wire (pts (xy 78.00 171.35) (xy 41.03 171.35)) (stroke (width 0) (type default)) (uuid "7bb27974-53d4-41f1-ae41-da16afb06e40"))
-  (wire (pts (xy 100.00 199.81) (xy 100.00 204.00)) (stroke (width 0) (type default)) (uuid "b0f68d5a-6c20-42b5-aead-8d28513f4b39"))
-  (symbol (lib_id "Device:C") (at 120.00 185.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "30abb1a6-959a-4763-be86-cdaeabbe720f")
-    (property "Reference" "C9" (at 120.00 177.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "22uF" (at 120.00 193.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 120.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 120.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 120.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "140a3f41-78f7-4099-a4dc-d1573306e602"))
-    (pin "2" (uuid "0f0d0f5b-dc44-4f48-a1aa-afec0ac071fd"))
-    (instances (project "unni-smartification-c6" (path "/30abb1a6-959a-4763-be86-cdaeabbe720f" (reference "C9") (unit 1))))
-  )
-  (wire (pts (xy 120.00 181.19) (xy 120.00 171.35)) (stroke (width 0) (type default)) (uuid "036589e7-8a4f-489d-ab21-5eebf30f5b3c"))
-  (wire (pts (xy 120.00 188.81) (xy 120.00 204.00)) (stroke (width 0) (type default)) (uuid "11263509-cdc8-4e6a-a569-a5e93b0187d0"))
-  (symbol (lib_id "Device:C") (at 132.00 185.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "31c0f4fb-214a-4869-a98e-faedf71d483c")
-    (property "Reference" "C10" (at 132.00 177.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "22uF" (at 132.00 193.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 132.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 132.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 132.00 185.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "78e22997-8486-4943-8588-60d2438479e9"))
-    (pin "2" (uuid "5a8a40c3-9973-4d93-b850-3a495419a0d3"))
-    (instances (project "unni-smartification-c6" (path "/31c0f4fb-214a-4869-a98e-faedf71d483c" (reference "C10") (unit 1))))
-  )
-  (wire (pts (xy 132.00 181.19) (xy 132.00 171.35)) (stroke (width 0) (type default)) (uuid "e9aff86c-f023-48b5-8462-660dee6c9bfb"))
-  (wire (pts (xy 132.00 188.81) (xy 132.00 204.00)) (stroke (width 0) (type default)) (uuid "7162c7b2-c3e4-46e8-8990-3363dbd0cb83"))
-  (wire (pts (xy 52.46 152.30) (xy 52.46 148.00)) (stroke (width 0) (type default)) (uuid "d2dab563-5c3c-4ae3-95e8-78cc8d60344e"))
-  (wire (pts (xy 52.46 148.00) (xy 22.00 148.00)) (stroke (width 0) (type default)) (uuid "c9ade2ca-ed16-4f93-acbb-f1427680860e"))
-  (global_label "GND" (shape passive) (at 22.00 148.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "c97c5aaf-5034-414a-809f-cde7a308e381"))
-  (wire (pts (xy 30.00 196.00) (xy 30.00 204.00)) (stroke (width 0) (type default)) (uuid "54528feb-082e-4e4a-beb0-9f8a2f6b48dd"))
-  (wire (pts (xy 30.00 204.00) (xy 132.00 204.00)) (stroke (width 0) (type default)) (uuid "7755d9ec-8238-4be1-850a-20cda2b5d53a"))
-  (wire (pts (xy 100.00 204.00) (xy 100.00 204.00)) (stroke (width 0) (type default)) (uuid "2030552c-018f-4a7e-a9f3-354c53a28680"))
-  (wire (pts (xy 41.03 168.81) (xy 35.00 168.81)) (stroke (width 0) (type default)) (uuid "55ec7ccc-e0aa-4b9f-8d59-607e2d1815b9"))
-  (global_label "BOOST_EN_HW" (shape passive) (at 35.00 168.81 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "75b1b3c0-bda5-4cfe-80a7-3d9519310be9"))
-  (symbol (lib_id "UNNI:2N7002") (at 45.00 218.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "48cb93c7-f492-4e9d-8173-08cc8d8e421f")
-    (property "Reference" "Q1" (at 45.00 210.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "2N7002" (at 45.00 226.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 45.00 218.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "" (at 45.00 218.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 45.00 218.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "9cc1f8f3-f3a1-4ca1-b248-8633587781f8"))
-    (pin "2" (uuid "bff8a465-a698-4f68-8c64-3af8e5ac6e5a"))
-    (pin "3" (uuid "d67f2e69-aed4-428e-a32d-365650baa681"))
-    (instances (project "unni-smartification-c6" (path "/48cb93c7-f492-4e9d-8173-08cc8d8e421f" (reference "Q1") (unit 1))))
-  )
-  (global_label "BOOST_EN" (shape passive) (at 29.38 218.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "d0435ba1-1ae5-47d0-88be-bcb9f33a922c"))
-  (wire (pts (xy 29.38 218.00) (xy 37.38 218.00)) (stroke (width 0) (type default)) (uuid "a18cd43e-62e4-448d-823a-2b14164cd309"))
-  (wire (pts (xy 45.00 225.62) (xy 45.00 231.00)) (stroke (width 0) (type default)) (uuid "d9b005d9-af37-4a16-b60b-3cce767bc4ec"))
-  (global_label "GND" (shape passive) (at 45.00 231.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "3aa1d0ad-6e8c-49a1-82a3-2828c9da1fe6"))
-  (wire (pts (xy 52.62 218.00) (xy 61.00 218.00)) (stroke (width 0) (type default)) (uuid "ab3c291c-fd44-47df-8703-739aa01bf60c"))
-  (global_label "BOOST_EN_HW" (shape passive) (at 61.00 218.00 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "d4be0f09-3b79-4fe5-be09-ebcf5f6884d8"))
-  (text "Q1 / BOOST_EN_HW is the hardware-inhibit stage; final polarity/gate conditioning will be checked in ERC/design review." (exclude_from_sim no) (at 20.00 238.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "ab39e46b-59e1-4e82-bf1a-75e4153e2d26"))
-  (symbol (lib_id "UNNI:TPS2116") (at 110.00 222.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "1620878a-6424-4699-9173-fe35fddc82b8")
-    (property "Reference" "U5" (at 110.00 214.00 0) (effects (font (size 1.27 1.27))))
-    (property "Value" "TPS2116" (at 110.00 230.00 0) (effects (font (size 1.27 1.27))))
-    (property "Footprint" "Package_SOT:SOT-563-8" (at 110.00 222.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps2116.pdf" (at 110.00 222.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (property "Description" "" (at 110.00 222.00 0) (hide yes) (effects (font (size 1.27 1.27))))
-    (pin "1" (uuid "b1ac5e7c-f2c3-4d81-becd-047f761222e2"))
-    (pin "2" (uuid "7f330ce7-2de2-4cf2-a05a-b2286486cd57"))
-    (pin "3" (uuid "71f26eb9-dab1-44f4-865c-5f114cf6be14"))
-    (pin "4" (uuid "219d758b-1eaa-436c-9174-1b69832972d6"))
-    (pin "5" (uuid "aa41af02-3309-4597-b4d4-68f27b078d61"))
-    (pin "6" (uuid "7823e171-9e33-4acb-9721-da7caaccc6bf"))
-    (pin "7" (uuid "f642e3de-d09b-4baf-aaf9-f4ff3289f440"))
-    (pin "8" (uuid "083b1a74-d572-4f13-a423-a0837ae2fe62"))
-    (instances (project "unni-smartification-c6" (path "/1620878a-6424-4699-9173-fe35fddc82b8" (reference "U5") (unit 1))))
-  )
-  (global_label "USB_5V_RAW" (shape passive) (at 75.00 229.62 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "1a7398b8-b435-489b-8d83-f38e602951a9"))
-  (wire (pts (xy 75.00 229.62) (xy 96.03 229.62)) (stroke (width 0) (type default)) (uuid "ee35dbfc-9096-4ff3-bd21-359da1f69ba0"))
-  (global_label "BOOST_5V" (shape passive) (at 75.00 222.00 180) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify right)) (uuid "ce7253da-59f7-4fd6-913e-0ae3f8b4d22e"))
-  (wire (pts (xy 75.00 222.00) (xy 96.03 222.00)) (stroke (width 0) (type default)) (uuid "2f624b22-9cbd-4710-b114-95de61a650b0"))
-  (wire (pts (xy 96.03 227.08) (xy 88.00 227.08)) (stroke (width 0) (type default)) (uuid "039f981c-a662-4f9c-82bf-2671c85fc92a"))
-  (wire (pts (xy 88.00 227.08) (xy 88.00 229.62)) (stroke (width 0) (type default)) (uuid "4beacbbd-3be7-45f0-a6c6-fb959ab2195a"))
-  (wire (pts (xy 96.03 224.54) (xy 88.00 224.54)) (stroke (width 0) (type default)) (uuid "f2cdd0f9-499d-475b-bea4-a4de11aa58ae"))
-  (wire (pts (xy 88.00 224.54) (xy 88.00 229.62)) (stroke (width 0) (type default)) (uuid "1418069b-4202-4946-b4c0-60f0220f7dfc"))
-  (wire (pts (xy 123.97 224.54) (xy 136.00 224.54)) (stroke (width 0) (type default)) (uuid "d7f1081e-3c1b-4c5b-bb19-f7001fa30ac7"))
-  (wire (pts (xy 123.97 227.08) (xy 136.00 227.08)) (stroke (width 0) (type default)) (uuid "b3b9d485-7bb4-48bc-a80b-1fa042861c93"))
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
   (wire (pts (xy 136.00 224.54) (xy 136.00 227.08)) (stroke (width 0) (type default)) (uuid "c89c2570-57a8-4d66-8cc2-b71b9a77ec92"))
   (wire (pts (xy 136.00 225.81) (xy 148.00 225.81)) (stroke (width 0) (type default)) (uuid "f17139b7-d80b-41e4-941b-233db9829caa"))
   (global_label "UNNI_AC" (shape passive) (at 148.00 225.81 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "29e58fb4-28e8-4708-af58-b16c2117b12f"))
-  (wire (pts (xy 107.46 208.03) (xy 107.46 202.00)) (stroke (width 0) (type default)) (uuid "b0a664d9-52d6-4a42-9a5a-d0e79784167c"))
-  (global_label "GND" (shape passive) (at 107.46 202.00 0) (fields_autoplaced yes) (effects (font (size 0.9 0.9)) (justify left)) (uuid "4fa71101-fb27-4927-9149-e4ae9fc3496c"))
-  (no_connect (at 123.97 229.62) (uuid "3349e845-245c-4033-8798-98af8a9dec94"))
-  (text "TPS2116: VIN1 USB_5V_RAW has priority over VIN2 BOOST_5V; both VOUT pins are visibly tied to UNNI_AC." (exclude_from_sim no) (at 70.00 244.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "85bdafe6-b5af-4e8a-bb64-3f53728f3bd0"))
+  
+  
+  
+  
   (text "UNNI PASSIVE SIGNAL TAPS + TOUCH/BACKLIGHT" (exclude_from_sim no) (at 245.00 175.00 0) (effects (font (size 1.6 1.6)) (justify left bottom)) (uuid "9bd3b911-908c-4137-a41c-e910fc1a87e0"))
   (symbol (lib_id "Connector_Generic:Conn_01x03") (at 260.00 200.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "e06bcb82-82ed-43c4-be1e-7c1ec21a15b9")
     (property "Reference" "J3" (at 260.00 192.00 0) (effects (font (size 1.27 1.27))))
@@ -4464,8 +5473,468 @@
   (label "{USB_RAW_P USB_RAW_N}" (at 300.00 187.00 0) (effects (font (size 0.9 0.9)) (justify left bottom)) (uuid "3f6f3434-2fc1-44d6-b58f-b37491db2611"))
   (bus (pts (xy 300.00 191.00) (xy 340.00 191.00)) (stroke (width 0) (type default)) (uuid "3c7dff21-0e0b-4aa3-9bae-392e543d22c7"))
   (label "{USB_P USB_N}" (at 300.00 191.00 0) (effects (font (size 0.9 0.9)) (justify left bottom)) (uuid "08c93823-b706-4d78-be5a-8f600e41b0b6"))
-  (text "J8 inter-board pin plan: 1 USB_5V_RAW, 2 USB_RAW_P, 3 USB_RAW_N, 4 UNNI_AC, 5 GND." (exclude_from_sim no) (at 20.00 122.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "81b69302-76db-4d00-bde2-5a8b2bf0b7ca"))
-  (text "J9 original-Unni connection: UNNI_AC + GND. Main-board J2: VBAT/UNNI_DC + GND." (exclude_from_sim no) (at 20.00 127.00 0) (effects (font (size 1.0 1.0)) (justify left bottom)) (uuid "9f6e8c2a-e7a5-4ef4-a6b8-136b30d710bb"))
+  
+  
   (sheet_instances (path "/" (page "1")))
   (embedded_fonts no)
+
+  (text "USB / LI-ION CHARGER + LOAD SHARING — MCP73812 + AO3401A" (exclude_from_sim no) (at 135.00 34.00 0) (effects (font (size 1.45 1.45)) (justify left bottom)) (uuid "3f7dd3aa-42f1-4c7e-b4fd-9c952289d212"))
+  (text "~300 mA charge. CE is MCU-controlled and defaults low. USB feeds SYS through Schottky; battery feeds SYS through Q101 only when USB is absent." (exclude_from_sim no) (at 135.00 38.00 0) (effects (font (size 0.78 0.78)) (justify left bottom)) (uuid "1c05dcc5-43eb-491c-a6b2-ca1835ce8f83"))
+  (symbol (lib_id "Battery_Management:MCP73812T-420I-OT") (at 175.00 68.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "ddb04bab-9ede-4083-b7d0-d97b7999863c")
+    (property "Reference" "U101" (at 175.00 61.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "MCP73812T-420I/OT" (at 175.00 75.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-5" (at 175.00 68.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf" (at 175.00 68.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 175.00 68.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "194e7eb1-9061-4626-bb4c-9ecc25e5455f"))
+    (pin "2" (uuid "6dad5aee-8811-4467-bfdd-ec1fa0f9ccf5"))
+    (pin "3" (uuid "644f8484-d93e-4575-b3e4-ea742a654d8a"))
+    (pin "4" (uuid "d4c80289-2967-40a8-b132-7307daed1136"))
+    (pin "5" (uuid "21ba238f-0936-461b-b6b9-e247dcf4f27b"))
+    (instances (project "unni-smartification-c6" (path "/ddb04bab-9ede-4083-b7d0-d97b7999863c" (reference "U101") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 154.00 65.46 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "80b05943-9e3c-4e9a-89f7-535bbe16a13b")
+    (property "Reference" "R101" (at 154.00 58.46 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "3.3k" (at 154.00 72.46 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 154.00 65.46 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 154.00 65.46 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 154.00 65.46 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "8b674319-0ed8-471a-a13a-6ef73fd1925d"))
+    (pin "2" (uuid "12bd6b8d-4cf9-4da0-80cd-68d6d7051d1d"))
+    (instances (project "unni-smartification-c6" (path "/80b05943-9e3c-4e9a-89f7-535bbe16a13b" (reference "R101") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 150.00 80.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "a6bff6ee-d4c6-4498-b6f4-6f06daa348c6")
+    (property "Reference" "R102" (at 150.00 73.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "100k" (at 150.00 87.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 150.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 150.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 150.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "120a052e-bb47-4926-b452-67115bc64120"))
+    (pin "2" (uuid "101a6fbd-e802-46a9-9f52-8b5d99d48a2f"))
+    (instances (project "unni-smartification-c6" (path "/a6bff6ee-d4c6-4498-b6f4-6f06daa348c6" (reference "R102") (unit 1))))
+  )
+  (symbol (lib_id "Device:C") (at 190.00 80.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "e77c5987-2b6e-4f70-b9fa-06e7ab3485d3")
+    (property "Reference" "C101" (at 190.00 73.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1uF" (at 190.00 87.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 190.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 190.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 190.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "566a6745-cef7-4d70-a6b6-a9d2d52e3fb7"))
+    (pin "2" (uuid "c881fbf1-2c44-4826-b437-85186f07454b"))
+    (instances (project "unni-smartification-c6" (path "/e77c5987-2b6e-4f70-b9fa-06e7ab3485d3" (reference "C101") (unit 1))))
+  )
+  (symbol (lib_id "Device:C") (at 200.00 80.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "bada5df3-4837-4324-a5e4-201334a3cb53")
+    (property "Reference" "C102" (at 200.00 73.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1uF" (at 200.00 87.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 200.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 200.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 200.00 80.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "7aff1e69-7680-45ed-9d98-66ea24f5a13f"))
+    (pin "2" (uuid "3e42ed50-c2de-4b98-a197-546900f576a5"))
+    (instances (project "unni-smartification-c6" (path "/bada5df3-4837-4324-a5e4-201334a3cb53" (reference "C102") (unit 1))))
+  )
+  (symbol (lib_id "Device:D_Schottky") (at 215.00 52.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "e5d86781-a157-4b57-a35b-d839038452fa")
+    (property "Reference" "D101" (at 215.00 45.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "SS14" (at 215.00 59.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Diode_SMD:D_SMA" (at 215.00 52.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 215.00 52.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 215.00 52.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "b99796d6-ddf9-40b3-8637-2678fd09bd03"))
+    (pin "2" (uuid "18e430ad-182b-4d07-bc8f-a6e4147ad650"))
+    (instances (project "unni-smartification-c6" (path "/e5d86781-a157-4b57-a35b-d839038452fa" (reference "D101") (unit 1))))
+  )
+  (symbol (lib_id "Transistor_FET:Q_PMOS_GSD") (at 215.00 88.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "78ea466c-2cf8-4572-a6cc-7d549613a2c5")
+    (property "Reference" "Q101" (at 215.00 81.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AO3401A" (at 215.00 95.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 215.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 215.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 215.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "8f0fbd25-1813-4973-bb42-3f41d068928e"))
+    (pin "2" (uuid "0158e2fe-c2fb-4261-b0cb-44bf5f8944e9"))
+    (pin "3" (uuid "ffbd7626-5231-4bd8-a440-865926ac3364"))
+    (instances (project "unni-smartification-c6" (path "/78ea466c-2cf8-4572-a6cc-7d549613a2c5" (reference "Q101") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 195.00 88.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c1740e98-9673-40e5-bfd1-6c8a3c1b0393")
+    (property "Reference" "R103" (at 195.00 81.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "100k" (at 195.00 95.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 195.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 195.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 195.00 88.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "cd75597c-65a7-492e-814a-0d2d33a33e82"))
+    (pin "2" (uuid "185b287c-524e-42ea-8de8-f175280af076"))
+    (instances (project "unni-smartification-c6" (path "/c1740e98-9673-40e5-bfd1-6c8a3c1b0393" (reference "R103") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 205.00 100.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "67149e2e-dfd8-4264-b40a-ac82add6dabf")
+    (property "Reference" "R104" (at 205.00 93.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1M" (at 205.00 107.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 205.00 100.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 205.00 100.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 205.00 100.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "eed9a888-d773-4f7e-a01f-f1e9a768e9e9"))
+    (pin "2" (uuid "07ef04b6-e0cb-4a0d-b699-3a13b9edeb88"))
+    (instances (project "unni-smartification-c6" (path "/67149e2e-dfd8-4264-b40a-ac82add6dabf" (reference "R104") (unit 1))))
+  )
+  (global_label "USB_5V_RAW" (shape passive) (at 140.00 75.62 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "20e8e17d-82c1-4e97-922f-8df7aa11041a"))
+  (wire (pts (xy 140.00 75.62) (xy 175.00 75.62)) (stroke (width 0) (type default)) (uuid "1b40c8a6-5cbf-4ecb-ac7c-0c138c71732e"))
+  (wire (pts (xy 175.00 75.62) (xy 190.00 75.62)) (stroke (width 0) (type default)) (uuid "46630fb5-63ff-4c48-a15c-3919b4747ede"))
+  (wire (pts (xy 190.00 75.62) (xy 190.00 76.19)) (stroke (width 0) (type default)) (uuid "7cbb58d6-dbca-4a40-99a1-16e9a8d3bfc7"))
+  (wire (pts (xy 190.00 83.81) (xy 190.00 88.00)) (stroke (width 0) (type default)) (uuid "62112568-1c88-4767-8fb2-ce43ce5d097d"))
+  (global_label "GND" (shape passive) (at 190.00 88.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "74b7d467-9f1d-4911-a6a6-6c13836b14f0"))
+  (wire (pts (xy 175.00 60.38) (xy 175.00 55.00)) (stroke (width 0) (type default)) (uuid "5f382749-fd56-45ba-a2da-69eab4841bf7"))
+  (global_label "GND" (shape passive) (at 175.00 55.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "e7a0bedc-ba07-485a-b41b-0e1714f06f92"))
+  (wire (pts (xy 164.84 65.46) (xy 157.81 65.46)) (stroke (width 0) (type default)) (uuid "d4a32a0a-ee21-4cf4-94cf-9b3288dc827a"))
+  (wire (pts (xy 150.19 65.46) (xy 145.00 65.46)) (stroke (width 0) (type default)) (uuid "7b84cb6d-6555-49f0-b41c-84d738a5977a"))
+  (global_label "GND" (shape passive) (at 145.00 65.46 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "f1d5921a-28a7-45cf-bba2-aefc04cd34d6"))
+  (wire (pts (xy 164.84 70.54) (xy 150.00 70.54)) (stroke (width 0) (type default)) (uuid "8cd2e8f5-127c-467b-b164-7a000e5c2e5c"))
+  (global_label "CHARGE_EN" (shape passive) (at 150.00 70.54 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "50576ce4-ac44-42bf-9a51-3f2da07f9261"))
+  (wire (pts (xy 150.00 70.54) (xy 150.00 76.19)) (stroke (width 0) (type default)) (uuid "f01420f5-dd01-4044-9240-389c00721bfd"))
+  (wire (pts (xy 150.00 83.81) (xy 150.00 88.00)) (stroke (width 0) (type default)) (uuid "e5b7d945-ef9e-4eb2-95f2-a5d55f374649"))
+  (global_label "GND" (shape passive) (at 150.00 88.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "aa33cd2a-d78d-442d-8ba0-df65df4c7104"))
+  (wire (pts (xy 185.16 70.54) (xy 200.00 70.54)) (stroke (width 0) (type default)) (uuid "fffa0606-969e-4044-ab30-2accb20f45c3"))
+  (global_label "VBAT" (shape passive) (at 205.00 70.54 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "33838a3c-c05a-4d32-a554-15a12970a734"))
+  (wire (pts (xy 200.00 70.54) (xy 200.00 76.19)) (stroke (width 0) (type default)) (uuid "b771ee24-7c34-4425-9918-b8cf503a06e8"))
+  (wire (pts (xy 200.00 83.81) (xy 200.00 88.00)) (stroke (width 0) (type default)) (uuid "9aa3ca74-603f-43af-9119-cc08a8aeafad"))
+  (global_label "GND" (shape passive) (at 200.00 88.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "03e2dcdd-3f4b-498f-9173-56c40fb0386f"))
+  (wire (pts (xy 200.00 70.54) (xy 205.00 70.54)) (stroke (width 0) (type default)) (uuid "98212ee5-9f86-494b-8f9f-a9fa925d5b8c"))
+  (global_label "USB_5V_RAW" (shape passive) (at 200.00 52.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "82ca77d4-f350-46fb-bb56-33424ded6e1a"))
+  (wire (pts (xy 200.00 52.00) (xy 211.19 52.00)) (stroke (width 0) (type default)) (uuid "fb312b8e-3232-4f9a-87c1-810c2ccad9ee"))
+  (wire (pts (xy 218.81 52.00) (xy 230.00 52.00)) (stroke (width 0) (type default)) (uuid "a5758a89-7735-4485-a67b-abab146dd0d2"))
+  (global_label "SYS" (shape passive) (at 230.00 52.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "71c4ef9d-cb19-4cb9-9cf2-3ec558a8d678"))
+  (wire (pts (xy 217.54 82.92) (xy 217.54 76.00)) (stroke (width 0) (type default)) (uuid "c2d065bf-6fc1-419e-b77b-88df364945c2"))
+  (global_label "VBAT" (shape passive) (at 217.54 76.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "59696f8c-9346-4ed6-b71d-5db5d058a346"))
+  (wire (pts (xy 217.54 93.08) (xy 217.54 105.00)) (stroke (width 0) (type default)) (uuid "55246962-2eb1-49a0-9aa8-55fc5aa4b9c0"))
+  (wire (pts (xy 217.54 105.00) (xy 230.00 105.00)) (stroke (width 0) (type default)) (uuid "2941460b-a84f-40b7-b9e3-f261b2e4274d"))
+  (global_label "SYS" (shape passive) (at 230.00 105.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "7ab3ce1c-621b-4f4f-b83e-fc2cf7ec430a"))
+  (global_label "USB_5V_RAW" (shape passive) (at 185.00 88.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "4f3cf95a-7400-4e43-b6fd-916bf0d44c1a"))
+  (wire (pts (xy 185.00 88.00) (xy 191.19 88.00)) (stroke (width 0) (type default)) (uuid "245d52f6-82c1-4c37-a957-7a00ae9b6f46"))
+  (wire (pts (xy 198.81 88.00) (xy 209.92 88.00)) (stroke (width 0) (type default)) (uuid "c83643d0-8a18-48d6-a9fe-96bdf2d43352"))
+  (wire (pts (xy 205.00 96.19) (xy 205.00 88.00)) (stroke (width 0) (type default)) (uuid "066d008c-14f0-473c-b8c3-7810a2350669"))
+  (wire (pts (xy 205.00 88.00) (xy 209.92 88.00)) (stroke (width 0) (type default)) (uuid "06d9743b-1c65-4018-85a1-5463f658bd7b"))
+  (wire (pts (xy 205.00 103.81) (xy 205.00 108.00)) (stroke (width 0) (type default)) (uuid "5e3b8430-5508-4674-8345-1b5c54c5052a"))
+  (global_label "GND" (shape passive) (at 205.00 108.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "b17c9921-83f9-4295-90ec-e9dd273fa9c5"))
+  (text "Q101: 100k from USB to gate + 1M gate pulldown. USB present -> PMOS off; USB absent -> battery path on." (exclude_from_sim no) (at 135.00 116.00 0) (effects (font (size 0.78 0.78)) (justify left bottom)) (uuid "6d23a151-316d-4ca0-b2fd-ca1827839732"))
+  (text "FORCED-AWAKE 5 V — TPS613222A + AO3401/AO3400 INHIBIT + AP22913 OR-ING" (exclude_from_sim no) (at 20.00 128.00 0) (effects (font (size 1.4 1.4)) (justify left bottom)) (uuid "1642ce66-4464-486a-8f0e-00307c150807"))
+  (text "TPS613222A is hard-disconnected in normal battery mode. Q104 forces BOOST_GATE low whenever real USB is present." (exclude_from_sim no) (at 20.00 132.00 0) (effects (font (size 0.78 0.78)) (justify left bottom)) (uuid "0e68ce3b-f401-42e2-ae5a-51030196fda1"))
+  (symbol (lib_id "Transistor_FET:Q_PMOS_GSD") (at 45.00 158.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "2f485cc8-a5ef-4826-ba09-b70410a69adc")
+    (property "Reference" "Q102" (at 45.00 151.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AO3401A" (at 45.00 165.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 45.00 158.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 45.00 158.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 45.00 158.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "9a7165f4-4d90-47b0-ad06-715305f9666e"))
+    (pin "2" (uuid "9b1228bc-588d-4954-bfb9-173af36d0937"))
+    (pin "3" (uuid "eb3b91cd-953b-4ba7-8c79-58f5f10934fe"))
+    (instances (project "unni-smartification-c6" (path "/2f485cc8-a5ef-4826-ba09-b70410a69adc" (reference "Q102") (unit 1))))
+  )
+  (symbol (lib_id "Transistor_FET:Q_NMOS_GSD") (at 30.00 182.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "68d2e0d1-8a0e-4e4d-976e-55a8794dc1cc")
+    (property "Reference" "Q103" (at 30.00 175.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AO3400A" (at 30.00 189.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 30.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 30.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 30.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "6f27c61c-a592-4c84-917c-e25fd09171ca"))
+    (pin "2" (uuid "e4e18f30-2442-41f0-ba18-5366552c9926"))
+    (pin "3" (uuid "29dc2a5f-6e27-414b-8d8d-fa327f32ed86"))
+    (instances (project "unni-smartification-c6" (path "/68d2e0d1-8a0e-4e4d-976e-55a8794dc1cc" (reference "Q103") (unit 1))))
+  )
+  (symbol (lib_id "Transistor_FET:Q_NMOS_GSD") (at 65.00 182.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "cec2a5b9-27a1-4e61-a36e-b115e617f4f1")
+    (property "Reference" "Q104" (at 65.00 175.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AO3400A" (at 65.00 189.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 65.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 65.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 65.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "cdce1061-2109-42b3-aead-8378b6914927"))
+    (pin "2" (uuid "816d1c90-2533-45cf-aa16-a46f89eb48ef"))
+    (pin "3" (uuid "7beef8e2-a165-4f79-b329-f8717ccb039f"))
+    (instances (project "unni-smartification-c6" (path "/cec2a5b9-27a1-4e61-a36e-b115e617f4f1" (reference "Q104") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 15.00 182.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "7c0ca366-562d-4ca7-b31e-ed8096eb503b")
+    (property "Reference" "R105" (at 15.00 175.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "10k" (at 15.00 189.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 15.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 15.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 15.00 182.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "1415ec12-9991-4ffe-9ae0-4f26c679639b"))
+    (pin "2" (uuid "214a050e-7608-46d4-81ff-3a23eb82a291"))
+    (instances (project "unni-smartification-c6" (path "/7c0ca366-562d-4ca7-b31e-ed8096eb503b" (reference "R105") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 42.00 145.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c2923ae1-b052-48ab-86dd-ca2d5c0b59ca")
+    (property "Reference" "R106" (at 42.00 138.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "100k" (at 42.00 152.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 42.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 42.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 42.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "1c1b67f7-9b66-4ec4-81a8-b983fd075e66"))
+    (pin "2" (uuid "043054cd-6cf2-4bf2-a4c9-a4cd911b4f4b"))
+    (instances (project "unni-smartification-c6" (path "/c2923ae1-b052-48ab-86dd-ca2d5c0b59ca" (reference "R106") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 25.00 198.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "e0646ef5-e85f-4c7d-a344-17c070386f88")
+    (property "Reference" "R107" (at 25.00 191.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "100k" (at 25.00 205.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 25.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 25.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 25.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "ff30bc5b-059b-46eb-a923-ecdde10e644f"))
+    (pin "2" (uuid "a6eeac97-a957-4d06-8053-94467144201e"))
+    (instances (project "unni-smartification-c6" (path "/e0646ef5-e85f-4c7d-a344-17c070386f88" (reference "R107") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 60.00 198.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "59132f86-c14e-42f1-906e-b51710b81f42")
+    (property "Reference" "R108" (at 60.00 191.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1M" (at 60.00 205.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 60.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 60.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 60.00 198.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "2cb33875-572c-4a2e-9e5c-cec472c28a74"))
+    (pin "2" (uuid "443f6d23-7cee-431f-9d4a-67ee9f59f0fe"))
+    (instances (project "unni-smartification-c6" (path "/59132f86-c14e-42f1-906e-b51710b81f42" (reference "R108") (unit 1))))
+  )
+  (symbol (lib_id "Regulator_Switching:TPS613222ADBZ") (at 85.00 160.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "53ed6458-919c-4727-9d5d-f9115fdf235c")
+    (property "Reference" "U102" (at 85.00 153.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "TPS613222ADBZ" (at 85.00 167.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23" (at 85.00 160.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "http://www.ti.com/lit/ds/symlink/tps61322.pdf" (at 85.00 160.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 85.00 160.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "54194140-7e36-44bf-accf-9f38986f31b8"))
+    (pin "2" (uuid "b7a6eb99-7479-4691-b414-c1c94af8b1a3"))
+    (pin "3" (uuid "76138f08-be73-419e-a9ac-9a689df620ca"))
+    (instances (project "unni-smartification-c6" (path "/53ed6458-919c-4727-9d5d-f9115fdf235c" (reference "U102") (unit 1))))
+  )
+  (symbol (lib_id "Device:L") (at 65.00 162.54 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "3db7e4c2-5328-4546-9e72-1b84f0f9a6c7")
+    (property "Reference" "L101" (at 65.00 155.54 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "2.2uH" (at 65.00 169.54 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Inductor_SMD:L_1210_3225Metric" (at 65.00 162.54 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 65.00 162.54 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 65.00 162.54 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "8c487b52-585e-49c0-8769-93839a0da080"))
+    (pin "2" (uuid "efa6eb5d-c2c3-465d-9e68-f509eaf32f92"))
+    (instances (project "unni-smartification-c6" (path "/3db7e4c2-5328-4546-9e72-1b84f0f9a6c7" (reference "L101") (unit 1))))
+  )
+  (symbol (lib_id "Device:C") (at 58.00 178.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "eda228ff-f304-47dc-b187-d7eccd6a81ab")
+    (property "Reference" "C103" (at 58.00 171.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "10uF" (at 58.00 185.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric" (at 58.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 58.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 58.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "2892a881-4143-48c5-bbb0-698db7e1fa96"))
+    (pin "2" (uuid "fe3cc27a-d6da-405e-8e7a-35d68bc14c02"))
+    (instances (project "unni-smartification-c6" (path "/eda228ff-f304-47dc-b187-d7eccd6a81ab" (reference "C103") (unit 1))))
+  )
+  (symbol (lib_id "Device:C") (at 105.00 178.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "22460d6f-6320-4fda-a7b9-546fe1676821")
+    (property "Reference" "C104" (at 105.00 171.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "22uF" (at 105.00 185.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Capacitor_SMD:C_0805_2012Metric" (at 105.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 105.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 105.00 178.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "32bb93ed-d432-4a17-92f7-3aebf936cc1e"))
+    (pin "2" (uuid "9153ad26-e875-4a02-94de-c0e46ab19af4"))
+    (instances (project "unni-smartification-c6" (path "/22460d6f-6320-4fda-a7b9-546fe1676821" (reference "C104") (unit 1))))
+  )
+  (symbol (lib_id "Device:D_Schottky") (at 85.00 145.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp yes) (uuid "203d398b-1e3d-4375-a77e-3cbfdaaa746b")
+    (property "Reference" "D102" (at 85.00 138.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "DNP / SS14" (at 85.00 152.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Diode_SMD:D_SMA" (at 85.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 85.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 85.00 145.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "76af9363-b96a-4b25-8262-1579ff3b2d77"))
+    (pin "2" (uuid "b676263a-8742-4fd2-84b8-4a0b68d2c145"))
+    (instances (project "unni-smartification-c6" (path "/203d398b-1e3d-4375-a77e-3cbfdaaa746b" (reference "D102") (unit 1))))
+  )
+  (symbol (lib_id "Power_Management:AP22913CN4") (at 55.00 220.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "d6a24e89-22e7-4db4-b525-4ca65c19468a")
+    (property "Reference" "U103" (at 55.00 213.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AP22913W6-7" (at 55.00 227.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-6" (at 55.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "https://www.diodes.com/assets/Datasheets/AP22913.pdf" (at 55.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 55.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "A1" (uuid "5709708a-875a-4af0-8fc3-f5db9cbe9b5c"))
+    (pin "A2" (uuid "b3878936-a701-4082-925c-67234df37095"))
+    (pin "B1" (uuid "8df84f72-e85b-42e4-b2f4-e3c1d933ab86"))
+    (pin "B2" (uuid "11b0d418-e296-40c0-87fd-fa434ee40be3"))
+    (instances (project "unni-smartification-c6" (path "/d6a24e89-22e7-4db4-b525-4ca65c19468a" (reference "U103") (unit 1))))
+  )
+  (symbol (lib_id "Power_Management:AP22913CN4") (at 105.00 220.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "354d35b9-7e9d-4a52-a93c-14735ee69b5c")
+    (property "Reference" "U104" (at 105.00 213.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "AP22913W6-7" (at 105.00 227.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Package_TO_SOT_SMD:SOT-23-6" (at 105.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "https://www.diodes.com/assets/Datasheets/AP22913.pdf" (at 105.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 105.00 220.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "A1" (uuid "33f41ebd-a063-4155-a920-1b487b077f2a"))
+    (pin "A2" (uuid "a2dc1ab6-9c37-4567-8a53-166ab53311d0"))
+    (pin "B1" (uuid "5c626414-e378-49c4-a71a-27a3533b8f0f"))
+    (pin "B2" (uuid "d6d682e3-6a0e-4010-a5e0-caa9e0b05b64"))
+    (instances (project "unni-smartification-c6" (path "/354d35b9-7e9d-4a52-a93c-14735ee69b5c" (reference "U104") (unit 1))))
+  )
+  (wire (pts (xy 47.54 152.92) (xy 47.54 140.00)) (stroke (width 0) (type default)) (uuid "a6b99aa3-7680-47f0-b04f-f01de8f36b73"))
+  (global_label "VBAT" (shape passive) (at 47.54 140.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "7f37cfa3-91f1-4ad3-b436-fbc29777f7a9"))
+  (wire (pts (xy 47.54 163.08) (xy 47.54 170.00)) (stroke (width 0) (type default)) (uuid "c0b46d91-6298-443b-b83e-f234f2148432"))
+  (global_label "BOOST_VIN" (shape passive) (at 47.54 170.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "48d71b82-3661-47d8-8b51-920f451f37e1"))
+  (wire (pts (xy 42.00 141.19) (xy 42.00 140.00)) (stroke (width 0) (type default)) (uuid "08cabe6d-9066-41ff-a75e-1e2bf0d2dd17"))
+  (wire (pts (xy 42.00 140.00) (xy 47.54 140.00)) (stroke (width 0) (type default)) (uuid "19acf542-911e-487d-a193-c1c237d45699"))
+  (wire (pts (xy 42.00 148.81) (xy 42.00 158.00)) (stroke (width 0) (type default)) (uuid "380392a7-25ac-479d-a55f-b5556639399e"))
+  (wire (pts (xy 42.00 158.00) (xy 39.92 158.00)) (stroke (width 0) (type default)) (uuid "63b64f1d-93c3-4088-83a9-21a90fd84dd4"))
+  (wire (pts (xy 32.54 187.08) (xy 32.54 158.00)) (stroke (width 0) (type default)) (uuid "46dd5955-dfd7-4982-a271-d6185a1228da"))
+  (wire (pts (xy 32.54 158.00) (xy 39.92 158.00)) (stroke (width 0) (type default)) (uuid "871e6672-720a-418b-8521-52e4ba181185"))
+  (wire (pts (xy 32.54 176.92) (xy 32.54 172.00)) (stroke (width 0) (type default)) (uuid "bad4a5b4-5cf1-4569-b178-61bf5c1d5128"))
+  (global_label "GND" (shape passive) (at 32.54 172.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "a2b768c0-bcb6-44bd-895f-e3846c0aabc8"))
+  (global_label "BOOST_CMD" (shape passive) (at 5.00 182.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "c90e9233-1e48-4119-a264-81afe5a6b2f9"))
+  (wire (pts (xy 5.00 182.00) (xy 11.19 182.00)) (stroke (width 0) (type default)) (uuid "f3e0aa80-20f5-45a5-8f8f-08de074413f4"))
+  (wire (pts (xy 18.81 182.00) (xy 24.92 182.00)) (stroke (width 0) (type default)) (uuid "c733c1f5-a038-4092-a74f-53e37ef81116"))
+  (wire (pts (xy 25.00 194.19) (xy 25.00 182.00)) (stroke (width 0) (type default)) (uuid "16404fe5-11d3-4d69-a057-c943774aabe0"))
+  (wire (pts (xy 25.00 182.00) (xy 24.92 182.00)) (stroke (width 0) (type default)) (uuid "18f263a7-9143-4a31-adf8-3cd207f0311b"))
+  (wire (pts (xy 25.00 201.81) (xy 25.00 206.00)) (stroke (width 0) (type default)) (uuid "00abd510-08bc-43f0-bb91-d75ce0b04798"))
+  (global_label "GND" (shape passive) (at 25.00 206.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "5132d76d-0ad4-4525-a73c-4506e0d032e3"))
+  (wire (pts (xy 67.54 187.08) (xy 50.00 187.08)) (stroke (width 0) (type default)) (uuid "6bece40f-d74b-43a1-8bc0-527bfb139972"))
+  (wire (pts (xy 50.00 187.08) (xy 50.00 182.00)) (stroke (width 0) (type default)) (uuid "800bd7df-d0eb-4e4d-aec0-03d20db373f2"))
+  (wire (pts (xy 50.00 182.00) (xy 24.92 182.00)) (stroke (width 0) (type default)) (uuid "c5067f08-fa33-4135-bc14-e01ac991292e"))
+  (wire (pts (xy 67.54 176.92) (xy 67.54 172.00)) (stroke (width 0) (type default)) (uuid "5b72c9e9-cf7b-4c0c-9dbb-8c0587bc265c"))
+  (global_label "GND" (shape passive) (at 67.54 172.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "176a55d9-6a4b-4a88-950a-0712f14e49de"))
+  (global_label "USB_5V_RAW" (shape passive) (at 52.00 182.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "60e3b8f5-d936-4fbb-9306-188157d2d0a7"))
+  (wire (pts (xy 52.00 182.00) (xy 59.92 182.00)) (stroke (width 0) (type default)) (uuid "2239c12f-992c-4b75-826a-d4a0ca4a1eb5"))
+  (wire (pts (xy 60.00 194.19) (xy 60.00 182.00)) (stroke (width 0) (type default)) (uuid "adac91dd-a4b8-44a9-9fec-5a837952e4dd"))
+  (wire (pts (xy 60.00 182.00) (xy 59.92 182.00)) (stroke (width 0) (type default)) (uuid "0a6203ef-99d9-473a-aa8d-c07d977d5870"))
+  (wire (pts (xy 60.00 201.81) (xy 60.00 206.00)) (stroke (width 0) (type default)) (uuid "af290be5-4c57-49b6-b491-e3b6b3afdb0e"))
+  (global_label "GND" (shape passive) (at 60.00 206.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "89c2e811-95cc-4a12-b888-c2e7da58731c"))
+  (global_label "BOOST_VIN" (shape passive) (at 55.00 162.54 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "68bd1a98-d19a-4c67-b6ac-fd7672797da8"))
+  (wire (pts (xy 55.00 162.54) (xy 61.19 162.54)) (stroke (width 0) (type default)) (uuid "6a0531c8-d134-4791-8de0-ba8c4bbf1fc0"))
+  (wire (pts (xy 68.81 162.54) (xy 74.84 162.54)) (stroke (width 0) (type default)) (uuid "a138ba4e-f766-42eb-85f9-3df6fabc3c0a"))
+  (wire (pts (xy 58.00 174.19) (xy 58.00 162.54)) (stroke (width 0) (type default)) (uuid "dc007d2e-7d10-4735-abce-06539b054525"))
+  (wire (pts (xy 58.00 162.54) (xy 61.19 162.54)) (stroke (width 0) (type default)) (uuid "89405127-2754-4eca-b0eb-d437261340b9"))
+  (wire (pts (xy 58.00 181.81) (xy 58.00 188.00)) (stroke (width 0) (type default)) (uuid "20db40f6-d4df-4516-a99d-4e81f185503d"))
+  (global_label "GND" (shape passive) (at 58.00 188.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "c6c2e935-d6d6-402a-b3d3-115315b87a52"))
+  (wire (pts (xy 85.00 152.38) (xy 85.00 150.00)) (stroke (width 0) (type default)) (uuid "170c0c5c-dff1-4edf-8bf7-f17b85087125"))
+  (global_label "GND" (shape passive) (at 85.00 150.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "dbe168d0-22a8-4db2-a4b7-dc3cb1f1e409"))
+  (wire (pts (xy 95.16 162.54) (xy 115.00 162.54)) (stroke (width 0) (type default)) (uuid "98636adf-07f7-4124-8503-120244980510"))
+  (global_label "BOOST_5V" (shape passive) (at 115.00 162.54 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "85e10307-6ca5-4867-b26d-812d04bef04e"))
+  (wire (pts (xy 105.00 174.19) (xy 105.00 162.54)) (stroke (width 0) (type default)) (uuid "26996226-2086-4539-831d-6977dedd1546"))
+  (wire (pts (xy 105.00 181.81) (xy 105.00 188.00)) (stroke (width 0) (type default)) (uuid "6fb30d84-7d91-4854-a4a0-addbcf627361"))
+  (global_label "GND" (shape passive) (at 105.00 188.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "4e859035-2be4-4bf6-b8e7-92d069cd4651"))
+  (wire (pts (xy 74.84 162.54) (xy 74.84 145.00)) (stroke (width 0) (type default)) (uuid "cfa7c7f4-05f1-4e20-871a-c628eda30bc1"))
+  (wire (pts (xy 74.84 145.00) (xy 81.19 145.00)) (stroke (width 0) (type default)) (uuid "fbc2714b-18f6-482f-8a9e-b2e15f16aff8"))
+  (wire (pts (xy 88.81 145.00) (xy 95.16 145.00)) (stroke (width 0) (type default)) (uuid "c324abd1-078f-4da0-be26-f1c97c233778"))
+  (wire (pts (xy 95.16 145.00) (xy 95.16 162.54)) (stroke (width 0) (type default)) (uuid "6244220b-4b42-4d00-ba15-91ef26ac5bcc"))
+  (global_label "USB_5V_RAW" (shape passive) (at 35.00 222.54 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "6eefd881-f8ce-41cb-8ba5-0196e0c63ae7"))
+  (wire (pts (xy 35.00 222.54) (xy 44.84 222.54)) (stroke (width 0) (type default)) (uuid "ad4652a5-44b8-47fd-b4c7-d52b59445775"))
+  (wire (pts (xy 40.00 222.54) (xy 40.00 217.46)) (stroke (width 0) (type default)) (uuid "b2a47b7d-b628-499b-885d-534cde4dcd6c"))
+  (wire (pts (xy 40.00 217.46) (xy 44.84 217.46)) (stroke (width 0) (type default)) (uuid "f263ebfe-c20a-43a6-9a06-23a29fafc749"))
+  (wire (pts (xy 55.00 212.38) (xy 55.00 208.00)) (stroke (width 0) (type default)) (uuid "483bbbf9-14c4-44c8-9929-61cc1980b40f"))
+  (global_label "GND" (shape passive) (at 55.00 208.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "15854307-2a57-4089-bb5b-3758c6239a0a"))
+  (global_label "BOOST_5V" (shape passive) (at 85.00 222.54 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "b4efbd9a-dc19-4c58-8521-776b4a998f9b"))
+  (wire (pts (xy 85.00 222.54) (xy 94.84 222.54)) (stroke (width 0) (type default)) (uuid "75353dc0-4ce9-4bb2-b9e9-3000079d961f"))
+  (wire (pts (xy 90.00 222.54) (xy 90.00 217.46)) (stroke (width 0) (type default)) (uuid "8838dcd8-5fa5-4cd7-8c8e-46f60a952fd5"))
+  (wire (pts (xy 90.00 217.46) (xy 94.84 217.46)) (stroke (width 0) (type default)) (uuid "edf3fd0e-2dc6-4e3a-abd2-df24406e28f1"))
+  (wire (pts (xy 105.00 212.38) (xy 105.00 208.00)) (stroke (width 0) (type default)) (uuid "558cf73f-1e15-4d6c-b4c4-727d3f416de9"))
+  (global_label "GND" (shape passive) (at 105.00 208.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "2f021a62-37dc-4b00-b86b-a83ce9dc7e5c"))
+  (wire (pts (xy 65.16 222.54) (xy 75.00 222.54)) (stroke (width 0) (type default)) (uuid "d4855b00-f806-4bdd-9ad3-d92efc6f4526"))
+  (wire (pts (xy 75.00 222.54) (xy 75.00 235.00)) (stroke (width 0) (type default)) (uuid "bc2195f0-d6eb-4ee2-8a25-7554a656f9f1"))
+  (wire (pts (xy 115.16 222.54) (xy 125.00 222.54)) (stroke (width 0) (type default)) (uuid "211d713d-15f0-4a01-a5d9-ef8159e634bc"))
+  (wire (pts (xy 125.00 222.54) (xy 125.00 235.00)) (stroke (width 0) (type default)) (uuid "311c68df-d919-4cd1-bff8-56fe38d6a970"))
+  (wire (pts (xy 75.00 235.00) (xy 125.00 235.00)) (stroke (width 0) (type default)) (uuid "fcba788a-949a-401e-9657-4106837ea688"))
+  (global_label "UNNI_AC" (shape passive) (at 125.00 235.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "578fea17-6fe2-4256-94b9-4e44dfb6f705"))
+  (junction (at 75.00 235.00) (diameter 0) (color 0 0 0 0) (uuid "7774fc39-fb48-4a90-bdcc-a63c6c204568"))
+  (junction (at 125.00 235.00) (diameter 0) (color 0 0 0 0) (uuid "5df587d5-d900-484d-9d21-dbc3d8d8c193"))
+  (text "U103/U104 are AP22913 logical symbols; PCB target is AP22913W6-7 SOT-26. OFF-state TRCB prevents backfeed between real USB and boosted 5 V." (exclude_from_sim no) (at 20.00 240.00 0) (effects (font (size 0.74 0.74)) (justify left bottom)) (uuid "fb498801-12ed-4d4d-96b1-927226390047"))
+  (text "ADC SENSE + BATTERY TEMPERATURE" (exclude_from_sim no) (at 20.00 248.00 0) (effects (font (size 1.25 1.25)) (justify left bottom)) (uuid "73e5bdcd-8657-476c-8023-84cabac122c4"))
+  (symbol (lib_id "Device:R") (at 35.00 258.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "98b914ef-877f-456a-a659-722d94469cee")
+    (property "Reference" "R110" (at 35.00 251.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1M" (at 35.00 265.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 35.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 35.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 35.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "df4a4b3f-b59e-4c03-81c9-82cccf435c03"))
+    (pin "2" (uuid "198a1d28-737c-41c4-8fd0-1aba6a74982d"))
+    (instances (project "unni-smartification-c6" (path "/98b914ef-877f-456a-a659-722d94469cee" (reference "R110") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 55.00 258.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "5683825d-0d27-48ce-a08c-d961c25200ae")
+    (property "Reference" "R111" (at 55.00 251.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "1M" (at 55.00 265.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 55.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 55.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 55.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "e8298d96-f4d0-4858-8cd9-6a0b93e36204"))
+    (pin "2" (uuid "aca2f134-e0ba-4256-8974-9303f2cdb8e6"))
+    (instances (project "unni-smartification-c6" (path "/5683825d-0d27-48ce-a08c-d961c25200ae" (reference "R111") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 75.00 258.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "23554674-d2ea-4fe0-abfd-94feb8b303ca")
+    (property "Reference" "R112" (at 75.00 251.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "220k" (at 75.00 265.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 75.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 75.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 75.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "ed59b306-68aa-42a2-bcc6-82298c87209b"))
+    (pin "2" (uuid "6ba85522-4bbd-4115-b2b3-c24f0d3fbf4c"))
+    (instances (project "unni-smartification-c6" (path "/23554674-d2ea-4fe0-abfd-94feb8b303ca" (reference "R112") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 95.00 258.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "6f2b7a7b-620c-41d1-bb2d-cf64ff973b49")
+    (property "Reference" "R113" (at 95.00 251.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "220k" (at 95.00 265.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 95.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 95.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 95.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "dd617a76-6ebe-410d-9c1a-4a1bde681456"))
+    (pin "2" (uuid "3ef09ada-aeaf-4537-894d-61486647113b"))
+    (instances (project "unni-smartification-c6" (path "/6f2b7a7b-620c-41d1-bb2d-cf64ff973b49" (reference "R113") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 115.00 258.00 90) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c49ba7c1-7024-4228-a074-bbcc20eeb590")
+    (property "Reference" "R114" (at 115.00 251.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "10k" (at 115.00 265.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 115.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 115.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 115.00 258.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "eb29ffa7-a12e-415a-8575-1264802edb99"))
+    (pin "2" (uuid "6f6cf640-d3a0-4ccc-b269-f50c0dac946d"))
+    (instances (project "unni-smartification-c6" (path "/c49ba7c1-7024-4228-a074-bbcc20eeb590" (reference "R114") (unit 1))))
+  )
+  (symbol (lib_id "Device:R") (at 125.00 266.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "c40acb71-2a42-430d-8be3-668cbcfa238d")
+    (property "Reference" "R115" (at 125.00 259.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "10k NTC" (at 125.00 273.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 125.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 125.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 125.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "1c5afdbb-6eac-4f5a-9777-7c9b92fed953"))
+    (pin "2" (uuid "00318665-c2fb-4417-9d06-fe991b579a80"))
+    (instances (project "unni-smartification-c6" (path "/c40acb71-2a42-430d-8be3-668cbcfa238d" (reference "R115") (unit 1))))
+  )
+  (symbol (lib_id "Device:C") (at 105.00 266.00 0) (unit 1) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (uuid "089f7fbb-c5f2-450a-b994-644bc7f314e5")
+    (property "Reference" "C105" (at 105.00 259.00 0) (effects (font (size 0.9 0.9))))
+    (property "Value" "100nF" (at 105.00 273.00 0) (effects (font (size 0.9 0.9))))
+    (property "Footprint" "Capacitor_SMD:C_0603_1608Metric" (at 105.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Datasheet" "" (at 105.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (property "Description" "" (at 105.00 266.00 0) (hide yes) (effects (font (size 1 1))))
+    (pin "1" (uuid "d981b62c-8f6d-49b9-aeca-871c7fab68cf"))
+    (pin "2" (uuid "f52a7632-0ca9-42ce-bc52-c9385d52770f"))
+    (instances (project "unni-smartification-c6" (path "/089f7fbb-c5f2-450a-b994-644bc7f314e5" (reference "C105") (unit 1))))
+  )
+  (global_label "VBAT" (shape passive) (at 25.00 258.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "ae43ac73-b77d-4251-ae19-b33cc5de95db"))
+  (wire (pts (xy 25.00 258.00) (xy 31.19 258.00)) (stroke (width 0) (type default)) (uuid "36cbba1c-f61e-4c3b-924e-0be8c3c8d3ad"))
+  (wire (pts (xy 38.81 258.00) (xy 51.19 258.00)) (stroke (width 0) (type default)) (uuid "0cacce22-2a2b-4513-a9a6-3dc070a980f5"))
+  (global_label "BAT_ADC" (shape passive) (at 45.00 258.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "64b6df92-1fc6-47f6-b7cc-80fd71b42333"))
+  (wire (pts (xy 58.81 258.00) (xy 62.00 258.00)) (stroke (width 0) (type default)) (uuid "c9778b36-18f0-4798-8075-904a61930e37"))
+  (global_label "GND" (shape passive) (at 62.00 258.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "4596ccd0-11c3-422f-87f7-5a967efbc86a"))
+  (global_label "USB_5V_RAW" (shape passive) (at 65.00 258.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "75f0ca38-b970-40a6-9a23-1aefef735371"))
+  (wire (pts (xy 65.00 258.00) (xy 71.19 258.00)) (stroke (width 0) (type default)) (uuid "63ffbc21-cf92-45b8-ad30-a12c9b52df94"))
+  (wire (pts (xy 78.81 258.00) (xy 91.19 258.00)) (stroke (width 0) (type default)) (uuid "fbb4a1de-3db9-4867-b15a-14183a85c8a9"))
+  (global_label "USB_ADC" (shape passive) (at 85.00 258.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "7fff3da5-d93b-47f1-b7bd-4e425e38604d"))
+  (wire (pts (xy 98.81 258.00) (xy 102.00 258.00)) (stroke (width 0) (type default)) (uuid "d56d9b7d-a3a2-41c1-8f53-7aaa0df3f574"))
+  (global_label "GND" (shape passive) (at 102.00 258.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "f69ab45c-32d8-4fe7-9d45-b2133d729ac1"))
+  (global_label "BAT_TEMP_EXCITE" (shape passive) (at 105.00 258.00 180) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "22140c16-98e6-44c7-90fa-3a134a7687d7"))
+  (wire (pts (xy 105.00 258.00) (xy 111.19 258.00)) (stroke (width 0) (type default)) (uuid "035cbeca-1dc4-4e11-af67-4bed080f5305"))
+  (wire (pts (xy 118.81 258.00) (xy 125.00 258.00)) (stroke (width 0) (type default)) (uuid "1dac8b5b-6407-4435-9996-08c8b1ee3e97"))
+  (global_label "BAT_TEMP_ADC" (shape passive) (at 125.00 258.00 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "a5aa2b37-8d2f-4923-af98-e76f469e46fe"))
+  (wire (pts (xy 125.00 258.00) (xy 125.00 262.19)) (stroke (width 0) (type default)) (uuid "630d293b-d9d6-451f-9fe6-7ce1b251b1a7"))
+  (wire (pts (xy 125.00 269.81) (xy 125.00 274.00)) (stroke (width 0) (type default)) (uuid "7bb5d653-c4ad-49d5-9d3f-416079feb676"))
+  (global_label "GND" (shape passive) (at 125.00 274.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "6cc92b61-2347-4732-ae52-84c88911ed86"))
+  (wire (pts (xy 105.00 262.19) (xy 105.00 258.00)) (stroke (width 0) (type default)) (uuid "bf3c3e08-dbe0-4a00-8e18-a6842aa08d55"))
+  (wire (pts (xy 105.00 269.81) (xy 105.00 274.00)) (stroke (width 0) (type default)) (uuid "37baa5ea-ddf6-4ad3-9a8b-1fe88ad5f097"))
+  (global_label "GND" (shape passive) (at 105.00 274.00 90) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify right)) (uuid "8b010329-cc0e-4e70-98ff-afd20cf5ba09"))
+  (wire (pts (xy 355.24 97.62) (xy 370.00 97.62)) (stroke (width 0) (type default)) (uuid "609ca550-eb81-4901-a7fe-e0fb5ac6501f"))
+  (global_label "BAT_TEMP_ADC" (shape passive) (at 370.00 97.62 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "6ba33b0e-ed98-43dc-bdd2-24a755ea8d4d"))
+  (wire (pts (xy 355.24 82.38) (xy 370.00 82.38)) (stroke (width 0) (type default)) (uuid "dd3af11f-73b8-4c28-83e0-8fdcdb893c45"))
+  (global_label "CHARGE_EN" (shape passive) (at 370.00 82.38 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "9bbcd1b8-7608-4266-929f-e45e614d9837"))
+  (wire (pts (xy 355.24 79.84) (xy 370.00 79.84)) (stroke (width 0) (type default)) (uuid "24b539e8-ca4d-45d5-ba46-889a62d824eb"))
+  (global_label "BAT_TEMP_EXCITE" (shape passive) (at 370.00 79.84 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "e5b6d56a-4742-4fec-b36a-1f56e3cea93c"))
+  (wire (pts (xy 355.24 77.30) (xy 370.00 77.30)) (stroke (width 0) (type default)) (uuid "d8f710cc-4393-4294-95f9-5617de48ffb9"))
+  (global_label "BOOST_CMD" (shape passive) (at 370.00 77.30 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "4fb28e62-2e40-471b-a1ac-0c4f7e551f9e"))
+  (wire (pts (xy 355.24 102.70) (xy 370.00 102.70)) (stroke (width 0) (type default)) (uuid "28ffee5c-a790-476e-94fe-a5082b708228"))
+  (global_label "USB_N" (shape passive) (at 370.00 102.70 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "90d57a6d-7a36-4f2f-9af9-79a671deba1f"))
+  (wire (pts (xy 355.24 100.16) (xy 370.00 100.16)) (stroke (width 0) (type default)) (uuid "83f2f969-5f3d-4178-8250-b1806f93fbe5"))
+  (global_label "USB_P" (shape passive) (at 370.00 100.16 0) (fields_autoplaced yes) (effects (font (size 0.85 0.85)) (justify left)) (uuid "7da84961-5f8b-4dcd-836d-878da3ad6878"))
 )

@@ -1,8 +1,8 @@
 (export
 	(version "E")
 	(design
-		(source "/mnt/data/unni-smartification-c6-kicad10-revA-v9-wired/unni-smartification-c6.kicad_sch")
-		(date "2026-08-18T15:44:05")
+		(source "/mnt/data/unni-smartification-c6-kicad10-revA-v11-lowcost-power/unni-smartification-c6.kicad_sch")
+		(date "2026-08-18T18:44:37")
 		(tool "Eeschema 10.0.5")
 		(sheet
 			(number "1")
@@ -11,7 +11,7 @@
 			(title_block
 				(title "Unni CO2 Smartification — ESP32-C6 Rev A")
 				(company "Unni CO2 Smartification")
-				(rev "A-v9-wired")
+				(rev "A-v11-lowcost-power")
 				(date "2026-08-18")
 				(source "unni-smartification-c6.kicad_sch")
 				(comment
@@ -54,168 +54,6 @@
 		)
 	)
 	(components
-		(comp
-			(ref "C1")
-			(value "4.7uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "7fe797c2-d555-419d-b239-5dbceb1f0f8e")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "C2")
-			(value "10uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "c70959e2-5b5c-41d0-ae21-04bee6f5acd1")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "C3")
-			(value "10uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "76eacee4-4bd9-4280-867f-1d4b7a322fcc")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
 		(comp
 			(ref "C4")
 			(value "10uF")
@@ -418,168 +256,6 @@
 				(tstamps "/")
 			)
 			(tstamps "a08f83ce-d1a0-4eaa-b945-c15b7c6b80a8")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "C8")
-			(value "10uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "73962eb6-0dab-4b08-8e66-83c4a3f65289")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "C9")
-			(value "22uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "30abb1a6-959a-4763-be86-cdaeabbe720f")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "C10")
-			(value "22uF")
-			(footprint "Capacitor_SMD:C_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "C")
-				(description "Unpolarized capacitor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "cap capacitor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "C_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "31c0f4fb-214a-4869-a98e-faedf71d483c")
 			(units
 				(unit
 					(name "A")
@@ -823,12 +499,12 @@
 			)
 		)
 		(comp
-			(ref "J1")
-			(value "Li-ion battery")
-			(footprint "Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical")
+			(ref "C101")
+			(value "1uF")
+			(footprint "Capacitor_SMD:C_0603_1608Metric")
 			(fields
 				(field
-					(name "Footprint") "Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical")
+					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
 				(field
 					(name "Datasheet")
 				)
@@ -837,9 +513,9 @@
 				)
 			)
 			(libsource
-				(lib "Connector_Generic")
-				(part "Conn_01x02")
-				(description "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)")
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
 			)
 			(property
 				(name "Sheetname")
@@ -851,17 +527,17 @@
 			)
 			(property
 				(name "ki_keywords")
-				(value "connector")
+				(value "cap capacitor")
 			)
 			(property
 				(name "ki_fp_filters")
-				(value "Connector*:*_1x??_*")
+				(value "C_*")
 			)
 			(sheetpath
 				(names "/")
 				(tstamps "/")
 			)
-			(tstamps "347a98c3-1c28-4036-af0f-ff974e1ce748")
+			(tstamps "e77c5987-2b6e-4f70-b9fa-06e7ab3485d3")
 			(units
 				(unit
 					(name "A")
@@ -877,12 +553,12 @@
 			)
 		)
 		(comp
-			(ref "J2")
-			(value "UNNI DC")
-			(footprint "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical")
+			(ref "C102")
+			(value "1uF")
+			(footprint "Capacitor_SMD:C_0603_1608Metric")
 			(fields
 				(field
-					(name "Footprint") "Connector_JST:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical")
+					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
 				(field
 					(name "Datasheet")
 				)
@@ -891,9 +567,9 @@
 				)
 			)
 			(libsource
-				(lib "Connector_Generic")
-				(part "Conn_01x02")
-				(description "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)")
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
 			)
 			(property
 				(name "Sheetname")
@@ -905,17 +581,179 @@
 			)
 			(property
 				(name "ki_keywords")
-				(value "connector")
+				(value "cap capacitor")
 			)
 			(property
 				(name "ki_fp_filters")
-				(value "Connector*:*_1x??_*")
+				(value "C_*")
 			)
 			(sheetpath
 				(names "/")
 				(tstamps "/")
 			)
-			(tstamps "3b967f05-81f3-47de-aa5d-a4ba5d983a9c")
+			(tstamps "bada5df3-4837-4324-a5e4-201334a3cb53")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "C103")
+			(value "10uF")
+			(footprint "Capacitor_SMD:C_0805_2012Metric")
+			(fields
+				(field
+					(name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "cap capacitor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "C_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "eda228ff-f304-47dc-b187-d7eccd6a81ab")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "C104")
+			(value "22uF")
+			(footprint "Capacitor_SMD:C_0805_2012Metric")
+			(fields
+				(field
+					(name "Footprint") "Capacitor_SMD:C_0805_2012Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "cap capacitor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "C_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "22460d6f-6320-4fda-a7b9-546fe1676821")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "C105")
+			(value "100nF")
+			(footprint "Capacitor_SMD:C_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Capacitor_SMD:C_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "C")
+				(description "Unpolarized capacitor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "cap capacitor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "C_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "089f7fbb-c5f2-450a-b994-644bc7f314e5")
 			(units
 				(unit
 					(name "A")
@@ -1375,12 +1213,12 @@
 			)
 		)
 		(comp
-			(ref "L2")
-			(value "1.0uH")
-			(footprint "Inductor_SMD:L_Changjiang_FNR3015S")
+			(ref "L101")
+			(value "2.2uH")
+			(footprint "Inductor_SMD:L_1210_3225Metric")
 			(fields
 				(field
-					(name "Footprint") "Inductor_SMD:L_Changjiang_FNR3015S")
+					(name "Footprint") "Inductor_SMD:L_1210_3225Metric")
 				(field
 					(name "Datasheet")
 				)
@@ -1413,7 +1251,7 @@
 				(names "/")
 				(tstamps "/")
 			)
-			(tstamps "36ff3b6d-ab96-40d2-b6f8-3c776f12e2c2")
+			(tstamps "3db7e4c2-5328-4546-9e72-1b84f0f9a6c7")
 			(units
 				(unit
 					(name "A")
@@ -1423,55 +1261,6 @@
 						)
 						(pin
 							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "Q1")
-			(value "2N7002")
-			(footprint "Package_TO_SOT_SMD:SOT-23")
-			(fields
-				(field
-					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "UNNI")
-				(part "2N7002")
-				(description "N-channel MOSFET")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "48cb93c7-f492-4e9d-8173-08cc8d8e421f")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-						(pin
-							(num "3")
 						)
 					)
 				)
@@ -1521,6 +1310,218 @@
 						)
 						(pin
 							(num "3")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "Q101")
+			(value "AO3401A")
+			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Transistor_FET")
+				(part "Q_PMOS_GSD")
+				(description "P-MOSFET transistor, gate/source/drain")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "transistor PMOS P-MOS P-MOSFET")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "78ea466c-2cf8-4572-a6cc-7d549613a2c5")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "Q102")
+			(value "AO3401A")
+			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Transistor_FET")
+				(part "Q_PMOS_GSD")
+				(description "P-MOSFET transistor, gate/source/drain")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "transistor PMOS P-MOS P-MOSFET")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "2f485cc8-a5ef-4826-ba09-b70410a69adc")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "Q103")
+			(value "AO3400A")
+			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Transistor_FET")
+				(part "Q_NMOS_GSD")
+				(description "N-MOSFET transistor, gate/source/drain")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "transistor NMOS N-MOS N-MOSFET")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "68d2e0d1-8a0e-4e4d-976e-55a8794dc1cc")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "Q104")
+			(value "AO3400A")
+			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Transistor_FET")
+				(part "Q_NMOS_GSD")
+				(description "N-MOSFET transistor, gate/source/drain")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "transistor NMOS N-MOS N-MOSFET")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "cec2a5b9-27a1-4e61-a36e-b115e617f4f1")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "3")
+						)
+						(pin
+							(num "2")
 						)
 					)
 				)
@@ -1635,168 +1636,6 @@
 			)
 		)
 		(comp
-			(ref "R3")
-			(value "3.0k")
-			(footprint "Resistor_SMD:R_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "R")
-				(description "Resistor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "R res resistor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "R_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "32267f3e-86ce-428d-aae2-2283828d2950")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "R4")
-			(value "1.18k")
-			(footprint "Resistor_SMD:R_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "R")
-				(description "Resistor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "R res resistor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "R_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "1c39a2bb-c1f1-40e5-8e47-b3e01194b03a")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "R5")
-			(value "10k")
-			(footprint "Resistor_SMD:R_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "R")
-				(description "Resistor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "R res resistor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "R_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "ec92edef-51f1-4120-b5ec-513b45b0316f")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
 			(ref "R6")
 			(value "10k")
 			(footprint "Resistor_SMD:R_0603_1608Metric")
@@ -1890,114 +1729,6 @@
 				(tstamps "/")
 			)
 			(tstamps "0fd01505-516f-442e-8bc0-2b02cfcb9fef")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "R8")
-			(value "732k")
-			(footprint "Resistor_SMD:R_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "R")
-				(description "Resistor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "R res resistor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "R_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "4e6db8e5-a99f-495a-bf5c-9c8d429a0522")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "2")
-						)
-					)
-				)
-			)
-		)
-		(comp
-			(ref "R9")
-			(value "100k")
-			(footprint "Resistor_SMD:R_0603_1608Metric")
-			(fields
-				(field
-					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
-				(field
-					(name "Datasheet")
-				)
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "Device")
-				(part "R")
-				(description "Resistor")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(property
-				(name "ki_keywords")
-				(value "R res resistor")
-			)
-			(property
-				(name "ki_fp_filters")
-				(value "R_*")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "c60688a2-93ed-45c6-b607-5e436e65b90e")
 			(units
 				(unit
 					(name "A")
@@ -2661,6 +2392,762 @@
 			)
 		)
 		(comp
+			(ref "R101")
+			(value "3.3k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "80b05943-9e3c-4e9a-89f7-535bbe16a13b")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R102")
+			(value "100k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "a6bff6ee-d4c6-4498-b6f4-6f06daa348c6")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R103")
+			(value "100k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c1740e98-9673-40e5-bfd1-6c8a3c1b0393")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R104")
+			(value "1M")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "67149e2e-dfd8-4264-b40a-ac82add6dabf")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R105")
+			(value "10k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "7c0ca366-562d-4ca7-b31e-ed8096eb503b")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R106")
+			(value "100k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c2923ae1-b052-48ab-86dd-ca2d5c0b59ca")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R107")
+			(value "100k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "e0646ef5-e85f-4c7d-a344-17c070386f88")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R108")
+			(value "1M")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "59132f86-c14e-42f1-906e-b51710b81f42")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R110")
+			(value "1M")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "98b914ef-877f-456a-a659-722d94469cee")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R111")
+			(value "1M")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "5683825d-0d27-48ce-a08c-d961c25200ae")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R112")
+			(value "220k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "23554674-d2ea-4fe0-abfd-94feb8b303ca")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R113")
+			(value "220k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "6f2b7a7b-620c-41d1-bb2d-cf64ff973b49")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R114")
+			(value "10k")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c49ba7c1-7024-4228-a074-bbcc20eeb590")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "R115")
+			(value "10k NTC")
+			(footprint "Resistor_SMD:R_0603_1608Metric")
+			(fields
+				(field
+					(name "Footprint") "Resistor_SMD:R_0603_1608Metric")
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Device")
+				(part "R")
+				(description "Resistor")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "R res resistor")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "R_*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "c40acb71-2a42-430d-8be3-668cbcfa238d")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "1")
+						)
+						(pin
+							(num "2")
+						)
+					)
+				)
+			)
+		)
+		(comp
 			(ref "SW1")
 			(value "RESET")
 			(footprint "Button_Switch_SMD:SW_SPST_PTS810")
@@ -2960,97 +3447,6 @@
 			)
 		)
 		(comp
-			(ref "U2")
-			(value "BQ24074")
-			(footprint "Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm")
-			(datasheet "https://www.ti.com/lit/ds/symlink/bq24074.pdf")
-			(fields
-				(field
-					(name "Footprint") "Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm")
-				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/bq24074.pdf")
-				(field
-					(name "Description")
-				)
-			)
-			(libsource
-				(lib "UNNI")
-				(part "BQ24074")
-				(description "1-cell Li-ion charger with PowerPath")
-			)
-			(property
-				(name "Sheetname")
-				(value "unni-smartification-c6")
-			)
-			(property
-				(name "Sheetfile")
-				(value "unni-smartification-c6.kicad_sch")
-			)
-			(sheetpath
-				(names "/")
-				(tstamps "/")
-			)
-			(tstamps "42ce33d5-feda-4b04-be1e-0f8f59dd7c89")
-			(units
-				(unit
-					(name "A")
-					(pins
-						(pin
-							(num "7")
-						)
-						(pin
-							(num "6")
-						)
-						(pin
-							(num "5")
-						)
-						(pin
-							(num "4")
-						)
-						(pin
-							(num "3")
-						)
-						(pin
-							(num "2")
-						)
-						(pin
-							(num "1")
-						)
-						(pin
-							(num "8")
-						)
-						(pin
-							(num "16")
-						)
-						(pin
-							(num "17")
-						)
-						(pin
-							(num "9")
-						)
-						(pin
-							(num "10")
-						)
-						(pin
-							(num "11")
-						)
-						(pin
-							(num "12")
-						)
-						(pin
-							(num "13")
-						)
-						(pin
-							(num "14")
-						)
-						(pin
-							(num "15")
-						)
-					)
-				)
-			)
-		)
-		(comp
 			(ref "U3")
 			(value "TPS63031DSK")
 			(footprint "Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm")
@@ -3132,23 +3528,23 @@
 			)
 		)
 		(comp
-			(ref "U4")
-			(value "TPS61023")
-			(footprint "Package_SOT:SOT-563")
-			(datasheet "https://www.ti.com/lit/ds/symlink/tps61023.pdf")
+			(ref "U101")
+			(value "MCP73812T-420I/OT")
+			(footprint "Package_TO_SOT_SMD:SOT-23-5")
+			(datasheet "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf")
 			(fields
 				(field
-					(name "Footprint") "Package_SOT:SOT-563")
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23-5")
 				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/tps61023.pdf")
+					(name "Datasheet") "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf")
 				(field
 					(name "Description")
 				)
 			)
 			(libsource
-				(lib "UNNI")
-				(part "TPS61023")
-				(description "3.7-A synchronous boost converter")
+				(lib "Battery_Management")
+				(part "MCP73812T-420I-OT")
+				(description "Simple, Miniature Single-Cell, Fully Integrated Li-Ion / Li-Polymer Charge Management Controllers, 50mA-500mA, 4.2V, SOT23-5")
 			)
 			(property
 				(name "Sheetname")
@@ -3158,55 +3554,60 @@
 				(name "Sheetfile")
 				(value "unni-smartification-c6.kicad_sch")
 			)
+			(property
+				(name "ki_keywords")
+				(value "Lithium-Ion Battery Charger")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "SOT?23*")
+			)
 			(sheetpath
 				(names "/")
 				(tstamps "/")
 			)
-			(tstamps "dbc98743-839b-4b8c-b019-76494ae2343e")
+			(tstamps "ddb04bab-9ede-4083-b7d0-d97b7999863c")
 			(units
 				(unit
 					(name "A")
 					(pins
 						(pin
-							(num "3")
-						)
-						(pin
-							(num "2")
-						)
-						(pin
 							(num "1")
-						)
-						(pin
-							(num "4")
 						)
 						(pin
 							(num "5")
 						)
 						(pin
-							(num "6")
+							(num "4")
+						)
+						(pin
+							(num "2")
+						)
+						(pin
+							(num "3")
 						)
 					)
 				)
 			)
 		)
 		(comp
-			(ref "U5")
-			(value "TPS2116")
-			(footprint "Package_SOT:SOT-563-8")
-			(datasheet "https://www.ti.com/lit/ds/symlink/tps2116.pdf")
+			(ref "U102")
+			(value "TPS613222ADBZ")
+			(footprint "Package_TO_SOT_SMD:SOT-23")
+			(datasheet "http://www.ti.com/lit/ds/symlink/tps61322.pdf")
 			(fields
 				(field
-					(name "Footprint") "Package_SOT:SOT-563-8")
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
 				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/tps2116.pdf")
+					(name "Datasheet") "http://www.ti.com/lit/ds/symlink/tps61322.pdf")
 				(field
 					(name "Description")
 				)
 			)
 			(libsource
-				(lib "UNNI")
-				(part "TPS2116")
-				(description "2.5-A low-Iq power mux")
+				(lib "Regulator_Switching")
+				(part "TPS613222ADBZ")
+				(description "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23")
 			)
 			(property
 				(name "Sheetname")
@@ -3216,38 +3617,141 @@
 				(name "Sheetfile")
 				(value "unni-smartification-c6.kicad_sch")
 			)
+			(property
+				(name "ki_keywords")
+				(value "Boost converter")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "SOT?23*")
+			)
 			(sheetpath
 				(names "/")
 				(tstamps "/")
 			)
-			(tstamps "1620878a-6424-4699-9173-fe35fddc82b8")
+			(tstamps "53ed6458-919c-4727-9d5d-f9115fdf235c")
+			(units
+				(unit
+					(name "A")
+					(pins)
+				)
+			)
+		)
+		(comp
+			(ref "U103")
+			(value "AP22913W6-7")
+			(footprint "Package_TO_SOT_SMD:SOT-23-6")
+			(datasheet "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23-6")
+				(field
+					(name "Datasheet") "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Power_Management")
+				(part "AP22913CN4")
+				(description "Slew rate controlled load switch, WLCSP-4")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "Lead control switch slew rate")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "WLCSP*0.89x0.89mm*Layout2x2*P0.5mm*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "d6a24e89-22e7-4db4-b525-4ca65c19468a")
 			(units
 				(unit
 					(name "A")
 					(pins
 						(pin
-							(num "6")
+							(num "A2")
 						)
 						(pin
-							(num "5")
+							(num "B2")
 						)
 						(pin
-							(num "4")
+							(num "B1")
 						)
 						(pin
-							(num "3")
+							(num "A1")
+						)
+					)
+				)
+			)
+		)
+		(comp
+			(ref "U104")
+			(value "AP22913W6-7")
+			(footprint "Package_TO_SOT_SMD:SOT-23-6")
+			(datasheet "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+			(fields
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23-6")
+				(field
+					(name "Datasheet") "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+				(field
+					(name "Description")
+				)
+			)
+			(libsource
+				(lib "Power_Management")
+				(part "AP22913CN4")
+				(description "Slew rate controlled load switch, WLCSP-4")
+			)
+			(property
+				(name "Sheetname")
+				(value "unni-smartification-c6")
+			)
+			(property
+				(name "Sheetfile")
+				(value "unni-smartification-c6.kicad_sch")
+			)
+			(property
+				(name "ki_keywords")
+				(value "Lead control switch slew rate")
+			)
+			(property
+				(name "ki_fp_filters")
+				(value "WLCSP*0.89x0.89mm*Layout2x2*P0.5mm*")
+			)
+			(sheetpath
+				(names "/")
+				(tstamps "/")
+			)
+			(tstamps "354d35b9-7e9d-4a52-a93c-14735ee69b5c")
+			(units
+				(unit
+					(name "A")
+					(pins
+						(pin
+							(num "A2")
 						)
 						(pin
-							(num "1")
+							(num "B2")
 						)
 						(pin
-							(num "7")
+							(num "B1")
 						)
 						(pin
-							(num "2")
-						)
-						(pin
-							(num "8")
+							(num "A1")
 						)
 					)
 				)
@@ -3257,6 +3761,54 @@
 	(groups)
 	(variants)
 	(libparts
+		(libpart
+			(lib "Battery_Management")
+			(part "MCP73812T-420I-OT")
+			(description "Simple, Miniature Single-Cell, Fully Integrated Li-Ion / Li-Polymer Charge Management Controllers, 50mA-500mA, 4.2V, SOT23-5")
+			(docs "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf")
+			(footprints
+				(fp "SOT?23*")
+			)
+			(fields
+				(field
+					(name "Reference") "U")
+				(field
+					(name "Value") "MCP73812T-420I-OT")
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23-5")
+				(field
+					(name "Datasheet") "http://ww1.microchip.com/downloads/en/DeviceDoc/22036b.pdf")
+				(field
+					(name "Description") "Simple, Miniature Single-Cell, Fully Integrated Li-Ion / Li-Polymer Charge Management Controllers, 50mA-500mA, 4.2V, SOT23-5")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "CE")
+					(type "input")
+				)
+				(pin
+					(num "2")
+					(name "V_{SS}")
+					(type "power_in")
+				)
+				(pin
+					(num "3")
+					(name "V_{BAT}")
+					(type "power_out")
+				)
+				(pin
+					(num "4")
+					(name "V_{DD}")
+					(type "power_in")
+				)
+				(pin
+					(num "5")
+					(name "PROG")
+					(type "input")
+				)
+			)
+		)
 		(libpart
 			(lib "Connector")
 			(part "USB_C_Receptacle_USB2.0_16P")
@@ -3638,6 +4190,49 @@
 			)
 		)
 		(libpart
+			(lib "Power_Management")
+			(part "AP22913CN4")
+			(description "Slew rate controlled load switch, WLCSP-4")
+			(docs "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+			(footprints
+				(fp "WLCSP*0.89x0.89mm*Layout2x2*P0.5mm*")
+			)
+			(fields
+				(field
+					(name "Reference") "U")
+				(field
+					(name "Value") "AP22913CN4")
+				(field
+					(name "Footprint") "Package_CSP:WLCSP-4_0.89x0.89mm_Layout2x2_P0.5mm")
+				(field
+					(name "Datasheet") "https://www.diodes.com/assets/Datasheets/AP22913.pdf")
+				(field
+					(name "Description") "Slew rate controlled load switch, WLCSP-4")
+			)
+			(pins
+				(pin
+					(num "A1")
+					(name "OUT")
+					(type "power_out")
+				)
+				(pin
+					(num "A2")
+					(name "IN")
+					(type "power_in")
+				)
+				(pin
+					(num "B1")
+					(name "GND")
+					(type "power_in")
+				)
+				(pin
+					(num "B2")
+					(name "ON")
+					(type "input")
+				)
+			)
+		)
+		(libpart
 			(lib "RF_Module")
 			(part "ESP32-C6-MINI-1")
 			(description "RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna")
@@ -3927,6 +4522,27 @@
 		)
 		(libpart
 			(lib "Regulator_Switching")
+			(part "TPS613222ADBZ")
+			(description "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23")
+			(docs "http://www.ti.com/lit/ds/symlink/tps61322.pdf")
+			(footprints
+				(fp "SOT?23*")
+			)
+			(fields
+				(field
+					(name "Reference") "U")
+				(field
+					(name "Value") "TPS613222ADBZ")
+				(field
+					(name "Footprint") "Package_TO_SOT_SMD:SOT-23")
+				(field
+					(name "Datasheet") "http://www.ti.com/lit/ds/symlink/tps61322.pdf")
+				(field
+					(name "Description") "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23")
+			)
+		)
+		(libpart
+			(lib "Regulator_Switching")
 			(part "TPS63031DSK")
 			(description "Buck-Boost Converter, 1.8-5.5V Input Voltage, 1A Switch Current, 3.3V Output Voltage, VSON-10 (DSK0010A)")
 			(docs "https://www.ti.com/lit/ds/symlink/tps63030.pdf")
@@ -4004,6 +4620,78 @@
 			)
 		)
 		(libpart
+			(lib "Transistor_FET")
+			(part "Q_NMOS_GSD")
+			(description "N-MOSFET transistor, gate/source/drain")
+			(fields
+				(field
+					(name "Reference") "Q")
+				(field
+					(name "Value") "Q_NMOS_GSD")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "N-MOSFET transistor, gate/source/drain")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "G")
+					(type "input")
+				)
+				(pin
+					(num "2")
+					(name "S")
+					(type "passive")
+				)
+				(pin
+					(num "3")
+					(name "D")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
+			(lib "Transistor_FET")
+			(part "Q_PMOS_GSD")
+			(description "P-MOSFET transistor, gate/source/drain")
+			(fields
+				(field
+					(name "Reference") "Q")
+				(field
+					(name "Value") "Q_PMOS_GSD")
+				(field
+					(name "Footprint")
+				)
+				(field
+					(name "Datasheet")
+				)
+				(field
+					(name "Description") "P-MOSFET transistor, gate/source/drain")
+			)
+			(pins
+				(pin
+					(num "1")
+					(name "G")
+					(type "input")
+				)
+				(pin
+					(num "2")
+					(name "S")
+					(type "passive")
+				)
+				(pin
+					(num "3")
+					(name "D")
+					(type "passive")
+				)
+			)
+		)
+		(libpart
 			(lib "UNNI")
 			(part "2N7002")
 			(description "N-channel MOSFET")
@@ -4040,111 +4728,6 @@
 		)
 		(libpart
 			(lib "UNNI")
-			(part "BQ24074")
-			(description "1-cell Li-ion charger with PowerPath")
-			(docs "https://www.ti.com/lit/ds/symlink/bq24074.pdf")
-			(fields
-				(field
-					(name "Reference") "U")
-				(field
-					(name "Value") "BQ24074")
-				(field
-					(name "Footprint") "Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.68x1.68mm")
-				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/bq24074.pdf")
-				(field
-					(name "Description") "1-cell Li-ion charger with PowerPath")
-			)
-			(pins
-				(pin
-					(num "1")
-					(name "TS")
-					(type "input")
-				)
-				(pin
-					(num "2")
-					(name "BAT")
-					(type "bidirectional")
-				)
-				(pin
-					(num "3")
-					(name "BAT")
-					(type "bidirectional")
-				)
-				(pin
-					(num "4")
-					(name "CE")
-					(type "input")
-				)
-				(pin
-					(num "5")
-					(name "EN2")
-					(type "input")
-				)
-				(pin
-					(num "6")
-					(name "EN1")
-					(type "input")
-				)
-				(pin
-					(num "7")
-					(name "PGOOD")
-					(type "open_collector")
-				)
-				(pin
-					(num "8")
-					(name "VSS")
-					(type "power_in")
-				)
-				(pin
-					(num "9")
-					(name "CHG")
-					(type "open_collector")
-				)
-				(pin
-					(num "10")
-					(name "OUT")
-					(type "power_out")
-				)
-				(pin
-					(num "11")
-					(name "OUT")
-					(type "power_out")
-				)
-				(pin
-					(num "12")
-					(name "ILIM")
-					(type "input")
-				)
-				(pin
-					(num "13")
-					(name "IN")
-					(type "power_in")
-				)
-				(pin
-					(num "14")
-					(name "TMR")
-					(type "input")
-				)
-				(pin
-					(num "15")
-					(name "ITERM")
-					(type "input")
-				)
-				(pin
-					(num "16")
-					(name "ISET")
-					(type "input")
-				)
-				(pin
-					(num "17")
-					(name "EP")
-					(type "power_in")
-				)
-			)
-		)
-		(libpart
-			(lib "UNNI")
 			(part "SW_Push")
 			(description "Momentary pushbutton")
 			(fields
@@ -4170,116 +4753,6 @@
 					(num "2")
 					(name "2")
 					(type "passive")
-				)
-			)
-		)
-		(libpart
-			(lib "UNNI")
-			(part "TPS2116")
-			(description "2.5-A low-Iq power mux")
-			(docs "https://www.ti.com/lit/ds/symlink/tps2116.pdf")
-			(fields
-				(field
-					(name "Reference") "U")
-				(field
-					(name "Value") "TPS2116")
-				(field
-					(name "Footprint") "Package_SOT:SOT-563-8")
-				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/tps2116.pdf")
-				(field
-					(name "Description") "2.5-A low-Iq power mux")
-			)
-			(pins
-				(pin
-					(num "1")
-					(name "GND")
-					(type "power_in")
-				)
-				(pin
-					(num "2")
-					(name "VOUT")
-					(type "power_out")
-				)
-				(pin
-					(num "3")
-					(name "VIN1")
-					(type "power_in")
-				)
-				(pin
-					(num "4")
-					(name "PR1")
-					(type "input")
-				)
-				(pin
-					(num "5")
-					(name "MODE")
-					(type "input")
-				)
-				(pin
-					(num "6")
-					(name "VIN2")
-					(type "power_in")
-				)
-				(pin
-					(num "7")
-					(name "VOUT")
-					(type "power_out")
-				)
-				(pin
-					(num "8")
-					(name "ST")
-					(type "open_collector")
-				)
-			)
-		)
-		(libpart
-			(lib "UNNI")
-			(part "TPS61023")
-			(description "3.7-A synchronous boost converter")
-			(docs "https://www.ti.com/lit/ds/symlink/tps61023.pdf")
-			(fields
-				(field
-					(name "Reference") "U")
-				(field
-					(name "Value") "TPS61023")
-				(field
-					(name "Footprint") "Package_SOT:SOT-563")
-				(field
-					(name "Datasheet") "https://www.ti.com/lit/ds/symlink/tps61023.pdf")
-				(field
-					(name "Description") "3.7-A synchronous boost converter")
-			)
-			(pins
-				(pin
-					(num "1")
-					(name "FB")
-					(type "input")
-				)
-				(pin
-					(num "2")
-					(name "EN")
-					(type "input")
-				)
-				(pin
-					(num "3")
-					(name "VIN")
-					(type "power_in")
-				)
-				(pin
-					(num "4")
-					(name "GND")
-					(type "power_in")
-				)
-				(pin
-					(num "5")
-					(name "SW")
-					(type "power_out")
-				)
-				(pin
-					(num "6")
-					(name "VOUT")
-					(type "power_out")
 				)
 			)
 		)
@@ -4387,6 +4860,16 @@
 			(name "BAT_ADC")
 			(class "Default")
 			(node
+				(ref "R110")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R111")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
 				(ref "R16")
 				(pin "2")
 				(pintype "passive")
@@ -4405,23 +4888,75 @@
 		)
 		(net
 			(code "8")
-			(name "BOOST_5V")
+			(name "BAT_TEMP_ADC")
 			(class "Default")
 			(node
-				(ref "U4")
-				(pin "6")
-				(pinfunction "VOUT_6")
-				(pintype "power_out")
+				(ref "R114")
+				(pin "2")
+				(pintype "passive")
 			)
 			(node
-				(ref "U5")
-				(pin "6")
-				(pinfunction "VIN2_6")
-				(pintype "power_in")
+				(ref "R115")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U1")
+				(pin "27")
+				(pinfunction "IO21_27")
+				(pintype "bidirectional")
 			)
 		)
 		(net
 			(code "9")
+			(name "BAT_TEMP_EXCITE")
+			(class "Default")
+			(node
+				(ref "C105")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R114")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U1")
+				(pin "18")
+				(pinfunction "IO13_18")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "10")
+			(name "BOOST_5V")
+			(class "Default")
+			(node
+				(ref "U104")
+				(pin "B2")
+				(pinfunction "ON_B2")
+				(pintype "input")
+			)
+		)
+		(net
+			(code "11")
+			(name "BOOST_CMD")
+			(class "Default")
+			(node
+				(ref "R105")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U1")
+				(pin "17")
+				(pinfunction "IO12_17")
+				(pintype "bidirectional")
+			)
+		)
+		(net
+			(code "12")
 			(name "BOOST_EN")
 			(class "Default")
 			(node
@@ -4432,18 +4967,51 @@
 			)
 		)
 		(net
-			(code "10")
-			(name "BOOST_EN_HW")
+			(code "13")
+			(name "BOOST_VIN")
 			(class "Default")
 			(node
-				(ref "U4")
+				(ref "C103")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "L101")
+				(pin "1")
+				(pinfunction "1_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "Q102")
 				(pin "2")
-				(pinfunction "EN_2")
+				(pinfunction "S_2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "14")
+			(name "CHARGE_EN")
+			(class "Default")
+			(node
+				(ref "R102")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "U1")
+				(pin "19")
+				(pinfunction "IO14_19")
+				(pintype "bidirectional")
+			)
+			(node
+				(ref "U101")
+				(pin "5")
+				(pinfunction "PROG_5")
 				(pintype "input")
 			)
 		)
 		(net
-			(code "11")
+			(code "15")
 			(name "CO2_SCL")
 			(class "Default")
 			(node
@@ -4459,7 +5027,7 @@
 			)
 		)
 		(net
-			(code "12")
+			(code "16")
 			(name "CO2_SDA")
 			(class "Default")
 			(node
@@ -4475,7 +5043,7 @@
 			)
 		)
 		(net
-			(code "13")
+			(code "17")
 			(name "ESP_BOOT")
 			(class "Default")
 			(node
@@ -4491,7 +5059,7 @@
 			)
 		)
 		(net
-			(code "14")
+			(code "18")
 			(name "ESP_EN")
 			(class "Default")
 			(node
@@ -4507,34 +5075,47 @@
 			)
 		)
 		(net
-			(code "15")
+			(code "19")
 			(name "GND")
 			(class "Default")
+			(node
+				(ref "C101")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "C101")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C102")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C103")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C104")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C105")
+				(pin "2")
+				(pintype "passive")
+			)
 			(node
 				(ref "C14")
 				(pin "2")
 				(pintype "passive")
 			)
 			(node
-				(ref "C3")
-				(pin "2")
-				(pintype "passive")
-			)
-			(node
 				(ref "C7")
 				(pin "2")
-				(pintype "passive")
-			)
-			(node
-				(ref "J1")
-				(pin "2")
-				(pinfunction "Pin_2_2")
-				(pintype "passive")
-			)
-			(node
-				(ref "J2")
-				(pin "2")
-				(pinfunction "Pin_2_2")
 				(pintype "passive")
 			)
 			(node
@@ -4569,6 +5150,18 @@
 			)
 			(node
 				(ref "J7")
+				(pin "A4")
+				(pinfunction "VBUS_A4")
+				(pintype "passive")
+			)
+			(node
+				(ref "J7")
+				(pin "A9")
+				(pinfunction "VBUS_A9")
+				(pintype "passive")
+			)
+			(node
+				(ref "J7")
 				(pin "B1")
 				(pinfunction "GND_B1")
 				(pintype "passive")
@@ -4581,8 +5174,26 @@
 			)
 			(node
 				(ref "J7")
+				(pin "B4")
+				(pinfunction "VBUS_B4")
+				(pintype "passive")
+			)
+			(node
+				(ref "J7")
+				(pin "B9")
+				(pinfunction "VBUS_B9")
+				(pintype "passive")
+			)
+			(node
+				(ref "J7")
 				(pin "SH")
 				(pinfunction "SHIELD_SH")
+				(pintype "passive")
+			)
+			(node
+				(ref "J8")
+				(pin "1")
+				(pinfunction "Pin_1_1")
 				(pintype "passive")
 			)
 			(node
@@ -4598,7 +5209,113 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "Q101")
+				(pin "1")
+				(pinfunction "G_1")
+				(pintype "input")
+			)
+			(node
+				(ref "Q102")
+				(pin "1")
+				(pinfunction "G_1")
+				(pintype "input")
+			)
+			(node
+				(ref "Q103")
+				(pin "2")
+				(pinfunction "S_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "Q103")
+				(pin "3")
+				(pinfunction "D_3")
+				(pintype "passive")
+			)
+			(node
+				(ref "Q104")
+				(pin "1")
+				(pinfunction "G_1")
+				(pintype "input")
+			)
+			(node
+				(ref "Q104")
+				(pin "3")
+				(pinfunction "D_3")
+				(pintype "passive")
+			)
+			(node
 				(ref "R1")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R101")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R102")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R103")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R103")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R104")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R104")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R106")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R107")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R108")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R108")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R111")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R112")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R113")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R115")
 				(pin "2")
 				(pintype "passive")
 			)
@@ -4613,6 +5330,11 @@
 				(pintype "passive")
 			)
 			(node
+				(ref "R18")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
 				(ref "R19")
 				(pin "2")
 				(pintype "passive")
@@ -4620,21 +5342,6 @@
 			(node
 				(ref "R2")
 				(pin "2")
-				(pintype "passive")
-			)
-			(node
-				(ref "R3")
-				(pin "2")
-				(pintype "passive")
-			)
-			(node
-				(ref "R4")
-				(pin "2")
-				(pintype "passive")
-			)
-			(node
-				(ref "R5")
-				(pin "1")
 				(pintype "passive")
 			)
 			(node
@@ -4770,9 +5477,21 @@
 				(pintype "passive")
 			)
 			(node
-				(ref "U2")
-				(pin "5")
-				(pinfunction "EN2_5")
+				(ref "U101")
+				(pin "2")
+				(pinfunction "V_{SS}_2")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U101")
+				(pin "4")
+				(pinfunction "V_{DD}_4")
+				(pintype "power_in")
+			)
+			(node
+				(ref "U103")
+				(pin "B2")
+				(pinfunction "ON_B2")
 				(pintype "input")
 			)
 			(node
@@ -4781,36 +5500,39 @@
 				(pinfunction "PS/SYNC_7")
 				(pintype "input")
 			)
-			(node
-				(ref "U4")
-				(pin "4")
-				(pinfunction "GND_4")
-				(pintype "power_in")
-			)
-			(node
-				(ref "U5")
-				(pin "1")
-				(pinfunction "GND_1")
-				(pintype "power_in")
-			)
 		)
 		(net
-			(code "16")
-			(name "Net-(C10-Pad2)")
+			(code "20")
+			(name "Net-(D101-Pad??)")
 			(class "Default")
 			(node
-				(ref "C10")
-				(pin "2")
-				(pintype "passive")
+				(ref "D101")
+				(pin "1")
+				(pintype "unspecified")
 			)
 			(node
-				(ref "C8")
+				(ref "D101")
 				(pin "2")
-				(pintype "passive")
+				(pintype "unspecified")
 			)
 		)
 		(net
-			(code "17")
+			(code "21")
+			(name "Net-(D102-Pad??)")
+			(class "Default")
+			(node
+				(ref "D102")
+				(pin "1")
+				(pintype "unspecified")
+			)
+			(node
+				(ref "D102")
+				(pin "2")
+				(pintype "unspecified")
+			)
+		)
+		(net
+			(code "22")
 			(name "Net-(J3-Pin_1)")
 			(class "Default")
 			(node
@@ -4826,7 +5548,7 @@
 			)
 		)
 		(net
-			(code "18")
+			(code "23")
 			(name "Net-(J3-Pin_2)")
 			(class "Default")
 			(node
@@ -4842,7 +5564,7 @@
 			)
 		)
 		(net
-			(code "19")
+			(code "24")
 			(name "Net-(J4-Pin_1)")
 			(class "Default")
 			(node
@@ -4858,7 +5580,7 @@
 			)
 		)
 		(net
-			(code "20")
+			(code "25")
 			(name "Net-(J4-Pin_2)")
 			(class "Default")
 			(node
@@ -4874,7 +5596,7 @@
 			)
 		)
 		(net
-			(code "21")
+			(code "26")
 			(name "Net-(J7-D+-PadA6)")
 			(class "Default")
 			(node
@@ -4891,7 +5613,7 @@
 			)
 		)
 		(net
-			(code "22")
+			(code "27")
 			(name "Net-(J7-D--PadA7)")
 			(class "Default")
 			(node
@@ -4908,72 +5630,34 @@
 			)
 		)
 		(net
-			(code "23")
-			(name "Net-(R8-Pad2)")
+			(code "28")
+			(name "Net-(Q103-G)")
 			(class "Default")
 			(node
-				(ref "R8")
-				(pin "2")
-				(pintype "passive")
-			)
-			(node
-				(ref "R9")
+				(ref "Q103")
 				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "24")
-			(name "Net-(U2-BAT-Pad2)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "2")
-				(pinfunction "BAT_2")
-				(pintype "bidirectional")
-			)
-			(node
-				(ref "U2")
-				(pin "3")
-				(pinfunction "BAT_3")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "25")
-			(name "Net-(U2-ILIM)")
-			(class "Default")
-			(node
-				(ref "R4")
-				(pin "1")
-				(pintype "passive")
-			)
-			(node
-				(ref "U2")
-				(pin "12")
-				(pinfunction "ILIM_12")
+				(pinfunction "G_1")
 				(pintype "input")
 			)
-		)
-		(net
-			(code "26")
-			(name "Net-(U2-OUT-Pad10)")
-			(class "Default")
 			(node
-				(ref "U2")
-				(pin "10")
-				(pinfunction "OUT_10")
-				(pintype "power_out")
+				(ref "Q104")
+				(pin "2")
+				(pinfunction "S_2")
+				(pintype "passive")
 			)
 			(node
-				(ref "U2")
-				(pin "11")
-				(pinfunction "OUT_11")
-				(pintype "power_out")
+				(ref "R105")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R107")
+				(pin "1")
+				(pintype "passive")
 			)
 		)
 		(net
-			(code "27")
+			(code "29")
 			(name "Net-(U3-L1)")
 			(class "Default")
 			(node
@@ -4990,7 +5674,7 @@
 			)
 		)
 		(net
-			(code "28")
+			(code "30")
 			(name "Net-(U3-L2)")
 			(class "Default")
 			(node
@@ -5007,7 +5691,7 @@
 			)
 		)
 		(net
-			(code "29")
+			(code "31")
 			(name "Net-(U3-PGND-Pad11)")
 			(class "Default")
 			(node
@@ -5024,54 +5708,19 @@
 			)
 		)
 		(net
-			(code "30")
-			(name "Net-(U4-SW)")
+			(code "32")
+			(name "Net-(U101-CE)")
 			(class "Default")
 			(node
-				(ref "L2")
-				(pin "1")
-				(pinfunction "1_1")
+				(ref "R101")
+				(pin "2")
 				(pintype "passive")
 			)
 			(node
-				(ref "U4")
-				(pin "5")
-				(pinfunction "SW_5")
-				(pintype "power_out")
-			)
-		)
-		(net
-			(code "31")
-			(name "Net-(U5-MODE)")
-			(class "Default")
-			(node
-				(ref "U5")
-				(pin "4")
-				(pinfunction "PR1_4")
+				(ref "U101")
+				(pin "1")
+				(pinfunction "CE_1")
 				(pintype "input")
-			)
-			(node
-				(ref "U5")
-				(pin "5")
-				(pinfunction "MODE_5")
-				(pintype "input")
-			)
-		)
-		(net
-			(code "32")
-			(name "Net-(U5-VOUT-Pad2)")
-			(class "Default")
-			(node
-				(ref "U5")
-				(pin "2")
-				(pinfunction "VOUT_2")
-				(pintype "power_out")
-			)
-			(node
-				(ref "U5")
-				(pin "7")
-				(pinfunction "VOUT_7")
-				(pintype "power_out")
 			)
 		)
 		(net
@@ -5111,11 +5760,6 @@
 			(name "SYS")
 			(class "Default")
 			(node
-				(ref "C3")
-				(pin "1")
-				(pintype "passive")
-			)
-			(node
 				(ref "C4")
 				(pin "1")
 				(pintype "passive")
@@ -5123,6 +5767,12 @@
 			(node
 				(ref "C5")
 				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "Q101")
+				(pin "2")
+				(pinfunction "S_2")
 				(pintype "passive")
 			)
 			(node
@@ -5201,60 +5851,18 @@
 		)
 		(net
 			(code "41")
-			(name "USB_5V_RAW")
-			(class "Default")
-			(node
-				(ref "J7")
-				(pin "A4")
-				(pinfunction "VBUS_A4")
-				(pintype "passive")
-			)
-			(node
-				(ref "J7")
-				(pin "A9")
-				(pinfunction "VBUS_A9")
-				(pintype "passive")
-			)
-			(node
-				(ref "J7")
-				(pin "B4")
-				(pinfunction "VBUS_B4")
-				(pintype "passive")
-			)
-			(node
-				(ref "J7")
-				(pin "B9")
-				(pinfunction "VBUS_B9")
-				(pintype "passive")
-			)
-			(node
-				(ref "J8")
-				(pin "1")
-				(pinfunction "Pin_1_1")
-				(pintype "passive")
-			)
-			(node
-				(ref "R18")
-				(pin "1")
-				(pintype "passive")
-			)
-			(node
-				(ref "U2")
-				(pin "6")
-				(pinfunction "EN1_6")
-				(pintype "input")
-			)
-			(node
-				(ref "U5")
-				(pin "3")
-				(pinfunction "VIN1_3")
-				(pintype "power_in")
-			)
-		)
-		(net
-			(code "42")
 			(name "USB_ADC")
 			(class "Default")
+			(node
+				(ref "R112")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R113")
+				(pin "1")
+				(pintype "passive")
+			)
 			(node
 				(ref "R18")
 				(pin "2")
@@ -5273,7 +5881,7 @@
 			)
 		)
 		(net
-			(code "43")
+			(code "42")
 			(name "USB_CC1")
 			(class "Default")
 			(node
@@ -5289,7 +5897,7 @@
 			)
 		)
 		(net
-			(code "44")
+			(code "43")
 			(name "USB_CC2")
 			(class "Default")
 			(node
@@ -5305,7 +5913,7 @@
 			)
 		)
 		(net
-			(code "45")
+			(code "44")
 			(name "USB_N")
 			(class "Default")
 			(node
@@ -5315,13 +5923,13 @@
 			)
 			(node
 				(ref "U1")
-				(pin "17")
-				(pinfunction "IO12_17")
+				(pin "29")
+				(pinfunction "IO23_29")
 				(pintype "bidirectional")
 			)
 		)
 		(net
-			(code "46")
+			(code "45")
 			(name "USB_P")
 			(class "Default")
 			(node
@@ -5331,13 +5939,13 @@
 			)
 			(node
 				(ref "U1")
-				(pin "18")
-				(pinfunction "IO13_18")
+				(pin "28")
+				(pinfunction "IO22_28")
 				(pintype "bidirectional")
 			)
 		)
 		(net
-			(code "47")
+			(code "46")
 			(name "USB_RAW_N")
 			(class "Default")
 			(node
@@ -5353,7 +5961,7 @@
 			)
 		)
 		(net
-			(code "48")
+			(code "47")
 			(name "USB_RAW_P")
 			(class "Default")
 			(node
@@ -5369,29 +5977,34 @@
 			)
 		)
 		(net
-			(code "49")
+			(code "48")
 			(name "VBAT")
 			(class "Default")
 			(node
-				(ref "C2")
+				(ref "C102")
 				(pin "1")
 				(pintype "passive")
 			)
 			(node
-				(ref "C8")
+				(ref "Q101")
+				(pin "3")
+				(pinfunction "D_3")
+				(pintype "passive")
+			)
+			(node
+				(ref "Q102")
+				(pin "3")
+				(pinfunction "D_3")
+				(pintype "passive")
+			)
+			(node
+				(ref "R106")
 				(pin "1")
 				(pintype "passive")
 			)
 			(node
-				(ref "J1")
+				(ref "R110")
 				(pin "1")
-				(pinfunction "Pin_1_1")
-				(pintype "passive")
-			)
-			(node
-				(ref "J2")
-				(pin "1")
-				(pinfunction "Pin_1_1")
 				(pintype "passive")
 			)
 			(node
@@ -5399,45 +6012,9 @@
 				(pin "1")
 				(pintype "passive")
 			)
-			(node
-				(ref "U4")
-				(pin "3")
-				(pinfunction "VIN_3")
-				(pintype "power_in")
-			)
 		)
 		(net
-			(code "50")
-			(name "unconnected-(C1-Pad1)")
-			(class "Default")
-			(node
-				(ref "C1")
-				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "51")
-			(name "unconnected-(C1-Pad2)")
-			(class "Default")
-			(node
-				(ref "C1")
-				(pin "2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "52")
-			(name "unconnected-(C2-Pad2)")
-			(class "Default")
-			(node
-				(ref "C2")
-				(pin "2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "53")
+			(code "49")
 			(name "unconnected-(C4-Pad2)")
 			(class "Default")
 			(node
@@ -5447,7 +6024,7 @@
 			)
 		)
 		(net
-			(code "54")
+			(code "50")
 			(name "unconnected-(C5-Pad2)")
 			(class "Default")
 			(node
@@ -5457,7 +6034,7 @@
 			)
 		)
 		(net
-			(code "55")
+			(code "51")
 			(name "unconnected-(C6-Pad2)")
 			(class "Default")
 			(node
@@ -5467,37 +6044,7 @@
 			)
 		)
 		(net
-			(code "56")
-			(name "unconnected-(C9-Pad1)")
-			(class "Default")
-			(node
-				(ref "C9")
-				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "57")
-			(name "unconnected-(C9-Pad2)")
-			(class "Default")
-			(node
-				(ref "C9")
-				(pin "2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "58")
-			(name "unconnected-(C10-Pad1)")
-			(class "Default")
-			(node
-				(ref "C10")
-				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "59")
+			(code "52")
 			(name "unconnected-(C11-Pad1)")
 			(class "Default")
 			(node
@@ -5507,7 +6054,7 @@
 			)
 		)
 		(net
-			(code "60")
+			(code "53")
 			(name "unconnected-(C11-Pad2)")
 			(class "Default")
 			(node
@@ -5517,7 +6064,7 @@
 			)
 		)
 		(net
-			(code "61")
+			(code "54")
 			(name "unconnected-(C12-Pad1)")
 			(class "Default")
 			(node
@@ -5527,7 +6074,7 @@
 			)
 		)
 		(net
-			(code "62")
+			(code "55")
 			(name "unconnected-(C12-Pad2)")
 			(class "Default")
 			(node
@@ -5537,7 +6084,7 @@
 			)
 		)
 		(net
-			(code "63")
+			(code "56")
 			(name "unconnected-(C13-Pad1)")
 			(class "Default")
 			(node
@@ -5547,7 +6094,7 @@
 			)
 		)
 		(net
-			(code "64")
+			(code "57")
 			(name "unconnected-(C13-Pad2)")
 			(class "Default")
 			(node
@@ -5557,7 +6104,17 @@
 			)
 		)
 		(net
-			(code "65")
+			(code "58")
+			(name "unconnected-(C104-Pad1)")
+			(class "Default")
+			(node
+				(ref "C104")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "59")
 			(name "unconnected-(J7-SBU1-PadA8)")
 			(class "Default")
 			(node
@@ -5568,7 +6125,7 @@
 			)
 		)
 		(net
-			(code "66")
+			(code "60")
 			(name "unconnected-(J7-SBU2-PadB8)")
 			(class "Default")
 			(node
@@ -5579,51 +6136,18 @@
 			)
 		)
 		(net
-			(code "67")
-			(name "unconnected-(L2-Pad2)")
+			(code "61")
+			(name "unconnected-(L101-Pad2)")
 			(class "Default")
 			(node
-				(ref "L2")
+				(ref "L101")
 				(pin "2")
 				(pinfunction "2_2")
 				(pintype "passive")
 			)
 		)
 		(net
-			(code "68")
-			(name "unconnected-(Q1-D-Pad3)")
-			(class "Default")
-			(node
-				(ref "Q1")
-				(pin "3")
-				(pinfunction "D_3")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "69")
-			(name "unconnected-(Q1-G-Pad1)")
-			(class "Default")
-			(node
-				(ref "Q1")
-				(pin "1")
-				(pinfunction "G_1")
-				(pintype "input")
-			)
-		)
-		(net
-			(code "70")
-			(name "unconnected-(Q1-S-Pad2)")
-			(class "Default")
-			(node
-				(ref "Q1")
-				(pin "2")
-				(pinfunction "S_2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "71")
+			(code "62")
 			(name "unconnected-(Q2-D-Pad3)")
 			(class "Default")
 			(node
@@ -5634,7 +6158,7 @@
 			)
 		)
 		(net
-			(code "72")
+			(code "63")
 			(name "unconnected-(Q2-G-Pad1)")
 			(class "Default")
 			(node
@@ -5645,7 +6169,7 @@
 			)
 		)
 		(net
-			(code "73")
+			(code "64")
 			(name "unconnected-(Q2-S-Pad2)")
 			(class "Default")
 			(node
@@ -5656,47 +6180,7 @@
 			)
 		)
 		(net
-			(code "74")
-			(name "unconnected-(R3-Pad1)")
-			(class "Default")
-			(node
-				(ref "R3")
-				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "75")
-			(name "unconnected-(R5-Pad2)")
-			(class "Default")
-			(node
-				(ref "R5")
-				(pin "2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "76")
-			(name "unconnected-(R8-Pad1)")
-			(class "Default")
-			(node
-				(ref "R8")
-				(pin "1")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "77")
-			(name "unconnected-(R9-Pad2)")
-			(class "Default")
-			(node
-				(ref "R9")
-				(pin "2")
-				(pintype "passive")
-			)
-		)
-		(net
-			(code "78")
+			(code "65")
 			(name "unconnected-(SW1-Pad1)")
 			(class "Default")
 			(node
@@ -5707,7 +6191,7 @@
 			)
 		)
 		(net
-			(code "79")
+			(code "66")
 			(name "unconnected-(SW1-Pad2)")
 			(class "Default")
 			(node
@@ -5718,7 +6202,7 @@
 			)
 		)
 		(net
-			(code "80")
+			(code "67")
 			(name "unconnected-(SW2-Pad1)")
 			(class "Default")
 			(node
@@ -5729,7 +6213,7 @@
 			)
 		)
 		(net
-			(code "81")
+			(code "68")
 			(name "unconnected-(SW2-Pad2)")
 			(class "Default")
 			(node
@@ -5740,7 +6224,7 @@
 			)
 		)
 		(net
-			(code "82")
+			(code "69")
 			(name "unconnected-(U1-IO4-Pad9)")
 			(class "Default")
 			(node
@@ -5751,7 +6235,7 @@
 			)
 		)
 		(net
-			(code "83")
+			(code "70")
 			(name "unconnected-(U1-IO5-Pad10)")
 			(class "Default")
 			(node
@@ -5762,7 +6246,7 @@
 			)
 		)
 		(net
-			(code "84")
+			(code "71")
 			(name "unconnected-(U1-IO8-Pad22)")
 			(class "Default")
 			(node
@@ -5773,18 +6257,7 @@
 			)
 		)
 		(net
-			(code "85")
-			(name "unconnected-(U1-IO14-Pad19)")
-			(class "Default")
-			(node
-				(ref "U1")
-				(pin "19")
-				(pinfunction "IO14_19")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "86")
+			(code "72")
 			(name "unconnected-(U1-IO15-Pad20)")
 			(class "Default")
 			(node
@@ -5795,40 +6268,7 @@
 			)
 		)
 		(net
-			(code "87")
-			(name "unconnected-(U1-IO21-Pad27)")
-			(class "Default")
-			(node
-				(ref "U1")
-				(pin "27")
-				(pinfunction "IO21_27")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "88")
-			(name "unconnected-(U1-IO22-Pad28)")
-			(class "Default")
-			(node
-				(ref "U1")
-				(pin "28")
-				(pinfunction "IO22_28")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "89")
-			(name "unconnected-(U1-IO23-Pad29)")
-			(class "Default")
-			(node
-				(ref "U1")
-				(pin "29")
-				(pinfunction "IO23_29")
-				(pintype "bidirectional")
-			)
-		)
-		(net
-			(code "90")
+			(code "73")
 			(name "unconnected-(U1-NC-Pad4)")
 			(class "Default")
 			(node
@@ -5839,7 +6279,7 @@
 			)
 		)
 		(net
-			(code "91")
+			(code "74")
 			(name "unconnected-(U1-NC-Pad7)")
 			(class "Default")
 			(node
@@ -5850,7 +6290,7 @@
 			)
 		)
 		(net
-			(code "92")
+			(code "75")
 			(name "unconnected-(U1-NC-Pad21)")
 			(class "Default")
 			(node
@@ -5861,7 +6301,7 @@
 			)
 		)
 		(net
-			(code "93")
+			(code "76")
 			(name "unconnected-(U1-NC-Pad32)")
 			(class "Default")
 			(node
@@ -5872,7 +6312,7 @@
 			)
 		)
 		(net
-			(code "94")
+			(code "77")
 			(name "unconnected-(U1-NC-Pad33)")
 			(class "Default")
 			(node
@@ -5883,7 +6323,7 @@
 			)
 		)
 		(net
-			(code "95")
+			(code "78")
 			(name "unconnected-(U1-NC-Pad34)")
 			(class "Default")
 			(node
@@ -5894,7 +6334,7 @@
 			)
 		)
 		(net
-			(code "96")
+			(code "79")
 			(name "unconnected-(U1-NC-Pad35)")
 			(class "Default")
 			(node
@@ -5905,117 +6345,7 @@
 			)
 		)
 		(net
-			(code "97")
-			(name "unconnected-(U2-CE-Pad4)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "4")
-				(pinfunction "CE_4")
-				(pintype "input")
-			)
-		)
-		(net
-			(code "98")
-			(name "unconnected-(U2-CHG-Pad9)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "9")
-				(pinfunction "CHG_9")
-				(pintype "open_collector")
-			)
-		)
-		(net
-			(code "99")
-			(name "unconnected-(U2-EP-Pad17)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "17")
-				(pinfunction "EP_17")
-				(pintype "power_in")
-			)
-		)
-		(net
-			(code "100")
-			(name "unconnected-(U2-IN-Pad13)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "13")
-				(pinfunction "IN_13")
-				(pintype "power_in")
-			)
-		)
-		(net
-			(code "101")
-			(name "unconnected-(U2-ISET-Pad16)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "16")
-				(pinfunction "ISET_16")
-				(pintype "input")
-			)
-		)
-		(net
-			(code "102")
-			(name "unconnected-(U2-ITERM-Pad15)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "15")
-				(pinfunction "ITERM_15")
-				(pintype "input+no_connect")
-			)
-		)
-		(net
-			(code "103")
-			(name "unconnected-(U2-PGOOD-Pad7)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "7")
-				(pinfunction "PGOOD_7")
-				(pintype "open_collector")
-			)
-		)
-		(net
-			(code "104")
-			(name "unconnected-(U2-TMR-Pad14)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "14")
-				(pinfunction "TMR_14")
-				(pintype "input+no_connect")
-			)
-		)
-		(net
-			(code "105")
-			(name "unconnected-(U2-TS-Pad1)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "1")
-				(pinfunction "TS_1")
-				(pintype "input")
-			)
-		)
-		(net
-			(code "106")
-			(name "unconnected-(U2-VSS-Pad8)")
-			(class "Default")
-			(node
-				(ref "U2")
-				(pin "8")
-				(pinfunction "VSS_8")
-				(pintype "power_in")
-			)
-		)
-		(net
-			(code "107")
+			(code "80")
 			(name "unconnected-(U3-GND-Pad9)")
 			(class "Default")
 			(node
@@ -6026,7 +6356,7 @@
 			)
 		)
 		(net
-			(code "108")
+			(code "81")
 			(name "unconnected-(U3-VINA-Pad8)")
 			(class "Default")
 			(node
@@ -6037,25 +6367,80 @@
 			)
 		)
 		(net
-			(code "109")
-			(name "unconnected-(U4-FB-Pad1)")
+			(code "82")
+			(name "unconnected-(U101-V_{BAT}-Pad3)")
 			(class "Default")
 			(node
-				(ref "U4")
-				(pin "1")
-				(pinfunction "FB_1")
-				(pintype "input")
+				(ref "U101")
+				(pin "3")
+				(pinfunction "V_{BAT}_3")
+				(pintype "power_out")
 			)
 		)
 		(net
-			(code "110")
-			(name "unconnected-(U5-ST-Pad8)")
+			(code "83")
+			(name "unconnected-(U103-GND-PadB1)")
 			(class "Default")
 			(node
-				(ref "U5")
-				(pin "8")
-				(pinfunction "ST_8")
-				(pintype "open_collector+no_connect")
+				(ref "U103")
+				(pin "B1")
+				(pinfunction "GND_B1")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "84")
+			(name "unconnected-(U103-IN-PadA2)")
+			(class "Default")
+			(node
+				(ref "U103")
+				(pin "A2")
+				(pinfunction "IN_A2")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "85")
+			(name "unconnected-(U103-OUT-PadA1)")
+			(class "Default")
+			(node
+				(ref "U103")
+				(pin "A1")
+				(pinfunction "OUT_A1")
+				(pintype "power_out")
+			)
+		)
+		(net
+			(code "86")
+			(name "unconnected-(U104-GND-PadB1)")
+			(class "Default")
+			(node
+				(ref "U104")
+				(pin "B1")
+				(pinfunction "GND_B1")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "87")
+			(name "unconnected-(U104-IN-PadA2)")
+			(class "Default")
+			(node
+				(ref "U104")
+				(pin "A2")
+				(pinfunction "IN_A2")
+				(pintype "power_in")
+			)
+		)
+		(net
+			(code "88")
+			(name "unconnected-(U104-OUT-PadA1)")
+			(class "Default")
+			(node
+				(ref "U104")
+				(pin "A1")
+				(pinfunction "OUT_A1")
+				(pintype "power_out")
 			)
 		)
 	)
