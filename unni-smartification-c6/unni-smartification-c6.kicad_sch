@@ -7,7 +7,7 @@
 	(title_block
 		(title "Unni CO2 Smartification — ESP32-C6 Rev A")
 		(date "2026-08-19")
-		(rev "A-v28-final")
+		(rev "A-v29-validated")
 		(company "Unni CO2 Smartification")
 	)
 	(lib_symbols)

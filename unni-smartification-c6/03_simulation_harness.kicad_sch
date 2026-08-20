@@ -7,7 +7,7 @@
 	(title_block
 		(title "Simulation Harness")
 		(date "2026-08-19")
-		(rev "A-v28-final")
+		(rev "A-v29-validated")
 		(company "Unni CO2 Smartification")
 	)
 	(lib_symbols
@@ -916,7 +916,7 @@
 		)
 		(uuid "32c53e5a-cca3-49a2-a12a-3c9136fc2378")
 	)
-	(text "Scenario: battery-only → forced awake → USB hot-plug while BOOST_CMD remains asserted → autonomous charging → USB removal. Battery model includes 120 mΩ ESR. I2/I3 proxy converter input power so battery sag is visible without switch-level regulator models."
+	(text "Scenario: battery-only → forced awake → USB hot-plug while BOOST_CMD remains asserted → autonomous charging → USB removal. Battery model includes 120 mΩ ESR. Battery model includes 120 mΩ ESR. I2 is the 3V3-converter input-power proxy. TPS613222A input power/discharge is modeled internally; legacy I3 is excluded from simulation."
 		(exclude_from_sim no)
 		(at 15.24 20.32 0)
 		(effects
@@ -1606,7 +1606,7 @@
 				)
 			)
 		)
-		(property "Value" "100m"
+		(property "Value" "USB hot-plug / 100m"
 			(at 41.91 52.07 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -1638,7 +1638,7 @@
 				)
 			)
 		)
-		(property "Description" "USB source/cable resistance (simulation only)"
+		(property "Description" "USB hot-plug switch with 100m on-resistance (simulation only)"
 			(at 41.91 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -1648,6 +1648,27 @@
 					(size 1.27 1.27)
 				)
 			)
+		)
+		(property "Sim.Library" "spice/models/USB_HOTPLUG.lib"
+			(at 41.91 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects (font (size 1 1)))
+		)
+		(property "Sim.Name" "USB_HOTPLUG"
+			(at 41.91 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects (font (size 1 1)))
+		)
+		(property "Sim.Pins" "1=1 2=2"
+			(at 41.91 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects (font (size 1 1)))
 		)
 		(pin "1"
 			(uuid "080e19d2-8817-45c0-b0ae-ecc716f8b995")
@@ -1784,7 +1805,7 @@
 		(at 152.4 93.98 0)
 		(unit 1)
 		(body_style 1)
-		(exclude_from_sim no)
+		(exclude_from_sim yes)
 		(in_bom no)
 		(on_board no)
 		(in_pos_files yes)

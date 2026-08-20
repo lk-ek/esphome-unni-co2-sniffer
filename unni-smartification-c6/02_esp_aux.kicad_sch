@@ -7,7 +7,7 @@
 	(title_block
 		(title "ESP32-C6 + Auxiliary Circuits")
 		(date "2026-08-19")
-		(rev "A-v28-final")
+		(rev "A-v29-validated")
 		(company "Unni CO2 Smartification")
 	)
 	(lib_symbols
@@ -3698,13 +3698,23 @@
 	)
 	(wire
 		(pts
-			(xy 309.88 209.55) (xy 309.88 217.17)
+			(xy 314.96 209.55) (xy 314.96 217.17)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
 		(uuid "3784abbb-f2e6-4db4-a28c-6f2fb02b54ae")
+	)
+	(wire
+		(pts
+			(xy 314.96 217.17) (xy 309.88 217.17)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a1cf2a30-bfa4-4be7-8e5b-5eec4a772cd8")
 	)
 	(wire
 		(pts

@@ -7,7 +7,7 @@
 	(title_block
 		(title "USB + Power")
 		(date "2026-08-19")
-		(rev "A-v28-final")
+		(rev "A-v29-validated")
 		(company "Unni CO2 Smartification")
 	)
 	(lib_symbols
@@ -7799,7 +7799,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "1M"
+		(property "Value" "47k"
 			(at 72.39 186.69 0)
 			(show_name no)
 			(do_not_autoplace no)

@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-19T07:02:16</date>
+    <source>/mnt/data/unni-smartification-c6-fixed/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-20T15:33:03</date>
     <tool>Eeschema 10.0.5</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>Unni CO2 Smartification — ESP32-C6 Rev A</title>
         <company>Unni CO2 Smartification</company>
-        <rev>A-v28-final</rev>
+        <rev>A-v29-validated</rev>
         <date>2026-08-19</date>
         <source>unni-smartification-c6.kicad_sch</source>
         <comment number="1" value=""/>
@@ -26,7 +26,7 @@
       <title_block>
         <title>USB + Power</title>
         <company>Unni CO2 Smartification</company>
-        <rev>A-v28-final</rev>
+        <rev>A-v29-validated</rev>
         <date>2026-08-19</date>
         <source>01_usb_power.kicad_sch</source>
         <comment number="1" value=""/>
@@ -44,7 +44,7 @@
       <title_block>
         <title>ESP32-C6 + Auxiliary Circuits</title>
         <company>Unni CO2 Smartification</company>
-        <rev>A-v28-final</rev>
+        <rev>A-v29-validated</rev>
         <date>2026-08-19</date>
         <source>02_esp_aux.kicad_sch</source>
         <comment number="1" value=""/>
@@ -62,7 +62,7 @@
       <title_block>
         <title>Simulation Harness</title>
         <company>Unni CO2 Smartification</company>
-        <rev>A-v28-final</rev>
+        <rev>A-v29-validated</rev>
         <date>2026-08-19</date>
         <source>03_simulation_harness.kicad_sch</source>
         <comment number="1" value=""/>
@@ -314,7 +314,7 @@
       <property name="ki_keywords" value="diode Schottky"/>
       <property name="ki_fp_filters" value="D*DO?41*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>4e721241-bf33-4de6-910a-9cf9215da207</tstamps>
+      <tstamps>249dd1f7-55a5-42e0-bfcb-a48475a76594</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -625,7 +625,7 @@
       <property name="ki_keywords" value="P-Channel MOSFET"/>
       <property name="ki_fp_filters" value="SOT?23*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>effa2719-db62-41c9-84f1-47eb788f3a0c</tstamps>
+      <tstamps>16429d1c-30d7-418e-b9ff-26b30827cf04</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -685,7 +685,7 @@
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="transistor NMOS N-MOS N-MOSFET"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>46d96a23-87d1-4e84-a3f8-2c143005c58d</tstamps>
+      <tstamps>f3ee2cbd-d6a3-4470-aab7-d6f31cf0e56e</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -806,7 +806,7 @@
       <property name="ki_keywords" value="R res resistor"/>
       <property name="ki_fp_filters" value="R_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>7f29959e-15d4-411d-8a44-91386c001f09</tstamps>
+      <tstamps>0e1804c5-9df0-4b7b-b527-f8dd4b9443d0</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -865,7 +865,7 @@
       </units>
     </comp>
     <comp ref="R9">
-      <value>100k</value>
+      <value>1M</value>
       <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
       <fields>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
@@ -878,7 +878,7 @@
       <property name="ki_keywords" value="R res resistor"/>
       <property name="ki_fp_filters" value="R_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>48064d2c-d74c-4838-9403-20a9edf80f55</tstamps>
+      <tstamps>21260e6b-0177-4208-9fce-b14003df868f</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -926,7 +926,31 @@
       <property name="ki_keywords" value="R res resistor"/>
       <property name="ki_fp_filters" value="R_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>644c0721-a336-47b3-abcb-8b0ea8096dfe</tstamps>
+      <tstamps>2e7e458c-a5cd-4363-8678-11280079417c</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
+    <comp ref="R13">
+      <value>47k</value>
+      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <fields>
+        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Sheetname" value="USB + Power"/>
+      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
+      <property name="ki_keywords" value="R res resistor"/>
+      <property name="ki_fp_filters" value="R_*"/>
+      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
+      <tstamps>402a4de4-9b79-4a50-a86e-abecc3118516</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -2146,14 +2170,20 @@
       </units>
     </comp>
     <comp ref="R310">
-      <value>100m</value>
-      <description>USB source/cable resistance (simulation only)</description>
+      <value>USB hot-plug / 100m</value>
+      <description>USB hot-plug switch with 100m on-resistance (simulation only)</description>
       <fields>
+        <field name="Sim.Library">spice/models/USB_HOTPLUG.lib</field>
+        <field name="Sim.Name">USB_HOTPLUG</field>
+        <field name="Sim.Pins">1=1 2=2</field>
         <field name="Footprint"/>
         <field name="Datasheet"/>
-        <field name="Description">USB source/cable resistance (simulation only)</field>
+        <field name="Description">USB hot-plug switch with 100m on-resistance (simulation only)</field>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Sim.Library" value="spice/models/USB_HOTPLUG.lib"/>
+      <property name="Sim.Name" value="USB_HOTPLUG"/>
+      <property name="Sim.Pins" value="1=1 2=2"/>
       <property name="Sheetname" value="Simulation Harness"/>
       <property name="Sheetfile" value="03_simulation_harness.kicad_sch"/>
       <property name="exclude_from_bom"/>
@@ -2740,12 +2770,12 @@
     </net>
     <net code="4" name="/ESP32-C6 + Auxiliary/BOOT_GPIO9" class="Default">
       <node ref="R21" pin="2" pintype="passive"/>
-      <node ref="SW2" pin="1" pinfunction="1_1" pintype="passive"/>
+      <node ref="SW2" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="U10" pin="23" pinfunction="IO9_23" pintype="bidirectional"/>
     </net>
     <net code="5" name="/ESP32-C6 + Auxiliary/ESP_EN" class="Default">
       <node ref="R20" pin="2" pintype="passive"/>
-      <node ref="SW1" pin="1" pinfunction="1_1" pintype="passive"/>
+      <node ref="SW1" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="U10" pin="8" pinfunction="EN_8" pintype="input"/>
     </net>
     <net code="6" name="/ESP32-C6 + Auxiliary/USB_N" class="Default">
@@ -2838,6 +2868,7 @@
       <node ref="Q4" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="R1" pin="2" pintype="passive"/>
       <node ref="R12" pin="2" pintype="passive"/>
+      <node ref="R13" pin="1" pintype="passive"/>
       <node ref="R2" pin="2" pintype="passive"/>
       <node ref="R3" pin="2" pintype="passive"/>
       <node ref="R301" pin="2" pintype="passive"/>
@@ -2846,11 +2877,11 @@
       <node ref="R33" pin="2" pintype="passive"/>
       <node ref="R51" pin="2" pintype="passive"/>
       <node ref="R52" pin="2" pintype="passive"/>
-      <node ref="R6" pin="2" pintype="passive"/>
+      <node ref="R6" pin="1" pintype="passive"/>
       <node ref="R9" pin="2" pintype="passive"/>
       <node ref="RT1" pin="2" pintype="passive"/>
-      <node ref="SW1" pin="2" pinfunction="2_2" pintype="passive"/>
-      <node ref="SW2" pin="2" pinfunction="2_2" pintype="passive"/>
+      <node ref="SW1" pin="1" pinfunction="1_1" pintype="passive"/>
+      <node ref="SW2" pin="1" pinfunction="1_1" pintype="passive"/>
       <node ref="U1" pin="2" pinfunction="V_{SS}_2" pintype="power_in"/>
       <node ref="U10" pin="1" pinfunction="GND_1" pintype="power_in"/>
       <node ref="U10" pin="11" pinfunction="GND_11" pintype="passive"/>
@@ -2937,7 +2968,7 @@
     <net code="30" name="Net-(Q1-G)" class="Default">
       <node ref="Q1" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R5" pin="2" pintype="passive"/>
-      <node ref="R6" pin="1" pintype="passive"/>
+      <node ref="R6" pin="2" pintype="passive"/>
     </net>
     <net code="31" name="Net-(Q2-G)" class="Default">
       <node ref="Q2" pin="1" pinfunction="G_1" pintype="input"/>
@@ -3036,6 +3067,7 @@
       <node ref="J1" pin="B4" pinfunction="VBUS_B4" pintype="passive"/>
       <node ref="J1" pin="B9" pinfunction="VBUS_B9" pintype="passive"/>
       <node ref="Q4" pin="1" pinfunction="G_1" pintype="input"/>
+      <node ref="R13" pin="2" pintype="passive"/>
       <node ref="R310" pin="2" pintype="passive"/>
       <node ref="R32" pin="1" pintype="passive"/>
       <node ref="R5" pin="1" pintype="passive"/>

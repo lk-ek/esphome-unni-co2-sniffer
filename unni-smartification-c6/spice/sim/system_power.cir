@@ -5,6 +5,7 @@
 .include ../models/MCP73831.lib
 .include ../models/TPS63031.lib
 .include ../models/TPS613222A.lib
+.include ../models/USB_HOTPLUG.lib
 
 .param VBAT_OC=3.70
 .param RBAT=0.12
@@ -14,8 +15,10 @@ VBAT0 bat0 0 {VBAT_OC}
 RBAT bat0 batt {RBAT}
 CBAT batt 0 2200u
 
-* External USB: absent -> present 120..240ms
-VUSB usb 0 PULSE(0 5 120m 20u 20u 120m 400m)
+* External USB: a 5 V source connected through a simulation-only hot-plug switch.
+VUSB_SRC usbsrc 0 PULSE(0 5 120m 20u 20u 120m 400m)
+XUSBHOT usbsrc usb USB_HOTPLUG
+RUSBPD usb 0 47k
 
 * MCP73831, RPROG=3.3k (~300mA nominal), autonomous charging.
 * No ESP-controlled charge enable: a flat battery must still be able to charge.
@@ -41,7 +44,7 @@ IRADIO 3v3 0 PULSE(0 220m 20m 20u 20u 3m 20m)
 * Forced-awake request 40..190ms. External USB independently inhibits it.
 VREQ reqsrc 0 PULSE(0 3.3 40m 5u 5u 150m 400m)
 RREQ reqsrc boost_cmd 10k
-RREQDN boost_cmd 0 100k
+RREQDN boost_cmd 0 1Meg
 XQINH usb 0 boost_cmd AO3400A
 XQDRV boost_cmd 0 boost_gate AO3400A
 RQHSPU batt boost_gate 1Meg
@@ -54,7 +57,7 @@ CBOOST5 boost5 0 22u
 XDUSBAC unni_ac usb SS14_SUB
 XDBSTAC unni_ac boost5 SS14_SUB
 CAC unni_ac 0 10u
-BUNNIAC unni_ac 0 I={V(unni_ac)>3.5 ? 0.10 : 0}
+BUNNIAC unni_ac 0 I={V(unni_ac)>3.5 ? 0.050 : 0}
 * Unni's battery input remains directly on cell.
 IUNNIDC batt 0 12m
 

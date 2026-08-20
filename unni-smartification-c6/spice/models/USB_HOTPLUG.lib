@@ -1,0 +1,9 @@
+* Simulation-only USB hot-plug element.
+* Pins: 1 SOURCE, 2 VBUS.
+* When SOURCE (the VPULSE node) is above 1 V, connect with 100 mOhm.
+* When SOURCE is 0 V, disconnect with 1 GOhm so "USB absent" is open-circuit
+* rather than a 0-V source clamping VBUS.
+.SUBCKT USB_HOTPLUG SOURCE VBUS
+SUSB SOURCE VBUS SOURCE 0 SW_USB
+.MODEL SW_USB SW(RON=0.10 ROFF=1e9 VT=1.0 VH=0.10)
+.ENDS USB_HOTPLUG

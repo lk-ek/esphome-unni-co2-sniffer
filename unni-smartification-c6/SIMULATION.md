@@ -1,56 +1,56 @@
-# KiCad / ngspice simulation
+# KiCad / ngspice simulation — Rev A v29
 
-The project is prepared for KiCad 10.0.5 **Inspect → Simulator**. `unni-smartification-c6.wbk` contains prepared transient views. The simulation harness is part of the same hierarchical schematic, but is excluded from BOM/PCB.
+The project is prepared for **KiCad 10.0.5 -> Inspect -> Simulator**. `unni-smartification-c6.wbk` provides four transient views. The simulation harness is part of the same hierarchy but excluded from BOM/PCB, while the ESP sheet is excluded from SPICE and represented by load stimuli.
 
-## KiCad simulation harness
+## Main 10-second scenario
 
-`03_simulation_harness.kicad_sch` supplies system-level test sources and loads while `02_esp_aux.kicad_sch` is excluded from SPICE as a whole. The ESP32-C6 is represented by load stimuli rather than a nonexistent transistor-level MCU model.
+The test intentionally stresses the hardware power arbitration rather than assuming cooperative firmware:
 
-### Stimulus
+1. **0.0–0.5 s — battery idle:** USB absent, `BOOST_CMD=0`. Expected: SYS follows battery, +3V3 regulated, +5V and UNNI_AC off.
+2. **0.5–3.0 s — forced awake from battery:** `BOOST_CMD=3.3 V`. Q3 turns Q2 on; BOOST_IN rises to battery voltage; TPS613222A raises +5V and UNNI_AC.
+3. **3.0–5.0 s — USB inserted while BOOST_CMD deliberately stays high:** Q4 must hardware-inhibit Q3, Q2 must open, BOOST_IN/+5V must collapse, while USB continues to supply SYS and UNNI_AC.
+4. **5.0–6.0 s — USB on, BOOST_CMD low:** normal USB operation.
+5. **6.0–7.0 s — USB removed, BOOST_CMD low:** all 5 V forced-awake rails must shut off while battery/SYS/+3V3 remain valid.
+6. **from 7.0 s — second forced-awake cycle:** proves the boost can restart after USB removal.
 
-- USB source: 0 → 5 V hot-plug at 3 s, including 100 mΩ source/cable resistance.
-- Battery: 3.70 V open-circuit plus 120 mΩ internal resistance.
-- `BOOST_CMD`: asserted before USB insertion and deliberately kept asserted across hot-plug. This tests the hardware USB-inhibit path rather than relying on firmware cooperation.
-- 3V3 load: 20 mA baseline with 180 mA radio bursts.
-- UNNI_AC test load: 100 Ω.
-- Unni battery-side test load: 330 Ω.
+## Stimuli / loads
 
-These load values are validation stimuli, not claims about measured device consumption.
+- Battery: 3.70 V open-circuit, 120 mΩ series resistance.
+- USB: 5 V source with a simulation-only 100 mΩ hot-plug element. When USB is absent the element is 1 GΩ, so VBUS is genuinely open rather than clamped by a 0 V source.
+- ESP load: 20 mA baseline with 180 mA radio bursts on +3V3.
+- TPS63031 input-power proxy: I2 on SYS, matching the dynamic ESP load at system level.
+- TPS613222A: input consumption/discharge is built into its behavioral model; legacy I3 is excluded.
+- UNNI_AC validation load: 100 Ω (~47–50 mA).
+- Unni battery-side validation load: 330 Ω (~11 mA at 3.7 V).
 
-## Charger
+These are validation stimuli, not measured final product loads.
 
-The final hardware and KiCad simulation both use autonomous MCP73831 operation. `PROG` is returned to ground through 3.3 kΩ; there is no MCU-controlled charge-enable switch. The behavioral MCP73831 model implements a smooth system-level CC/CV approximation and STAT behavior suitable for power-path tests.
+## Why VBUS may be a few hundred millivolts while unplugged
 
-## Models
+The SS14 model includes reverse leakage. During internally boosted operation, D3 reverse leakage can weakly raise the unplugged VBUS node. Hardware R13=47 kΩ deliberately clamps this leakage so Q4 stays safely off. In the validated transient VBUS remains below ~0.5 V while USB is absent and forced-awake is active. This is a useful real-world check rather than a simulation artifact we hide.
 
-- `AO3400A.lib` — detailed selected user-supplied model.
-- `AO3400_user_alternatives.lib` — all three supplied variants, retained for comparison testing.
-- `AO3401A.lib` — system-level P-MOS model for load-sharing/high-side-switch behavior.
-- `MCP73831.lib` — smooth behavioral CC/CV charger model.
-- `TPS63031.lib` — fixed-3.3 V behavioral buck-boost model.
-- `TPS613222A.lib` — fixed-5 V behavioral boost model.
-- `SS14.lib` — Schottky diode subcircuit.
+## Behavioral models
 
-The converter models intentionally omit switching-node waveform, loop dynamics, ripple, and EMI. The optional external TPS613222A Schottky is excluded from SPICE because a static behavioral boost model has no physical switching waveform for that diode to rectify.
+- `AO3400A.lib` — selected detailed user-supplied AO3400 model.
+- `AO3400_user_alternatives.lib` — retained alternatives for comparison.
+- `AO3401A.lib` — slow/system-level P-MOS model for power-path/high-side switching.
+- `MCP73831.lib` — smooth CC/CV + STAT approximation.
+- `TPS63031.lib` — 3.3 V system regulator; dynamic input power is represented by I2 in the harness.
+- `TPS613222A.lib` — 5 V system model with finite output impedance plus a 56 Ω equivalent input load. The latter corresponds roughly to the current ~50 mA UNNI_AC test load and ensures BOOST_IN discharges promptly when Q2 opens.
+- `SS14.lib` — Schottky model including reverse leakage.
+- `USB_HOTPLUG.lib` — simulation-only source connection: 100 mΩ when the VPULSE source is high, 1 GΩ when absent.
 
-## Standalone regression decks
+The regulator models are deliberately not switch-level models; do not use them for ripple, loop stability or EMI.
 
-`spice/sim/` contains:
+## Workbook tabs
 
-- `ao3400_compare.cir`
-- `mcp73831_charge.cir`
-- `3v3_loadstep.cir`
-- `system_power.cir`
+1. **System power:** +3V3, +5V, +BATT, BOOST_IN, BOOST_CMD, Q2/Q3 gate nodes, SYS, UNNI_AC and VBUS.
+2. **3V3 load step:** +3V3, +BATT and SYS around the radio-current bursts.
+3. **Charging:** +BATT, CHARGE_STAT and VBUS around USB insertion/removal.
+4. **Forced-awake/inhibit:** +5V, BOOST_CMD, UNNI_AC and VBUS.
 
-All are exercised by `tools/validate_kicad.sh` using KiCad's bundled `libngspice`.
+## Automated direct-from-KiCad test
 
-## Direct KiCad-netlist validation
+`tools/validate_kicad.sh` exports the SPICE netlist from the actual KiCad hierarchy, then `tools/make_kicad_transient.py` adds only the analysis/control block. The resulting transient therefore uses the real KiCad connectivity rather than a separately redrawn test circuit.
 
-The validator exports `spice/exported-from-kicad.cir` from the actual hierarchy, adds only a transient analysis command, then runs that generated deck through ngspice. This prevents a separate hand-written simulation schematic from masking wiring mistakes in the KiCad source.
-
-Validated operating points include:
-
-- around 1 s, battery operation with forced-awake active: 3V3 remains regulated and `UNNI_AC` is raised to the 5 V domain through the boost/SS14 path;
-- around 4 s, external USB is present while `BOOST_CMD` is still asserted: USB supplies the system and `UNNI_AC`, exercising the hardware inhibit topology.
-
-The exact generated samples from the most recent run are printed by `tools/validate_kicad.sh` and the waveform data are saved in `validation/kicad-system.csv`.
+The validator checks representative points at 0.10, 0.70, 3.10, 6.10 and 7.10 s, including Q2/Q3 gate states and BOOST_IN. See `validation/summary.txt` and `validation/kicad-system.csv`.
