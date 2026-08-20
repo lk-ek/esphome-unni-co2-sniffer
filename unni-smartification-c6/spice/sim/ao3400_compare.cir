@@ -1,0 +1,15 @@
+* Compare all three user-provided AO3400 model variants at VDS=1 V.
+.include ../models/AO3400_user_alternatives.lib
+VG g 0 2
+VD1 d1 0 1
+VD2 d2 0 1
+VD3 d3 0 1
+X1 g 0 d1 AO3400_original
+X2 g 0 d2 AO3400_sonnet
+X3 g 0 d3 AO3400_sonnet2
+.control
+set wr_singlescale
+dc VG 2.0 10.0 0.1
+wrdata results/ao3400_compare.csv v(g) i(VD1) i(VD2) i(VD3)
+.endc
+.end

@@ -1,0 +1,54 @@
+.title KiCad schematic
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/AO3400A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/AO3401A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/MCP73831.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/SS14.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/TPS613222A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v28-final/spice/models/TPS63031.lib"
+XD1 SYS VBUS SS14_SUB
+C1 VBUS GND 4.7u
+R11 Net-_U1-STAT_ CHARGE_STAT 150k
+XU1 Net-_U1-STAT_ GND +BATT VBUS Net-_U1-PROG_ MCP73831
+R3 Net-_U1-PROG_ GND 3.3k
+C2 +BATT GND 4.7u
+R12 CHARGE_STAT GND 220k
+R5 VBUS Net-_Q1-G_ 100k
+R6 Net-_Q1-G_ GND 1Meg
+L2 /USB_+_Power/BOOST_IN Net-_D2-A_ 2.2u
+C8 +5V GND 22u
+C7 /USB_+_Power/BOOST_IN GND 10u
+XU3 +5V Net-_D2-A_ GND TPS613222A
+C4 SYS GND 100n
+C3 SYS GND 10u
+XU2 +3V3 Net-_U2-L2_ GND Net-_U2-L1_ SYS SYS GND SYS GND +3V3 GND TPS63031
+XQ1 Net-_Q1-G_ SYS +BATT AO3401A
+R2 Net-_J1-CC2_ GND 5.1k
+R1 Net-_J1-CC1_ GND 5.1k
+L1 Net-_U2-L1_ Net-_U2-L2_ 1.5u
+C5 +3V3 GND 10u
+XD3 UNNI_AC VBUS SS14_SUB
+C6 +3V3 GND 10u
+XD4 UNNI_AC +5V SS14_SUB
+C9 UNNI_AC GND 1u
+XQ4 VBUS GND Net-_Q3-G_ AO3400A
+XQ3 Net-_Q3-G_ GND Net-_Q2-G_ AO3400A
+R9 Net-_Q3-G_ GND 100k
+XQ2 Net-_Q2-G_ +BATT /USB_+_Power/BOOST_IN AO3401A
+R7 +BATT Net-_Q2-G_ 1Meg
+R8 BOOST_CMD Net-_Q3-G_ 10k
+I3 +BATT GND PULSE( 0 0.10 0.5 5m 5m 2.5 20 ) 
+V3 BOOST_CMD GND PULSE( 0 3.3 0.5 5m 5m 4.5 6.5 ) 
+V2 Net-_R300-Pad1_ GND DC 3.70 
+R310 Net-_R310-Pad1_ VBUS 100m
+V1 Net-_R310-Pad1_ GND PULSE( 0 5 3 20m 20m 3 20 ) 
+R302 +BATT GND 330
+R301 UNNI_AC GND 100
+R300 Net-_R300-Pad1_ +BATT 120m
+I1 +3V3 GND PULSE( 0.02 0.18 0.2 1m 1m 0.05 0.5 ) 
+I2 SYS GND PULSE( 0.02 0.18 0.2 1m 1m 0.05 0.5 )
+.control
+set wr_singlescale
+tran 100u 5s
+wrdata kicad-system.csv time v(VBUS) v(+BATT) v(SYS) v(+3V3) v(+5V) v(UNNI_AC) v(BOOST_CMD)
+.endc
+.end

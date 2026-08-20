@@ -7,7 +7,7 @@
 .include ../models/TPS613222A.lib
 
 .param VBAT_OC=3.70
-.param RBAT=0.15
+.param RBAT=0.12
 
 * Battery with simple series impedance
 VBAT0 bat0 0 {VBAT_OC}
@@ -17,11 +17,9 @@ CBAT batt 0 2200u
 * External USB: absent -> present 120..240ms
 VUSB usb 0 PULSE(0 5 120m 20u 20u 120m 400m)
 
-* MCP73831, RPROG=3.3k. Enable is controlled by opening/closing PROG return.
-RPROG prog qchg_d 3.3k
-SCHG qchg_d 0 charge_en 0 SWLOGIC
-VCHGEN charge_en 0 PULSE(0 3.3 135m 5u 5u 90m 400m)
-.MODEL SWLOGIC SW(RON=0.03 ROFF=1e9 VT=1.5 VH=0.1)
+* MCP73831, RPROG=3.3k (~300mA nominal), autonomous charging.
+* No ESP-controlled charge enable: a flat battery must still be able to charge.
+RPROG prog 0 3.3k
 XCHG chg_stat 0 batt usb prog MCP73831
 RSTAT chg_stat 0 220k
 

@@ -1,0 +1,20 @@
+* MCP73831T-2ACI/OT system-level behavioral model for ngspice/KiCad
+* Pins: 1 STAT, 2 VSS, 3 VBAT, 4 VDD, 5 PROG
+* Smooth CC/CV approximation intended for system power-path / hot-plug simulation.
+* Does NOT model thermal regulation, preconditioning, termination latch/hysteresis,
+* exact STAT high-Z behavior, or silicon-level detail.
+.SUBCKT MCP73831 STAT VSS VBAT VDD PROG
+* Datasheet programming node is approximately 1 V while charging.
+VPROG PROG_INT VSS 1.0
+RPROG_SENSE PROG_INT PROG 1m
+* Programmed current is approximately 1000 * I(PROG), capped at 500 mA here.
+* Smooth input-headroom and CV taper factors avoid discontinuities at USB hot-plug.
+BCHG VDD VBAT I={ min(0.5,1000*abs(I(VPROG))) * min(max((V(VDD,VSS)-V(VBAT,VSS)-0.04)/0.16,0),1) * min(max((4.20-V(VBAT,VSS))/0.15,0),1) }
+* Leakage paths aid convergence and roughly represent shutdown leakage.
+RLEAKV VDD VSS 100Meg
+RLEAKB VBAT VSS 100Meg
+* STAT approximation: low while powered and battery is below charge-complete region;
+* otherwise pulled high toward VDD. Real device is high-Z in shutdown/no-battery.
+BSTAT STAT VSS V={ min(max((V(VDD,VSS)-2.8)/0.4,0),1) * (0.05 + (V(VDD,VSS)-0.15-0.05) * min(max((V(VBAT,VSS)-4.12)/0.06,0),1)) }
+RSTAT STAT VSS 1Meg
+.ENDS MCP73831

@@ -1,0 +1,13 @@
+* TPS613222A fixed-5V DC/system behavioral model for KiCad/ngspice.
+* Smooth startup and finite output impedance. Not a switching-ripple/loop model.
+.SUBCKT TPS613222A_SYS IN OUT GND
+BDRIVE DRIVE GND V={5.0*min(max((V(IN,GND)-0.7)/0.30,0),1)}
+RREG DRIVE OUT 0.10
+RLEAK OUT GND 10MEG
+RIN IN GND 10MEG
+.ENDS TPS613222A_SYS
+
+* Physical-pin wrapper: 1 VOUT, 2 SW/input-side switching node, 3 GND.
+.SUBCKT TPS613222A VOUT SW GND
+XCORE SW VOUT GND TPS613222A_SYS
+.ENDS TPS613222A

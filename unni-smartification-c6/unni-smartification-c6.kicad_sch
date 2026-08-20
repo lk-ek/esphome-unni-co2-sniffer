@@ -1,23 +1,178 @@
 (kicad_sch
-  (version 20250227)
-  (generator "openai_kicad_generator")
-  (generator_version "10.0.5-target")
-  (uuid "15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51")
-  (paper "A3")
-  (title_block (title "Unni CO2 Smartification — ESP32-C6 Rev A") (date "2026-08-18") (rev "A-v25-kicad-spice") (company "Unni CO2 Smartification"))
-  (lib_symbols)
-  (text "UNNI CO2 SMARTIFICATION — REV A" (exclude_from_sim no) (at 20.32 15.24 0) (effects (font (size 2.5 2.5) (bold yes)) (justify left bottom)) (uuid "1542340f-abac-41b5-8c6d-fdbdfb1ffb84"))
-  (text "Two-sheet cleanup: standard power symbols, grid-aligned wiring, explicit local connectivity." (exclude_from_sim no) (at 20.32 22.86 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "47fc6489-9939-4978-88b5-7172f13b88f4"))
-  (sheet (at 38.10 50.80) (size 101.60 63.50) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (stroke (width 0.1524) (type solid)) (fill (color 0 0 0 0.0000)) (uuid "c2ff28aa-a0f2-4a89-9a60-62d08b111b12")
-    (property "Sheetname" "USB + Power" (at 38.10 49.53 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
-    (property "Sheetfile" "01_usb_power.kicad_sch" (at 38.10 115.57 0) (effects (font (size 1.27 1.27)) (justify left top)))
-    (instances (project "unni-smartification-c6" (path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51" (page "2"))))
-  )
-  (sheet (at 165.10 50.80) (size 101.60 63.50) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (stroke (width 0.1524) (type solid)) (fill (color 0 0 0 0.0000)) (uuid "706aea83-d0d2-469c-a6dd-7c6a9d9c51bb")
-    (property "Sheetname" "ESP32-C6 + Auxiliary" (at 165.10 49.53 0) (effects (font (size 1.27 1.27)) (justify left bottom)))
-    (property "Sheetfile" "02_esp_aux.kicad_sch" (at 165.10 115.57 0) (effects (font (size 1.27 1.27)) (justify left top)))
-    (instances (project "unni-smartification-c6" (path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51" (page "3"))))
-  )
-  (sheet_instances (path "/" (page "1")))
-  (embedded_fonts no)
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51")
+	(paper "A3")
+	(title_block
+		(title "Unni CO2 Smartification — ESP32-C6 Rev A")
+		(date "2026-08-19")
+		(rev "A-v28-final")
+		(company "Unni CO2 Smartification")
+	)
+	(lib_symbols)
+	(text "UNNI CO2 SMARTIFICATION — REV A"
+		(exclude_from_sim no)
+		(at 20.32 15.24 0)
+		(effects
+			(font
+				(size 2.5 2.5)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+		(uuid "1542340f-abac-41b5-8c6d-fdbdfb1ffb84")
+	)
+	(text "Two-sheet cleanup: standard power symbols, grid-aligned wiring, explicit local connectivity."
+		(exclude_from_sim no)
+		(at 20.32 22.86 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "47fc6489-9939-4978-88b5-7172f13b88f4")
+	)
+	(sheet
+		(at 165.1 50.8)
+		(size 101.6 63.5)
+		(exclude_from_sim yes)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "706aea83-d0d2-469c-a6dd-7c6a9d9c51bb")
+		(property "Sheetname" "ESP32-C6 + Auxiliary"
+			(at 165.1 49.53 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "02_esp_aux.kicad_sch"
+			(at 165.1 115.57 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 101.6 139.7)
+		(size 101.6 63.5)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "74787967-dfd9-44ae-8bc6-cf8f765062ad")
+		(property "Sheetname" "Simulation Harness"
+			(at 101.6 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "03_simulation_harness.kicad_sch"
+			(at 101.6 204.47 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 38.1 50.8)
+		(size 101.6 63.5)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "c2ff28aa-a0f2-4a89-9a60-62d08b111b12")
+		(property "Sheetname" "USB + Power"
+			(at 38.1 49.53 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "01_usb_power.kicad_sch"
+			(at 38.1 115.57 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+	(embedded_fonts no)
 )
