@@ -48,3 +48,7 @@ The headless AppImage reports only `lib_symbol_issues` and `footprint_link_issue
 ## Model limits
 
 AO3400A uses the selected detailed user-supplied MOSFET model. AO3401A, MCP73831, TPS63031 and TPS613222A are system-level behavioral models. They validate topology, source handover, charger behavior, enable/inhibit states and supply transients. They do **not** predict switch-node ripple, control-loop stability, switching losses or EMI.
+
+## Rev A v30: worst-case power regression
+
+The validation suite now includes a 12-case battery sweep (4 OCV values x 3 internal resistances) with the ESP radio burst aligned to forced-awake startup. Run it through `tools/validate_kicad.sh`; detailed results are generated under `validation/worst-case/`.

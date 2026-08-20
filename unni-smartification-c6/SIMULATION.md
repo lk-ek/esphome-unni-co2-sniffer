@@ -54,3 +54,20 @@ The regulator models are deliberately not switch-level models; do not use them f
 `tools/validate_kicad.sh` exports the SPICE netlist from the actual KiCad hierarchy, then `tools/make_kicad_transient.py` adds only the analysis/control block. The resulting transient therefore uses the real KiCad connectivity rather than a separately redrawn test circuit.
 
 The validator checks representative points at 0.10, 0.70, 3.10, 6.10 and 7.10 s, including Q2/Q3 gate states and BOOST_IN. See `validation/summary.txt` and `validation/kicad-system.csv`.
+
+## Worst-case battery sweep
+
+`tools/run_worst_case_sweep.py` adds a second, deliberately harsher regression layer. It does **not** redraw the power circuit: every case starts from `spice/exported-from-kicad.cir`, so the sweep exercises the same KiCad connectivity as the normal workbook.
+
+The matrix is:
+
+- battery OCV: **4.2, 3.7, 3.3, 3.0 V**;
+- battery internal resistance: **0.1, 0.3, 0.5 ohm**;
+- ESP load: 20 mA baseline with a **180 mA radio burst deliberately aligned to the 0.5 s forced-awake startup**;
+- UNNI_AC load remains the 100-ohm validation load used by the workbook.
+
+For this stress regression only, the simple SYS current proxy is replaced by a conservative input-power proxy at 88% efficiency. The 5 V boost also gets supplemental low-voltage input loading so the normal 56-ohm behavioral input load does not become unrealistically optimistic as VBAT falls. These modifications live only in the generated sweep decks; the interactive KiCad workbook remains unchanged.
+
+Results are written to `validation/worst-case/worst-case-sweep.csv` and summarized in `validation/worst-case/README.md`. The automated validator fails if +3V3 drops below 3.15 V, the modeled +5 V rail drops below 4.80 V, or UNNI_AC drops below 4.40 V at the steady simultaneous-stress sample.
+
+The 3.0 V OCV cases are intentionally aggressive. A real protected Li-ion cell or protection board may disconnect before the simulated regulator rails fail, so these rows are regulator/power-path stress tests rather than a recommended battery cutoff.

@@ -39,17 +39,19 @@ C7 /USB_+_Power/BOOST_IN GND 10u
 L2 /USB_+_Power/BOOST_IN Net-_D2-A_ 2.2u
 XU3 +5V Net-_D2-A_ GND TPS613222A
 R302 +BATT GND 330
-I2 SYS GND PULSE( 0.02 0.18 0.2 1m 1m 0.05 0.5 ) 
-I1 +3V3 GND PULSE( 0.02 0.18 0.2 1m 1m 0.05 0.5 ) 
+B3V3IN SYS GND I={max(I(I1),0)*max(V(+3V3),0)/(0.88*max(V(SYS),1.8))}
+I1 +3V3 GND PULSE( 0.02 0.18 0.48 1m 1m 0.25 10 ) 
 V3 BOOST_CMD GND PULSE( 0 3.3 0.5 5m 5m 4.5 6.5 ) 
 V1 Net-_R310-Pad1_ GND PULSE( 0 5 3 20m 20m 3 20 ) 
-V2 Net-_R300-Pad1_ GND DC 3.70 
+V2 Net-_R300-Pad1_ GND DC 3.000 
 XR310 Net-_R310-Pad1_ VBUS USB_HOTPLUG
-R300 Net-_R300-Pad1_ +BATT 120m
+R300 Net-_R300-Pad1_ +BATT 0.500
 R301 UNNI_AC GND 100
+BBOOSTEXTRA /USB_+_Power/BOOST_IN GND I={min(max((0.30/max(V(/USB_+_Power/BOOST_IN),1.0)-V(/USB_+_Power/BOOST_IN)/56)*min(max(V(+5V)/4.5,0),1),0),1.0)}
+
 .control
 set wr_singlescale
-tran 100u 10s
-wrdata kicad-system.csv time v(VBUS) v(+BATT) v(SYS) v(+3V3) v(+5V) v(UNNI_AC) v(BOOST_CMD) v(/USB_+_Power/BOOST_IN) v(Net-_Q2-G_) v(Net-_Q3-G_)
+tran 100u 1.2s
+wrdata case_3.0V_0.5ohm.csv time v(VBUS) v(+BATT) v(SYS) v(+3V3) v(+5V) v(UNNI_AC) v(BOOST_CMD) v(/USB_+_Power/BOOST_IN) i(V2)
 .endc
 .end
