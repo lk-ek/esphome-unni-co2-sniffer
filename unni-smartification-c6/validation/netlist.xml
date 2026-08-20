@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/mnt/data/unni-smartification-c6-revA-v30-worstcase/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-20T15:51:52</date>
+    <source>/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-20T18:13:05</date>
     <tool>Eeschema 10.0.5</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -434,14 +434,14 @@
         <unit name="A">
           <pins>
             <pin num="SH"/>
-            <pin num="B1"/>
-            <pin num="B12"/>
             <pin num="A1"/>
             <pin num="A12"/>
+            <pin num="B1"/>
+            <pin num="B12"/>
+            <pin num="A4"/>
             <pin num="A9"/>
             <pin num="B4"/>
             <pin num="B9"/>
-            <pin num="A4"/>
             <pin num="A5"/>
             <pin num="B5"/>
             <pin num="A7"/>
@@ -1951,28 +1951,28 @@
             <pin num="34"/>
             <pin num="35"/>
             <pin num="3"/>
+            <pin num="53"/>
+            <pin num="38"/>
+            <pin num="52"/>
+            <pin num="51"/>
+            <pin num="43"/>
+            <pin num="42"/>
+            <pin num="14"/>
+            <pin num="50"/>
+            <pin num="49"/>
+            <pin num="48"/>
+            <pin num="1"/>
+            <pin num="47"/>
+            <pin num="46"/>
+            <pin num="41"/>
+            <pin num="45"/>
+            <pin num="11"/>
+            <pin num="40"/>
+            <pin num="39"/>
+            <pin num="2"/>
             <pin num="36"/>
             <pin num="37"/>
-            <pin num="38"/>
-            <pin num="39"/>
-            <pin num="40"/>
-            <pin num="41"/>
-            <pin num="47"/>
-            <pin num="42"/>
-            <pin num="43"/>
             <pin num="44"/>
-            <pin num="45"/>
-            <pin num="46"/>
-            <pin num="2"/>
-            <pin num="48"/>
-            <pin num="49"/>
-            <pin num="50"/>
-            <pin num="51"/>
-            <pin num="52"/>
-            <pin num="53"/>
-            <pin num="1"/>
-            <pin num="11"/>
-            <pin num="14"/>
             <pin num="4"/>
             <pin num="7"/>
             <pin num="21"/>
@@ -2735,7 +2735,38 @@
       </pins>
     </libpart>
   </libparts>
-  <libraries/>
+  <libraries>
+    <library logical="Battery_Management">
+      <uri>${KICAD8_SYMBOL_DIR}/Battery_Management.kicad_sym</uri>
+    </library>
+    <library logical="Connector">
+      <uri>${KICAD8_SYMBOL_DIR}/Connector.kicad_sym</uri>
+    </library>
+    <library logical="Connector_Generic">
+      <uri>${KICAD8_SYMBOL_DIR}/Connector_Generic.kicad_sym</uri>
+    </library>
+    <library logical="Device">
+      <uri>${KICAD8_SYMBOL_DIR}/Device.kicad_sym</uri>
+    </library>
+    <library logical="Diode">
+      <uri>${KICAD8_SYMBOL_DIR}/Diode.kicad_sym</uri>
+    </library>
+    <library logical="RF_Module">
+      <uri>${KICAD8_SYMBOL_DIR}/RF_Module.kicad_sym</uri>
+    </library>
+    <library logical="Regulator_Switching">
+      <uri>${KICAD8_SYMBOL_DIR}/Regulator_Switching.kicad_sym</uri>
+    </library>
+    <library logical="Simulation_SPICE">
+      <uri>${KICAD8_SYMBOL_DIR}/Simulation_SPICE.kicad_sym</uri>
+    </library>
+    <library logical="Switch">
+      <uri>${KICAD8_SYMBOL_DIR}/Switch.kicad_sym</uri>
+    </library>
+    <library logical="Transistor_FET">
+      <uri>${KICAD8_SYMBOL_DIR}/Transistor_FET.kicad_sym</uri>
+    </library>
+  </libraries>
   <nets>
     <net code="1" name="+3V3" class="Default">
       <node ref="C10" pin="1" pintype="passive"/>
