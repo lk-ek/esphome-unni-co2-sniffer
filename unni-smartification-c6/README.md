@@ -52,3 +52,20 @@ AO3400A uses the selected detailed user-supplied MOSFET model. AO3401A, MCP73831
 ## Rev A v30: worst-case power regression
 
 The validation suite now includes a 12-case battery sweep (4 OCV values x 3 internal resistances) with the ESP radio burst aligned to forced-awake startup. Run it through `tools/validate_kicad.sh`; detailed results are generated under `validation/worst-case/`.
+
+## Portable ngspice validation (macOS / Linux)
+
+The validation scripts no longer contain a hard-coded Linux AppImage path. `tools/run_ngspice_shared.py` resolves ngspice in this order:
+
+1. `NGSPICE_LIB=/absolute/path/to/libngspice`
+2. KiCad's macOS `KiCad.app/Contents/Frameworks`, Homebrew and common Unix library paths
+3. `ctypes.util.find_library("ngspice")`
+4. `NGSPICE_BIN` or an `ngspice` executable in `PATH`
+
+A normal macOS invocation is simply:
+
+```sh
+KICAD_CLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli" ./tools/validate_all.sh
+```
+
+If KiCad's bundled library is not discoverable, either set `NGSPICE_LIB` explicitly or install/use a standalone ngspice executable. The project itself does not require the author's `/mnt/data/...` paths.

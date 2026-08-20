@@ -71,3 +71,7 @@ For this stress regression only, the simple SYS current proxy is replaced by a c
 Results are written to `validation/worst-case/worst-case-sweep.csv` and summarized in `validation/worst-case/README.md`. The automated validator fails if +3V3 drops below 3.15 V, the modeled +5 V rail drops below 4.80 V, or UNNI_AC drops below 4.40 V at the steady simultaneous-stress sample.
 
 The 3.0 V OCV cases are intentionally aggressive. A real protected Li-ion cell or protection board may disconnect before the simulated regulator rails fail, so these rows are regulator/power-path stress tests rather than a recommended battery cutoff.
+
+### Running validation outside the author's Linux environment
+
+`tools/run_ngspice_shared.py` is platform-aware. It auto-discovers KiCad/Homebrew/system libngspice on macOS and Linux and falls back to the `ngspice` CLI. Override discovery with `NGSPICE_LIB` or `NGSPICE_BIN` if desired. No `/mnt/data/...` path is required on the user's machine.

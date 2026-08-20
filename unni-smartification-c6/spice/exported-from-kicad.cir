@@ -1,11 +1,11 @@
 .title KiCad schematic
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/AO3400A.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/AO3401A.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/MCP73831.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/SS14.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/TPS613222A.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/TPS63031.lib"
-.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/spice/models/USB_HOTPLUG.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/AO3400A.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/AO3401A.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/MCP73831.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/SS14.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/TPS613222A.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/TPS63031.lib"
+.include "/mnt/data/unni-smartification-c6-revA-v31-portable-validation/spice/models/USB_HOTPLUG.lib"
 R2 Net-_J1-CC2_ GND 5.1k
 R1 Net-_J1-CC1_ GND 5.1k
 R6 GND Net-_Q1-G_ 1Meg
