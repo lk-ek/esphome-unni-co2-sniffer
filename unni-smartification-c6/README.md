@@ -78,3 +78,8 @@ If KiCad's bundled library is not discoverable, either set `NGSPICE_LIB` explici
 - `experimental/unni-smartification-c6-10.99-constraints.kicad_pcb` — KiCad 10.99-only copy using native geometric constraints for the rectangular daughterboard outline. Width is driving/fixed at 19 mm; board height is intentionally not fixed so the rear/bottom edge may be extended.
 
 The main `unni-smartification-c6.kicad_pcb` remains KiCad 10.0.5-compatible. The experimental board requires KiCad 10.99 or newer.
+
+## PCB layout (KiCad 10.99)
+
+The manufacturing master `unni-smartification-c6.kicad_pcb` now contains **both physical PCBs in one PCB Editor file**. The USB/power board is the 19 mm wide left island (currently drawn at the full 65 mm available depth; only its 19 mm width/top datum are driving constraints). The ESP/interface board is the 46 x 32 mm right island with width and height constrained. Cross-board electrical connections deliberately remain visible as ratsnest lines until the final JST-PH interconnect pinout is added to the schematic.
+

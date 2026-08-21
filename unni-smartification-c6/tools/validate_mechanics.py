@@ -40,35 +40,66 @@ thickness = float(m.group(1))
 if not close(thickness, 1.0):
     fail(f"board thickness is {thickness:g} mm, expected 1.0 mm")
 
-# Exactly one manufactured outer Edge.Cuts rectangle is expected at this stub stage.
-rects = []
+# Manufactured Edge.Cuts contain two physical PCB islands in the same file:
+# the mechanically fixed USB/power board and the ESP/interface board.
+lines = []
 for m in re.finditer(
-    r"\(gr_rect\s+\(start\s+([-0-9.]+)\s+([-0-9.]+)\)\s+"
+    r"\(gr_line\s+\(start\s+([-0-9.]+)\s+([-0-9.]+)\)\s+"
     r"\(end\s+([-0-9.]+)\s+([-0-9.]+)\).*?\(layer\s+\"Edge\.Cuts\"\)",
     S,
     re.S,
 ):
-    rects.append(tuple(float(x) for x in m.groups()))
-if len(rects) != 1:
-    fail(f"expected one Edge.Cuts rectangle, found {len(rects)}")
-x1, y1, x2, y2 = rects[0]
+    lines.append(tuple(float(x) for x in m.groups()))
+
+
+def rectangle_from_lines(group: list[tuple[float, float, float, float]], name: str):
+    if len(group) != 4:
+        fail(f"{name}: expected four Edge.Cuts lines, found {len(group)}")
+    xs = [v for line in group for v in (line[0], line[2])]
+    ys = [v for line in group for v in (line[1], line[3])]
+    x1, x2, y1, y2 = min(xs), max(xs), min(ys), max(ys)
+    expected = {
+        (x1, y1, x2, y1), (x2, y1, x2, y2),
+        (x2, y2, x1, y2), (x1, y2, x1, y1),
+    }
+    if set(group) != expected:
+        fail(f"{name}: Edge.Cuts outline is not a closed axis-aligned rectangle")
+    return x1, y1, x2, y2
+
+usb_lines = [ln for ln in lines if max(ln[0], ln[2]) < 250.0]
+esp_lines = [ln for ln in lines if min(ln[0], ln[2]) > 250.0]
+if len(lines) != 8:
+    fail(f"expected 8 Edge.Cuts lines for two PCB islands, found {len(lines)}")
+
+x1, y1, x2, y2 = rectangle_from_lines(usb_lines, "USB board")
 if not (close(x1, LEFT) and close(y1, TOP) and close(x2, RIGHT)):
-    fail(f"fixed top/side board datum changed: got {(x1, y1, x2)}, expected {(LEFT, TOP, RIGHT)}")
+    fail(f"USB fixed top/side datum changed: got {(x1, y1, x2)}, expected {(LEFT, TOP, RIGHT)}")
 if y2 + TOL < REF_BOTTOM:
-    fail(f"bottom edge moved upward to y={y2:g}; minimum/reference y is {REF_BOTTOM:g}")
+    fail(f"USB bottom edge moved upward to y={y2:g}; minimum/reference y is {REF_BOTTOM:g}")
 if not close(x2 - x1, 19.0):
-    fail(f"board width is {x2-x1:g} mm, expected 19.0 mm")
+    fail(f"USB board width is {x2-x1:g} mm, expected 19.0 mm")
+
+ex1, ey1, ex2, ey2 = rectangle_from_lines(esp_lines, "ESP board")
+if not (close(ex2-ex1, 46.0) and close(ey2-ey1, 32.0)):
+    fail(f"ESP board envelope is {ex2-ex1:g} x {ey2-ey1:g} mm, expected 46 x 32 mm")
+
+# Confirm driving fixed-length constraints for the two-board study are present.
+fixed_vals = [float(v) for v in re.findall(r"\(constraint\s+\(type\s+fixed_length\).*?\(value\s+([-0-9.]+)\)", S, re.S)]
+for needed in (19.0, 46.0, 32.0):
+    if not any(close(v, needed) for v in fixed_vals):
+        fail(f"missing fixed_length geometric constraint for {needed:g} mm")
 
 # Footprint parser: locate each board-only mechanical footprint by Reference and
 # inspect its top-level placement and NPTH drill.
 def footprint_for_reference(ref: str) -> str:
-    # Board footprint blocks are balanced S-expressions; scan from each footprint start.
-    for start in (m.start() for m in re.finditer(r"\n\t\(footprint\s+", S)):
+    # Balanced scan from each top-level footprint opening.
+    for m0 in re.finditer(r"\(footprint\s+", S):
+        start = m0.start()
         depth = 0
         in_str = False
         esc = False
         end = None
-        for i in range(start + 1, len(S)):
+        for i in range(start, len(S)):
             c = S[i]
             if in_str:
                 if esc:
@@ -98,8 +129,10 @@ def footprint_for_reference(ref: str) -> str:
 
 def check_hole(ref: str, x: float, y: float, drill: float) -> None:
     b = footprint_for_reference(ref)
-    # The first (at ...) in a board footprint is its placement.
-    m = re.search(r"\n\t\t\(at\s+([-0-9.]+)\s+([-0-9.]+)(?:\s+[-0-9.]+)?\)", b)
+    # KiCad 10 uses top-level (at ...); 10.99 uses transform/translate.
+    m = re.search(r"\(transform\s+\(translate\s+([-0-9.]+)\s+([-0-9.]+)\)", b, re.S)
+    if not m:
+        m = re.search(r"\n\t\t\(at\s+([-0-9.]+)\s+([-0-9.]+)(?:\s+[-0-9.]+)?\)", b)
     if not m:
         fail(f"{ref} placement not found")
     gotx, goty = map(float, m.groups())
@@ -124,7 +157,12 @@ check_hole("H4", RIGHT - 2.5, TOP + 13.5, 1.5)
 # library footprint's "PCB Edge" marker is local y=+3.675 mm.  At 180 degrees,
 # y_origin = TOP + 3.675 puts that marker exactly on the top datum.
 j1 = footprint_for_reference("J1")
-m = re.search(r"\n\t\t\(at\s+([-0-9.]+)\s+([-0-9.]+)\s+([-0-9.]+)\)", j1)
+m = re.search(
+    r"\(transform\s+\(translate\s+([-0-9.]+)\s+([-0-9.]+)\)\s+\(rotate\s+([-0-9.]+)\)",
+    j1, re.S,
+)
+if not m:
+    m = re.search(r"\n\t\t\(at\s+([-0-9.]+)\s+([-0-9.]+)\s+([-0-9.]+)\)", j1)
 if not m:
     fail("J1 placement not found")
 jx, jy, ja = map(float, m.groups())
@@ -137,6 +175,6 @@ if not (close(jx, expected_jx) and close(jy, expected_jy) and close((ja % 360), 
     )
 
 print(
-    "Mechanical assertions passed: 1.0 mm PCB; 19 mm fixed width/top datum; "
-    "4 NPTH holes; USB centered/aligned; bottom may extend downward."
+    "Mechanical assertions passed: 1.0 mm PCB; USB board 19 mm fixed width/top datum with 4 NPTH holes; "
+    "USB centered/aligned; USB bottom may extend downward; ESP board envelope 46 x 32 mm."
 )
