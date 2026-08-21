@@ -169,8 +169,11 @@ if not m:
     fail("J1 placement not found")
 jx, jy, ja = map(float, m.groups())
 expected_jx = LEFT + 8.5
-expected_jy = TOP + 2.625
-if not (close(jx, expected_jx) and close(jy, expected_jy) and close((ja % 360), 0.0)):
+# The Same Sky UJ20 footprint origin sits at the receptacle mouth.  The measured
+# metal shield protrudes ~1 mm beyond the top datum; allow normal footprint/grid
+# rounding rather than tying the validator to the previous connector footprint.
+expected_jy = TOP - 1.0
+if not (close(jx, expected_jx, 0.05) and close(jy, expected_jy, 0.10) and close((ja % 360), 0.0)):
     fail(
         f"J1 placement is ({jx:g}, {jy:g}, {ja:g} deg), expected "
         f"({expected_jx:g}, {expected_jy:g}, 0 deg)"

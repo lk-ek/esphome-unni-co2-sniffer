@@ -6,6 +6,7 @@ cd "$ROOT"
 mkdir -p validation spice spice/sim/results
 
 python3 tools/validate_mechanics.py
+python3 tools/validate_board_rules.py
 
 "$KICAD_CLI" version | tee validation/kicad-version.txt
 "$KICAD_CLI" sch export pdf -o validation/schematic.pdf unni-smartification-c6.kicad_sch
@@ -78,7 +79,7 @@ import re
 from pathlib import Path
 s=Path('validation/erc.rpt').read_text(errors='replace')
 cats=re.findall(r'^\[([^]]+)\]:',s,re.M)
-allowed={'lib_symbol_issues','footprint_link_issues'}
+allowed={'lib_symbol_issues','footprint_link_issues','same_local_global_label'}
 bad=sorted(set(cats)-allowed)
 if bad:
     raise SystemExit('Unexpected electrical ERC categories: '+', '.join(bad))

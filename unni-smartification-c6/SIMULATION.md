@@ -75,3 +75,7 @@ The 3.0 V OCV cases are intentionally aggressive. A real protected Li-ion cell o
 ### Running validation outside the author's Linux environment
 
 `tools/run_ngspice_shared.py` is platform-aware. It auto-discovers KiCad/Homebrew/system libngspice on macOS and Linux and falls back to the `ngspice` CLI. Override discovery with `NGSPICE_LIB` or `NGSPICE_BIN` if desired. No `/mnt/data/...` path is required on the user's machine.
+
+## KiCad 10.99 connector simulation note
+
+Physical connectors J1 (USB-C) and J4 (Unni power/battery connector) are explicitly excluded from SPICE. Their connectivity remains present in the electrical netlist, but KiCad no longer emits the unsimulatable placeholder devices `J1 __J1` / `J4 __J4`. This restores direct simulator export after the USB-C symbol was replaced with the Same Sky UJ20 part.

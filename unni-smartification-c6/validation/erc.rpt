@@ -1,10 +1,13 @@
-ERC report (2026-08-21T18:40:37, Encoding UTF8)
+ERC report (2026-08-21T20:15:57, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
-[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Misc'
     ; warning
-    @(27.94 mm, 81.28 mm): Symbol #PWR005 [GND]
+    @(33.02 mm, 50.80 mm): Symbol J1 [UJ20-C-H-G-SMT-1-P16-TR]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Misc'
+    ; warning
+    @(33.02 mm, 50.80 mm): Symbol J1 [UJ20-C-H-G-SMT-1-P16-TR]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
     ; warning
     @(34.29 mm, 101.60 mm): Symbol J2 [Conn_01x02]
@@ -17,12 +20,6 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
     ; warning
     @(34.29 mm, 172.72 mm): Symbol R8 [R]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector'
-    ; warning
-    @(35.56 mm, 53.34 mm): Symbol J1 [USB_C_Receptacle_USB2.0_16P]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_USB'
-    ; warning
-    @(35.56 mm, 53.34 mm): Symbol J1 [USB_C_Receptacle_USB2.0_16P]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(39.37 mm, 199.39 mm): Symbol R9 [R]
@@ -35,6 +32,9 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
     ; warning
     @(48.26 mm, 172.72 mm): Symbol Q3 [Q_NMOS_GSD]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+    ; warning
+    @(50.80 mm, 27.94 mm): Symbol #PWR03 [VBUS]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(50.80 mm, 101.60 mm): Symbol #PWR006 [+BATT]
@@ -53,39 +53,36 @@ Report includes: Errors, Warnings, Exclusions
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(50.80 mm, 209.55 mm): Symbol #PWR040 [GND]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
-    @(55.88 mm, 38.10 mm): Symbol #PWR003 [VBUS]
+    @(54.61 mm, 53.34 mm): Symbol R1 [R]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    ; warning
+    @(54.61 mm, 53.34 mm): Symbol R1 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(57.15 mm, 165.10 mm): Symbol R7 [R]
 [footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
     ; warning
     @(57.15 mm, 165.10 mm): Symbol R7 [R]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(59.69 mm, 60.96 mm): Symbol R2 [R]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
+    ; warning
+    @(59.69 mm, 60.96 mm): Symbol R2 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Transistor_FET'
     ; warning
     @(62.23 mm, 190.50 mm): Symbol Q4 [Q_NMOS_GSD]
 [footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
     ; warning
     @(62.23 mm, 190.50 mm): Symbol Q4 [Q_NMOS_GSD]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
-    ; warning
-    @(64.77 mm, 43.18 mm): Symbol R1 [R]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
-    ; warning
-    @(64.77 mm, 43.18 mm): Symbol R1 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(64.77 mm, 148.59 mm): Symbol #PWR037 [+BATT]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
-    ; warning
-    @(69.85 mm, 45.72 mm): Symbol R2 [R]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
-    ; warning
-    @(69.85 mm, 45.72 mm): Symbol R2 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
-    @(76.20 mm, 45.72 mm): Symbol #PWR002 [GND]
+    @(66.04 mm, 83.82 mm): Symbol #PWR02 [GND]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(76.20 mm, 148.59 mm): Symbol #PWR042 [VBUS]
@@ -661,6 +658,10 @@ Report includes: Errors, Warnings, Exclusions
     @(337.82 mm, 189.23 mm): Symbol #PWR123 [GND]
 
 ***** Sheet /USB + Power/
+[same_local_global_label]: Local and global labels have same name
+    ; warning
+    @(205.74 mm, 149.86 mm): Symbol #PWR028 Pin 1 [Power input, Line]
+    @(126.365 mm, 74.93 mm): Label 'GND'
 
 ***** Sheet /ESP32-C6 + Auxiliary/
 

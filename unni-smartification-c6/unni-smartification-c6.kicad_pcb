@@ -91,7 +91,6 @@
 		)
 		(capping no)
 		(filling no)
-		(zone_defaults)
 		(pcbplotparams
 			(layerselection 0x00000000_00000000_55555555_5755f5ff)
 			(plot_on_all_layers_selection 0x00000000_00000000_00000000_00000000)
@@ -17784,7 +17783,7 @@
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -18056,12 +18055,12 @@
 		(hatch edge 0.5)
 		(priority 3)
 		(connect_pads
-			(clearance 0.2)
+			(clearance 0.25)
 		)
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -18204,7 +18203,7 @@
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -18822,7 +18821,7 @@
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -20020,12 +20019,12 @@
 		(hatch edge 0.5)
 		(priority 4)
 		(connect_pads
-			(clearance 0.2)
+			(clearance 0.25)
 		)
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -20367,12 +20366,12 @@
 		(hatch edge 0.5)
 		(priority 5)
 		(connect_pads
-			(clearance 0.2)
+			(clearance 0.25)
 		)
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -20462,7 +20461,7 @@
 		(min_thickness 0.2)
 		(fill yes
 			(thermal_gap 0.3)
-			(thermal_bridge_width 0.35)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon
@@ -20550,12 +20549,12 @@
 		(hatch edge 0.5)
 		(priority 1)
 		(connect_pads
-			(clearance 0.5)
+			(clearance 0.25)
 		)
-		(min_thickness 0.25)
+		(min_thickness 0.2)
 		(fill yes
-			(thermal_gap 0.5)
-			(thermal_bridge_width 0.5)
+			(thermal_gap 0.3)
+			(thermal_bridge_width 0.4)
 			(island_removal_mode 0)
 		)
 		(polygon

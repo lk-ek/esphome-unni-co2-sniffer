@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/mnt/data/unni_work/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-21T18:40:36</date>
+    <source>/mnt/data/unni_cfg/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-21T20:15:55</date>
     <tool>Eeschema 10.99.0-2795-g77a613d64c</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -419,39 +419,44 @@
     </comp>
     <comp ref="J1">
       <value>USB-C (replacement daughterboard)</value>
-      <footprint>Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal</footprint>
+      <footprint>Misc:SAMESKY_UJ20-C-H-G-SMT-1-P16-TR</footprint>
       <fields>
-        <field name="Footprint">Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal</field>
+        <field name="PARTREV">1.0</field>
+        <field name="MANUFACTURER">Same Sky</field>
+        <field name="MAXIMUM_PACKAGE_HEIGHT">3.46mm</field>
+        <field name="STANDARD">Manufacturer Recommendations</field>
+        <field name="Footprint">Misc:SAMESKY_UJ20-C-H-G-SMT-1-P16-TR</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
-      <libsource lib="Connector" part="USB_C_Receptacle_USB2.0_16P" description="USB 2.0-only 16P Type-C Receptacle connector"/>
+      <libsource lib="Misc" part="UJ20-C-H-G-SMT-1-P16-TR" description=""/>
+      <property name="PARTREV" value="1.0"/>
+      <property name="MANUFACTURER" value="Same Sky"/>
+      <property name="MAXIMUM_PACKAGE_HEIGHT" value="3.46mm"/>
+      <property name="STANDARD" value="Manufacturer Recommendations"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="usb universal serial bus type-C USB2.0"/>
-      <property name="ki_fp_filters" value="USB*C*Receptacle*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>a06a6c8a-819a-4466-95d6-9dc5b1a665a6</tstamps>
+      <tstamps>adf3641b-2048-42fa-9f50-9f568d882a01</tstamps>
       <units>
         <unit name="A">
           <pins>
-            <pin num="SH"/>
-            <pin num="B1"/>
-            <pin num="B12"/>
-            <pin num="A1"/>
-            <pin num="A12"/>
-            <pin num="A9"/>
-            <pin num="B4"/>
-            <pin num="B9"/>
-            <pin num="A4"/>
-            <pin num="A5"/>
-            <pin num="B5"/>
+            <pin num="A4_B9"/>
+            <pin num="B4_A9"/>
             <pin num="A7"/>
-            <pin num="B7"/>
             <pin num="A6"/>
+            <pin num="B7"/>
             <pin num="B6"/>
+            <pin num="A5"/>
             <pin num="A8"/>
+            <pin num="B5"/>
             <pin num="B8"/>
+            <pin num="A1_B12"/>
+            <pin num="B1_A12"/>
+            <pin num="SH1"/>
+            <pin num="SH2"/>
+            <pin num="SH3"/>
+            <pin num="SH4"/>
           </pins>
         </unit>
       </units>
@@ -690,7 +695,7 @@
       <property name="ki_keywords" value="R res resistor"/>
       <property name="ki_fp_filters" value="R_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>ea504a5d-2143-48f4-a8da-9b1013c61255</tstamps>
+      <tstamps>0671fe02-7360-4646-8bde-43d9eb829e20</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -714,7 +719,7 @@
       <property name="ki_keywords" value="R res resistor"/>
       <property name="ki_fp_filters" value="R_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>d60794e3-c7f8-4089-990a-3687f0108a5e</tstamps>
+      <tstamps>856567ee-ee6f-43c5-ae8e-b9914281ab06</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -1900,10 +1905,12 @@
     <comp ref="U10">
       <value>ESP32-C6-MINI-1</value>
       <footprint>RF_Module:ESP32-C6-MINI-1</footprint>
+      <datasheet>https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf</datasheet>
+      <description>RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna</description>
       <fields>
         <field name="Footprint">RF_Module:ESP32-C6-MINI-1</field>
-        <field name="Datasheet"/>
-        <field name="Description"/>
+        <field name="Datasheet">https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf</field>
+        <field name="Description">RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna</field>
       </fields>
       <libsource lib="RF_Module" part="ESP32-C6-MINI-1" description="RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
@@ -1911,7 +1918,7 @@
       <property name="ki_keywords" value="Radio BT ESP Espressif"/>
       <property name="ki_fp_filters" value="ESP32?C6?MINI?1*"/>
       <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>838b3974-fa91-4053-b2c0-6f31bcdd5ea6</tstamps>
+      <tstamps>8b7e4e29-34dd-4a6a-84ec-49ee2b6123a1</tstamps>
       <units>
         <unit name="A">
           <pins>
@@ -2318,39 +2325,6 @@
         <pin num="1" name="1" type="passive"/>
       </pins>
     </libpart>
-    <libpart lib="Connector" part="USB_C_Receptacle_USB2.0_16P">
-      <description>USB 2.0-only 16P Type-C Receptacle connector</description>
-      <docs>https://www.usb.org/sites/default/files/documents/usb_type-c.zip</docs>
-      <footprints>
-        <fp>USB*C*Receptacle*</fp>
-      </footprints>
-      <fields>
-        <field name="Reference">J</field>
-        <field name="Value">USB_C_Receptacle_USB2.0_16P</field>
-        <field name="Footprint"/>
-        <field name="Datasheet">https://www.usb.org/sites/default/files/documents/usb_type-c.zip</field>
-        <field name="Description">USB 2.0-only 16P Type-C Receptacle connector</field>
-      </fields>
-      <pins>
-        <pin num="A1" name="GND" type="passive"/>
-        <pin num="A4" name="VBUS" type="passive"/>
-        <pin num="A5" name="CC1" type="bidirectional"/>
-        <pin num="A6" name="D+" type="bidirectional"/>
-        <pin num="A7" name="D-" type="bidirectional"/>
-        <pin num="A8" name="SBU1" type="bidirectional"/>
-        <pin num="A9" name="VBUS" type="passive"/>
-        <pin num="A12" name="GND" type="passive"/>
-        <pin num="B1" name="GND" type="passive"/>
-        <pin num="B4" name="VBUS" type="passive"/>
-        <pin num="B5" name="CC2" type="bidirectional"/>
-        <pin num="B6" name="D+" type="bidirectional"/>
-        <pin num="B7" name="D-" type="bidirectional"/>
-        <pin num="B8" name="SBU2" type="bidirectional"/>
-        <pin num="B9" name="VBUS" type="passive"/>
-        <pin num="B12" name="GND" type="passive"/>
-        <pin num="SH" name="SHIELD" type="passive"/>
-      </pins>
-    </libpart>
     <libpart lib="Connector_Generic" part="Conn_01x02">
       <description>Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <footprints>
@@ -2493,6 +2467,37 @@
       <pins>
         <pin num="1" name="K" type="passive"/>
         <pin num="2" name="A" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="Misc" part="UJ20-C-H-G-SMT-1-P16-TR">
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">UJ20-C-H-G-SMT-1-P16-TR</field>
+        <field name="Footprint">Misc:SAMESKY_UJ20-C-H-G-SMT-1-P16-TR</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+        <field name="PARTREV">1.0</field>
+        <field name="MANUFACTURER">Same Sky</field>
+        <field name="MAXIMUM_PACKAGE_HEIGHT">3.46mm</field>
+        <field name="STANDARD">Manufacturer Recommendations</field>
+      </fields>
+      <pins>
+        <pin num="A1_B12" name="GND" type="passive"/>
+        <pin num="A4_B9" name="VBUS" type="passive"/>
+        <pin num="A5" name="CC1" type="passive"/>
+        <pin num="A6" name="DP1" type="passive"/>
+        <pin num="A7" name="DN1" type="passive"/>
+        <pin num="A8" name="SBU1" type="passive"/>
+        <pin num="B1_A12" name="GND__1" type="passive"/>
+        <pin num="B4_A9" name="VBUS__1" type="passive"/>
+        <pin num="B5" name="CC2" type="passive"/>
+        <pin num="B6" name="DP2" type="passive"/>
+        <pin num="B7" name="DN2" type="passive"/>
+        <pin num="B8" name="SBU2" type="passive"/>
+        <pin num="SH1" name="SHIELD" type="passive"/>
+        <pin num="SH2" name="SHIELD__1" type="passive"/>
+        <pin num="SH3" name="SHIELD__2" type="passive"/>
+        <pin num="SH4" name="SHIELD__3" type="passive"/>
       </pins>
     </libpart>
     <libpart lib="RF_Module" part="ESP32-C6-MINI-1">
@@ -2717,7 +2722,7 @@
   </libparts>
   <libraries/>
   <nets>
-    <net code="1" name="+3V3" class="Default">
+    <net code="1" name="+3V3" class="Power_3V3">
       <node ref="C10" pin="1" pintype="passive"/>
       <node ref="C11" pin="1" pintype="passive"/>
       <node ref="C5" pin="1" pintype="passive"/>
@@ -2729,13 +2734,13 @@
       <node ref="U2" pin="1" pinfunction="VOUT_1" pintype="power_out"/>
       <node ref="U2" pin="10" pinfunction="FB_10" pintype="input"/>
     </net>
-    <net code="2" name="+5V" class="Default">
+    <net code="2" name="+5V" class="Power_5V">
       <node ref="C8" pin="1" pintype="passive"/>
       <node ref="D2" pin="1" pinfunction="K_1" pintype="passive"/>
       <node ref="D4" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="U3" pin="1" pinfunction="VOUT_1" pintype="power_out"/>
     </net>
-    <net code="3" name="+BATT" class="Default">
+    <net code="3" name="+BATT" class="Battery_SYS">
       <node ref="C2" pin="1" pintype="passive"/>
       <node ref="I3" pin="1" pintype="passive"/>
       <node ref="J2" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
@@ -2758,60 +2763,60 @@
       <node ref="SW1" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="U10" pin="8" pinfunction="EN_8" pintype="input"/>
     </net>
-    <net code="6" name="/ESP32-C6 + Auxiliary/USB_N" class="Default">
+    <net code="6" name="/ESP32-C6 + Auxiliary/USB_N" class="USB">
       <node ref="R22" pin="1" pintype="passive"/>
       <node ref="U10" pin="17" pinfunction="IO12_17" pintype="bidirectional"/>
     </net>
-    <net code="7" name="/ESP32-C6 + Auxiliary/USB_P" class="Default">
+    <net code="7" name="/ESP32-C6 + Auxiliary/USB_P" class="USB">
       <node ref="R23" pin="1" pintype="passive"/>
       <node ref="U10" pin="18" pinfunction="IO13_18" pintype="bidirectional"/>
     </net>
-    <net code="8" name="/USB + Power/BOOST_IN" class="Default">
+    <net code="8" name="/USB + Power/BOOST_IN" class="Battery_SYS">
       <node ref="C7" pin="1" pintype="passive"/>
       <node ref="L2" pin="1" pinfunction="1_1" pintype="passive"/>
       <node ref="Q2" pin="3" pinfunction="D_3" pintype="passive"/>
     </net>
-    <net code="9" name="BACKLIGHT_ADC" class="Default">
+    <net code="9" name="BACKLIGHT_ADC" class="Sensitive">
       <node ref="C33" pin="1" pintype="passive"/>
       <node ref="R50" pin="2" pintype="passive"/>
       <node ref="R51" pin="1" pintype="passive"/>
       <node ref="U10" pin="6" pinfunction="IO3_6" pintype="bidirectional"/>
     </net>
-    <net code="10" name="BAT_ADC" class="Default">
+    <net code="10" name="BAT_ADC" class="Sensitive">
       <node ref="C20" pin="1" pintype="passive"/>
       <node ref="R30" pin="2" pintype="passive"/>
       <node ref="R31" pin="1" pintype="passive"/>
       <node ref="U10" pin="12" pinfunction="IO0_12" pintype="bidirectional"/>
     </net>
-    <net code="11" name="BAT_TEMP_ADC" class="Default">
+    <net code="11" name="BAT_TEMP_ADC" class="Sensitive">
       <node ref="C21" pin="1" pintype="passive"/>
       <node ref="R34" pin="2" pintype="passive"/>
       <node ref="RT1" pin="1" pintype="passive"/>
       <node ref="U10" pin="5" pinfunction="IO2_5" pintype="bidirectional"/>
     </net>
-    <net code="12" name="BAT_TEMP_EXCITE" class="Default">
+    <net code="12" name="BAT_TEMP_EXCITE" class="Sensitive">
       <node ref="R34" pin="1" pintype="passive"/>
       <node ref="U10" pin="29" pinfunction="IO23_29" pintype="bidirectional"/>
     </net>
-    <net code="13" name="BOOST_CMD" class="Default">
+    <net code="13" name="BOOST_CMD" class="Signal">
       <node ref="R8" pin="1" pintype="passive"/>
       <node ref="U10" pin="27" pinfunction="IO21_27" pintype="bidirectional"/>
       <node ref="V3" pin="1" pintype="passive"/>
     </net>
-    <net code="14" name="CHARGE_STAT" class="Default">
+    <net code="14" name="CHARGE_STAT" class="Signal">
       <node ref="R11" pin="2" pintype="passive"/>
       <node ref="R12" pin="1" pintype="passive"/>
       <node ref="U10" pin="19" pinfunction="IO14_19" pintype="bidirectional"/>
     </net>
-    <net code="15" name="CO2_SCL" class="Default">
+    <net code="15" name="CO2_SCL" class="Sensitive">
       <node ref="R41" pin="2" pintype="passive"/>
       <node ref="U10" pin="25" pinfunction="IO19_25" pintype="bidirectional"/>
     </net>
-    <net code="16" name="CO2_SDA" class="Default">
+    <net code="16" name="CO2_SDA" class="Sensitive">
       <node ref="R40" pin="2" pintype="passive"/>
       <node ref="U10" pin="24" pinfunction="IO18_24" pintype="bidirectional"/>
     </net>
-    <net code="17" name="GND" class="Default">
+    <net code="17" name="GND" class="Ground">
       <node ref="C1" pin="2" pintype="passive"/>
       <node ref="C10" pin="2" pintype="passive"/>
       <node ref="C11" pin="2" pintype="passive"/>
@@ -2831,11 +2836,12 @@
       <node ref="I1" pin="2" pintype="passive"/>
       <node ref="I2" pin="2" pintype="passive"/>
       <node ref="I3" pin="2" pintype="passive"/>
-      <node ref="J1" pin="A1" pinfunction="GND_A1" pintype="passive"/>
-      <node ref="J1" pin="A12" pinfunction="GND_A12" pintype="passive"/>
-      <node ref="J1" pin="B1" pinfunction="GND_B1" pintype="passive"/>
-      <node ref="J1" pin="B12" pinfunction="GND_B12" pintype="passive"/>
-      <node ref="J1" pin="SH" pinfunction="SHIELD_SH" pintype="passive"/>
+      <node ref="J1" pin="A1_B12" pinfunction="GND_A1_B12" pintype="passive"/>
+      <node ref="J1" pin="B1_A12" pinfunction="GND__1_B1_A12" pintype="passive"/>
+      <node ref="J1" pin="SH1" pinfunction="SHIELD_SH1" pintype="passive"/>
+      <node ref="J1" pin="SH2" pinfunction="SHIELD__1_SH2" pintype="passive"/>
+      <node ref="J1" pin="SH3" pinfunction="SHIELD__2_SH3" pintype="passive"/>
+      <node ref="J1" pin="SH4" pinfunction="SHIELD__3_SH4" pintype="passive"/>
       <node ref="J10" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="J2" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
       <node ref="J20" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
@@ -2894,11 +2900,11 @@
       <node ref="V3" pin="2" pintype="passive"/>
     </net>
     <net code="18" name="Net-(J1-CC1)" class="Default">
-      <node ref="J1" pin="A5" pinfunction="CC1_A5" pintype="bidirectional"/>
+      <node ref="J1" pin="A5" pinfunction="CC1_A5" pintype="passive"/>
       <node ref="R1" pin="1" pintype="passive"/>
     </net>
     <net code="19" name="Net-(J1-CC2)" class="Default">
-      <node ref="J1" pin="B5" pinfunction="CC2_B5" pintype="bidirectional"/>
+      <node ref="J1" pin="B5" pinfunction="CC2_B5" pintype="passive"/>
       <node ref="R2" pin="1" pintype="passive"/>
     </net>
     <net code="20" name="Net-(J10-Pin_1)" class="Default">
@@ -2939,23 +2945,23 @@
       <node ref="J22" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="TP1" pin="1" pinfunction="1_1" pintype="passive"/>
     </net>
-    <net code="29" name="Net-(Q1-G)" class="Default">
+    <net code="29" name="Net-(Q1-G)" class="Signal">
       <node ref="Q1" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R5" pin="2" pintype="passive"/>
       <node ref="R6" pin="2" pintype="passive"/>
     </net>
-    <net code="30" name="Net-(Q2-G)" class="Default">
+    <net code="30" name="Net-(Q2-G)" class="Signal">
       <node ref="Q2" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="Q3" pin="3" pinfunction="D_3" pintype="passive"/>
       <node ref="R7" pin="1" pintype="passive"/>
     </net>
-    <net code="31" name="Net-(Q3-G)" class="Default">
+    <net code="31" name="Net-(Q3-G)" class="Signal">
       <node ref="Q3" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="Q4" pin="3" pinfunction="D_3" pintype="passive"/>
       <node ref="R8" pin="2" pintype="passive"/>
       <node ref="R9" pin="1" pintype="passive"/>
     </net>
-    <net code="32" name="Net-(Q10-D)" class="Default">
+    <net code="32" name="Net-(Q10-D)" class="Signal">
       <node ref="C30" pin="2" pintype="passive"/>
       <node ref="C31" pin="2" pintype="passive"/>
       <node ref="C32" pin="2" pintype="passive"/>
@@ -2977,28 +2983,28 @@
       <node ref="R11" pin="1" pintype="passive"/>
       <node ref="U1" pin="1" pinfunction="STAT_1" pintype="tri_state"/>
     </net>
-    <net code="37" name="Net-(U2-L1)" class="Default">
+    <net code="37" name="Net-(U2-L1)" class="Switching">
       <node ref="L1" pin="1" pinfunction="1_1" pintype="passive"/>
       <node ref="U2" pin="4" pinfunction="L1_4" pintype="input"/>
     </net>
-    <net code="38" name="Net-(U2-L2)" class="Default">
+    <net code="38" name="Net-(U2-L2)" class="Switching">
       <node ref="L1" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="U2" pin="2" pinfunction="L2_2" pintype="input"/>
     </net>
-    <net code="39" name="Net-(U3-SW)" class="Default">
+    <net code="39" name="Net-(U3-SW)" class="Switching">
       <node ref="D2" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="L2" pin="2" pinfunction="2_2" pintype="passive"/>
       <node ref="U3" pin="2" pinfunction="SW_2" pintype="power_in"/>
     </net>
-    <net code="40" name="RH" class="Default">
+    <net code="40" name="RH" class="Sensitive">
       <node ref="R43" pin="2" pintype="passive"/>
       <node ref="U10" pin="16" pinfunction="IO7_16" pintype="bidirectional"/>
     </net>
-    <net code="41" name="RT" class="Default">
+    <net code="41" name="RT" class="Sensitive">
       <node ref="R42" pin="2" pintype="passive"/>
       <node ref="U10" pin="15" pinfunction="IO6_15" pintype="bidirectional"/>
     </net>
-    <net code="42" name="SYS" class="Default">
+    <net code="42" name="SYS" class="Battery_SYS">
       <node ref="C3" pin="1" pintype="passive"/>
       <node ref="C4" pin="1" pintype="passive"/>
       <node ref="D1" pin="1" pinfunction="K_1" pintype="passive"/>
@@ -3008,43 +3014,41 @@
       <node ref="U2" pin="6" pinfunction="EN_6" pintype="input"/>
       <node ref="U2" pin="8" pinfunction="VINA_8" pintype="passive"/>
     </net>
-    <net code="43" name="TOUCH_TRIGGER" class="Default">
+    <net code="43" name="TOUCH_TRIGGER" class="Signal">
       <node ref="Q10" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R52" pin="1" pintype="passive"/>
       <node ref="U10" pin="26" pinfunction="IO20_26" pintype="bidirectional"/>
     </net>
-    <net code="44" name="UNNI_AC" class="Default">
+    <net code="44" name="UNNI_AC" class="Power_5V">
       <node ref="C9" pin="1" pintype="passive"/>
       <node ref="D3" pin="1" pinfunction="K_1" pintype="passive"/>
       <node ref="D4" pin="1" pinfunction="K_1" pintype="passive"/>
       <node ref="J4" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
       <node ref="R301" pin="1" pintype="passive"/>
     </net>
-    <net code="45" name="USB_ADC" class="Default">
+    <net code="45" name="USB_ADC" class="Sensitive">
       <node ref="R32" pin="2" pintype="passive"/>
       <node ref="R33" pin="1" pintype="passive"/>
       <node ref="U10" pin="13" pinfunction="IO1_13" pintype="bidirectional"/>
     </net>
-    <net code="46" name="USB_RAW_N" class="Default">
+    <net code="46" name="USB_RAW_N" class="USB">
       <node ref="C12" pin="1" pintype="passive"/>
-      <node ref="J1" pin="A7" pinfunction="D-_A7" pintype="bidirectional"/>
-      <node ref="J1" pin="B7" pinfunction="D-_B7" pintype="bidirectional"/>
+      <node ref="J1" pin="A7" pinfunction="DN1_A7" pintype="passive"/>
+      <node ref="J1" pin="B7" pinfunction="DN2_B7" pintype="passive"/>
       <node ref="R22" pin="2" pintype="passive"/>
     </net>
-    <net code="47" name="USB_RAW_P" class="Default">
+    <net code="47" name="USB_RAW_P" class="USB">
       <node ref="C13" pin="1" pintype="passive"/>
-      <node ref="J1" pin="A6" pinfunction="D+_A6" pintype="bidirectional"/>
-      <node ref="J1" pin="B6" pinfunction="D+_B6" pintype="bidirectional"/>
+      <node ref="J1" pin="A6" pinfunction="DP1_A6" pintype="passive"/>
+      <node ref="J1" pin="B6" pinfunction="DP2_B6" pintype="passive"/>
       <node ref="R23" pin="2" pintype="passive"/>
     </net>
-    <net code="48" name="VBUS" class="Default">
+    <net code="48" name="VBUS" class="Power_5V">
       <node ref="C1" pin="1" pintype="passive"/>
       <node ref="D1" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="D3" pin="2" pinfunction="A_2" pintype="passive"/>
-      <node ref="J1" pin="A4" pinfunction="VBUS_A4" pintype="passive"/>
-      <node ref="J1" pin="A9" pinfunction="VBUS_A9" pintype="passive"/>
-      <node ref="J1" pin="B4" pinfunction="VBUS_B4" pintype="passive"/>
-      <node ref="J1" pin="B9" pinfunction="VBUS_B9" pintype="passive"/>
+      <node ref="J1" pin="A4_B9" pinfunction="VBUS_A4_B9" pintype="passive"/>
+      <node ref="J1" pin="B4_A9" pinfunction="VBUS__1_B4_A9" pintype="passive"/>
       <node ref="Q4" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R13" pin="2" pintype="passive"/>
       <node ref="R310" pin="2" pintype="passive"/>
@@ -3053,10 +3057,10 @@
       <node ref="U1" pin="4" pinfunction="V_{DD}_4" pintype="power_in"/>
     </net>
     <net code="49" name="unconnected-(J1-SBU1-PadA8)" class="Default">
-      <node ref="J1" pin="A8" pinfunction="SBU1_A8" pintype="bidirectional+no_connect"/>
+      <node ref="J1" pin="A8" pinfunction="SBU1_A8" pintype="passive+no_connect"/>
     </net>
     <net code="50" name="unconnected-(J1-SBU2-PadB8)" class="Default">
-      <node ref="J1" pin="B8" pinfunction="SBU2_B8" pintype="bidirectional+no_connect"/>
+      <node ref="J1" pin="B8" pinfunction="SBU2_B8" pintype="passive+no_connect"/>
     </net>
     <net code="51" name="unconnected-(U10-IO4-Pad9)" class="Default">
       <node ref="U10" pin="9" pinfunction="IO4_9" pintype="bidirectional+no_connect"/>

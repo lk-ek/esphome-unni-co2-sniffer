@@ -1,0 +1,51 @@
+(version 1)
+
+# Conservative JLCPCB low-cost baseline for 1 oz copper.
+# These are design targets, intentionally looser than JLCPCB's absolute 4/4 mil capability.
+(rule "JLCPCB zone clearance"
+  (constraint clearance (min 0.25mm))
+  (condition "(A.Type == 'Zone') || (B.Type == 'Zone')")
+)
+
+# Net-class routing guards.  The netclass default width is the preferred/interactive width;
+# these rules only prevent accidentally routing a class much narrower than intended.
+(rule "Signal width"
+  (constraint track_width (min 0.15mm) (opt 0.20mm))
+  (condition "A.NetClass == 'Signal'")
+)
+
+(rule "Sensitive width"
+  (constraint track_width (min 0.15mm) (opt 0.20mm))
+  (condition "A.NetClass == 'Sensitive'")
+)
+
+(rule "USB width"
+  (constraint track_width (min 0.15mm) (opt 0.20mm) (max 0.30mm))
+  (constraint diff_pair_gap (min 0.15mm) (opt 0.20mm))
+  (condition "A.NetClass == 'USB'")
+)
+
+(rule "3V3 power width"
+  (constraint track_width (min 0.30mm) (opt 0.40mm))
+  (condition "A.NetClass == 'Power_3V3'")
+)
+
+(rule "5V power width"
+  (constraint track_width (min 0.40mm) (opt 0.50mm))
+  (condition "A.NetClass == 'Power_5V'")
+)
+
+(rule "Battery SYS width"
+  (constraint track_width (min 0.60mm) (opt 0.80mm))
+  (condition "A.NetClass == 'Battery_SYS'")
+)
+
+(rule "Switch-node width"
+  (constraint track_width (min 0.50mm) (opt 0.80mm))
+  (condition "A.NetClass == 'Switching'")
+)
+
+(rule "Ground track width"
+  (constraint track_width (min 0.40mm) (opt 0.50mm))
+  (condition "A.NetClass == 'Ground'")
+)

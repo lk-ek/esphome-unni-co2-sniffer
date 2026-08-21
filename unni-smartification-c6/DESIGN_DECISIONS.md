@@ -22,3 +22,11 @@
 - The four measurements were taken from the B.Cu/enclosure-side view: (2.0, 9.0) Ø2.0, (1.5, 13.0) Ø1.0, (9.5, 13.7) Ø2.0, and (16.5, 13.5) Ø1.5 mm. In PCBNew/F.Cu coordinates their X positions are mirrored to 17.0, 17.5, 9.5 and 2.5 mm respectively.
 - USB shield nominal span measured from B.Cu is X=6.0..15.0 mm; in PCBNew/F.Cu coordinates it is X=4.0..13.0 mm, center X=8.5 mm. The metal shield mouth, not the contact/pad end, protrudes 1.0 mm beyond the top PCB edge.
 - KiCad 10.99 geometric constraints are kept in an experimental board copy because 10.0.5 cannot load the 10.99 constraint file format and the current solver does not robustly constrain whole mounting-hole footprints as rigid units.
+
+## PCB routing / fabrication baseline (2026-08-21)
+
+The project targets inexpensive JLCPCB 1 oz fabrication without routing at the fab's absolute limits. Board Setup therefore uses a conservative 0.15 mm global minimum trace/clearance baseline, 0.30 mm copper-to-edge clearance, 0.30 mm hole-to-copper clearance, and a preferred general-purpose 0.60/0.30 mm via. A 0.50/0.20 mm via is available as a dense-routing preset, not the normal default.
+
+Predefined routing widths are 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00 and 1.20 mm. Net classes select useful defaults from these presets: Signal 0.20 mm, Sensitive 0.20 mm with 0.25 mm clearance, USB 0.20/0.20 mm width/gap, +3V3 0.40 mm, VBUS/+5V/UNNI_AC 0.50 mm, battery/SYS/BOOST_IN 0.80 mm, switch nodes 0.80 mm with extra clearance, and GND tracks 0.50 mm. USB width/gap is a practical routing default only; if controlled impedance is ordered, it must be recalculated for the selected JLCPCB stackup.
+
+Copper zones default to 0.25 mm clearance, 0.20 mm minimum copper thickness, 0.30 mm thermal gap, 0.40 mm thermal spokes and 1 mm² minimum island area. Existing copper zones are normalized to these values. `unni-smartification-c6.kicad_dru` adds DRC guards for zone clearance and per-netclass minimum/preferred widths.
