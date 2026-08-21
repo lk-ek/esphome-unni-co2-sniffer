@@ -1654,21 +1654,33 @@
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
-			(effects (font (size 1 1)))
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
 		)
 		(property "Sim.Name" "USB_HOTPLUG"
 			(at 41.91 55.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
-			(effects (font (size 1 1)))
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
 		)
 		(property "Sim.Pins" "1=1 2=2"
 			(at 41.91 55.88 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
-			(effects (font (size 1 1)))
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
 		)
 		(pin "1"
 			(uuid "080e19d2-8817-45c0-b0ae-ecc716f8b995")
