@@ -19,6 +19,6 @@
 
 - The replacement USB daughterboard uses the top PCB edge as the authoritative mechanical datum; USB points outward/upward.
 - Reference body size is 19.0 mm wide x 18.0 mm high, with 1.0 mm PCB thickness. The board may grow only toward the rear/bottom; all measured hole Y offsets and USB placement remain referenced to the top edge.
-- The four measured holes are board-only NPTH footprints at X/Y = (2.0, 9.0) Ø2.0, (1.5, 13.0) Ø1.0, (9.5, 13.7) Ø2.0, and (16.5, 13.5) Ø1.5 mm relative to the top-left datum.
-- USB shield nominal span is X=6.0..15.0 mm, giving center X=10.5 mm. The connector protrudes 1.0 mm beyond the top PCB edge.
+- The four measurements were taken from the B.Cu/enclosure-side view: (2.0, 9.0) Ø2.0, (1.5, 13.0) Ø1.0, (9.5, 13.7) Ø2.0, and (16.5, 13.5) Ø1.5 mm. In PCBNew/F.Cu coordinates their X positions are mirrored to 17.0, 17.5, 9.5 and 2.5 mm respectively.
+- USB shield nominal span measured from B.Cu is X=6.0..15.0 mm; in PCBNew/F.Cu coordinates it is X=4.0..13.0 mm, center X=8.5 mm. The metal shield mouth, not the contact/pad end, protrudes 1.0 mm beyond the top PCB edge.
 - KiCad 10.99 geometric constraints are kept in an experimental board copy because 10.0.5 cannot load the 10.99 constraint file format and the current solver does not robustly constrain whole mounting-hole footprints as rigid units.

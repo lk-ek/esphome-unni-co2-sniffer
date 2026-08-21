@@ -3332,10 +3332,6 @@
 		(uuid "0fcb5294-65ce-4a0e-ae21-83b3f3142094")
 	)
 	(no_connect
-		(at 177.8 96.52)
-		(uuid "10da1571-c703-4e3e-aff7-cc96f28a3dd7")
-	)
-	(no_connect
 		(at 175.26 81.28)
 		(uuid "1fa1cd7b-74e4-495f-b8a9-5ae9caf9e0ac")
 	)
@@ -3344,36 +3340,12 @@
 		(uuid "261e8aa7-81b2-4ade-858e-5b163acb1f59")
 	)
 	(no_connect
-		(at 203.2 104.14)
-		(uuid "313b628f-1d9d-48d2-9d89-29d19963100a")
-	)
-	(no_connect
-		(at 177.8 99.06)
-		(uuid "51c6d7dd-27ae-48db-969e-4beb04d13582")
-	)
-	(no_connect
 		(at 218.44 93.98)
 		(uuid "5e599d46-f020-49a7-9434-6654e21b8ff2")
 	)
 	(no_connect
 		(at 205.74 78.74)
 		(uuid "8a466788-b5bf-44d9-a5c5-3559c6c520dc")
-	)
-	(no_connect
-		(at 203.2 101.6)
-		(uuid "947baa4e-a61c-414f-b96b-d2302fceabfd")
-	)
-	(no_connect
-		(at 203.2 99.06)
-		(uuid "d98519d4-6758-42a4-96d4-c9abb481f38d")
-	)
-	(no_connect
-		(at 177.8 101.6)
-		(uuid "e62cd89a-dcb8-46b0-adc0-f984bf0a63f3")
-	)
-	(no_connect
-		(at 177.8 104.14)
-		(uuid "fc97aa23-14a0-42d1-b1f1-a249616af6eb")
 	)
 	(wire
 		(pts
@@ -5325,7 +5297,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal"
+		(property "Footprint" "Connector_JST:JST_PH_S4B-PH-SM4-TB_1x04-1MP_P2.00mm_Horizontal"
 			(at 279.4 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -5894,7 +5866,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 55.88 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -6855,7 +6827,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 304.8 148.59 0)
 			(hide yes)
 			(show_name no)
@@ -7335,7 +7307,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 137.16 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -7664,20 +7636,20 @@
 		(at 190.5 83.82 0)
 		(unit 1)
 		(body_style 1)
-		(exclude_from_sim yes)
+		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "838b3974-fa91-4053-b2c0-6f31bcdd5ea6")
+		(uuid "8b7e4e29-34dd-4a6a-84ec-49ee2b6123a1")
 		(property "Reference" "U10"
 			(at 192.6433 55.88 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 				(justify left)
 			)
@@ -7688,202 +7660,202 @@
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 				(justify left)
 			)
 		)
 		(property "Footprint" "RF_Module:ESP32-C6-MINI-1"
-			(at 190.5 83.82 0)
+			(at 208.28 109.22 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Datasheet" ""
-			(at 190.5 83.82 0)
+		(property "Datasheet" "https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf"
+			(at 190.5 46.99 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Description" ""
-			(at 190.5 83.82 0)
+		(property "Description" "RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna"
+			(at 190.5 44.45 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 			)
-		)
-		(pin "1"
-			(uuid "da69dc73-0213-42e3-8054-477638bdb8a5")
-		)
-		(pin "2"
-			(uuid "bb96e748-66e0-411b-ac14-664af1e5bd67")
-		)
-		(pin "3"
-			(uuid "c95005f3-ec3f-458a-bb90-560e86ff30bc")
-		)
-		(pin "4"
-			(uuid "607ce52c-9cec-4b7e-a570-8d4e1c9c5974")
-		)
-		(pin "5"
-			(uuid "9a515b07-a78e-46d2-bf43-2bc51ae02e3e")
-		)
-		(pin "6"
-			(uuid "098aaad0-4046-4c6c-8973-f822fcdad151")
-		)
-		(pin "7"
-			(uuid "e269529d-f2e3-410f-86f7-07f992a3efc5")
-		)
-		(pin "8"
-			(uuid "6d4fcced-f524-46b6-9742-fb74e6cdc315")
-		)
-		(pin "9"
-			(uuid "b7ac1ad1-7247-44c6-b67c-eff3cd0a4078")
-		)
-		(pin "10"
-			(uuid "74363e9b-9b39-4fd4-8ffa-0e513d40265c")
-		)
-		(pin "11"
-			(uuid "b7bf95bf-de2a-489c-a11e-f7d688cabc8a")
-		)
-		(pin "12"
-			(uuid "2d4495e5-907d-426e-8585-533a94079fd5")
-		)
-		(pin "13"
-			(uuid "4d5f58b1-f516-44d8-a3cb-48cd2ded9cbc")
-		)
-		(pin "14"
-			(uuid "0dd5cbbb-ece8-4a54-9b6b-179c6e8f8412")
 		)
 		(pin "15"
-			(uuid "d741123e-3c2f-47fa-8efc-27b9d4248810")
+			(uuid "af4c4f49-db0c-41a0-abac-12b25aefbc73")
 		)
-		(pin "16"
-			(uuid "5a3b543b-cab6-4753-9423-4f5e487dbc6d")
-		)
-		(pin "17"
-			(uuid "40c4e789-2d1f-4d24-844f-69c9b8d6a97b")
-		)
-		(pin "18"
-			(uuid "17f747a0-f3ed-40c4-9c6c-2377c5c4ba0c")
-		)
-		(pin "19"
-			(uuid "8b1255e2-1b68-462b-81f6-3e75b4fdbc55")
-		)
-		(pin "20"
-			(uuid "68d15005-a6d0-4370-8400-4b9588c66383")
-		)
-		(pin "21"
-			(uuid "ee018822-941e-4272-9c18-4796900eae83")
-		)
-		(pin "22"
-			(uuid "88626567-6916-486b-94d5-89078d0854e8")
-		)
-		(pin "23"
-			(uuid "b0435812-05e3-422c-a7f4-a0a772c6d12a")
-		)
-		(pin "24"
-			(uuid "06c26209-5eda-4e9e-bec7-078d56653ee0")
-		)
-		(pin "25"
-			(uuid "be618ca1-3a99-4fb9-b977-9150b181416c")
-		)
-		(pin "26"
-			(uuid "7398ef1a-d8bc-4486-8659-3fe9f46905f5")
-		)
-		(pin "27"
-			(uuid "517c4b85-6825-44a8-bf5c-862ee187b4b0")
-		)
-		(pin "28"
-			(uuid "5ba8265e-09d7-4237-a1c3-398854488d65")
-		)
-		(pin "29"
-			(uuid "f9f1e682-bd3e-42ac-bb03-26fdab1ee76a")
-		)
-		(pin "30"
-			(uuid "742b7968-b5a5-4425-8ab7-1da786edb7d4")
-		)
-		(pin "31"
-			(uuid "63fee0f9-be04-41a5-a5a8-f84ff8d6127a")
+		(pin "14"
+			(uuid "b3e1443e-35e5-4df2-bf1c-eb5e27a364e8")
 		)
 		(pin "32"
-			(uuid "603da400-afe5-48dd-822e-13bc0ebc0794")
-		)
-		(pin "33"
-			(uuid "682e81b0-72f1-4dec-bcfc-65766721b65c")
-		)
-		(pin "34"
-			(uuid "b0c6776c-4bc2-4178-8ab6-46123274e8c7")
-		)
-		(pin "35"
-			(uuid "bd672443-e41c-4ff1-a589-f7d3ce290676")
-		)
-		(pin "36"
-			(uuid "b059d63a-989a-4bf0-92ea-2b79db15e9e9")
+			(uuid "a16aa600-3551-4f2b-8151-4f404095ee91")
 		)
 		(pin "37"
-			(uuid "352f0f86-5805-4d93-a783-72fc7ff8eb45")
+			(uuid "9ad7c075-e660-4c1d-ba40-b5328170ff4d")
 		)
 		(pin "38"
-			(uuid "b3b29e22-f43d-490b-9778-3493215f5a7d")
+			(uuid "bc587102-205e-448c-aa9c-e708ef117e10")
+		)
+		(pin "33"
+			(uuid "f7256c44-6df8-40da-9625-1f808d84d891")
+		)
+		(pin "35"
+			(uuid "8fe9d61c-d4d2-4bfb-8c59-903c057af5da")
 		)
 		(pin "39"
-			(uuid "5c556707-62bf-4b54-9b56-7812cb155ba8")
+			(uuid "50a2026f-3c57-4313-94b1-578adb0acfc0")
 		)
 		(pin "40"
-			(uuid "73a2f3c4-644d-4f7b-87dd-5c1736b45c83")
+			(uuid "8cbfbd21-c388-4599-b7c6-c5ce846a8d56")
+		)
+		(pin "34"
+			(uuid "30b1df60-3e22-4ac2-a8f8-5b8c0953dd2b")
+		)
+		(pin "36"
+			(uuid "d970d829-142c-4bd7-9ce5-f4c463acc44f")
 		)
 		(pin "41"
-			(uuid "56de1d60-2a98-4335-9c46-1b4ad48be216")
-		)
-		(pin "42"
-			(uuid "e53310a3-d7ae-40c5-9c8e-75aa77b00282")
-		)
-		(pin "43"
-			(uuid "07c898f2-c635-4af2-964e-bd6d59a65e19")
+			(uuid "a9d8f600-4707-4481-8f45-c520a8a70bcb")
 		)
 		(pin "44"
-			(uuid "8d688100-6fbd-4499-b0b1-bf32e4c614a9")
+			(uuid "96492f78-8b45-4a7a-8f70-7c36d604d083")
+		)
+		(pin "42"
+			(uuid "665e6ae3-2d9b-4ed8-a050-0cdd005c5e96")
 		)
 		(pin "45"
-			(uuid "ba16728e-7e5f-41af-801d-e3c68819bba1")
+			(uuid "771bd516-1037-4712-97b5-441c6f852ec8")
+		)
+		(pin "43"
+			(uuid "47d89d30-217b-43f6-aa25-1a9ca6d23369")
 		)
 		(pin "46"
-			(uuid "d2b4286c-5d67-4862-abbf-0c435c5b1b6d")
-		)
-		(pin "47"
-			(uuid "63aca6fc-e004-4d3c-b0c3-28dc0ad83f02")
-		)
-		(pin "48"
-			(uuid "d7ef5274-f715-4537-bc81-398bcdc78675")
-		)
-		(pin "49"
-			(uuid "98b2828d-206b-4284-b01d-dfa68219e29e")
+			(uuid "2ace0ab2-6e93-4d62-8768-60b6b8426310")
 		)
 		(pin "50"
-			(uuid "398be2d1-e34f-4358-b6af-9fa5cbbb0038")
+			(uuid "d95e0e0b-4aa9-4521-8c30-e78a7fc19db7")
+		)
+		(pin "49"
+			(uuid "10f16259-771e-4156-9fc4-94b987cdf0ec")
 		)
 		(pin "51"
-			(uuid "1fc22e0b-c6fa-4fa1-ac7c-ed1c5e995ab0")
+			(uuid "390376d3-e2d3-4e84-92c7-f6c85d42a631")
+		)
+		(pin "47"
+			(uuid "cae37d9a-c717-48f2-b4f9-ac39f4c8fd4e")
 		)
 		(pin "52"
-			(uuid "50033d5b-0d88-42e8-a208-a8518aa8eb95")
+			(uuid "435f35b7-d00a-4d49-acf5-b2bcd803301b")
+		)
+		(pin "48"
+			(uuid "4aeb565e-d3a4-4c2b-95c3-18e05a38787f")
 		)
 		(pin "53"
-			(uuid "ae806dc7-f06a-43c2-8fa6-88d065c57217")
+			(uuid "5772a9b4-6efd-49d5-9081-e0431c2b5847")
+		)
+		(pin "18"
+			(uuid "d01a81c4-48bf-41e9-a44b-dd7d97984430")
+		)
+		(pin "22"
+			(uuid "4c788a47-2dce-47a7-9533-7c8c876bf221")
+		)
+		(pin "19"
+			(uuid "56b8b22f-3808-46b1-8ab3-7086e1561d80")
+		)
+		(pin "23"
+			(uuid "9a6a7b7e-6302-45bd-b13d-63a3d9bb11ec")
+		)
+		(pin "20"
+			(uuid "d2509bce-6146-4b90-b10a-f1cd3320bad8")
+		)
+		(pin "21"
+			(uuid "8fd6c679-79b5-4d79-9d1a-8efa7de96a35")
+		)
+		(pin "4"
+			(uuid "2725117d-7c73-44ae-b69f-2b049be88e8f")
+		)
+		(pin "5"
+			(uuid "51019489-fedb-489a-818e-9e337dd9f573")
+		)
+		(pin "8"
+			(uuid "c511b79f-1153-42e4-9721-309c95627c5b")
+		)
+		(pin "6"
+			(uuid "ccbf0761-7c15-45f6-93e7-6622afd673e8")
+		)
+		(pin "7"
+			(uuid "eedd6e17-c909-4ede-9d04-e3cd9de86d8b")
+		)
+		(pin "11"
+			(uuid "ca623027-fc58-4bd2-a8ba-403098cab89d")
+		)
+		(pin "10"
+			(uuid "2efa5610-c15a-470a-ab11-d35ee0776a0a")
+		)
+		(pin "12"
+			(uuid "afc1d52f-d502-4998-9866-80619907bb3a")
+		)
+		(pin "13"
+			(uuid "259c46a4-aea4-4a31-845e-328d44c66e2a")
+		)
+		(pin "9"
+			(uuid "a494ce86-4313-45dd-9493-468dc499bba8")
+		)
+		(pin "2"
+			(uuid "ea6c404d-39a0-4cb5-8b18-7126e8675154")
+		)
+		(pin "3"
+			(uuid "0620a6d4-5cda-446b-96b0-c0aa6a70cc37")
+		)
+		(pin "1"
+			(uuid "f8d452de-89a2-4b5a-814f-107cac1af165")
+		)
+		(pin "26"
+			(uuid "24d2fa5f-d559-4a85-bd12-b216006b9aee")
+		)
+		(pin "24"
+			(uuid "31d5a515-efa9-4317-852a-02282ba58e13")
+		)
+		(pin "25"
+			(uuid "08365df5-43b4-42f8-b503-ae11ad49feef")
+		)
+		(pin "28"
+			(uuid "8ec2c480-027c-4098-8ced-e3a59a81ffad")
+		)
+		(pin "29"
+			(uuid "d5539800-e86a-4905-a279-9b1d33e16880")
+		)
+		(pin "27"
+			(uuid "caef7bc8-dd94-4c96-8345-bc28873a3153")
+		)
+		(pin "30"
+			(uuid "6d1e0509-f05c-430a-bff8-cffcd79a3e61")
+		)
+		(pin "31"
+			(uuid "ba0e0862-aa19-4fd1-a5a3-8ce2c9c7ce77")
+		)
+		(pin "16"
+			(uuid "6d090cb2-644e-480d-a15d-c13e8d1b4ded")
+		)
+		(pin "17"
+			(uuid "a4a9a7a2-9f3c-4c76-bc6b-99eefc9e7c35")
 		)
 		(instances
 			(project "unni-smartification-c6"
@@ -8006,7 +7978,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Thermistor_SMD:Thermistor_0603_1608Metric"
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal"
 			(at 121.92 160.02 0)
 			(hide yes)
 			(show_name no)
@@ -8086,7 +8058,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 304.8 163.83 0)
 			(hide yes)
 			(show_name no)
@@ -8247,7 +8219,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
+		(property "Footprint" "Connector_JST:JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal"
 			(at 190.5 236.22 0)
 			(hide yes)
 			(show_name no)
@@ -8412,7 +8384,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
+		(property "Footprint" "Connector_JST:JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal"
 			(at 292.1 53.34 0)
 			(hide yes)
 			(show_name no)
@@ -8815,7 +8787,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 156.21 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -8977,7 +8949,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 304.8 156.21 0)
 			(hide yes)
 			(show_name no)
@@ -9059,7 +9031,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 289.56 81.28 0)
 			(hide yes)
 			(show_name no)
@@ -9140,7 +9112,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
+		(property "Footprint" "Connector_JST:JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal"
 			(at 190.5 208.28 0)
 			(hide yes)
 			(show_name no)
@@ -9307,7 +9279,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 167.64 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -9389,7 +9361,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 309.88 220.98 0)
 			(hide yes)
 			(show_name no)
@@ -10032,7 +10004,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric"
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
 			(at 269.24 83.82 0)
 			(hide yes)
 			(show_name no)

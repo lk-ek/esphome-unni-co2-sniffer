@@ -148,14 +148,16 @@ def check_hole(ref: str, x: float, y: float, drill: float) -> None:
         fail(f"{ref} must remain board_only")
 
 
-check_hole("H1", LEFT + 2.0, TOP + 9.0, 2.0)
-check_hole("H2", LEFT + 1.5, TOP + 13.0, 1.0)
+check_hole("H1", RIGHT - 2.0, TOP + 9.0, 2.0)
+check_hole("H2", RIGHT - 1.5, TOP + 13.0, 1.0)
 check_hole("H3", RIGHT - 9.5, TOP + 13.7, 2.0)
-check_hole("H4", RIGHT - 2.5, TOP + 13.5, 1.5)
+check_hole("H4", LEFT + 2.5, TOP + 13.5, 1.5)
 
-# USB footprint: exact center x from measured 6/4 mm shield clearances.  The GCT
-# library footprint's "PCB Edge" marker is local y=+3.675 mm.  At 180 degrees,
-# y_origin = TOP + 3.675 puts that marker exactly on the top datum.
+# USB/NPTH measurements were taken while looking at the enclosure/B.Cu side.
+# PCBNew's normal F.Cu view mirrors X, so the measured shield span 6..15 mm
+# becomes 4..13 mm (center X=8.5 mm) in board coordinates.  J1 is oriented
+# with the receptacle mouth outward and positioned so the metal shield body,
+# rather than the contact/pad end, protrudes about 1.0 mm past the top edge.
 j1 = footprint_for_reference("J1")
 m = re.search(
     r"\(transform\s+\(translate\s+([-0-9.]+)\s+([-0-9.]+)\)\s+\(rotate\s+([-0-9.]+)\)",
@@ -166,15 +168,61 @@ if not m:
 if not m:
     fail("J1 placement not found")
 jx, jy, ja = map(float, m.groups())
-expected_jx = LEFT + 10.5
-expected_jy = TOP + 3.675
-if not (close(jx, expected_jx) and close(jy, expected_jy) and close((ja % 360), 180.0)):
+expected_jx = LEFT + 8.5
+expected_jy = TOP + 2.625
+if not (close(jx, expected_jx) and close(jy, expected_jy) and close((ja % 360), 0.0)):
     fail(
         f"J1 placement is ({jx:g}, {jy:g}, {ja:g} deg), expected "
-        f"({expected_jx:g}, {expected_jy:g}, 180 deg)"
+        f"({expected_jx:g}, {expected_jy:g}, 0 deg)"
     )
+
+# Component-side mechanics. The housing clearance on the USB board exists only
+# on B.Cu in the first 19 x 18 mm datum rectangle.
+def fp_layer(block: str) -> str:
+    m = re.search(r'\(layer\s+"([FB]\.Cu)"\)', block)
+    if not m:
+        fail("footprint copper side not found")
+    return m.group(1)
+
+if fp_layer(j1) != "B.Cu":
+    fail("J1 USB-C receptacle must be on B.Cu / enclosure side")
+for ref in ("R1", "R2"):
+    b = footprint_for_reference(ref)
+    if fp_layer(b) != "B.Cu":
+        fail(f"{ref} USB-C CC resistor must remain on B.Cu")
+    pm = re.search(r"\(transform\s+\(translate\s+([-0-9.]+)\s+([-0-9.]+)\)", b, re.S)
+    if not pm:
+        fail(f"{ref} placement not found")
+    px, py = map(float, pm.groups())
+    if not (LEFT <= px <= RIGHT and TOP <= py <= REF_BOTTOM):
+        fail(f"{ref} is outside the 19 x 18 mm B-side clearance window")
+
+# Explicit placement keepout protects the flush B-side region below the datum window.
+if 'B-side component keepout beyond 19x18 mm clearance' not in S or '(footprints not_allowed)' not in S:
+    fail("missing B-side footprint placement keepout below the 19 x 18 mm clearance window")
+
+# All JSTs are SMT side-entry PH connectors, not THT/XH, and remain on F.Cu.
+for ref in ("J2", "J4", "J10", "J20", "J21", "J22"):
+    b = footprint_for_reference(ref)
+    if 'JST_PH_S' not in b or '-PH-SM4-TB_' not in b or '(attr smd)' not in b:
+        fail(f"{ref} is not an SMT side-entry JST-PH SxB-PH-SM4-TB footprint")
+    if fp_layer(b) != "F.Cu":
+        fail(f"{ref} must be on F.Cu")
+
+# Hand-solder variants for all 0603/0805 capacitors currently used in the design.
+for mref in re.finditer(r'\(property\s+"Reference"\s+"(C[0-9]+)"', S):
+    ref = mref.group(1)
+    b = footprint_for_reference(ref)
+    if ('C_0603_1608Metric' in b or 'C_0805_2012Metric' in b) and '_HandSolder' not in b:
+        fail(f"{ref} does not use a hand-solder capacitor footprint")
+
+# RT1 is intentionally leaded/THT on the ESP board to make assembly and sensor placement easier.
+rt1 = footprint_for_reference("RT1")
+if 'Resistor_THT:R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal' not in rt1 or '(attr through_hole)' not in rt1:
+    fail("RT1 must use the selected leaded THT footprint")
 
 print(
     "Mechanical assertions passed: 1.0 mm PCB; USB board 19 mm fixed width/top datum with 4 NPTH holes; "
-    "USB centered/aligned; USB bottom may extend downward; ESP board envelope 46 x 32 mm."
+    "USB/Rcc on B.Cu within the 19 x 18 mm clearance; B-side keepout below it; "
+    "SMT side-entry JST-PH connectors; hand-solder capacitors; THT RT1; ESP board envelope 46 x 32 mm."
 )

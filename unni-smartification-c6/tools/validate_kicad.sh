@@ -11,6 +11,7 @@ python3 tools/validate_mechanics.py
 "$KICAD_CLI" sch export pdf -o validation/schematic.pdf unni-smartification-c6.kicad_sch
 "$KICAD_CLI" sch export netlist --format spice -o spice/exported-from-kicad.cir unni-smartification-c6.kicad_sch
 "$KICAD_CLI" sch export netlist --format kicadxml -o validation/netlist.xml unni-smartification-c6.kicad_sch
+python3 tools/validate_pcb_netmap.py unni-smartification-c6.kicad_pcb validation/netlist.xml
 "$KICAD_CLI" sch erc --severity-all -o validation/erc.rpt unni-smartification-c6.kicad_sch || true
 
 # No unsimulatable placeholder symbols may leak into the SPICE netlist.

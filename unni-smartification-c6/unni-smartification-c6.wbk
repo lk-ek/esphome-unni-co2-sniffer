@@ -18,58 +18,73 @@
       },
       "measurements": [],
       "showGrid": true,
+      "smithMode": false,
       "traces": [
         {
           "color": "rgb(152, 78, 163)",
           "signal": "V(+3V3)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(255, 255, 51)",
           "signal": "V(+5V)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(228, 26, 28)",
           "signal": "V(+BATT)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(102, 194, 165)",
           "signal": "V(/USB_+_Power/BOOST_IN)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(166, 86, 40)",
           "signal": "V(BOOST_CMD)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(252, 141, 98)",
           "signal": "V(Net-_Q2-G_)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(141, 160, 203)",
           "signal": "V(Net-_Q3-G_)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(77, 175, 74)",
           "signal": "V(SYS)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(255, 127, 0)",
           "signal": "V(UNNI_AC)",
-          "trace_type": 257
-        },
-        {
-          "color": "rgb(55, 126, 184)",
-          "signal": "V(VBUS)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         }
-      ]
+      ],
+      "viewCount": 1
     },
     {
       "analysis": "TRAN",
@@ -87,23 +102,31 @@
       },
       "measurements": [],
       "showGrid": true,
+      "smithMode": false,
       "traces": [
         {
           "color": "rgb(55, 126, 184)",
           "signal": "V(+3V3)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(152, 78, 163)",
           "signal": "V(+BATT)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(77, 175, 74)",
           "signal": "V(SYS)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         }
-      ]
+      ],
+      "viewCount": 1
     },
     {
       "analysis": "TRAN",
@@ -121,23 +144,31 @@
       },
       "measurements": [],
       "showGrid": true,
+      "smithMode": false,
       "traces": [
         {
           "color": "rgb(255, 127, 0)",
           "signal": "V(+BATT)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(77, 175, 74)",
           "signal": "V(CHARGE_STAT)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(55, 126, 184)",
           "signal": "V(VBUS)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         }
-      ]
+      ],
+      "viewCount": 1
     },
     {
       "analysis": "TRAN",
@@ -155,30 +186,40 @@
       },
       "measurements": [],
       "showGrid": true,
+      "smithMode": false,
       "traces": [
         {
           "color": "rgb(77, 175, 74)",
           "signal": "V(+5V)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(55, 126, 184)",
           "signal": "V(BOOST_CMD)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(152, 78, 163)",
           "signal": "V(UNNI_AC)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         },
         {
           "color": "rgb(228, 26, 28)",
           "signal": "V(VBUS)",
-          "trace_type": 257
+          "trace_type": 257,
+          "view": 0,
+          "yScaleView": 0
         }
-      ]
+      ],
+      "viewCount": 1
     }
   ],
   "user_defined_signals": [],
-  "version": 7
+  "version": 8
 }
