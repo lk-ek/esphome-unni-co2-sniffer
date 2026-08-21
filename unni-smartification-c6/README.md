@@ -2,7 +2,7 @@
 
 Target: **KiCad 10.0.5**.
 
-This package contains the completed schematic and KiCad/ngspice system simulation for the current Rev-A architecture. PCB work is intentionally excluded; the project focuses on a validated, editable schematic and repeatable power-path simulation.
+This package contains the completed schematic and KiCad/ngspice system simulation for the current Rev-A architecture. Routing and component placement are still intentionally incomplete. The PCB file now contains the measured replacement USB-daughterboard mechanical stub (1.0 mm board thickness, fixed USB/top datum and mounting holes) so layout can proceed against real mechanics.
 
 ## Sheets
 
@@ -69,3 +69,12 @@ KICAD_CLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli" ./tools/valid
 ```
 
 If KiCad's bundled library is not discoverable, either set `NGSPICE_LIB` explicitly or install/use a standalone ngspice executable. The project itself does not require the author's `/mnt/data/...` paths.
+
+
+## Mechanical reference
+
+- `MECHANICAL.md` — measured USB daughterboard datum, hole locations, USB overhang, PCB thickness, and extension rule.
+- `tools/validate_mechanics.py` — asserts the fixed top/side datum, 1.0 mm thickness, exact NPTH positions/diameters, USB placement, and prevents shortening the daughterboard below the 18 mm reference body.
+- `experimental/unni-smartification-c6-10.99-constraints.kicad_pcb` — KiCad 10.99-only copy using native geometric constraints for the rectangular daughterboard outline. Width is driving/fixed at 19 mm; board height is intentionally not fixed so the rear/bottom edge may be extended.
+
+The main `unni-smartification-c6.kicad_pcb` remains KiCad 10.0.5-compatible. The experimental board requires KiCad 10.99 or newer.

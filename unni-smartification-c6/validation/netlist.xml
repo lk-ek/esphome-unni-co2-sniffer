@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-20T22:56:00</date>
+    <source>/mnt/data/unni_c6_work/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-21T14:26:06</date>
     <tool>Eeschema 10.0.5</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -434,14 +434,14 @@
         <unit name="A">
           <pins>
             <pin num="SH"/>
-            <pin num="A1"/>
-            <pin num="A12"/>
             <pin num="B1"/>
             <pin num="B12"/>
-            <pin num="A4"/>
+            <pin num="A1"/>
+            <pin num="A12"/>
             <pin num="A9"/>
             <pin num="B4"/>
             <pin num="B9"/>
+            <pin num="A4"/>
             <pin num="A5"/>
             <pin num="B5"/>
             <pin num="A7"/>
@@ -698,9 +698,9 @@
     </comp>
     <comp ref="R1">
       <value>5.1k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -722,9 +722,9 @@
     </comp>
     <comp ref="R2">
       <value>5.1k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -746,9 +746,9 @@
     </comp>
     <comp ref="R3">
       <value>3.3k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -770,9 +770,9 @@
     </comp>
     <comp ref="R5">
       <value>100k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -794,9 +794,9 @@
     </comp>
     <comp ref="R6">
       <value>1M</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -818,9 +818,9 @@
     </comp>
     <comp ref="R7">
       <value>1M</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -842,9 +842,9 @@
     </comp>
     <comp ref="R8">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -866,9 +866,9 @@
     </comp>
     <comp ref="R9">
       <value>1M</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -890,9 +890,9 @@
     </comp>
     <comp ref="R11">
       <value>150k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -914,9 +914,9 @@
     </comp>
     <comp ref="R12">
       <value>220k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -938,9 +938,9 @@
     </comp>
     <comp ref="R13">
       <value>47k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1442,9 +1442,9 @@
     </comp>
     <comp ref="R20">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1466,9 +1466,9 @@
     </comp>
     <comp ref="R21">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1490,9 +1490,9 @@
     </comp>
     <comp ref="R22">
       <value>22R</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1514,9 +1514,9 @@
     </comp>
     <comp ref="R23">
       <value>22R</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1538,9 +1538,9 @@
     </comp>
     <comp ref="R30">
       <value>1M</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1562,9 +1562,9 @@
     </comp>
     <comp ref="R31">
       <value>1M</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1586,9 +1586,9 @@
     </comp>
     <comp ref="R32">
       <value>220k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1610,9 +1610,9 @@
     </comp>
     <comp ref="R33">
       <value>220k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1634,9 +1634,9 @@
     </comp>
     <comp ref="R34">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1658,9 +1658,9 @@
     </comp>
     <comp ref="R40">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1682,9 +1682,9 @@
     </comp>
     <comp ref="R41">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1706,9 +1706,9 @@
     </comp>
     <comp ref="R42">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1730,9 +1730,9 @@
     </comp>
     <comp ref="R43">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1754,9 +1754,9 @@
     </comp>
     <comp ref="R50">
       <value>330k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1778,9 +1778,9 @@
     </comp>
     <comp ref="R51">
       <value>220k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1802,9 +1802,9 @@
     </comp>
     <comp ref="R52">
       <value>100k</value>
-      <footprint>Resistor_SMD:R_0603_1608Metric</footprint>
+      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0603_1608Metric</field>
+        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1951,28 +1951,28 @@
             <pin num="34"/>
             <pin num="35"/>
             <pin num="3"/>
-            <pin num="53"/>
-            <pin num="38"/>
-            <pin num="52"/>
-            <pin num="51"/>
-            <pin num="43"/>
-            <pin num="42"/>
-            <pin num="14"/>
-            <pin num="50"/>
-            <pin num="49"/>
-            <pin num="48"/>
-            <pin num="1"/>
-            <pin num="47"/>
-            <pin num="46"/>
-            <pin num="41"/>
-            <pin num="45"/>
-            <pin num="11"/>
-            <pin num="40"/>
-            <pin num="39"/>
-            <pin num="2"/>
             <pin num="36"/>
             <pin num="37"/>
+            <pin num="38"/>
+            <pin num="39"/>
+            <pin num="40"/>
+            <pin num="41"/>
+            <pin num="47"/>
+            <pin num="42"/>
+            <pin num="43"/>
             <pin num="44"/>
+            <pin num="45"/>
+            <pin num="46"/>
+            <pin num="2"/>
+            <pin num="48"/>
+            <pin num="49"/>
+            <pin num="50"/>
+            <pin num="51"/>
+            <pin num="52"/>
+            <pin num="53"/>
+            <pin num="1"/>
+            <pin num="11"/>
+            <pin num="14"/>
             <pin num="4"/>
             <pin num="7"/>
             <pin num="21"/>
@@ -2735,38 +2735,7 @@
       </pins>
     </libpart>
   </libparts>
-  <libraries>
-    <library logical="Battery_Management">
-      <uri>${KICAD8_SYMBOL_DIR}/Battery_Management.kicad_sym</uri>
-    </library>
-    <library logical="Connector">
-      <uri>${KICAD8_SYMBOL_DIR}/Connector.kicad_sym</uri>
-    </library>
-    <library logical="Connector_Generic">
-      <uri>${KICAD8_SYMBOL_DIR}/Connector_Generic.kicad_sym</uri>
-    </library>
-    <library logical="Device">
-      <uri>${KICAD8_SYMBOL_DIR}/Device.kicad_sym</uri>
-    </library>
-    <library logical="Diode">
-      <uri>${KICAD8_SYMBOL_DIR}/Diode.kicad_sym</uri>
-    </library>
-    <library logical="RF_Module">
-      <uri>${KICAD8_SYMBOL_DIR}/RF_Module.kicad_sym</uri>
-    </library>
-    <library logical="Regulator_Switching">
-      <uri>${KICAD8_SYMBOL_DIR}/Regulator_Switching.kicad_sym</uri>
-    </library>
-    <library logical="Simulation_SPICE">
-      <uri>${KICAD8_SYMBOL_DIR}/Simulation_SPICE.kicad_sym</uri>
-    </library>
-    <library logical="Switch">
-      <uri>${KICAD8_SYMBOL_DIR}/Switch.kicad_sym</uri>
-    </library>
-    <library logical="Transistor_FET">
-      <uri>${KICAD8_SYMBOL_DIR}/Transistor_FET.kicad_sym</uri>
-    </library>
-  </libraries>
+  <libraries/>
   <nets>
     <net code="1" name="+3V3" class="Default">
       <node ref="C10" pin="1" pintype="passive"/>
@@ -2796,7 +2765,7 @@
       <node ref="R30" pin="1" pintype="passive"/>
       <node ref="R300" pin="2" pintype="passive"/>
       <node ref="R302" pin="1" pintype="passive"/>
-      <node ref="R7" pin="1" pintype="passive"/>
+      <node ref="R7" pin="2" pintype="passive"/>
       <node ref="U1" pin="3" pinfunction="V_{BAT}_3" pintype="power_out"/>
     </net>
     <net code="4" name="/ESP32-C6 + Auxiliary/BOOT_GPIO9" class="Default">
@@ -3004,7 +2973,7 @@
     <net code="31" name="Net-(Q2-G)" class="Default">
       <node ref="Q2" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="Q3" pin="3" pinfunction="D_3" pintype="passive"/>
-      <node ref="R7" pin="2" pintype="passive"/>
+      <node ref="R7" pin="1" pintype="passive"/>
     </net>
     <net code="32" name="Net-(Q3-G)" class="Default">
       <node ref="Q3" pin="1" pinfunction="G_1" pintype="input"/>

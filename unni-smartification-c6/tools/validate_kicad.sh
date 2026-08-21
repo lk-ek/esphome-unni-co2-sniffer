@@ -5,6 +5,8 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
 mkdir -p validation spice spice/sim/results
 
+python3 tools/validate_mechanics.py
+
 "$KICAD_CLI" version | tee validation/kicad-version.txt
 "$KICAD_CLI" sch export pdf -o validation/schematic.pdf unni-smartification-c6.kicad_sch
 "$KICAD_CLI" sch export netlist --format spice -o spice/exported-from-kicad.cir unni-smartification-c6.kicad_sch

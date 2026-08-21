@@ -1,7 +1,7 @@
 (kicad_sch
-	(version 20260306)
+	(version 20260818)
 	(generator "eeschema")
-	(generator_version "10.0")
+	(generator_version "10.99")
 	(uuid "c83256f0-fe3b-44b8-b934-451f98e0e43f")
 	(paper "A3")
 	(title_block
@@ -2347,6 +2347,7 @@
 					)
 				)
 			)
+			(symbol "SW_Push_1_1")
 			(embedded_fonts no)
 		)
 		(symbol "Transistor_FET:Q_NMOS_GSD"
@@ -3273,6 +3274,12 @@
 		(uuid "83c8c139-4e84-45f9-9c66-a31b5c9aa3cc")
 	)
 	(junction
+		(at 83.82 148.59)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "8b4dc3ba-c16a-4f71-a09e-2d9580c09496")
+	)
+	(junction
 		(at 167.64 35.56)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3283,6 +3290,18 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "b195f8df-7d17-4f50-8e57-b7cc9a39836a")
+	)
+	(junction
+		(at 121.92 148.59)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "be3a048e-649d-47ac-aa7e-76c9fb0ee541")
+	)
+	(junction
+		(at 40.64 148.59)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d0baf9d9-e969-4dd4-9963-9f41053e0efc")
 	)
 	(junction
 		(at 143.51 91.44)
@@ -5306,7 +5325,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_B4B-XH-A_1x04_P2.50mm_Vertical"
+		(property "Footprint" "Connector_JST:JST_XH_S4B-XH-A_1x04_P2.50mm_Horizontal"
 			(at 279.4 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -8228,7 +8247,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
 			(at 190.5 236.22 0)
 			(hide yes)
 			(show_name no)
@@ -8393,7 +8412,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Connector_PinHeader_1x03_P2.54mm_Vertical"
+		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
 			(at 292.1 53.34 0)
 			(hide yes)
 			(show_name no)
@@ -9121,7 +9140,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical"
+		(property "Footprint" "Connector_JST:JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal"
 			(at 190.5 208.28 0)
 			(hide yes)
 			(show_name no)
