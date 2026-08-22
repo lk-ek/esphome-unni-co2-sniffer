@@ -3579,7 +3579,7 @@
 	)
 	(wire
 		(pts
-			(xy 320.04 177.8) (xy 304.8 177.8)
+			(xy 320.04 177.8) (xy 308.61 177.8)
 		)
 		(stroke
 			(width 0)
@@ -4609,7 +4609,7 @@
 	)
 	(global_label "TOUCH_TRIGGER"
 		(shape input)
-		(at 304.8 177.8 180)
+		(at 308.61 177.8 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4619,7 +4619,7 @@
 		)
 		(uuid "0dcb1168-ba6a-4d5c-a7a4-a4045e3da131")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 290.6402 177.8 0)
+			(at 294.4502 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7389,7 +7389,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23_Handsoldering"
 			(at 335.28 177.8 0)
 			(hide yes)
 			(show_name no)

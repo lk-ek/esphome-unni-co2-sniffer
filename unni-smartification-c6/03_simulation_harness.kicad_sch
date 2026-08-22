@@ -939,6 +939,16 @@
 	)
 	(wire
 		(pts
+			(xy 190.5 80.01) (xy 190.5 88.9)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "14eb2fd4-28b0-465c-85e0-30f016768b71")
+	)
+	(wire
+		(pts
 			(xy 232.41 88.9) (xy 236.22 88.9)
 		)
 		(stroke
@@ -1173,7 +1183,7 @@
 	)
 	(global_label "SYS"
 		(shape passive)
-		(at 190.5 88.9 0)
+		(at 190.5 80.01 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -1183,7 +1193,7 @@
 		)
 		(uuid "7ecc7f75-d54a-4f8f-82bc-125dc79fc3b2")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 194.7372 88.9 0)
+			(at 194.7372 80.01 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -2437,6 +2447,7 @@
 		(on_board no)
 		(in_pos_files yes)
 		(dnp no)
+		(passthrough block)
 		(fields_autoplaced yes)
 		(uuid "bc3c1317-60b4-4e77-9c09-1a73c0a1c0c9")
 		(property "Reference" "I2"
