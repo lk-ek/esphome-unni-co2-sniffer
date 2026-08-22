@@ -3887,6 +3887,12 @@
 		(uuid "0ab0d442-3fc2-4405-b0a3-2387f7bafe23")
 	)
 	(junction
+		(at 66.04 46.99)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "22b0337a-1b0c-4c75-ba43-4c966e26c528")
+	)
+	(junction
 		(at 66.04 53.34)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3939,6 +3945,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "648e2a87-4268-4d9a-a742-abf7620a544c")
+	)
+	(junction
+		(at 66.04 30.48)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "6b5c2ea3-e536-4693-8f19-55b4bf858ee4")
 	)
 	(junction
 		(at 49.53 73.66)
@@ -4894,6 +4906,16 @@
 	)
 	(wire
 		(pts
+			(xy 66.04 30.48) (xy 90.17 30.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "633e1212-8781-40aa-9b42-aff5689f7898")
+	)
+	(wire
+		(pts
 			(xy 39.37 172.72) (xy 39.37 193.04)
 		)
 		(stroke
@@ -5204,7 +5226,7 @@
 	)
 	(wire
 		(pts
-			(xy 45.72 53.34) (xy 50.8 53.34)
+			(xy 45.72 53.34) (xy 52.07 53.34)
 		)
 		(stroke
 			(width 0)
@@ -5294,6 +5316,16 @@
 	)
 	(wire
 		(pts
+			(xy 66.04 46.99) (xy 66.04 53.34)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a2f64e6c-92fa-4a0b-891c-198650ce8f54")
+	)
+	(wire
+		(pts
 			(xy 137.16 31.75) (xy 137.16 30.48)
 		)
 		(stroke
@@ -5371,6 +5403,16 @@
 			(type default)
 		)
 		(uuid "b42a2523-4a01-4e78-99b7-5b41019a49f8")
+	)
+	(wire
+		(pts
+			(xy 66.04 46.99) (xy 90.17 46.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bc41b666-12d6-4baf-ac33-231fbeab8bd9")
 	)
 	(wire
 		(pts
@@ -5474,6 +5516,16 @@
 	)
 	(wire
 		(pts
+			(xy 90.17 30.48) (xy 90.17 34.29)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c40f5b79-51e1-4022-8e4f-ea60f7a6afc9")
+	)
+	(wire
+		(pts
 			(xy 133.35 189.23) (xy 133.35 191.77)
 		)
 		(stroke
@@ -5564,7 +5616,7 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 45.72) (xy 66.04 53.34)
+			(xy 66.04 45.72) (xy 66.04 46.99)
 		)
 		(stroke
 			(width 0)
@@ -5594,7 +5646,7 @@
 	)
 	(wire
 		(pts
-			(xy 58.42 53.34) (xy 66.04 53.34)
+			(xy 59.69 53.34) (xy 66.04 53.34)
 		)
 		(stroke
 			(width 0)
@@ -5791,6 +5843,16 @@
 			(type default)
 		)
 		(uuid "f8c91fb1-7008-434b-891e-55f6804238b7")
+	)
+	(wire
+		(pts
+			(xy 90.17 41.91) (xy 90.17 46.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f8de9a1e-04e2-41d6-ab30-25b1759b9afc")
 	)
 	(wire
 		(pts
@@ -6229,7 +6291,7 @@
 	)
 	(symbol
 		(lib_id "Device:R")
-		(at 54.61 53.34 90)
+		(at 55.88 53.34 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6240,7 +6302,7 @@
 		(fields_autoplaced yes)
 		(uuid "0671fe02-7360-4646-8bde-43d9eb829e20")
 		(property "Reference" "R1"
-			(at 54.61 46.99 90)
+			(at 55.88 46.99 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6250,7 +6312,7 @@
 			)
 		)
 		(property "Value" "5.1k"
-			(at 54.61 49.53 90)
+			(at 55.88 49.53 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6260,7 +6322,7 @@
 			)
 		)
 		(property "Footprint" "Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder"
-			(at 54.61 53.34 0)
+			(at 55.88 53.34 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6271,7 +6333,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 54.61 53.34 0)
+			(at 55.88 53.34 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6282,7 +6344,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 54.61 53.34 0)
+			(at 55.88 53.34 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6526,7 +6588,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "1.5uH"
+		(property "Value" "2.2uH"
 			(at 186.69 130.81 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8385,6 +8447,88 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:C")
+		(at 90.17 38.1 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim yes)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6b799681-20f2-49d5-b2c6-b412573e8cb2")
+		(property "Reference" "C14"
+			(at 93.98 36.8299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "100n"
+			(at 93.98 39.3699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
+			(at 91.1352 41.91 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 90.17 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Unpolarized capacitor"
+			(at 90.17 38.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2335bc3f-ca0c-443a-ad39-30bb2408f8ea")
+		)
+		(pin "2"
+			(uuid "1097f1de-a187-47d0-8126-216c2292c602")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "C14")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+5V")
 		(at 227.33 168.91 0)
 		(unit 1)
@@ -8547,7 +8691,7 @@
 		(at 66.04 38.1 0)
 		(unit 1)
 		(body_style 1)
-		(exclude_from_sim no)
+		(exclude_from_sim yes)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
@@ -10648,13 +10792,14 @@
 			)
 		)
 		(property "Value" "VBUS"
-			(at 50.8 22.86 0)
+			(at 53.34 26.67 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1 1)
 				)
+				(justify left)
 			)
 		)
 		(property "Footprint" ""
@@ -10805,13 +10950,14 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 66.04 88.9 0)
+			(at 68.58 85.09 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1 1)
 				)
+				(justify left)
 			)
 		)
 		(property "Footprint" ""
@@ -11303,9 +11449,10 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
+		(fields_autoplaced yes)
 		(uuid "f8b21ee5-2b70-4223-880c-b7b91f1a79f5")
 		(property "Reference" "J2"
-			(at 34.29 110.49 0)
+			(at 34.29 95.25 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11315,7 +11462,7 @@
 			)
 		)
 		(property "Value" "Li-Ion 1S JST-PH"
-			(at 34.29 107.95 0)
+			(at 34.29 97.79 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
