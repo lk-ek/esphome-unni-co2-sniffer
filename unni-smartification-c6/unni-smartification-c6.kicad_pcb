@@ -5469,7 +5469,7 @@
 		(descr "JST PH series connector, B2B-PH-K (http://www.jst-mfg.com/product/pdf/eng/ePH.pdf)")
 		(tags "connector JST PH vertical")
 		(property "Reference" "J5"
-			(at 0.63 3.671762 360)
+			(at 4.93 2.541762 360)
 			(unlocked yes)
 			(layer "F.SilkS")
 			(uuid "ee1bf4cf-711d-4ac8-b911-672fb208b143")

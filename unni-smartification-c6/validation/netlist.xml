@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/mnt/data/k105conv/src/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-23T18:52:47</date>
-    <tool>Eeschema 10.99.0-2795-g77a613d64c</tool>
+    <source>/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-23T21:45:15</date>
+    <tool>Eeschema 10.99.0-2756-gace8bf0470</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>Unni CO2 Smartification — ESP32-C6 Rev A</title>
@@ -973,56 +973,6 @@
         </unit>
       </units>
     </comp>
-    <comp ref="C30">
-      <value>47pF DNP</value>
-      <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
-      <fields>
-        <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
-        <field name="Description"/>
-      </fields>
-      <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="dnp"/>
-      <property name="ki_keywords" value="cap capacitor"/>
-      <property name="ki_fp_filters" value="C_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>63de4a75-ee2a-453f-85e1-47e18e922977</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-            <pin num="2"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="C31">
-      <value>100pF DNP</value>
-      <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
-      <fields>
-        <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
-        <field name="Description"/>
-      </fields>
-      <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="dnp"/>
-      <property name="ki_keywords" value="cap capacitor"/>
-      <property name="ki_fp_filters" value="C_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>c322e150-cdbd-4204-bde7-b78386dbdded</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-            <pin num="2"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
     <comp ref="C32">
       <value>220pF DNP</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
@@ -1034,7 +984,6 @@
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="dnp"/>
       <property name="ki_keywords" value="cap capacitor"/>
       <property name="ki_fp_filters" value="C_*"/>
       <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
@@ -1976,28 +1925,28 @@
             <pin num="34"/>
             <pin num="35"/>
             <pin num="3"/>
+            <pin num="53"/>
+            <pin num="38"/>
+            <pin num="52"/>
+            <pin num="51"/>
+            <pin num="43"/>
+            <pin num="42"/>
+            <pin num="14"/>
+            <pin num="50"/>
+            <pin num="49"/>
+            <pin num="48"/>
+            <pin num="1"/>
+            <pin num="47"/>
+            <pin num="46"/>
+            <pin num="41"/>
+            <pin num="45"/>
+            <pin num="11"/>
+            <pin num="40"/>
+            <pin num="39"/>
+            <pin num="2"/>
             <pin num="36"/>
             <pin num="37"/>
-            <pin num="38"/>
-            <pin num="39"/>
-            <pin num="40"/>
-            <pin num="41"/>
-            <pin num="47"/>
-            <pin num="42"/>
-            <pin num="43"/>
             <pin num="44"/>
-            <pin num="45"/>
-            <pin num="46"/>
-            <pin num="2"/>
-            <pin num="48"/>
-            <pin num="49"/>
-            <pin num="50"/>
-            <pin num="51"/>
-            <pin num="52"/>
-            <pin num="53"/>
-            <pin num="1"/>
-            <pin num="11"/>
-            <pin num="14"/>
             <pin num="4"/>
             <pin num="7"/>
             <pin num="21"/>
@@ -2782,7 +2731,41 @@
       </pins>
     </libpart>
   </libparts>
-  <libraries/>
+  <libraries>
+    <library logical="Battery_Management">
+      <uri>${KICAD10_SYMBOL_DIR}/Battery_Management.kicad_sym</uri>
+    </library>
+    <library logical="Connector_Generic">
+      <uri>${KICAD10_SYMBOL_DIR}/Connector_Generic.kicad_sym</uri>
+    </library>
+    <library logical="Device">
+      <uri>${KICAD10_SYMBOL_DIR}/Device.kicad_sym</uri>
+    </library>
+    <library logical="Diode">
+      <uri>${KICAD10_SYMBOL_DIR}/Diode.kicad_sym</uri>
+    </library>
+    <library logical="Misc">
+      <uri>/Users/lkolbe/Documents/Tinkering/Misc/Misc.kicad_sym</uri>
+    </library>
+    <library logical="Power_Protection">
+      <uri>${KICAD10_SYMBOL_DIR}/Power_Protection.kicad_sym</uri>
+    </library>
+    <library logical="RF_Module">
+      <uri>${KICAD10_SYMBOL_DIR}/RF_Module.kicad_sym</uri>
+    </library>
+    <library logical="Regulator_Switching">
+      <uri>${KICAD10_SYMBOL_DIR}/Regulator_Switching.kicad_sym</uri>
+    </library>
+    <library logical="Simulation_SPICE">
+      <uri>${KICAD10_SYMBOL_DIR}/Simulation_SPICE.kicad_sym</uri>
+    </library>
+    <library logical="Switch">
+      <uri>${KICAD10_SYMBOL_DIR}/Switch.kicad_sym</uri>
+    </library>
+    <library logical="Transistor_FET">
+      <uri>${KICAD10_SYMBOL_DIR}/Transistor_FET.kicad_sym</uri>
+    </library>
+  </libraries>
   <nets>
     <net code="1" name="+3V3" class="Power_3V3">
       <node ref="C10" pin="1" pintype="passive"/>
@@ -2903,8 +2886,6 @@
       <node ref="R40" pin="1" pintype="passive"/>
     </net>
     <net code="22" name="CONN_TOUCH" class="Default">
-      <node ref="C30" pin="1" pintype="passive"/>
-      <node ref="C31" pin="1" pintype="passive"/>
       <node ref="C32" pin="1" pintype="passive"/>
       <node ref="J5" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
     </net>
@@ -3017,8 +2998,6 @@
       <node ref="R9" pin="1" pintype="passive"/>
     </net>
     <net code="29" name="Net-(Q10-D)" class="Signal">
-      <node ref="C30" pin="2" pintype="passive"/>
-      <node ref="C31" pin="2" pintype="passive"/>
       <node ref="C32" pin="2" pintype="passive"/>
       <node ref="Q10" pin="3" pinfunction="D_3" pintype="passive"/>
     </net>
