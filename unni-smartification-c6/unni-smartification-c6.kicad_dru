@@ -1,18 +1,26 @@
 (version 1)
 
-# Conservative JLCPCB baseline.  Zone objects are normally configured for 0.25 mm
-# clearance; this 0.20 mm hard floor avoids 0.2499 mm rounding false positives while
-# still catching genuinely too-close copper.
+# Conservative low-cost JLCPCB baseline for a 4-layer, 1 oz outer / 0.5 oz inner board.
+# Zone objects normally use 0.25 mm clearance; this 0.20 mm hard floor avoids tiny
+# numeric-rounding false positives while still staying comfortably above JLC's 4-layer
+# copper spacing capability.
 (rule "JLCPCB zone hard minimum"
   (constraint clearance (min 0.20mm))
   (condition "(A.Type == 'Zone') || (B.Type == 'Zone')")
 )
 
-# Only rules that can be enforced without rejecting valid IC pad escapes live here.
-# Preferred trace widths and vias are defined by the netclasses in the project file.
+# JLCPCB specifies 0.20 mm via-hole-to-via-hole as a regular capability but 0.45 mm
+# between drilled component pads.  Keep the global Board Setup value at 0.20 mm so
+# via stitching is not needlessly blocked, and enforce the drilled-pad case here.
+(rule "JLCPCB drilled pad hole spacing"
+  (constraint hole_to_hole (min 0.45mm))
+  (condition "A.Type == 'Pad' && B.Type == 'Pad'")
+)
+
+# Only rules that can be enforced without rejecting valid fine-pitch IC pad escapes
+# live here. Preferred trace widths and vias are defined by netclasses in the project.
 # Power/switch nets intentionally do NOT have a global hard minimum track width:
-# short neck-downs at fine-pitch IC pads are required, after which the interactive
-# router defaults to the wider netclass width.
+# short neck-downs at IC pads are allowed, then the router returns to the wider class.
 (rule "USB routing"
   (constraint track_width (min 0.15mm) (opt 0.20mm) (max 0.30mm))
   (constraint diff_pair_gap (min 0.15mm) (opt 0.20mm))

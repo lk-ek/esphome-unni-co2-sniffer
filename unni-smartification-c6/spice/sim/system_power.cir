@@ -20,9 +20,9 @@ VUSB_SRC usbsrc 0 PULSE(0 5 120m 20u 20u 120m 400m)
 XUSBHOT usbsrc usb USB_HOTPLUG
 RUSBPD usb 0 47k
 
-* MCP73831, RPROG=3.3k (~300mA nominal), autonomous charging.
+* MCP73831, RPROG=5.1k (~196mA nominal), autonomous charging.
 * No ESP-controlled charge enable: a flat battery must still be able to charge.
-RPROG prog 0 3.3k
+RPROG prog 0 5.1k
 XCHG chg_stat 0 batt usb prog MCP73831
 RSTAT chg_stat 0 220k
 

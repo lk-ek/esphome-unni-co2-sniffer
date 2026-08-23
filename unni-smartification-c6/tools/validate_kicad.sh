@@ -48,10 +48,11 @@ checks={
  ('U3','1'):'+5V', ('U3','3'):'GND',
  ('D3','2'):'VBUS', ('D3','1'):'UNNI_AC', ('D4','2'):'+5V', ('D4','1'):'UNNI_AC',
  ('U10','17'):'/ESP32-C6 + Auxiliary/USB_N', ('U10','18'):'/ESP32-C6 + Auxiliary/USB_P',
- ('J1','A7'):'USBPort_N', ('J1','A6'):'USBPort_P',
+ ('J1','A7'):'USB_RAW_N', ('J1','A6'):'USB_RAW_P',
+ ('U4','1'):'USB_RAW_P', ('U4','2'):'USB_RAW_N', ('U4','3'):'GND',
  ('U10','12'):'BAT_ADC', ('U10','13'):'USB_ADC', ('U10','5'):'BAT_TEMP_ADC', ('U10','6'):'BACKLIGHT_ADC',
  ('U10','27'):'BOOST_CMD', ('U10','19'):'CHARGE_STAT',
- ('R12','1'):'CHARGE_STAT', ('C9','1'):'UNNI_AC', ('C20','1'):'BAT_ADC', ('C21','1'):'BAT_TEMP_ADC', ('C33','1'):'BACKLIGHT_ADC',
+ ('R12','1'):'CHARGE_STAT', ('C9','1'):'UNNI_AC', ('C20','1'):'BAT_ADC', ('C21','1'):'BAT_TEMP_ADC', ('C22','1'):'USB_ADC', ('C33','1'):'BACKLIGHT_ADC',
 }
 bad=[]
 for key,want in checks.items():
@@ -60,17 +61,25 @@ for key,want in checks.items():
 # R13 is passive: orientation is irrelevant, but it must be the 47k VBUS pulldown.
 if {pin_net.get(('R13','1')), pin_net.get(('R13','2'))} != {'VBUS','GND'}:
     bad.append((('R13','1/2'),{'VBUS','GND'},{pin_net.get(('R13','1')),pin_net.get(('R13','2'))}))
-# MCP73831 PROG must return to GND via 3.3k R3.
+# MCP73831 PROG must return to GND via 5.1k R3 (~196 mA nominal charge current).
 prog=pin_net.get(('U1','5'))
 if not prog: bad.append((('U1','5'),'program net',None))
 if pin_net.get(('R3','1'))!=prog and pin_net.get(('R3','2'))!=prog:
     bad.append((('R3','*'),prog,'not connected to U1 PROG'))
 other=pin_net.get(('R3','2')) if pin_net.get(('R3','1'))==prog else pin_net.get(('R3','1'))
 if other!='GND': bad.append((('R3','other'),'GND',other))
+# Assert component values for architecture-critical parts.
+values={}
+for comp in root.find('components'):
+    ref=comp.attrib.get('ref'); value=comp.findtext('value')
+    if ref: values[ref]=value
+if values.get('R3') != '5.1k': bad.append((('R3','value'),'5.1k',values.get('R3')))
+if values.get('U4') != 'TPD2E009DBZR': bad.append((('U4','value'),'TPD2E009DBZR',values.get('U4')))
+if values.get('C22') not in {'100nF','100n'}: bad.append((('C22','value'),'100nF',values.get('C22')))
 if bad:
     for x in bad: print('CONNECTIVITY ERROR:',x)
     raise SystemExit(4)
-print(f'Connectivity assertions passed: {len(checks)} critical pin/net checks + MCP73831 PROG return.')
+print(f'Connectivity assertions passed: {len(checks)} critical pin/net checks + TPD2E009 + 5.1k MCP73831 PROG + USB_ADC RC filter.')
 PY
 
 # In the extracted AppImage environment only missing global library-table warnings are allowed.
@@ -149,4 +158,4 @@ require(v[4] > 4.8 and v[5] > 4.4, 'second forced-awake 5V path invalid')
 print('KiCad-exported transient phase checks passed.')
 PY
 
-echo 'KiCad 10 schematic, connectivity, ERC classification and SPICE validation passed.' | tee validation/summary.txt
+echo 'KiCad 10.99 schematic, connectivity, ERC classification and SPICE validation passed.' | tee validation/summary.txt

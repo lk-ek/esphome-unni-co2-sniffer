@@ -4622,7 +4622,7 @@
 		)
 		(uuid "179c93f8-e0b4-4d62-a2bf-5d3a4bfd2114")
 	)
-	(text "RPROG 3.3k = ~303 mA nominal charge current"
+	(text "RPROG 5.1k = ~196 mA nominal charge current"
 		(exclude_from_sim no)
 		(at 20.574 107.442 0)
 		(effects

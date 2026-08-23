@@ -204,26 +204,24 @@ for ref in ("R1", "R2"):
 if 'B-side component keepout beyond 19x18 mm clearance' not in S or '(footprints not_allowed)' not in S:
     fail("missing B-side footprint placement keepout below the 19 x 18 mm clearance window")
 
-# Current connector architecture: J4 remains the low-profile SMT side-entry
-# connector on the flush USB/power board.  J2 is the serviceable battery
-# connector on the ESP board, where THT is mechanically allowed.  Inter-board
-# and sensor connections are now direct solder-wire pads rather than JSTs.
+# Current connector architecture. J4 is the only signal/power connector on the
+# mechanically flush USB board and therefore must remain SMT side-entry. The ESP
+# board may use THT JST-PH connectors; direct soldering to their pads is an
+# accepted assembly fallback if the connector bodies prove too tall in the case.
 j4 = footprint_for_reference("J4")
 if 'JST_PH_S' not in j4 or '-PH-SM4-TB_' not in j4 or '(attr smd)' not in j4:
     fail("J4 is not an SMT side-entry JST-PH SxB-PH-SM4-TB footprint")
 if fp_layer(j4) != "F.Cu":
     fail("J4 must be on F.Cu")
 
-j2 = footprint_for_reference("J2")
-if 'JST_PH_' not in j2:
-    fail("J2 battery connector is not a JST-PH footprint")
-if fp_layer(j2) != "F.Cu":
-    fail("J2 battery connector must be on F.Cu")
-
-for ref in ("J6","J8","J9","J11","J12","J13","J14","J15","J17","J18","J19","J23","J24","J26","J27"):
+for ref, pins in (("J2",2),("J3",6),("J5",2),("J6",5),("J10",6)):
     b = footprint_for_reference(ref)
-    if 'Connector_Wire:SolderWire-' not in b:
-        fail(f"{ref} is not a solder-wire connection footprint")
+    if 'Connector_JST:JST_PH_' not in b:
+        fail(f"{ref} is not a JST-PH footprint")
+    if fp_layer(b) != "F.Cu":
+        fail(f"{ref} must be on F.Cu")
+    if ref != "J4" and '(attr through_hole)' not in b:
+        fail(f"{ref} is expected to be a THT JST-PH connector on the ESP board")
 
 # Hand-solder variants for all 0603/0805 capacitors currently used in the design.
 for mref in re.finditer(r'\(property\s+"Reference"\s+"(C[0-9]+)"', S):
@@ -232,13 +230,14 @@ for mref in re.finditer(r'\(property\s+"Reference"\s+"(C[0-9]+)"', S):
     if ('C_0603_1608Metric' in b or 'C_0805_2012Metric' in b) and '_HandSolder' not in b:
         fail(f"{ref} does not use a hand-solder capacitor footprint")
 
-# RT1 is now a removable external NTC on a 2.54 mm vertical socket on the ESP board.
+# RT1 is a removable external NTC using the same compact 2-pin JST-PH family
+# as the current ESP-board service wiring.
 rt1 = footprint_for_reference("RT1")
-if 'Connector_PinSocket_2.54mm:PinSocket_1x02_P2.54mm_Vertical' not in rt1 or '(attr through_hole)' not in rt1:
-    fail("RT1 must use the selected 2-pin THT socket footprint")
+if 'Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical' not in rt1 or '(attr through_hole)' not in rt1:
+    fail("RT1 must use the selected 2-pin THT JST-PH footprint")
 
 print(
     "Mechanical assertions passed: 1.0 mm PCB; USB board 19 mm fixed width/top datum with 4 NPTH holes; "
     "USB/Rcc on B.Cu within the 19 x 18 mm clearance; B-side keepout below it; "
-    "current JST/solder-wire connector architecture; hand-solder capacitors; removable THT RT1; ESP board envelope 46 x 32 mm."
+    "current JST connector architecture; hand-solder capacitors; removable JST-PH RT1; ESP board envelope 46 x 32 mm."
 )

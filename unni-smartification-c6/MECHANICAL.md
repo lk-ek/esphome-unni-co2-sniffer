@@ -23,21 +23,27 @@ The USB shield dimensions imply a nominal 9.0 mm shield width and a measured B.C
 The mechanical values above are authoritative even where they are not yet represented by solver constraints. In the tested KiCad 10.99 nightly, geometric constraints currently work primarily on drawing primitives; constraining an entire mounting-hole footprint as a rigid unit is still an open usability limitation. Therefore the holes are implemented as board-only NPTH footprints at exact datum coordinates, while the board outline and dimensions remain suitable for later solver-driven construction geometry.
 
 
-## Component-side clearance (2026-08-21)
+## Component-side clearance (current Rev A)
 
 - The measured 19 x 18 mm mechanical clearance applies to the **back / B.Cu side** of the USB board.
-- The USB-C receptacle is mounted on **B.Cu** and still protrudes 1 mm beyond the top PCB edge.
-- The two USB-C CC 5.1 kOhm resistors (R1/R2) may also be on B.Cu inside that 19 x 18 mm window.
-- Below y = 18 mm from the USB-board top datum, the back side lies flat against the enclosure; therefore **no B-side component bodies are allowed there**. The PCB contains an explicit B-side footprint placement keepout for this region.
-- All other USB/power-board components are placed on F.Cu.
-- JST connectors use SMT, side-entry JST-PH footprints (SxB-PH-SM4-TB family); through-hole JST footprints are not permitted because the rear side must remain flush.
+- The USB-C receptacle is mounted on **B.Cu** and protrudes about 1 mm beyond the top PCB edge.
+- The two USB-C CC 5.1 kΩ resistors may remain on B.Cu inside the 19 x 18 mm clearance window.
+- Below y = 18 mm from the USB-board top datum, the back side lies flat against the enclosure; **no B-side component bodies are allowed there**. The PCB contains an explicit B-side footprint-placement keepout.
+- Other USB/power-board components are placed on F.Cu unless explicitly validated inside the B-side clearance window.
+- J4 on the USB/power board is an SMT side-entry JST-PH connector; no through-hole signal connector is allowed through the flush portion of that board.
+- The ESP board may use THT components and currently uses vertical JST-PH connectors for battery/inter-board/sensor connections. If connector body clearance is insufficient in the enclosure, direct wire soldering to those connector pads is an accepted assembly fallback.
 
+## Assembly-friendly footprints
 
-## Assembly-friendly footprints (2026-08-21)
-
-- Use official KiCad `*_HandSolder` footprints wherever a compatible passive footprint exists.
+- Use `*_HandSolder` footprints wherever a compatible passive footprint exists.
 - 0603 capacitors: `C_0603_1608Metric_Pad1.08x0.95mm_HandSolder`.
 - 0805 capacitors: `C_0805_2012Metric_Pad1.18x1.45mm_HandSolder`.
-- 0805 resistors already use the KiCad hand-solder footprint.
-- RT1 is intentionally THT on the ESP board. Until an exact NTC MPN is selected, the mechanically forgiving `R_Axial_DIN0204_L3.6mm_D1.6mm_P5.08mm_Horizontal` footprint is used for a small leaded/bead NTC with bent leads. Replace it with an MPN-specific footprint once the thermistor is selected.
-- All JST-PH connectors are SMT side-entry SxB-PH-SM4-TB footprints. Their cable mouths face toward free board area rather than directly out over an edge.
+- 0805 resistors use hand-solder footprints where available.
+- L1: project-local Murata LQH3NPN 3.0 x 3.0 mm hand-solder footprint.
+- L2: project-local Murata DFE322520FD 3.2 x 2.5 mm hand-solder footprint.
+- SW1/SW2: project-local TVAF36-N014JW-R hand-solder footprint.
+- RT1 is a removable external NTC on a 2-pin JST-PH THT connector.
+
+## RF / four-layer keepout
+
+The ESP32-C6 module antenna region must remain free of copper on **F.Cu, In1.Cu, In2.Cu and B.Cu**. The surrounding enclosure region is plastic; do not route cables or add metal hardware through the antenna near field during final assembly.

@@ -1,6 +1,6 @@
-# KiCad / ngspice simulation — Rev A v29
+# KiCad / ngspice simulation — Rev A
 
-The project is prepared for **KiCad 10.0.5 -> Inspect -> Simulator**. `unni-smartification-c6.wbk` provides four transient views. The simulation harness is part of the same hierarchy but excluded from BOM/PCB, while the ESP sheet is excluded from SPICE and represented by load stimuli.
+The project is prepared for **KiCad 10.99 -> Inspect -> Simulator**. `unni-smartification-c6.wbk` provides transient views. The simulation harness is part of the same hierarchy but excluded from BOM/PCB. The ESP sheet remains in SPICE because it now contains the MCP73831 and TPS63031 power stages; non-simulatable physical connectors and the ESP32-C6 module are excluded individually.
 
 ## Main 10-second scenario
 
@@ -79,3 +79,9 @@ The 3.0 V OCV cases are intentionally aggressive. A real protected Li-ion cell o
 ## KiCad 10.99 connector simulation note
 
 Physical connectors J1 (USB-C) and J4 (Unni power/battery connector) are explicitly excluded from SPICE. Their connectivity remains present in the electrical netlist, but KiCad no longer emits the unsimulatable placeholder devices `J1 __J1` / `J4 __J4`. This restores direct simulator export after the USB-C symbol was replaced with the Same Sky UJ20 part.
+
+## Rev A 2026-08-23 updates
+
+- MCP73831 RPROG is now 5.1 kΩ (about 196 mA nominal charge current).
+- USB ESD is now TPD2E009DBZR. The ESD device is excluded from SPICE because the system-level transient suite is not an ESD-event simulator; connectivity validation separately asserts its two USB lines and ground pin.
+- USB_ADC now includes a local capacitor to GND; the connectivity validator requires this RC filter.

@@ -1,85 +1,107 @@
-# Unni CO2 Smartification — ESP32-C6 Rev A v29 validated
+# Unni CO2 Smartification — ESP32-C6 Rev A
 
-Target: **KiCad 10.0.5**.
+Target: **KiCad 10.99 nightly or newer**. The current manufacturing master uses a 4-layer stackup and native KiCad 10.99 geometric constraints.
 
-This package contains the completed schematic and KiCad/ngspice system simulation for the current Rev-A architecture. Routing and component placement are still intentionally incomplete. The PCB file now contains the measured replacement USB-daughterboard mechanical stub (1.0 mm board thickness, fixed USB/top datum and mounting holes) so layout can proceed against real mechanics.
+This repository contains two physical PCBs in one KiCad PCB file so cross-board connectivity remains visible while routing. Placement and routing are still work in progress; the schematic and power architecture are substantially defined and covered by reproducible connectivity/SPICE checks.
 
-## Sheets
+## Physical boards
 
-- `01_usb_power.kicad_sch` — USB-C, MCP73831 charger, USB/battery load sharing, TPS63031 3.3 V rail, TPS613222A forced-awake 5 V rail, hardware USB inhibit, Unni AC/DC outputs.
-- `02_esp_aux.kicad_sch` — ESP32-C6-MINI-1, native USB pair, ADC sensing, battery NTC, passive CO2/RT/RH taps, touch emulation, backlight sensing.
-- `03_simulation_harness.kicad_sch` — simulation-only stimuli and loads; excluded from BOM/PCB.
+- **USB / power board** — 19 mm fixed width, 1.0 mm finished-board target, USB-C on B.Cu at the measured enclosure datum. It contains USB-C/CC, the TPD2E009DBZR USB ESD shunt, the battery-driven 5 V forced-awake boost and the Unni AC/DC interface.
+- **ESP / battery board** — maximum 46 x 32 mm. It contains the ESP32-C6-MINI-1, MCP73831 charger and USB/battery load sharing, TPS63031 3.3 V buck-boost, battery/USB/backlight ADCs, battery NTC, CO2/RT/RH taps, touch emulation, and local service controls.
 
-## Key corrections in v29
+The boards currently use JST-PH connectors where serviceability is useful. If enclosure clearance proves too tight, their exposed through-hole/SMT pads are also suitable for direct wire soldering; this is an assembly fallback, not a separate electrical architecture.
 
-- D1 corrected to conduct `VBUS -> SYS`, not `SYS -> VBUS`.
-- TPS63031 FB connected to VOUT/+3V3.
-- CHARGE_STAT divider R12, UNNI_AC capacitor C9, BAT_ADC C20, BAT_TEMP_ADC C21, and optional BACKLIGHT_ADC capacitor C33 are electrically connected.
-- Forced-awake Q2/Q3/Q4 wiring validated from KiCad's exported netlist.
-- VBUS pull-down R13 changed to 47 kΩ to prevent SS14 reverse leakage from falsely biasing Q4 while the internal boost is active.
-- Simulation USB hot-plug is now open-circuit when absent, using `USB_HOTPLUG.lib`, rather than a 0 V source clamping VBUS.
-- TPS613222A behavioral model now includes an equivalent input load/discharge path, so `BOOST_IN` and +5V collapse when Q2 opens. The obsolete I3 boost input proxy is excluded.
-- The KiCad-exported 10 s transient now checks all five phases: idle battery, forced-awake, USB insertion with BOOST_CMD still high, USB removal, and forced-awake restart.
+## Power architecture
 
-## Simulation in KiCad
+```text
+USB VBUS ──────────────┬─ MCP73831 (≈196 mA, RPROG=5.1k) ── +BATT
+                       ├─ Schottky ── SYS ── TPS63031 ── +3V3 ── ESP32-C6
+                       └─ Schottky ─────────────────────── UNNI_AC
 
-Open `unni-smartification-c6.kicad_pro`, then **Inspect -> Simulator**. `unni-smartification-c6.wbk` contains four transient views. See `SIMULATION.md` for model fidelity and test details.
-
-## Reproducible validation
-
-```sh
-KICAD_CLI=/path/to/kicad-cli \
-NGSPICE_LIB=/path/to/libngspice.so \
-./tools/validate_kicad.sh
+protected 1S Li-ion ─ +BATT ─ PMOS load share ─────────── SYS
+                    └ +BATT ─ boost switch ─ TPS613222A ─ +5V ─ Schottky ─ UNNI_AC
 ```
 
-Against the supplied KiCad 10.0.5 Linux AppImage environment, validation performs:
+Hardware VBUS inhibit prevents the battery 5 V boost from being enabled while real USB power is present. The battery pack used by the design contains its own protection PCB.
 
-1. full schematic load and PDF export;
-2. KiCad XML and SPICE netlist export;
-3. ERC classification;
-4. 41 critical pin/net assertions plus MCP73831 PROG verification;
-5. four standalone ngspice regression decks;
-6. a 10 s transient created from the SPICE netlist exported by KiCad itself;
-7. phase-by-phase checks of Q2/Q3/Q4 inhibit, 3V3 regulation, USB handover, +5V shutdown, and forced-awake restart.
+## USB
 
-The headless AppImage reports only `lib_symbol_issues` and `footprint_link_issues` because it does not have a normal desktop user's global library tables. No electrical ERC categories remain.
+- USB-C sink: independent 5.1 kΩ Rd on CC1 and CC2.
+- Native ESP32-C6 USB Full-Speed is routed through 22 Ω series resistors near the ESP.
+- USB ESD: **TI TPD2E009DBZR**, a two-line ground-referenced shunt device with no VBUS/VCC rail. This avoids a clamp path that could back-power VBUS and interfere with the hardware boost inhibit.
+- `USB_ADC` includes local RC filtering.
+- USB differential geometry is intentionally **not final yet**. Route it only after the selected JLCPCB stackup is loaded; final impedance geometry should be checked with JLCPCB's impedance calculator.
 
-## Model limits
+## 4-layer JLCPCB-near stackup
 
-AO3400A uses the selected detailed user-supplied MOSFET model. AO3401A, MCP73831, TPS63031 and TPS613222A are system-level behavioral models. They validate topology, source handover, charger behavior, enable/inhibit states and supply transients. They do **not** predict switch-node ripple, control-loop stability, switching losses or EMI.
+The KiCad stackup models JLCPCB's current 4-layer 1.0 mm **JLC3313** construction closely:
 
-## Rev A v30: worst-case power regression
+| Layer | KiCad model |
+| --- | --- |
+| F.Cu | 0.035 mm Cu (1 oz external) |
+| dielectric 1 | 0.0994 mm 3313 prepreg, εr 4.1 |
+| In1.Cu | 0.0152 mm Cu (0.5 oz internal) |
+| core | 0.700 mm Nan Ya NP-155F, εr 4.53 |
+| In2.Cu | 0.0152 mm Cu (0.5 oz internal) |
+| dielectric 3 | 0.0994 mm 3313 prepreg, εr 4.1 |
+| B.Cu | 0.035 mm Cu (1 oz external) |
 
-The validation suite now includes a 12-case battery sweep (4 OCV values x 3 internal resistances) with the ESP radio burst aligned to forced-awake startup. Run it through `tools/validate_kicad.sh`; detailed results are generated under `validation/worst-case/`.
+Soldermask is modeled approximately (εr 3.8); JLCPCB's calculator models mask geometry in more detail and remains authoritative for controlled impedance. The manufacturer nominal layer dimensions sum to approximately the requested 1.0 mm construction; finished-board thickness has normal fabrication tolerance.
 
-## Portable ngspice validation (macOS / Linux)
+Both internal layers are intended to remain GND reference planes. Power distribution uses F.Cu/B.Cu pours and stitching vias. High-dv/dt switch nodes remain small local outer-layer copper only. The ESP module antenna has an all-copper-layer keepout.
 
-The validation scripts no longer contain a hard-coded Linux AppImage path. `tools/run_ngspice_shared.py` resolves ngspice in this order:
+Current JLCPCB references:
+- https://jlcpcb.com/impedance
+- https://jlcpcb.com/help/article/user-guide-to-the-jlcpcb-impedance-calculator
+- https://jlcpcb.com/capabilities/pcb-capabilities
 
-1. `NGSPICE_LIB=/absolute/path/to/libngspice`
-2. KiCad's macOS `KiCad.app/Contents/Frameworks`, Homebrew and common Unix library paths
-3. `ctypes.util.find_library("ngspice")`
-4. `NGSPICE_BIN` or an `ngspice` executable in `PATH`
+## Schematic sheets
 
-A normal macOS invocation is simply:
+- `01_usb_power.kicad_sch` — USB-C/CC, TPD2E009DBZR ESD, forced-awake 5 V boost, hardware USB inhibit, Unni AC/DC interface.
+- `02_esp_aux.kicad_sch` — protected-battery input, MCP73831 charger, discrete USB/battery load share, TPS63031 3.3 V rail, ESP32-C6, ADC sensing, NTC, passive CO2/RT/RH taps, touch emulation and controls.
+- `03_simulation_harness.kicad_sch` — simulation-only stimuli and loads; excluded from BOM/PCB.
+
+## Routing / fabrication baseline
+
+The Board Setup intentionally targets comfortable low-cost JLCPCB geometry rather than absolute fab limits:
+
+- general minimum trace width / copper clearance: 0.15 mm
+- routed-edge copper clearance: 0.25 mm
+- hole-to-copper baseline: 0.20 mm
+- via-hole-to-via-hole baseline: 0.20 mm
+- drilled component pad hole-to-hole: 0.45 mm via `.kicad_dru`
+- normal preferred via: 0.60/0.30 mm
+- dense preset: 0.50/0.20 mm
+- zones: 0.25 mm nominal clearance, 0.20 mm hard floor, 0.30 mm thermal gap, 0.40 mm thermal spokes
+
+Preferred netclass widths remain wider than the hard manufacturing minimum. Fine-pitch IC pad escapes may neck down briefly before returning to their preferred class width.
+
+## Simulation and validation
+
+Open `unni-smartification-c6.kicad_pro`, then **Inspect -> Simulator**. `unni-smartification-c6.wbk` contains transient views. See `SIMULATION.md` for model fidelity and test details.
+
+A normal macOS validation run is:
 
 ```sh
 KICAD_CLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli" ./tools/validate_all.sh
 ```
 
-If KiCad's bundled library is not discoverable, either set `NGSPICE_LIB` explicitly or install/use a standalone ngspice executable. The project itself does not require the author's `/mnt/data/...` paths.
+If KiCad's ngspice shared library is not auto-discovered, set `NGSPICE_LIB` explicitly. Validation checks:
 
+1. fixed mechanics and both board envelopes;
+2. JLCPCB-near stackup and routing-rule presets;
+3. schematic load, PDF and KiCad/XML/SPICE netlist export;
+4. schematic↔PCB pad/net parity;
+5. critical power/USB connectivity, the TPD2E009 pinout, RPROG=5.1 kΩ and USB_ADC filtering;
+6. ERC classification;
+7. standalone behavioral power regressions;
+8. a transient generated directly from KiCad's exported SPICE netlist;
+9. a 12-case battery/internal-resistance worst-case sweep.
+
+Behavioral models validate topology, source handover, charger behavior, enable/inhibit states and supply transients. They do **not** predict switch-node ripple, converter control-loop stability, switching loss, RF performance or EMI.
+
+After opening a revision in PCB Editor, **refill all zones (`B`) before trusting DRC**, especially after changes to hole-clearance or stackup rules. KiCad stores filled-zone geometry in the PCB file; cached fills from the previous rule set can otherwise report obsolete clearances until refilled.
 
 ## Mechanical reference
 
-- `MECHANICAL.md` — measured USB daughterboard datum, hole locations, USB overhang, PCB thickness, and extension rule.
-- `tools/validate_mechanics.py` — asserts the fixed top/side datum, 1.0 mm thickness, exact NPTH positions/diameters, USB placement, and prevents shortening the daughterboard below the 18 mm reference body.
-- `experimental/unni-smartification-c6-10.99-constraints.kicad_pcb` — KiCad 10.99-only copy using native geometric constraints for the rectangular daughterboard outline. Width is driving/fixed at 19 mm; board height is intentionally not fixed so the rear/bottom edge may be extended.
-
-The main `unni-smartification-c6.kicad_pcb` remains KiCad 10.0.5-compatible. The experimental board requires KiCad 10.99 or newer.
-
-## PCB layout (KiCad 10.99)
-
-The manufacturing master `unni-smartification-c6.kicad_pcb` now contains **both physical PCBs in one PCB Editor file**. The USB/power board is the 19 mm wide left island (currently drawn at the full 65 mm available depth; only its 19 mm width/top datum are driving constraints). The ESP/interface board is the 46 x 32 mm right island with width and height constrained. Cross-board electrical connections deliberately remain visible as ratsnest lines until the final JST-PH interconnect pinout is added to the schematic.
-
+See `MECHANICAL.md`. The measured USB-board top datum, hole locations and USB overhang are fixed; the board may extend only toward its rear/bottom direction. The USB-side B.Cu component-clearance window is limited to the first 19 x 18 mm, with an explicit placement keepout below it.

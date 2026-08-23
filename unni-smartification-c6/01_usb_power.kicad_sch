@@ -3311,7 +3311,7 @@
 			(embedded_fonts no)
 		)
 	)
-	(text "MCP73831 runs autonomously: R3 = 3.3 kΩ sets ~300 mA; STAT is monitored by the ESP. Battery NTC remains firmware-supervised."
+	(text "MCP73831 is on the ESP/battery board: R3 = 5.1 kΩ sets ~196 mA; STAT is monitored by the ESP. Battery NTC remains firmware-supervised."
 		(exclude_from_sim no)
 		(at 81.28 104.14 0)
 		(effects

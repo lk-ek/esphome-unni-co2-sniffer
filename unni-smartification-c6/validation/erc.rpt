@@ -1,4 +1,4 @@
-ERC report (2026-08-23T13:28:29, Encoding UTF8)
+ERC report (2026-08-23T18:26:12, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
@@ -74,12 +74,6 @@ Report includes: Errors, Warnings, Exclusions
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(64.77 mm, 148.59 mm): Symbol #PWR037 [+BATT]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Power_Protection'
-    ; warning
-    @(66.04 mm, 38.10 mm): Symbol U4 [USBLC6-2SC6]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
-    ; warning
-    @(66.04 mm, 38.10 mm): Symbol U4 [USBLC6-2SC6]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(66.04 mm, 81.28 mm): Symbol #FLG02 [PWR_FLAG]
@@ -95,12 +89,12 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
     ; warning
     @(76.20 mm, 185.42 mm): Symbol R13 [R]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Power_Protection'
     ; warning
-    @(90.17 mm, 38.10 mm): Symbol C14 [C]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    @(78.74 mm, 39.37 mm): Symbol U4 [TPD2EUSB30]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
     ; warning
-    @(90.17 mm, 38.10 mm): Symbol C14 [C]
+    @(78.74 mm, 39.37 mm): Symbol U4 [TPD2EUSB30]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(102.87 mm, 181.61 mm): Symbol C7 [C]
@@ -115,40 +109,10 @@ Report includes: Errors, Warnings, Exclusions
     @(116.84 mm, 173.99 mm): Symbol #FLG04 [PWR_FLAG]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
     ; warning
-    @(130.81 mm, 50.80 mm): Symbol J3 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
+    @(133.35 mm, 55.88 mm): Symbol J3 [Conn_01x06]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_JST'
     ; warning
-    @(130.81 mm, 50.80 mm): Symbol J3 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(130.81 mm, 54.61 mm): Symbol J5 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(130.81 mm, 54.61 mm): Symbol J5 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(130.81 mm, 58.42 mm): Symbol J6 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(130.81 mm, 58.42 mm): Symbol J6 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(130.81 mm, 62.23 mm): Symbol J7 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(130.81 mm, 62.23 mm): Symbol J7 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(130.81 mm, 66.04 mm): Symbol J8 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(130.81 mm, 66.04 mm): Symbol J8 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(130.81 mm, 69.85 mm): Symbol J9 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(130.81 mm, 69.85 mm): Symbol J9 [Conn_01x01]
+    @(133.35 mm, 55.88 mm): Symbol J3 [Conn_01x06]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Diode'
     ; warning
     @(133.35 mm, 156.21 mm): Symbol D2 [SB120]
@@ -290,42 +254,6 @@ Report includes: Errors, Warnings, Exclusions
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(43.18 mm, 132.08 mm): Symbol #FLG05 [PWR_FLAG]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 201.93 mm): Symbol J11 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 201.93 mm): Symbol J11 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 205.74 mm): Symbol J12 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 205.74 mm): Symbol J12 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 209.55 mm): Symbol J13 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 209.55 mm): Symbol J13 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 213.36 mm): Symbol J25 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 213.36 mm): Symbol J25 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 217.17 mm): Symbol J26 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 217.17 mm): Symbol J26 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(48.26 mm, 220.98 mm): Symbol J27 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(48.26 mm, 220.98 mm): Symbol J27 [Conn_01x01]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(49.53 mm, 152.40 mm): Symbol L1 [L]
@@ -338,6 +266,12 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Package_TO_SOT_SMD'
     ; warning
     @(50.80 mm, 86.36 mm): Symbol U1 [MCP73831-2-OT]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
+    ; warning
+    @(50.80 mm, 207.01 mm): Symbol J10 [Conn_01x06]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_JST'
+    ; warning
+    @(50.80 mm, 207.01 mm): Symbol J10 [Conn_01x06]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(52.07 mm, 40.64 mm): Symbol #PWR06 [+BATT]
@@ -397,46 +331,10 @@ Report includes: Errors, Warnings, Exclusions
     @(83.82 mm, 129.54 mm): Symbol #PWR030 [+3V3]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
     ; warning
-    @(87.63 mm, 199.39 mm): Symbol J14 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
+    @(87.63 mm, 199.39 mm): Symbol J5 [Conn_01x02]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_JST'
     ; warning
-    @(87.63 mm, 199.39 mm): Symbol J14 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 203.20 mm): Symbol J15 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 203.20 mm): Symbol J15 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 210.82 mm): Symbol J17 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 210.82 mm): Symbol J17 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 214.63 mm): Symbol J18 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 214.63 mm): Symbol J18 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 218.44 mm): Symbol J19 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 218.44 mm): Symbol J19 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 222.25 mm): Symbol J23 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 222.25 mm): Symbol J23 [Conn_01x01]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
-    ; warning
-    @(87.63 mm, 226.06 mm): Symbol J24 [Conn_01x01]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_Wire'
-    ; warning
-    @(87.63 mm, 226.06 mm): Symbol J24 [Conn_01x01]
+    @(87.63 mm, 199.39 mm): Symbol J5 [Conn_01x02]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(87.63 mm, 243.84 mm): Symbol #PWR015 [+BATT]
@@ -446,6 +344,12 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
     ; warning
     @(88.90 mm, 157.48 mm): Symbol C6 [C]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Connector_Generic'
+    ; warning
+    @(90.17 mm, 215.90 mm): Symbol J6 [Conn_01x05]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_JST'
+    ; warning
+    @(90.17 mm, 215.90 mm): Symbol J6 [Conn_01x05]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(91.44 mm, 59.69 mm): Symbol #PWR020 [+BATT]
@@ -508,16 +412,13 @@ Report includes: Errors, Warnings, Exclusions
     @(166.37 mm, 146.05 mm): Symbol R31 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
-    @(166.37 mm, 156.21 mm): Symbol #PWR115 [GND]
+    @(172.72 mm, 156.21 mm): Symbol #PWR115 [GND]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
-    @(181.61 mm, 146.05 mm): Symbol C20 [C]
+    @(179.07 mm, 146.05 mm): Symbol C20 [C]
 [footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
     ; warning
-    @(181.61 mm, 146.05 mm): Symbol C20 [C]
-[lib_symbol_issues]: The current configuration does not include the symbol library 'power'
-    ; warning
-    @(181.61 mm, 156.21 mm): Symbol #PWR116 [GND]
+    @(179.07 mm, 146.05 mm): Symbol C20 [C]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
     @(203.20 mm, 210.82 mm): Symbol #PWR121 [GND]
@@ -541,7 +442,7 @@ Report includes: Errors, Warnings, Exclusions
     @(209.55 mm, 146.05 mm): Symbol R33 [R]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
     ; warning
-    @(209.55 mm, 156.21 mm): Symbol #PWR118 [GND]
+    @(215.90 mm, 156.21 mm): Symbol #PWR118 [GND]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(218.44 mm, 205.74 mm): Symbol R40 [R]
@@ -566,6 +467,12 @@ Report includes: Errors, Warnings, Exclusions
 [footprint_link_issues]: The current configuration does not include the footprint library 'Resistor_SMD'
     ; warning
     @(218.44 mm, 238.76 mm): Symbol R43 [R]
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
+    ; warning
+    @(222.25 mm, 146.05 mm): Symbol C22 [C]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Capacitor_SMD'
+    ; warning
+    @(222.25 mm, 146.05 mm): Symbol C22 [C]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(224.79 mm, 43.18 mm): Symbol R20 [R]
@@ -602,7 +509,7 @@ Report includes: Errors, Warnings, Exclusions
 [lib_symbol_issues]: The current configuration does not include the symbol library 'Device'
     ; warning
     @(247.65 mm, 146.05 mm): Symbol RT1 [Thermistor_NTC]
-[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_PinSocket_2.54mm'
+[footprint_link_issues]: The current configuration does not include the footprint library 'Connector_JST'
     ; warning
     @(247.65 mm, 146.05 mm): Symbol RT1 [Thermistor_NTC]
 [lib_symbol_issues]: The current configuration does not include the symbol library 'power'
@@ -741,7 +648,7 @@ Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /Simulation Harness/
 
- ** ERC messages: 244  Errors 0  Warnings 244
+ ** ERC messages: 213  Errors 0  Warnings 213
 
  ** Ignored checks:
     - Global label only appears once in the schematic

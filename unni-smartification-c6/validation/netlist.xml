@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/mnt/data/unni_fix/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-23T13:28:28</date>
+    <source>/mnt/data/rev6/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-23T18:26:11</date>
     <tool>Eeschema 10.99.0-2795-g77a613d64c</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
@@ -150,31 +150,6 @@
         </unit>
       </units>
     </comp>
-    <comp ref="C14">
-      <value>100n</value>
-      <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
-      <description>Unpolarized capacitor</description>
-      <fields>
-        <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
-        <field name="Description">Unpolarized capacitor</field>
-      </fields>
-      <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="cap capacitor"/>
-      <property name="ki_fp_filters" value="C_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>6b799681-20f2-49d5-b2c6-b412573e8cb2</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-            <pin num="2"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
     <comp ref="D2">
       <value>SS14 DNP</value>
       <footprint>Diode_SMD:D_SMA</footprint>
@@ -313,25 +288,30 @@
       </units>
     </comp>
     <comp ref="J3">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+      <value>Conn_01x06</value>
+      <footprint>Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</footprint>
+      <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</field>
+        <field name="Footprint">Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+        <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <libsource lib="Connector_Generic" part="Conn_01x06" description="Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
       <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>a5e8fc59-4ea7-4e96-9752-72ecd5fcb3cc</tstamps>
+      <tstamps>c63c6e7d-9750-4db4-aef4-971b474c861f</tstamps>
       <units>
         <unit name="A">
           <pins>
             <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+            <pin num="5"/>
+            <pin num="6"/>
           </pins>
         </unit>
       </units>
@@ -358,126 +338,6 @@
             <pin num="1"/>
             <pin num="2"/>
             <pin num="3"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J5">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>f96577d4-d237-4fb6-9f89-b612c9b3bf2b</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J6">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>1fb62588-bf8f-40e0-816c-914cf4564fa5</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J7">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>133da732-8f05-43ee-b987-62d920ba36ae</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J8">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>ab6131a0-315c-447f-b1f0-e73050fd384e</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J9">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="USB + Power"/>
-      <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>8e5590c6-53cf-4225-ab6a-e67d75457b2f</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
           </pins>
         </unit>
       </units>
@@ -773,31 +633,28 @@
       </units>
     </comp>
     <comp ref="U4">
-      <value>USBLC6-2SC6</value>
-      <footprint>Package_TO_SOT_SMD:SOT-23-6</footprint>
-      <datasheet>https://www.st.com/resource/en/datasheet/usblc6-2.pdf</datasheet>
-      <description>Very low capacitance ESD protection diode, 2 data-line, SOT-23-6</description>
+      <value>TPD2E009DBZR</value>
+      <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.ti.com/lit/ds/symlink/tpd2e009.pdf</datasheet>
+      <description>2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</description>
       <fields>
-        <field name="Footprint">Package_TO_SOT_SMD:SOT-23-6</field>
-        <field name="Datasheet">https://www.st.com/resource/en/datasheet/usblc6-2.pdf</field>
-        <field name="Description">Very low capacitance ESD protection diode, 2 data-line, SOT-23-6</field>
+        <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
+        <field name="Datasheet">https://www.ti.com/lit/ds/symlink/tpd2e009.pdf</field>
+        <field name="Description">2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</field>
       </fields>
-      <libsource lib="Power_Protection" part="USBLC6-2SC6" description="Very low capacitance ESD protection diode, 2 data-line, SOT-23-6"/>
+      <libsource lib="Power_Protection" part="TPD2EUSB30" description="2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
-      <property name="ki_keywords" value="usb ethernet video"/>
-      <property name="ki_fp_filters" value="SOT?23*"/>
+      <property name="ki_keywords" value="ESD protection USB 3.0"/>
+      <property name="ki_fp_filters" value="Texas*DRT*"/>
       <sheetpath names="/USB + Power/" tstamps="/c2ff28aa-a0f2-4a89-9a60-62d08b111b12/"/>
-      <tstamps>7e30537d-bf18-49b6-a9a7-c6b99add3a66</tstamps>
+      <tstamps>28ba93d4-cbe7-4566-86aa-71c5fb4b1411</tstamps>
       <units>
         <unit name="A">
           <pins>
             <pin num="1"/>
             <pin num="3"/>
-            <pin num="5"/>
             <pin num="2"/>
-            <pin num="6"/>
-            <pin num="4"/>
           </pins>
         </unit>
       </units>
@@ -1092,6 +949,30 @@
         </unit>
       </units>
     </comp>
+    <comp ref="C22">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <fields>
+        <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
+      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
+      <property name="ki_keywords" value="cap capacitor"/>
+      <property name="ki_fp_filters" value="C_*"/>
+      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
+      <tstamps>7752f1dd-282a-4b6d-b930-b5d8b549fef2</tstamps>
+      <units>
+        <unit name="A">
+          <pins>
+            <pin num="1"/>
+            <pin num="2"/>
+          </pins>
+        </unit>
+      </units>
+    </comp>
     <comp ref="C30">
       <value>47pF DNP</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
@@ -1224,9 +1105,9 @@
     </comp>
     <comp ref="J2">
       <value>Li-Ion 1S JST-PH</value>
-      <footprint>Connector_JST:JST_PH_S2B-PH-K_1x02_P2.00mm_Horizontal</footprint>
+      <footprint>Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</footprint>
       <fields>
-        <field name="Footprint">Connector_JST:JST_PH_S2B-PH-K_1x02_P2.00mm_Horizontal</field>
+        <field name="Footprint">Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -1246,314 +1127,84 @@
         </unit>
       </units>
     </comp>
-    <comp ref="J11">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+    <comp ref="J5">
+      <value>Conn_01x02</value>
+      <footprint>Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</footprint>
+      <description>Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</field>
+        <field name="Footprint">Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+        <field name="Description">Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <libsource lib="Connector_Generic" part="Conn_01x02" description="Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
       <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
       <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>33c59c8d-338c-40ab-85bd-a8bef1eb8416</tstamps>
+      <tstamps>fc70b891-f46a-43bd-ba4e-b4bef1a7009f</tstamps>
       <units>
         <unit name="A">
           <pins>
             <pin num="1"/>
+            <pin num="2"/>
           </pins>
         </unit>
       </units>
     </comp>
-    <comp ref="J12">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+    <comp ref="J6">
+      <value>Conn_01x05</value>
+      <footprint>Connector_JST:JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical</footprint>
+      <description>Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
+        <field name="Footprint">Connector_JST:JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+        <field name="Description">Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <libsource lib="Connector_Generic" part="Conn_01x05" description="Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
       <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
       <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>1f888d91-61dd-460a-b3ba-19803deb86a9</tstamps>
+      <tstamps>eb9a911d-c753-44f1-a40c-20780b96aa7d</tstamps>
       <units>
         <unit name="A">
           <pins>
             <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+            <pin num="5"/>
           </pins>
         </unit>
       </units>
     </comp>
-    <comp ref="J13">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+    <comp ref="J10">
+      <value>Conn_01x06</value>
+      <footprint>Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</footprint>
+      <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
+        <field name="Footprint">Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+        <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <libsource lib="Connector_Generic" part="Conn_01x06" description="Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
       <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
       <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>ec71141b-661d-43e1-b2e6-2c0c2903cace</tstamps>
+      <tstamps>73af3903-e2ea-49b7-a8e9-a0926f7aab17</tstamps>
       <units>
         <unit name="A">
           <pins>
             <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J14">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>2b7c8b1a-e3a8-4b70-9e62-f663d194fd52</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J15">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>cb29d029-fa14-411f-9459-ed19b3ef892a</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J17">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>64eb5586-1f8d-4811-86dd-40f65afaaf68</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J18">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>52c782b5-ab5a-4f9e-8f6b-3dfc2efe2f0b</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J19">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>80f6664e-d959-45cd-a4da-94353080ada2</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J23">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>23b3ff1e-0859-4259-a8c5-c703e0bff30b</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J24">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>38f4b69b-9fe9-4550-a04a-4808d1836561</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J25">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>f773a1b3-cd5b-4c86-95ea-3dffbbd4e54a</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J26">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>ac034c21-6ba5-4d0b-b5d0-3b80ced8f853</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
-          </pins>
-        </unit>
-      </units>
-    </comp>
-    <comp ref="J27">
-      <value>Conn_01x01</value>
-      <footprint>Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</footprint>
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <fields>
-        <field name="Footprint">Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm</field>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <libsource lib="Connector_Generic" part="Conn_01x01" description="Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
-      <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
-      <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
-      <property name="ki_keywords" value="connector"/>
-      <property name="ki_fp_filters" value="Connector*:*_1x??_*"/>
-      <sheetpath names="/ESP32-C6 + Auxiliary/" tstamps="/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb/"/>
-      <tstamps>b95b1a7c-a91b-4c6d-8150-410bc40b6101</tstamps>
-      <units>
-        <unit name="A">
-          <pins>
-            <pin num="1"/>
+            <pin num="2"/>
+            <pin num="3"/>
+            <pin num="4"/>
+            <pin num="5"/>
+            <pin num="6"/>
           </pins>
         </unit>
       </units>
@@ -1644,7 +1295,7 @@
       </units>
     </comp>
     <comp ref="R3">
-      <value>3.3k</value>
+      <value>5.1k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
       <fields>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
@@ -1981,9 +1632,9 @@
     </comp>
     <comp ref="R40">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
+        <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2005,9 +1656,9 @@
     </comp>
     <comp ref="R41">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
+        <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2029,9 +1680,9 @@
     </comp>
     <comp ref="R42">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
+        <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2053,9 +1704,9 @@
     </comp>
     <comp ref="R43">
       <value>10k</value>
-      <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
       <fields>
-        <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
+        <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2149,9 +1800,9 @@
     </comp>
     <comp ref="RT1">
       <value>10k NTC @25C</value>
-      <footprint>Connector_PinSocket_2.54mm:PinSocket_1x02_P2.54mm_Vertical</footprint>
+      <footprint>Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</footprint>
       <fields>
-        <field name="Footprint">Connector_PinSocket_2.54mm:PinSocket_1x02_P2.54mm_Vertical</field>
+        <field name="Footprint">Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</field>
         <field name="Datasheet"/>
         <field name="Description"/>
       </fields>
@@ -2695,22 +2346,6 @@
         <pin num="5" name="PROG" type="input"/>
       </pins>
     </libpart>
-    <libpart lib="Connector_Generic" part="Conn_01x01">
-      <description>Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
-      <footprints>
-        <fp>Connector*:*_1x??_*</fp>
-      </footprints>
-      <fields>
-        <field name="Reference">J</field>
-        <field name="Value">Conn_01x01</field>
-        <field name="Footprint"/>
-        <field name="Datasheet"/>
-        <field name="Description">Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
-      </fields>
-      <pins>
-        <pin num="1" name="Pin_1" type="passive"/>
-      </pins>
-    </libpart>
     <libpart lib="Connector_Generic" part="Conn_01x02">
       <description>Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <footprints>
@@ -2744,6 +2379,47 @@
         <pin num="1" name="Pin_1" type="passive"/>
         <pin num="2" name="Pin_2" type="passive"/>
         <pin num="3" name="Pin_3" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="Connector_Generic" part="Conn_01x05">
+      <description>Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+      <footprints>
+        <fp>Connector*:*_1x??_*</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">Conn_01x05</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+      </fields>
+      <pins>
+        <pin num="1" name="Pin_1" type="passive"/>
+        <pin num="2" name="Pin_2" type="passive"/>
+        <pin num="3" name="Pin_3" type="passive"/>
+        <pin num="4" name="Pin_4" type="passive"/>
+        <pin num="5" name="Pin_5" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="Connector_Generic" part="Conn_01x06">
+      <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
+      <footprints>
+        <fp>Connector*:*_1x??_*</fp>
+      </footprints>
+      <fields>
+        <field name="Reference">J</field>
+        <field name="Value">Conn_01x06</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
+      </fields>
+      <pins>
+        <pin num="1" name="Pin_1" type="passive"/>
+        <pin num="2" name="Pin_2" type="passive"/>
+        <pin num="3" name="Pin_3" type="passive"/>
+        <pin num="4" name="Pin_4" type="passive"/>
+        <pin num="5" name="Pin_5" type="passive"/>
+        <pin num="6" name="Pin_6" type="passive"/>
       </pins>
     </libpart>
     <libpart lib="Device" part="C">
@@ -2867,26 +2543,23 @@
         <pin num="SH4" name="SHIELD__3" type="passive"/>
       </pins>
     </libpart>
-    <libpart lib="Power_Protection" part="USBLC6-2SC6">
-      <description>Very low capacitance ESD protection diode, 2 data-line, SOT-23-6</description>
-      <docs>https://www.st.com/resource/en/datasheet/usblc6-2.pdf</docs>
+    <libpart lib="Power_Protection" part="TPD2EUSB30">
+      <description>2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</description>
+      <docs>http://www.ti.com/lit/ds/symlink/tpd2eusb30a.pdf</docs>
       <footprints>
-        <fp>SOT?23*</fp>
+        <fp>Texas*DRT*</fp>
       </footprints>
       <fields>
         <field name="Reference">U</field>
-        <field name="Value">USBLC6-2SC6</field>
-        <field name="Footprint">Package_TO_SOT_SMD:SOT-23-6</field>
-        <field name="Datasheet">https://www.st.com/resource/en/datasheet/usblc6-2.pdf</field>
-        <field name="Description">Very low capacitance ESD protection diode, 2 data-line, SOT-23-6</field>
+        <field name="Value">TPD2EUSB30</field>
+        <field name="Footprint">Package_TO_SOT_SMD:Texas_DRT-3</field>
+        <field name="Datasheet">http://www.ti.com/lit/ds/symlink/tpd2eusb30a.pdf</field>
+        <field name="Description">2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</field>
       </fields>
       <pins>
-        <pin num="1" name="I/O1" type="passive"/>
-        <pin num="2" name="GND" type="passive"/>
-        <pin num="3" name="I/O2" type="passive"/>
-        <pin num="4" name="I/O2" type="passive"/>
-        <pin num="5" name="VBUS" type="passive"/>
-        <pin num="6" name="I/O1" type="passive"/>
+        <pin num="1" name="D+" type="passive"/>
+        <pin num="2" name="D-" type="passive"/>
+        <pin num="3" name="GND" type="passive"/>
       </pins>
     </libpart>
     <libpart lib="RF_Module" part="ESP32-C6-MINI-1">
@@ -3132,10 +2805,10 @@
     <net code="3" name="+BATT" class="Battery_SYS">
       <node ref="C2" pin="1" pintype="passive"/>
       <node ref="I3" pin="1" pintype="passive"/>
+      <node ref="J10" pin="6" pinfunction="Pin_6_6" pintype="passive"/>
       <node ref="J2" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
-      <node ref="J27" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J3" pin="6" pinfunction="Pin_6_6" pintype="passive"/>
       <node ref="J4" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J7" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
       <node ref="Q1" pin="3" pinfunction="D_3" pintype="passive"/>
       <node ref="Q2" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="R30" pin="1" pintype="passive"/>
@@ -3190,8 +2863,8 @@
       <node ref="U10" pin="29" pinfunction="IO23_29" pintype="bidirectional"/>
     </net>
     <net code="13" name="BOOST_CMD" class="Signal">
-      <node ref="J25" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J5" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J10" pin="4" pinfunction="Pin_4_4" pintype="passive"/>
+      <node ref="J3" pin="4" pinfunction="Pin_4_4" pintype="passive"/>
       <node ref="R8" pin="1" pintype="passive"/>
       <node ref="U10" pin="27" pinfunction="IO21_27" pintype="bidirectional"/>
       <node ref="V3" pin="1" pintype="passive"/>
@@ -3210,30 +2883,30 @@
       <node ref="U10" pin="24" pinfunction="IO18_24" pintype="bidirectional"/>
     </net>
     <net code="17" name="CONN_LED+" class="Default">
-      <node ref="J15" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J5" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
       <node ref="R50" pin="1" pintype="passive"/>
     </net>
     <net code="18" name="CONN_RH" class="Default">
-      <node ref="J23" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J6" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="R43" pin="1" pintype="passive"/>
     </net>
     <net code="19" name="CONN_RT" class="Default">
-      <node ref="J19" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J6" pin="4" pinfunction="Pin_4_4" pintype="passive"/>
       <node ref="R42" pin="1" pintype="passive"/>
     </net>
     <net code="20" name="CONN_SCL" class="Default">
-      <node ref="J18" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J6" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
       <node ref="R41" pin="1" pintype="passive"/>
     </net>
     <net code="21" name="CONN_SDA" class="Default">
-      <node ref="J17" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J6" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
       <node ref="R40" pin="1" pintype="passive"/>
     </net>
     <net code="22" name="CONN_TOUCH" class="Default">
       <node ref="C30" pin="1" pintype="passive"/>
       <node ref="C31" pin="1" pintype="passive"/>
       <node ref="C32" pin="1" pintype="passive"/>
-      <node ref="J14" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J5" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
     </net>
     <net code="23" name="GND" class="Ground">
       <node ref="C1" pin="2" pintype="passive"/>
@@ -3241,10 +2914,10 @@
       <node ref="C11" pin="2" pintype="passive"/>
       <node ref="C12" pin="2" pintype="passive"/>
       <node ref="C13" pin="2" pintype="passive"/>
-      <node ref="C14" pin="2" pintype="passive"/>
       <node ref="C2" pin="2" pintype="passive"/>
       <node ref="C20" pin="2" pintype="passive"/>
       <node ref="C21" pin="2" pintype="passive"/>
+      <node ref="C22" pin="2" pintype="passive"/>
       <node ref="C3" pin="2" pintype="passive"/>
       <node ref="C33" pin="2" pintype="passive"/>
       <node ref="C4" pin="2" pintype="passive"/>
@@ -3262,11 +2935,11 @@
       <node ref="J1" pin="SH2" pinfunction="SHIELD__1_SH2" pintype="passive"/>
       <node ref="J1" pin="SH3" pinfunction="SHIELD__2_SH3" pintype="passive"/>
       <node ref="J1" pin="SH4" pinfunction="SHIELD__3_SH4" pintype="passive"/>
-      <node ref="J11" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J10" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="J2" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J24" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J3" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J3" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="J4" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
+      <node ref="J6" pin="5" pinfunction="Pin_5_5" pintype="passive"/>
       <node ref="Q10" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="Q3" pin="2" pinfunction="S_2" pintype="passive"/>
       <node ref="Q4" pin="2" pinfunction="S_2" pintype="passive"/>
@@ -3314,7 +2987,7 @@
       <node ref="U2" pin="7" pinfunction="PS/SYNC_7" pintype="input"/>
       <node ref="U2" pin="9" pinfunction="GND_9" pintype="power_in"/>
       <node ref="U3" pin="3" pinfunction="GND_3" pintype="power_in"/>
-      <node ref="U4" pin="2" pinfunction="GND_2" pintype="passive"/>
+      <node ref="U4" pin="3" pinfunction="GND_3" pintype="passive"/>
       <node ref="V1" pin="2" pintype="passive"/>
       <node ref="V2" pin="2" pintype="passive"/>
       <node ref="V3" pin="2" pintype="passive"/>
@@ -3408,98 +3081,91 @@
       <node ref="J4" pin="3" pinfunction="Pin_3_3" pintype="passive"/>
       <node ref="R301" pin="1" pintype="passive"/>
     </net>
-    <net code="42" name="USBPort_N" class="Default">
-      <node ref="J1" pin="A7" pinfunction="DN1_A7" pintype="passive"/>
-      <node ref="J1" pin="B7" pinfunction="DN2_B7" pintype="passive"/>
-      <node ref="U4" pin="1" pinfunction="I/O1_1" pintype="passive"/>
-    </net>
-    <net code="43" name="USBPort_P" class="Default">
-      <node ref="J1" pin="A6" pinfunction="DP1_A6" pintype="passive"/>
-      <node ref="J1" pin="B6" pinfunction="DP2_B6" pintype="passive"/>
-      <node ref="U4" pin="3" pinfunction="I/O2_3" pintype="passive"/>
-    </net>
-    <net code="44" name="USB_ADC" class="Sensitive">
+    <net code="42" name="USB_ADC" class="Sensitive">
+      <node ref="C22" pin="1" pintype="passive"/>
       <node ref="R32" pin="2" pintype="passive"/>
       <node ref="R33" pin="1" pintype="passive"/>
       <node ref="U10" pin="13" pinfunction="IO1_13" pintype="bidirectional"/>
     </net>
-    <net code="45" name="USB_RAW_N" class="USB">
+    <net code="43" name="USB_RAW_N" class="USB">
       <node ref="C12" pin="1" pintype="passive"/>
-      <node ref="J12" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J9" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J1" pin="A7" pinfunction="DN1_A7" pintype="passive"/>
+      <node ref="J1" pin="B7" pinfunction="DN2_B7" pintype="passive"/>
+      <node ref="J10" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
+      <node ref="J3" pin="2" pinfunction="Pin_2_2" pintype="passive"/>
       <node ref="R22" pin="2" pintype="passive"/>
-      <node ref="U4" pin="6" pinfunction="I/O1_6" pintype="passive"/>
+      <node ref="U4" pin="2" pinfunction="D-_2" pintype="passive"/>
     </net>
-    <net code="46" name="USB_RAW_P" class="USB">
+    <net code="44" name="USB_RAW_P" class="USB">
       <node ref="C13" pin="1" pintype="passive"/>
-      <node ref="J13" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J8" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J1" pin="A6" pinfunction="DP1_A6" pintype="passive"/>
+      <node ref="J1" pin="B6" pinfunction="DP2_B6" pintype="passive"/>
+      <node ref="J10" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J3" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
       <node ref="R23" pin="2" pintype="passive"/>
-      <node ref="U4" pin="4" pinfunction="I/O2_4" pintype="passive"/>
+      <node ref="U4" pin="1" pinfunction="D+_1" pintype="passive"/>
     </net>
-    <net code="47" name="VBUS" class="Power_5V">
+    <net code="45" name="VBUS" class="Power_5V">
       <node ref="C1" pin="1" pintype="passive"/>
-      <node ref="C14" pin="1" pintype="passive"/>
       <node ref="D1" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="D3" pin="2" pinfunction="A_2" pintype="passive"/>
       <node ref="J1" pin="A4_B9" pinfunction="VBUS_A4_B9" pintype="passive"/>
       <node ref="J1" pin="B4_A9" pinfunction="VBUS__1_B4_A9" pintype="passive"/>
-      <node ref="J26" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
-      <node ref="J6" pin="1" pinfunction="Pin_1_1" pintype="passive"/>
+      <node ref="J10" pin="5" pinfunction="Pin_5_5" pintype="passive"/>
+      <node ref="J3" pin="5" pinfunction="Pin_5_5" pintype="passive"/>
       <node ref="Q4" pin="1" pinfunction="G_1" pintype="input"/>
       <node ref="R13" pin="2" pintype="passive"/>
       <node ref="R310" pin="2" pintype="passive"/>
       <node ref="R32" pin="1" pintype="passive"/>
       <node ref="R5" pin="1" pintype="passive"/>
       <node ref="U1" pin="4" pinfunction="V_{DD}_4" pintype="power_in"/>
-      <node ref="U4" pin="5" pinfunction="VBUS_5" pintype="passive"/>
     </net>
-    <net code="48" name="unconnected-(J1-SBU1-PadA8)" class="Default">
+    <net code="46" name="unconnected-(J1-SBU1-PadA8)" class="Default">
       <node ref="J1" pin="A8" pinfunction="SBU1_A8" pintype="passive+no_connect"/>
     </net>
-    <net code="49" name="unconnected-(J1-SBU2-PadB8)" class="Default">
+    <net code="47" name="unconnected-(J1-SBU2-PadB8)" class="Default">
       <node ref="J1" pin="B8" pinfunction="SBU2_B8" pintype="passive+no_connect"/>
     </net>
-    <net code="50" name="unconnected-(U10-IO4-Pad9)" class="Default">
+    <net code="48" name="unconnected-(U10-IO4-Pad9)" class="Default">
       <node ref="U10" pin="9" pinfunction="IO4_9" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="51" name="unconnected-(U10-IO5-Pad10)" class="Default">
+    <net code="49" name="unconnected-(U10-IO5-Pad10)" class="Default">
       <node ref="U10" pin="10" pinfunction="IO5_10" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="52" name="unconnected-(U10-IO8-Pad22)" class="Default">
+    <net code="50" name="unconnected-(U10-IO8-Pad22)" class="Default">
       <node ref="U10" pin="22" pinfunction="IO8_22" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="53" name="unconnected-(U10-IO15-Pad20)" class="Default">
+    <net code="51" name="unconnected-(U10-IO15-Pad20)" class="Default">
       <node ref="U10" pin="20" pinfunction="IO15_20" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="54" name="unconnected-(U10-IO22-Pad28)" class="Default">
+    <net code="52" name="unconnected-(U10-IO22-Pad28)" class="Default">
       <node ref="U10" pin="28" pinfunction="IO22_28" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="55" name="unconnected-(U10-NC-Pad4)" class="Default">
+    <net code="53" name="unconnected-(U10-NC-Pad4)" class="Default">
       <node ref="U10" pin="4" pinfunction="NC_4" pintype="no_connect"/>
     </net>
-    <net code="56" name="unconnected-(U10-NC-Pad7)" class="Default">
+    <net code="54" name="unconnected-(U10-NC-Pad7)" class="Default">
       <node ref="U10" pin="7" pinfunction="NC_7" pintype="no_connect"/>
     </net>
-    <net code="57" name="unconnected-(U10-NC-Pad21)" class="Default">
+    <net code="55" name="unconnected-(U10-NC-Pad21)" class="Default">
       <node ref="U10" pin="21" pinfunction="NC_21" pintype="no_connect"/>
     </net>
-    <net code="58" name="unconnected-(U10-NC-Pad32)" class="Default">
+    <net code="56" name="unconnected-(U10-NC-Pad32)" class="Default">
       <node ref="U10" pin="32" pinfunction="NC_32" pintype="no_connect"/>
     </net>
-    <net code="59" name="unconnected-(U10-NC-Pad33)" class="Default">
+    <net code="57" name="unconnected-(U10-NC-Pad33)" class="Default">
       <node ref="U10" pin="33" pinfunction="NC_33" pintype="no_connect"/>
     </net>
-    <net code="60" name="unconnected-(U10-NC-Pad34)" class="Default">
+    <net code="58" name="unconnected-(U10-NC-Pad34)" class="Default">
       <node ref="U10" pin="34" pinfunction="NC_34" pintype="no_connect"/>
     </net>
-    <net code="61" name="unconnected-(U10-NC-Pad35)" class="Default">
+    <net code="59" name="unconnected-(U10-NC-Pad35)" class="Default">
       <node ref="U10" pin="35" pinfunction="NC_35" pintype="no_connect"/>
     </net>
-    <net code="62" name="unconnected-(U10-RXD0-Pad30)" class="Default">
+    <net code="60" name="unconnected-(U10-RXD0-Pad30)" class="Default">
       <node ref="U10" pin="30" pinfunction="RXD0_30" pintype="bidirectional+no_connect"/>
     </net>
-    <net code="63" name="unconnected-(U10-TXD0-Pad31)" class="Default">
+    <net code="61" name="unconnected-(U10-TXD0-Pad31)" class="Default">
       <node ref="U10" pin="31" pinfunction="TXD0_31" pintype="bidirectional+no_connect"/>
     </net>
   </nets>
