@@ -86,6 +86,30 @@ def _drop_dangling_group_members(text: str, uuids: list[str]) -> str:
     return text
 
 
+
+
+def _strip_design_block_links_from_groups(text: str) -> tuple[str, int]:
+    """Turn linked design-block groups into ordinary groups for KiCad 10.0.x.
+
+    KiCad 10.99 stores a design-block origin on (group ...) objects via
+    (lib_id "Library:..."). Stable 10.0.x follows that link and may try to
+    open the external .kicad_block/.kicad_pcb with a newer file format.
+    The instantiated group members are already fully present in the project,
+    so a compatibility export should preserve the group and remove only the
+    design-block library link.
+    """
+    pattern = re.compile(r"\n\t\(group(?:\s|\n)")
+    starts = [m.start() + 2 for m in pattern.finditer(text)]
+    count = 0
+    for start in reversed(starts):
+        end = _balanced_end(text, start)
+        block = text[start:end]
+        block2, n = re.subn(r'\n(?P<i>\s*)\(lib_id\s+"[^"]+"\)', '', block)
+        if n:
+            text = text[:start] + block2 + text[end:]
+            count += n
+    return text, count
+
 def _convert_footprint_transforms(text: str) -> tuple[str, int]:
     """Convert 10.99 footprint (transform ...) placement to 10.0.x (at ...)."""
     # Current 10.99 project uses unit scale only. Refuse non-unit scale instead of
@@ -125,6 +149,7 @@ def convert_pcb(path: Path) -> dict[str, int]:
     text, n_constraints_ids, n_constraints = _remove_top_level_forms(text, "constraint")
     text, n_generated_ids, n_generated = _remove_top_level_forms(text, "generated")
     text = _drop_dangling_group_members(text, n_constraints_ids + n_generated_ids)
+    text, n_design_block_links = _strip_design_block_links_from_groups(text)
     text, n_transforms = _convert_footprint_transforms(text)
 
     # KiCad 10.99 adds frequency-dependent dielectric metadata that stable 10.0
@@ -153,6 +178,7 @@ def convert_pcb(path: Path) -> dict[str, int]:
     return {
         "constraints_removed": n_constraints,
         "generated_via_stitch_removed": n_generated,
+        "design_block_group_links_removed": n_design_block_links,
         "footprint_transforms_converted": n_transforms,
         "explicit_vias_preserved": converted_vias,
         "spec_frequency_removed": n_specfreq,
@@ -167,6 +193,8 @@ def convert_schematic(path: Path) -> dict[str, int]:
     # Do NOT strip those (that would be a KiCad 10 -> 9 conversion). Only drop
     # constructs introduced on the 10.99/11 development line.
     removed = {}
+    text, n_design_block_links = _strip_design_block_links_from_groups(text)
+    removed["design_block_group_links"] = n_design_block_links
     for form in ("ellipse", "ellipse_arc", "net_chain", "net_chains"):
         text, _ids, n = _remove_top_level_forms(text, form)
         removed[form] = n
@@ -184,6 +212,23 @@ def convert_schematic(path: Path) -> dict[str, int]:
         raise ValueError(f"failed to rewrite schematic header in {path}")
     path.write_text(text, encoding="utf-8")
     return removed
+
+
+def assert_no_linked_design_block_groups(root: Path) -> None:
+    """Fail if a converted KiCad file still contains a linked group lib_id."""
+    leftovers: list[str] = []
+    for path in [*root.rglob("*.kicad_pcb"), *root.rglob("*.kicad_sch")]:
+        text = path.read_text(encoding="utf-8")
+        pattern = re.compile(r"\n\t\(group(?:\s|\n)")
+        for m in pattern.finditer(text):
+            start = m.start() + 2
+            end = _balanced_end(text, start)
+            block = text[start:end]
+            if re.search(r'\(lib_id\s+"[^"]+"\)', block):
+                leftovers.append(str(path.relative_to(root)))
+                break
+    if leftovers:
+        raise ValueError("linked design-block group metadata remains in: " + ", ".join(leftovers))
 
 
 def sanitize_project_local_state(root: Path) -> None:
@@ -298,6 +343,7 @@ def main() -> int:
         stats[str(p.relative_to(output))] = convert_pcb(p)
     for p in output.rglob("*.kicad_sch"):
         convert_schematic(p)
+    assert_no_linked_design_block_groups(output)
 
     # Marker and machine-readable conversion manifest.
     manifest = {
@@ -311,6 +357,7 @@ def main() -> int:
             "10.99 generated via-stitch descriptors removed; already-instantiated explicit vias are preserved.",
             "10.99 footprint transforms converted to KiCad 10.0.x footprint placements.",
             "10.99 stackup spec_frequency/dielectric_model metadata removed; physical stackup values preserved.",
+            "Design-block lib_id links on instantiated groups removed; group contents remain local and intact.",
             "Do not edit this compatibility tree as the project master.",
         ],
     }
@@ -326,6 +373,7 @@ def main() -> int:
         "- generated via-stitch descriptors (explicit generated vias remain)\n"
         "- 10.99 footprint transform wrappers (converted to KiCad 10 placements)\n"
         "- 10.99 stackup frequency/model metadata (thickness/material/Dk preserved)\n"
+        "- design-block library links on instantiated groups (group contents preserved)\n"
     )
 
     cli = find_cli(args.kicad_cli)
@@ -346,6 +394,7 @@ def main() -> int:
         print(
             f"  {name}: {st['constraints_removed']} constraints removed, "
             f"{st['generated_via_stitch_removed']} generated via-stitch descriptors removed, "
+            f"{st['design_block_group_links_removed']} design-block group links removed, "
             f"{st['footprint_transforms_converted']} footprint transforms converted, "
             f"{st['explicit_vias_preserved']} explicit vias preserved"
         )

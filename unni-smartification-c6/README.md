@@ -124,4 +124,4 @@ For a real KiCad 10.0.5 smoke test (schematic parse/ERC/netlist plus PCB DRC/sch
 KICAD_10_0_5_CLI=/path/to/kicad-cli tools/validate_kicad_10_0_5_export.sh
 ```
 
-The converter removes only 10.99 editing metadata that 10.0.5 cannot parse: native geometric constraint objects and generated via-stitch descriptors. The already-instantiated vias remain explicit PCB vias, footprint placements are translated to the 10.0.x representation, and the mechanical geometry continues to be guarded by `tools/validate_mechanics.py` in the master project.
+The converter removes only 10.99 editing/link metadata that stable 10.0.x cannot safely consume: native geometric constraint objects, generated via-stitch descriptors and design-block `lib_id` links attached to instantiated groups. The group members themselves remain local in the schematic/PCB, already-instantiated vias remain explicit PCB vias, footprint placements are translated to the 10.0.x representation, and the mechanical geometry continues to be guarded by `tools/validate_mechanics.py` in the master project.
