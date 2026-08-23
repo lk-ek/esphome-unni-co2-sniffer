@@ -105,3 +105,23 @@ After opening a revision in PCB Editor, **refill all zones (`B`) before trusting
 ## Mechanical reference
 
 See `MECHANICAL.md`. The measured USB-board top datum, hole locations and USB overhang are fixed; the board may extend only toward its rear/bottom direction. The USB-side B.Cu component-clearance window is limited to the first 19 x 18 mm, with an explicit placement keepout below it.
+
+## KiCad 10.0.5 compatibility export
+
+The editable project master targets KiCad 10.99 because it uses native geometric PCB constraints and generated via-stitch metadata. Some fabrication/export plugins are only available for stable KiCad 10.0.5, so the repository includes a reproducible compatibility converter instead of downgrading the master.
+
+Create the stable compatibility tree with:
+
+```sh
+python3 tools/make_kicad_10_0_5_copy.py
+```
+
+The result is written to `dist/kicad-10.0.5/unni-smartification-c6/`. Use that copy for KiCad 10.0.5 plugins and final fabrication exports. Do not make design edits there; regenerate it from the 10.99 master after each relevant change.
+
+For a real KiCad 10.0.5 smoke test (schematic parse/ERC/netlist plus PCB DRC/schematic parity/Gerber/drill export):
+
+```sh
+KICAD_10_0_5_CLI=/path/to/kicad-cli tools/validate_kicad_10_0_5_export.sh
+```
+
+The converter removes only 10.99 editing metadata that 10.0.5 cannot parse: native geometric constraint objects and generated via-stitch descriptors. The already-instantiated vias remain explicit PCB vias, footprint placements are translated to the 10.0.x representation, and the mechanical geometry continues to be guarded by `tools/validate_mechanics.py` in the master project.

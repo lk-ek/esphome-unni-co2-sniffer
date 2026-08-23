@@ -47,3 +47,7 @@ The ESP sheet is now included in SPICE because MCP73831 and TPS63031 live there.
 - USB_ADC is RC filtered locally.
 - Both inner layers are intended as GND reference planes. +3V3, SYS, VBUS and +BATT are distributed with outer-layer pours and same-net F/B stitching vias; switch nodes remain compact local copper.
 - The PCB stackup is modeled after JLCPCB's current 4-layer 1.0 mm JLC3313 construction: 35 µm outer Cu, 15.2 µm inner Cu, 99.4 µm 3313 prepreg and a 0.70 mm NP-155F core. KiCad's uniform soldermask model is only an approximation; JLCPCB's impedance calculator is authoritative for final USB geometry.
+
+## KiCad 10.0.5 fabrication compatibility target (2026-08-23)
+
+KiCad 10.99 remains the canonical editable source because the PCB uses native geometric constraints and generated via-stitch metadata. A generated KiCad 10.0.5 compatibility tree is used for stable-version-only plugins and fabrication/export workflows. `tools/make_kicad_10_0_5_copy.py` removes unsupported editing metadata, converts footprint placement transforms to the 10.0.x representation, preserves explicit generated vias, and rewrites file-format headers to versions proven parseable by KiCad 10.0.5. The compatibility copy is disposable and must not become a second editable source of truth.

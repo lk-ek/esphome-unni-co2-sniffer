@@ -83,11 +83,16 @@ ex1, ey1, ex2, ey2 = rectangle_from_lines(esp_lines, "ESP board")
 if not (close(ex2-ex1, 46.0) and close(ey2-ey1, 32.0)):
     fail(f"ESP board envelope is {ex2-ex1:g} x {ey2-ey1:g} mm, expected 46 x 32 mm")
 
-# Confirm driving fixed-length constraints for the two-board study are present.
-fixed_vals = [float(v) for v in re.findall(r"\(constraint\s+\(type\s+fixed_length\).*?\(value\s+([-0-9.]+)\)", S, re.S)]
-for needed in (19.0, 46.0, 32.0):
-    if not any(close(v, needed) for v in fixed_vals):
-        fail(f"missing fixed_length geometric constraint for {needed:g} mm")
+# Confirm driving fixed-length constraints are present in the 10.99 master.
+# The generated KiCad 10.0.5 compatibility tree deliberately strips native
+# 10.99 geometric constraints because stable KiCad cannot parse them; there the
+# actual board geometry checks above remain authoritative.
+compat_10_0_5 = (ROOT / "KICAD_10_0_5_COMPATIBILITY.json").exists()
+if not compat_10_0_5:
+    fixed_vals = [float(v) for v in re.findall(r"\(constraint\s+\(type\s+fixed_length\).*?\(value\s+([-0-9.]+)\)", S, re.S)]
+    for needed in (19.0, 46.0, 32.0):
+        if not any(close(v, needed) for v in fixed_vals):
+            fail(f"missing fixed_length geometric constraint for {needed:g} mm")
 
 # Footprint parser: locate each board-only mechanical footprint by Reference and
 # inspect its top-level placement and NPTH drill.
@@ -194,6 +199,8 @@ for ref in ("R1", "R2"):
     if fp_layer(b) != "B.Cu":
         fail(f"{ref} USB-C CC resistor must remain on B.Cu")
     pm = re.search(r"\(transform\s+\(translate\s+([-0-9.]+)\s+([-0-9.]+)\)", b, re.S)
+    if not pm:
+        pm = re.search(r"\n\t\t\(at\s+([-0-9.]+)\s+([-0-9.]+)(?:\s+[-0-9.]+)?\)", b)
     if not pm:
         fail(f"{ref} placement not found")
     px, py = map(float, pm.groups())
