@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Unni_Inductor")(type "KiCad")(uri "${KIPRJMOD}/Unni_Inductor.pretty")(options "")(descr "Project-local Murata power inductor footprints"))
+)
