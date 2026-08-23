@@ -11,6 +11,135 @@
 		(company "Unni CO2 Smartification")
 	)
 	(lib_symbols
+		(symbol "Connector_Generic:Conn_01x01"
+			(pin_names
+				(offset 1.016)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "J"
+				(at 0 2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "Conn_01x01"
+				(at 0 -2.54 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "connector"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "Connector*:*_1x??_*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Conn_01x01_1_1"
+				(rectangle
+					(start -1.27 1.27)
+					(end 1.27 -1.27)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type background)
+					)
+				)
+				(rectangle
+					(start -1.27 0.127)
+					(end 0 -0.127)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 3.81)
+					(name "Pin_1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "Connector_Generic:Conn_01x03"
 			(pin_names
 				(offset 1.016)
@@ -2878,6 +3007,122 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "power:PWR_FLAG"
+			(power global)
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(offset 0)
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "#FLG"
+				(at 0 1.905 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "PWR_FLAG"
+				(at 0 3.81 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Special symbol for telling ERC where power comes from"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "flag power"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "PWR_FLAG_0_0"
+				(pin power_out line
+					(at 0 0 90)
+					(length 0)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(symbol "PWR_FLAG_0_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 1.27) (xy -1.016 1.905) (xy 0 2.54) (xy 1.016 1.905) (xy 0 1.27)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(symbol "PWR_FLAG_1_1")
+			(embedded_fonts no)
+		)
 		(symbol "power:VBUS"
 			(power global)
 			(pin_numbers
@@ -3089,6 +3334,18 @@
 		(uuid "0ab0d442-3fc2-4405-b0a3-2387f7bafe23")
 	)
 	(junction
+		(at 102.87 173.99)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "1493afe2-607a-4734-8e31-3f808e15ecf6")
+	)
+	(junction
+		(at 50.8 26.67)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "1a4f12c0-8368-48ea-b64c-02ca7eeea375")
+	)
+	(junction
 		(at 66.04 46.99)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3105,12 +3362,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "367a7936-accd-4118-8278-b1d640ea2e79")
-	)
-	(junction
-		(at 102.87 173.99)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "36c79926-676e-4aa9-9a67-27ad008bd6b0")
 	)
 	(junction
 		(at 50.8 30.48)
@@ -3179,6 +3430,12 @@
 		(uuid "8d363c4f-8d48-4a7d-bf1a-5390f2e986e8")
 	)
 	(junction
+		(at 117.475 173.99)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "acc4ef8e-a949-4554-bb17-fa6a2d11e6d1")
+	)
+	(junction
 		(at 133.35 189.23)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3189,6 +3446,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "b357a786-ad99-4f28-90b7-869e570be887")
+	)
+	(junction
+		(at 66.04 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "bc9bb079-e92d-4b5c-8274-f2a7959c0684")
 	)
 	(junction
 		(at 49.53 76.2)
@@ -3370,6 +3633,16 @@
 	)
 	(wire
 		(pts
+			(xy 125.73 40.64) (xy 133.35 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1dc3322a-4586-4dc4-a294-36ccd1e2d9bf")
+	)
+	(wire
+		(pts
 			(xy 45.72 38.1) (xy 49.53 38.1)
 		)
 		(stroke
@@ -3427,16 +3700,6 @@
 			(type default)
 		)
 		(uuid "2eeb1dd6-b0f1-4fcc-83de-4d8db651dbba")
-	)
-	(wire
-		(pts
-			(xy 114.3 173.99) (xy 120.65 173.99)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "330fdeb2-c49d-4f4a-8bf6-3b76e88c5e73")
 	)
 	(wire
 		(pts
@@ -3500,13 +3763,13 @@
 	)
 	(wire
 		(pts
-			(xy 102.87 173.99) (xy 106.68 173.99)
+			(xy 153.67 146.05) (xy 153.67 173.99)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "45d3e720-796d-471d-afd4-c6b2d9a1bdfd")
+		(uuid "4829192c-8226-4127-9b1c-3b5146828d5e")
 	)
 	(wire
 		(pts
@@ -3570,7 +3833,7 @@
 	)
 	(wire
 		(pts
-			(xy 66.04 53.34) (xy 66.04 83.82)
+			(xy 66.04 53.34) (xy 66.04 81.28)
 		)
 		(stroke
 			(width 0)
@@ -3720,6 +3983,16 @@
 	)
 	(wire
 		(pts
+			(xy 66.04 81.28) (xy 66.04 83.82)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7e1dbe76-a173-47ef-9abf-28d300388efc")
+	)
+	(wire
+		(pts
 			(xy 219.71 186.69) (xy 219.71 190.5)
 		)
 		(stroke
@@ -3770,16 +4043,6 @@
 	)
 	(wire
 		(pts
-			(xy 153.67 146.05) (xy 153.67 173.99)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "8b81a1cd-4edc-49a2-b9f1-a88108540cfc")
-	)
-	(wire
-		(pts
 			(xy 250.19 187.96) (xy 254 187.96)
 		)
 		(stroke
@@ -3827,6 +4090,16 @@
 			(type default)
 		)
 		(uuid "9535f39a-ada5-410d-8f2e-9514a2d0d768")
+	)
+	(wire
+		(pts
+			(xy 50.8 26.67) (xy 50.8 30.48)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "95c59a6a-3c80-4e26-875a-245103fa5bdf")
 	)
 	(wire
 		(pts
@@ -3940,6 +4213,16 @@
 	)
 	(wire
 		(pts
+			(xy 102.87 173.99) (xy 106.68 173.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b6431ef4-80eb-46aa-8cc8-419584bbc460")
+	)
+	(wire
+		(pts
 			(xy 245.11 190.5) (xy 254 190.5)
 		)
 		(stroke
@@ -3947,6 +4230,16 @@
 			(type default)
 		)
 		(uuid "bb17fb5f-f879-4692-9bb6-9937ca1f5685")
+	)
+	(wire
+		(pts
+			(xy 117.475 173.99) (xy 120.65 173.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "bb27df09-5a39-4dc3-9ee0-cbb0c4688a93")
 	)
 	(wire
 		(pts
@@ -4070,6 +4363,16 @@
 	)
 	(wire
 		(pts
+			(xy 114.3 173.99) (xy 117.475 173.99)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d2b9675a-f727-45bc-aefc-fee8eb43deff")
+	)
+	(wire
+		(pts
 			(xy 66.04 45.72) (xy 66.04 46.99)
 		)
 		(stroke
@@ -4150,6 +4453,16 @@
 	)
 	(wire
 		(pts
+			(xy 125.73 36.83) (xy 133.35 36.83)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e5258629-1c7d-4a29-b7e4-bfb4b684fc06")
+	)
+	(wire
+		(pts
 			(xy 53.34 165.1) (xy 50.8 165.1)
 		)
 		(stroke
@@ -4180,7 +4493,7 @@
 	)
 	(wire
 		(pts
-			(xy 50.8 27.94) (xy 50.8 30.48)
+			(xy 50.8 25.4) (xy 50.8 26.67)
 		)
 		(stroke
 			(width 0)
@@ -4268,6 +4581,54 @@
 		)
 		(uuid "f5bcb236-ba9d-4129-8499-ac4d166da95b")
 	)
+	(global_label "CONN_USB_P"
+		(shape bidirectional)
+		(at 125.73 66.04 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "04748135-7ca4-472a-81e3-419e166dda37")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 112.8381 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "USB_RAW_P"
+		(shape passive)
+		(at 125.73 40.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "079a7926-a5e0-4c42-9a81-78b77d7ccbef")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 115.7309 40.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "USB_RAW_P"
 		(shape passive)
 		(at 74.93 40.64 0)
@@ -4292,7 +4653,79 @@
 			)
 		)
 	)
-	(global_label "USB_N"
+	(global_label "BOOST_CMD"
+		(shape bidirectional)
+		(at 125.73 54.61 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "4b3af279-d4b4-4b7d-a14d-ba35f6439bfa")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 113.7904 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_+BATT"
+		(shape input)
+		(at 125.73 62.23 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "4c1bc3bc-23f4-4b44-8750-52ce1745548d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 113.856 62.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_USB_P"
+		(shape bidirectional)
+		(at 133.35 40.64 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "5480f24b-6d8f-4a73-aabf-eefb11686baa")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 146.2419 40.64 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "USBPort_N"
 		(shape passive)
 		(at 58.42 38.1 90)
 		(fields_autoplaced yes)
@@ -4304,7 +4737,7 @@
 		)
 		(uuid "59f11a36-28a9-4565-a1a1-85feab65e907")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 58.42 31.8152 90)
+			(at 58.42 28.72 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4340,6 +4773,102 @@
 			)
 		)
 	)
+	(global_label "CONN_GND"
+		(shape bidirectional)
+		(at 125.73 50.8 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "5f64aee2-17fe-4624-a627-3e12cd4ba59b")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 114.5524 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_USB_N"
+		(shape bidirectional)
+		(at 133.35 36.83 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "61184ec7-1c75-486f-9bc8-3df49ad6a3f4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 146.2895 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "CONN_USB_N"
+		(shape bidirectional)
+		(at 125.73 69.85 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "8a016106-a586-49ad-bd92-f508832bfdeb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 112.7905 69.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_VBUS"
+		(shape input)
+		(at 125.73 58.42 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "8bdaceaf-1fc8-4679-9fc0-490936d28dc4")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 114.6179 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
 	(global_label "BOOST_CMD"
 		(shape input)
 		(at 29.21 172.72 180)
@@ -4364,7 +4893,7 @@
 			)
 		)
 	)
-	(global_label "USB_P"
+	(global_label "USBPort_P"
 		(shape passive)
 		(at 58.42 40.64 270)
 		(fields_autoplaced yes)
@@ -4376,7 +4905,31 @@
 		)
 		(uuid "93cfb3b2-cbaa-4fe7-ad87-27562f25dd92")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 58.42 46.8772 90)
+			(at 58.42 49.9724 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+	)
+	(global_label "USB_RAW_N"
+		(shape passive)
+		(at 125.73 36.83 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify right)
+		)
+		(uuid "add4f5cf-400b-4432-b4de-0b951ebdc7a3")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 115.6833 36.83 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -4606,6 +5159,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 62.23 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "133da732-8f05-43ee-b987-62d920ba36ae")
+		(property "Reference" "J7"
+			(at 133.35 60.9599 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 63.4999 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm"
+			(at 130.81 62.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 62.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 62.23 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0ef6d2c8-5fd7-42a3-91fa-044b89687ddd")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Transistor_FET:TP0610T")
 		(at 50.8 154.94 90)
 		(unit 1)
@@ -4716,6 +5348,85 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
 					(reference "Q2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 58.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "1fb62588-bf8f-40e0-816c-914cf4564fa5")
+		(property "Reference" "J6"
+			(at 133.35 57.1499 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 59.6899 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm"
+			(at 130.81 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7f3ffb5c-b3ae-4979-afa4-0bea583a7cd7")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J6")
 					(unit 1)
 				)
 			)
@@ -5025,14 +5736,14 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 53.34 210.82 0)
+			(at 48.26 210.82 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1 1)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" ""
@@ -5163,6 +5874,84 @@
 		)
 	)
 	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 117.475 173.99 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "41f429f0-9a68-4e8d-8741-3386ce1b7ec7")
+		(property "Reference" "#FLG04"
+			(at 117.475 172.085 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 117.475 168.91 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 117.475 173.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 117.475 173.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 117.475 173.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7d60051b-15e8-4374-9504-816ccd81b1c0")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "#FLG04")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 34.29 172.72 90)
 		(unit 1)
@@ -5266,14 +6055,14 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 53.34 181.61 0)
+			(at 48.26 181.61 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1 1)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" ""
@@ -5316,6 +6105,85 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
 					(reference "#PWR039")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 50.8 26.67 270)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "57b89f88-c26e-4b8f-b44f-2bf09d7a1815")
+		(property "Reference" "#FLG01"
+			(at 52.705 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 54.61 26.6699 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Package_DIP:DIP-24_W7.62mm"
+			(at 50.8 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 50.8 26.67 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "adeddc00-621a-499a-a0bc-91dbeb65d87f")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "#FLG01")
 					(unit 1)
 				)
 			)
@@ -5824,6 +6692,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 69.85 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8e5590c6-53cf-4225-ab6a-e67d75457b2f")
+		(property "Reference" "J9"
+			(at 133.35 68.5799 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 71.1199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm"
+			(at 130.81 69.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 69.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 69.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "598d1dba-c3a6-426f-8c39-461a106d9888")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J9")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+5V")
 		(at 153.67 146.05 0)
 		(unit 1)
@@ -6163,14 +7110,14 @@
 			)
 		)
 		(property "Value" "GND"
-			(at 250.19 204.47 0)
+			(at 245.11 204.47 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1 1)
 				)
-				(justify left)
+				(justify right)
 			)
 		)
 		(property "Footprint" ""
@@ -6213,6 +7160,85 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
 					(reference "#PWR051")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 50.8 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a5e8fc59-4ea7-4e96-9752-72ecd5fcb3cc")
+		(property "Reference" "J3"
+			(at 133.35 49.5299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 52.0699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.5sqmm_1x01_D0.9mm_OD2.1mm"
+			(at 130.81 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "88741e00-4d4c-4aa0-8ad5-e35287bf7dcc")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J3")
 					(unit 1)
 				)
 			)
@@ -6331,6 +7357,85 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
 					(reference "Q3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 66.04 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ab6131a0-315c-447f-b1f0-e73050fd384e")
+		(property "Reference" "J8"
+			(at 133.35 64.7699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 67.3099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm"
+			(at 130.81 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fa2dd8aa-e090-4f3b-bcc6-a1fca211467c")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J8")
 					(unit 1)
 				)
 			)
@@ -6786,7 +7891,7 @@
 	)
 	(symbol
 		(lib_id "power:VBUS")
-		(at 50.8 27.94 0)
+		(at 50.8 25.4 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -6797,7 +7902,7 @@
 		(fields_autoplaced yes)
 		(uuid "d9954fea-aef4-45c8-8a57-c40477ba2502")
 		(property "Reference" "#PWR03"
-			(at 50.8 34.29 0)
+			(at 50.8 31.75 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6808,7 +7913,7 @@
 			)
 		)
 		(property "Value" "VBUS"
-			(at 53.34 26.67 0)
+			(at 53.34 24.13 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -6819,7 +7924,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 50.8 27.94 0)
+			(at 50.8 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6830,7 +7935,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 50.8 27.94 0)
+			(at 50.8 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6841,7 +7946,7 @@
 			)
 		)
 		(property "Description" ""
-			(at 50.8 27.94 0)
+			(at 50.8 25.4 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6858,6 +7963,85 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
 					(reference "#PWR03")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 66.04 81.28 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e3aaf061-daea-4b5e-a086-6213c893b934")
+		(property "Reference" "#FLG02"
+			(at 64.135 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 62.23 81.2799 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 66.04 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 66.04 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 66.04 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "87b46dae-f108-458d-adeb-6f32b7e4a020")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "#FLG02")
 					(unit 1)
 				)
 			)
@@ -6974,7 +8158,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_SMD:L_TDK_NLV32_3.2x2.5mm"
+		(property "Footprint" "Unni_Inductor:L_Murata_DFE322520FD_3.2x2.5mm_HandSolder"
 			(at 110.49 173.99 0)
 			(hide yes)
 			(show_name no)
@@ -7219,6 +8403,85 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector_Generic:Conn_01x01")
+		(at 130.81 54.61 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f96577d4-d237-4fb6-9f89-b612c9b3bf2b")
+		(property "Reference" "J5"
+			(at 133.35 53.3399 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "Conn_01x01"
+			(at 133.35 55.8799 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Connector_Wire:SolderWire-0.1sqmm_1x01_D0.4mm_OD1mm"
+			(at 130.81 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 130.81 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x01, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 130.81 54.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "afd05bb9-f651-4f83-bed6-248742eab8eb")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/c2ff28aa-a0f2-4a89-9a60-62d08b111b12"
+					(reference "J5")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C")
 		(at 102.87 181.61 0)
 		(unit 1)
@@ -7452,25 +8715,25 @@
 		)
 	)
 	(group "5V Boost TPS613222ADBZ"
-		(uuid "c44b4233-c108-4744-be82-25c11153165a")
+		(uuid "c44b4233-c108-4744-be82-25c11153165b")
 		(lib_id "Library:5V Boost TPS613222ADBZ")
 		(members "01083c63-ba25-48c9-b27b-caf93458f60c" "04c9d2d5-f6e0-457d-b9be-a52cb7061d7d"
 			"05126eed-77df-4554-a978-4ec69a96e79b" "0e50fb23-d8f3-4991-8067-e55211285e55"
 			"115efad9-6298-44f2-aa10-6d75fd4ff61f" "12413106-fa23-44df-8048-e91d618386cb"
-			"14947983-38b7-453a-a70c-76cd76293bed" "2782b409-f722-493f-817d-d19e4de81822"
-			"2ac8d321-7c89-41e5-a576-3bbb20dec863" "2eeb1dd6-b0f1-4fcc-83de-4d8db651dbba"
-			"330fdeb2-c49d-4f4a-8bf6-3b76e88c5e73" "36c79926-676e-4aa9-9a67-27ad008bd6b0"
-			"38b2c436-f720-4723-b82a-04b91d6fe175" "45d3e720-796d-471d-afd4-c6b2d9a1bdfd"
-			"4fb8006e-102e-4671-9c77-b450670fc563" "504901ea-5195-4545-97d2-df4407ae09a3"
-			"51d7401e-9223-40c8-8cac-4c48839b2e79" "538b046a-09b1-4f31-9f83-7d2ff4ecef04"
-			"5e0443d0-ea60-416a-b7e0-c40577ad85ac" "5e519403-d5e2-442b-a7b7-6a2702a99b26"
-			"8811a838-4a51-4921-b7fe-d5a8c1f248f1" "8b81a1cd-4edc-49a2-b9f1-a88108540cfc"
+			"1493afe2-607a-4734-8e31-3f808e15ecf6" "14947983-38b7-453a-a70c-76cd76293bed"
+			"2782b409-f722-493f-817d-d19e4de81822" "2ac8d321-7c89-41e5-a576-3bbb20dec863"
+			"38b2c436-f720-4723-b82a-04b91d6fe175" "4fb8006e-102e-4671-9c77-b450670fc563"
+			"504901ea-5195-4545-97d2-df4407ae09a3" "51d7401e-9223-40c8-8cac-4c48839b2e79"
+			"538b046a-09b1-4f31-9f83-7d2ff4ecef04" "5e0443d0-ea60-416a-b7e0-c40577ad85ac"
+			"5e519403-d5e2-442b-a7b7-6a2702a99b26" "8811a838-4a51-4921-b7fe-d5a8c1f248f1"
 			"8d363c4f-8d48-4a7d-bf1a-5390f2e986e8" "9364f048-a019-4715-9b4e-02b856920780"
 			"9cb2dc49-ee52-4b21-9f79-3fa642389efb" "aa3a111e-7031-4fe6-a139-95f801208e81"
-			"ac46210f-2e14-4170-8925-16b7b04e7bc6" "acf80f90-2a82-40e3-bf4d-2e13f0e6eb89"
+			"ac46210f-2e14-4170-8925-16b7b04e7bc6" "acc4ef8e-a949-4554-bb17-fa6a2d11e6d1"
+			"acf80f90-2a82-40e3-bf4d-2e13f0e6eb89" "b6431ef4-80eb-46aa-8cc8-419584bbc460"
 			"c329f727-e446-486f-90e4-c2f2e63b8b46" "c47244fc-cc71-41bf-8938-1b75fb7e414f"
-			"ce398a50-4c81-4c08-8619-b4b77ecd2f8c" "e72f689f-73b0-4a0c-a0bc-7f7d403a89ad"
-			"f2a256d2-afe4-4e30-ada0-56618362332c" "fbdb7a1d-dd4e-46cf-8e39-5485571848cb"
+			"ce398a50-4c81-4c08-8619-b4b77ecd2f8c" "d2b9675a-f727-45bc-aefc-fee8eb43deff"
+			"e72f689f-73b0-4a0c-a0bc-7f7d403a89ad" "f2a256d2-afe4-4e30-ada0-56618362332c"
+			"fbdb7a1d-dd4e-46cf-8e39-5485571848cb"
 		)
 	)
 )

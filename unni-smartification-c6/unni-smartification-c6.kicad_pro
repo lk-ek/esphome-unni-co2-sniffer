@@ -156,9 +156,9 @@
       },
       "diff_pair_dimensions": [
         {
-          "gap": 0.15,
-          "via_gap": 0.2,
-          "width": 0.15
+          "gap": 0.0,
+          "via_gap": 0.0,
+          "width": 0.0
         },
         {
           "gap": 0.2,
@@ -247,8 +247,8 @@
         "zones_intersect": "error"
       },
       "rules": {
-        "max_error": 0.005,
-        "min_clearance": 0.15,
+        "max_error": 0.02,
+        "min_clearance": 0.05,
         "min_connection": 0.0,
         "min_copper_edge_clearance": 0.3,
         "min_groove_width": 0.0,
@@ -312,6 +312,7 @@
         }
       ],
       "track_widths": [
+        0.0,
         0.15,
         0.2,
         0.25,
@@ -351,8 +352,8 @@
       },
       "via_dimensions": [
         {
-          "diameter": 0.5,
-          "drill": 0.2
+          "diameter": 0.0,
+          "drill": 0.0
         },
         {
           "diameter": 0.6,
@@ -1151,7 +1152,7 @@
         "uuid": "15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51"
       }
     ],
-    "used_designators": "L1,R1-2,R6,R9-10,R12-13,C3-6,C14,Q2,Q4,D1,#PWR1-3,#PWR10,#PWR22-23,#PWR28,#PWR30,#PWR37,#PWR40,#PWR42,#PWR49,#PWR55,#PWR104,#PWR106,#PWR110,J2-3,U2,U4,#FLG1-2",
+    "used_designators": "L1,R1-2,R6,R9-10,R12-13,C3-6,C14,Q2,Q4,D1,#PWR1-3,#PWR10,#PWR15,#PWR22-23,#PWR27-28,#PWR30,#PWR37,#PWR40,#PWR42,#PWR49,#PWR55,#PWR104,#PWR106,#PWR110,J2-3,J5-9,J11-28,U2,U4,#FLG1-5",
     "variants": []
   },
   "sheets": [
