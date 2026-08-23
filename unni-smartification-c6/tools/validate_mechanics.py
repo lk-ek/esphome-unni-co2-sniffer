@@ -17,10 +17,10 @@ PCB = ROOT / "unni-smartification-c6.kicad_pcb"
 S = PCB.read_text(errors="strict")
 
 TOL = 1e-6
-LEFT = 222.65
-TOP = 78.2
-RIGHT = 241.65
-REF_BOTTOM = 96.2
+LEFT = 72.65
+TOP = 123.2
+RIGHT = 91.65
+REF_BOTTOM = 141.2
 
 
 def fail(msg: str) -> None:
@@ -66,12 +66,40 @@ def rectangle_from_lines(group: list[tuple[float, float, float, float]], name: s
         fail(f"{name}: Edge.Cuts outline is not a closed axis-aligned rectangle")
     return x1, y1, x2, y2
 
-usb_lines = [ln for ln in lines if max(ln[0], ln[2]) < 250.0]
-esp_lines = [ln for ln in lines if min(ln[0], ln[2]) > 250.0]
 if len(lines) != 8:
     fail(f"expected 8 Edge.Cuts lines for two PCB islands, found {len(lines)}")
 
-x1, y1, x2, y2 = rectangle_from_lines(usb_lines, "USB board")
+# Identify the two rectangular islands by connectivity rather than absolute X
+# position so the complete layout can be moved around the drawing sheet without
+# weakening the mechanical checks.
+def connected_components(edge_lines):
+    remaining = list(edge_lines)
+    comps = []
+    while remaining:
+        comp = [remaining.pop()]
+        changed = True
+        while changed:
+            changed = False
+            pts = {(l[0], l[1]) for l in comp} | {(l[2], l[3]) for l in comp}
+            keep = []
+            for ln in remaining:
+                if (ln[0], ln[1]) in pts or (ln[2], ln[3]) in pts:
+                    comp.append(ln)
+                    changed = True
+                else:
+                    keep.append(ln)
+            remaining = keep
+        comps.append(comp)
+    return comps
+
+components = connected_components(lines)
+if sorted(len(c) for c in components) != [4, 4]:
+    fail(f"expected two four-edge PCB islands, got component sizes {[len(c) for c in components]}")
+rects = [(rectangle_from_lines(c, "PCB island"), c) for c in components]
+usb_rect, usb_lines = next((r, c) for r, c in rects if close(r[2]-r[0], 19.0))
+esp_rect, esp_lines = next((r, c) for r, c in rects if close(r[2]-r[0], 46.0) and close(r[3]-r[1], 32.0))
+
+x1, y1, x2, y2 = usb_rect
 if not (close(x1, LEFT) and close(y1, TOP) and close(x2, RIGHT)):
     fail(f"USB fixed top/side datum changed: got {(x1, y1, x2)}, expected {(LEFT, TOP, RIGHT)}")
 if y2 + TOL < REF_BOTTOM:
@@ -79,9 +107,16 @@ if y2 + TOL < REF_BOTTOM:
 if not close(x2 - x1, 19.0):
     fail(f"USB board width is {x2-x1:g} mm, expected 19.0 mm")
 
-ex1, ey1, ex2, ey2 = rectangle_from_lines(esp_lines, "ESP board")
+ex1, ey1, ex2, ey2 = esp_rect
 if not (close(ex2-ex1, 46.0) and close(ey2-ey1, 32.0)):
     fail(f"ESP board envelope is {ex2-ex1:g} x {ey2-ey1:g} mm, expected 46 x 32 mm")
+
+# A4 drawing sheet is 297 x 210 mm in PCB coordinates. Keep both physical
+# board outlines inside the sheet; the USB receptacle itself may protrude ~1 mm
+# past its PCB top edge as required by the enclosure.
+for name, r in (("USB board", usb_rect), ("ESP board", esp_rect)):
+    if r[0] < 0 or r[1] < 0 or r[2] > 297 or r[3] > 210:
+        fail(f"{name} outline lies outside A4 sheet: {r}")
 
 # Confirm driving fixed-length constraints are present in the 10.99 master.
 # The generated KiCad 10.0.5 compatibility tree deliberately strips native

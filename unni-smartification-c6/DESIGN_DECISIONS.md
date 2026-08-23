@@ -51,3 +51,5 @@ The ESP sheet is now included in SPICE because MCP73831 and TPS63031 live there.
 ## KiCad 10.0.5 fabrication compatibility target (2026-08-23)
 
 KiCad 10.99 remains the canonical editable source because the PCB uses native geometric constraints and generated via-stitch metadata. A generated KiCad 10.0.5 compatibility tree is used for stable-version-only plugins and fabrication/export workflows. `tools/make_kicad_10_0_5_copy.py` removes unsupported editing metadata, converts footprint placement transforms to the 10.0.x representation, preserves explicit generated vias, and rewrites file-format headers to the stable KiCad 10 format. The compatibility copy is disposable and must not become a second editable source of truth.
+
+- Both PCB islands remain in one PCB document for visible inter-board connectivity, but are positioned wholly inside the A4 drawing sheet. Manufacturing exports are generated per island by `tools/export_jlc_gerbers.py`; the script uses the stable-KiCad compatibility conversion and therefore does not require maintaining separate editable PCB files.

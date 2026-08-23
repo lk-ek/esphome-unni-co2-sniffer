@@ -85,31 +85,60 @@ m=re.search(r'\(general\s+\(thickness\s+([0-9.]+)\)',s)
 if not m or not close(float(m.group(1)),1.0): die('board finished-thickness target is not 1.0 mm')
 
 
-# Both physical board islands must carry GND on both inner layers.
-for required in (
-    '(xy 260.3 80.3) (xy 305.7 80.3) (xy 305.7 111.7) (xy 260.3 111.7)',
-    '(xy 241.65 78.2) (xy 222.6 78.2) (xy 222.65 143.2) (xy 241.65 143.2)',
-):
-    found=False
-    for zm in re.finditer(r'\(zone\b',s):
-        st=zm.start(); depth=0; ins=False; esc=False; end=None
-        for i in range(st,len(s)):
-            c=s[i]
-            if ins:
-                if esc: esc=False
-                elif c=='\\': esc=True
-                elif c=='"': ins=False
-            else:
-                if c=='"': ins=True
-                elif c=='(': depth+=1
-                elif c==')':
-                    depth-=1
-                    if depth==0:
-                        end=i+1; break
-        b=s[st:end]
-        if '(net "GND")' in b and '(layers "In1.Cu" "In2.Cu")' in b and required in b:
-            found=True; break
-    if not found: die('missing dual-inner-layer GND plane on one board island')
+# Both physical board islands must carry a GND zone on both inner layers.
+# Detect this geometrically rather than hard-coding absolute sheet coordinates so
+# the two-board layout can be translated on the drawing sheet.
+def balanced_end(text,start):
+    depth=0; ins=False; esc=False
+    for i in range(start,len(text)):
+        c=text[i]
+        if ins:
+            if esc: esc=False
+            elif c=='\\': esc=True
+            elif c=='"': ins=False
+        else:
+            if c=='"': ins=True
+            elif c=='(': depth+=1
+            elif c==')':
+                depth-=1
+                if depth==0: return i+1
+    die('unterminated S-expression')
+
+edge_lines=[]
+for gm in re.finditer(r'\(gr_line\b',s):
+    b=s[gm.start():balanced_end(s,gm.start())]
+    if '(layer "Edge.Cuts")' not in b: continue
+    m=re.search(r'\(start ([0-9.-]+) ([0-9.-]+)\).*?\(end ([0-9.-]+) ([0-9.-]+)\)',b,re.S)
+    if m: edge_lines.append(tuple(map(float,m.groups())))
+if len(edge_lines)!=8: die(f'expected 8 Edge.Cuts lines, got {len(edge_lines)}')
+# Rectangles are axis aligned; unique x/y extrema split naturally into the two islands.
+pts=[(l[0],l[1]) for l in edge_lines]+[(l[2],l[3]) for l in edge_lines]
+# connected components by shared endpoints
+remaining=list(edge_lines); rects=[]
+while remaining:
+    comp=[remaining.pop()]; changed=True
+    while changed:
+        changed=False
+        cpts={(l[0],l[1]) for l in comp}|{(l[2],l[3]) for l in comp}
+        rest=[]
+        for ln in remaining:
+            if (ln[0],ln[1]) in cpts or (ln[2],ln[3]) in cpts:
+                comp.append(ln); changed=True
+            else: rest.append(ln)
+        remaining=rest
+    xs=[v for l in comp for v in (l[0],l[2])]; ys=[v for l in comp for v in (l[1],l[3])]
+    rects.append((min(xs),min(ys),max(xs),max(ys)))
+
+zones=[]
+for zm in re.finditer(r'\(zone\b',s):
+    b=s[zm.start():balanced_end(s,zm.start())]
+    if '(net "GND")' not in b or '(layers "In1.Cu" "In2.Cu")' not in b: continue
+    xy=[tuple(map(float,m)) for m in re.findall(r'\(xy ([0-9.-]+) ([0-9.-]+)\)',b)]
+    if xy: zones.append((min(x for x,y in xy),min(y for x,y in xy),max(x for x,y in xy),max(y for x,y in xy)))
+for r in rects:
+    cx=(r[0]+r[2])/2; cy=(r[1]+r[3])/2
+    if not any(z[0]-1e-6<=cx<=z[2]+1e-6 and z[1]-1e-6<=cy<=z[3]+1e-6 for z in zones):
+        die(f'missing dual-inner-layer GND plane on board island {r}')
 
 # Ensure the custom manufacturing-rule file contains the via/pad distinction.
 dru=(ROOT/'unni-smartification-c6.kicad_dru').read_text()

@@ -106,6 +106,11 @@ After opening a revision in PCB Editor, **refill all zones (`B`) before trusting
 
 See `MECHANICAL.md`. The measured USB-board top datum, hole locations and USB overhang are fixed; the board may extend only toward its rear/bottom direction. The USB-side B.Cu component-clearance window is limited to the first 19 x 18 mm, with an explicit placement keepout below it.
 
+
+## PCB sheet placement
+
+Both physical PCB islands are kept in the same A4 PCB drawing sheet, but the complete layout is translated into the lower-left half so neither board outline crosses the sheet boundary. The USB/power board top-left datum is currently at `(72.65, 123.2)` mm; the ESP/interface board spans `(110, 125)` to `(156, 157)` mm. This translation is purely a drawing-sheet placement change: all copper, footprints, zones, dimensions, generated via-stitch regions and native 10.99 geometric constraints retain their relative geometry. `tools/validate_mechanics.py` verifies both board envelopes and A4 containment.
+
 ## KiCad 10.0.5 compatibility export
 
 The editable project master targets KiCad 10.99 because it uses native geometric PCB constraints and generated via-stitch metadata. Some fabrication/export plugins are only available for stable KiCad 10.0.5, so the repository includes a reproducible compatibility converter instead of downgrading the master.
@@ -125,3 +130,19 @@ KICAD_10_0_5_CLI=/path/to/kicad-cli tools/validate_kicad_10_0_5_export.sh
 ```
 
 The converter removes only 10.99 editing/link metadata that stable 10.0.x cannot safely consume: native geometric constraint objects, generated via-stitch descriptors and design-block `lib_id` links attached to instantiated groups. The group members themselves remain local in the schematic/PCB, already-instantiated vias remain explicit PCB vias, footprint placements are translated to the 10.0.x representation, and the mechanical geometry continues to be guarded by `tools/validate_mechanics.py` in the master project.
+
+## Per-board JLCPCB Gerber export
+
+The design intentionally keeps both physical boards in one `.kicad_pcb`, while JLCPCB fabrication needs one closed board outline per order. Generate separate fabrication packages with:
+
+```sh
+KICAD_10_0_X_CLI=/path/to/KiCad-10.0.x/kicad-cli \
+  python3 tools/export_jlc_gerbers.py
+```
+
+The script first creates a temporary stable-KiCad compatibility copy, identifies the 19 mm USB/power island and the 46 x 32 mm ESP/interface island from `Edge.Cuts`, then creates isolated temporary boards and exports each with KiCad 10.0.x. Outputs are written to `dist/jlc/`:
+
+- `unni-usb-power-jlc-gerbers.zip`
+- `unni-esp-interface-jlc-gerbers.zip`
+
+Each ZIP contains the four copper layers, front/back solder mask, front/back silkscreen, `Edge.Cuts`, Gerber job file and separate PTH/NPTH Excellon drill files. Paste layers are intentionally omitted from the bare-PCB fabrication ZIPs. Regenerate the packages after every PCB change.
