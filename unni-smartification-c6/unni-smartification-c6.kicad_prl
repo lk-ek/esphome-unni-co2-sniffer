@@ -138,18 +138,6 @@
   "project": {
     "files": [
       {
-        "name": "unni-smartification-c6.kicad_sch",
-        "open": true,
-        "window": {
-          "display": 0,
-          "maximized": true,
-          "pos_x": 524,
-          "pos_y": 261,
-          "size_x": 1512,
-          "size_y": 948
-        }
-      },
-      {
         "name": "unni-smartification-c6.kicad_pcb",
         "open": true,
         "window": {
@@ -159,6 +147,18 @@
           "pos_y": 273,
           "size_x": 1800,
           "size_y": 1129
+        }
+      },
+      {
+        "name": "unni-smartification-c6.kicad_sch",
+        "open": true,
+        "window": {
+          "display": 0,
+          "maximized": true,
+          "pos_x": 524,
+          "pos_y": 261,
+          "size_x": 1512,
+          "size_y": 948
         }
       }
     ]

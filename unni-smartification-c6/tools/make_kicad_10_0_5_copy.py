@@ -5,7 +5,7 @@ The 10.99 master intentionally uses features that KiCad 10.0.5 cannot parse:
   * PCB geometric constraint objects
   * PCB generated via-stitch objects
   * footprint-level transform blocks
-  * 2026 file-format version headers
+  * 10.99/11-development file-format headers
 
 The compatibility export preserves the actual instantiated copper/vias/footprints and
 removes only the 10.99 editing metadata.  The generated copy is intended for stable
@@ -26,9 +26,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-PCB_TARGET_VERSION = "20241229"
-SCH_TARGET_VERSION = "20250114"
-TARGET_GENERATOR_VERSION = "10.0.5"
+PCB_TARGET_VERSION = "20260206"
+SCH_TARGET_VERSION = "20260306"
+TARGET_GENERATOR_VERSION = "10.0"
 PROJECT_BASENAME = "unni-smartification-c6"
 
 
@@ -127,6 +127,12 @@ def convert_pcb(path: Path) -> dict[str, int]:
     text = _drop_dangling_group_members(text, n_constraints_ids + n_generated_ids)
     text, n_transforms = _convert_footprint_transforms(text)
 
+    # KiCad 10.99 adds frequency-dependent dielectric metadata that stable 10.0
+    # does not understand. Preserve thickness/material/epsilon_r/loss_tangent and
+    # drop only these two nightly-only fields.
+    text, n_specfreq = re.subn(r"\n\s*\(spec_frequency\s+[^)]+\)", "", text)
+    text, n_dmodel = re.subn(r"\n\s*\(dielectric_model\s+[^)]+\)", "", text)
+
     text, nver = re.subn(r"\(version\s+\d+\)", f"(version {PCB_TARGET_VERSION})", text, count=1)
     text, ngen = re.subn(
         r'\(generator_version\s+"[^"]+"\)',
@@ -149,11 +155,24 @@ def convert_pcb(path: Path) -> dict[str, int]:
         "generated_via_stitch_removed": n_generated,
         "footprint_transforms_converted": n_transforms,
         "explicit_vias_preserved": converted_vias,
+        "spec_frequency_removed": n_specfreq,
+        "dielectric_model_removed": n_dmodel,
     }
 
 
-def convert_schematic(path: Path) -> None:
+def convert_schematic(path: Path) -> dict[str, int]:
     text = path.read_text(encoding="utf-8")
+
+    # Stable KiCad 10 understands body_style, passthrough, in_pos_files, etc.
+    # Do NOT strip those (that would be a KiCad 10 -> 9 conversion). Only drop
+    # constructs introduced on the 10.99/11 development line.
+    removed = {}
+    for form in ("ellipse", "ellipse_arc", "net_chain", "net_chains"):
+        text, _ids, n = _remove_top_level_forms(text, form)
+        removed[form] = n
+    text, n_locked = re.subn(r"\n\s*\(locked\s+(?:yes|no)\)", "", text)
+    removed["locked"] = n_locked
+
     text, nver = re.subn(r"\(version\s+\d+\)", f"(version {SCH_TARGET_VERSION})", text, count=1)
     text, ngen = re.subn(
         r'\(generator_version\s+"[^"]+"\)',
@@ -164,6 +183,7 @@ def convert_schematic(path: Path) -> None:
     if nver != 1 or ngen != 1:
         raise ValueError(f"failed to rewrite schematic header in {path}")
     path.write_text(text, encoding="utf-8")
+    return removed
 
 
 def sanitize_project_local_state(root: Path) -> None:
@@ -205,8 +225,9 @@ def validate_with_10_0_5(root: Path, cli: Path) -> None:
     if ver.returncode != 0:
         raise RuntimeError(ver.stderr or ver.stdout)
     version = ver.stdout.strip()
-    if not version.startswith("10.0.5"):
-        raise RuntimeError(f"expected KiCad 10.0.5 CLI, got {version!r} from {cli}")
+    if not version.startswith("10.0"):
+        
+        raise RuntimeError(f"expected KiCad 10.0.x CLI, got {version!r} from {cli}")
 
     val = root / "validation-kicad-10.0.5"
     if val.exists():
@@ -289,6 +310,7 @@ def main() -> int:
             "10.99 geometric constraints removed; geometry is preserved and checked by project validators.",
             "10.99 generated via-stitch descriptors removed; already-instantiated explicit vias are preserved.",
             "10.99 footprint transforms converted to KiCad 10.0.x footprint placements.",
+            "10.99 stackup spec_frequency/dielectric_model metadata removed; physical stackup values preserved.",
             "Do not edit this compatibility tree as the project master.",
         ],
     }
@@ -302,7 +324,8 @@ def main() -> int:
         "Removed editing-only 10.99 features:\n"
         "- native PCB geometric constraint objects\n"
         "- generated via-stitch descriptors (explicit generated vias remain)\n"
-        "- 10.99 footprint transform wrappers (converted to legacy placements)\n"
+        "- 10.99 footprint transform wrappers (converted to KiCad 10 placements)\n"
+        "- 10.99 stackup frequency/model metadata (thickness/material/Dk preserved)\n"
     )
 
     cli = find_cli(args.kicad_cli)
@@ -315,8 +338,8 @@ def main() -> int:
         # Opportunistically tell the user whether the discovered CLI is the right one,
         # but do not make conversion depend on a local install.
         cp = run([str(cli), "--version"], output)
-        if cp.returncode == 0 and cp.stdout.strip().startswith("10.0.5"):
-            print(f"KiCad 10.0.5 CLI found at {cli}; use --validate to smoke-test the export.")
+        if cp.returncode == 0 and cp.stdout.strip().startswith("10.0"):
+            print(f"KiCad 10.0.x CLI found at {cli}; use --validate to smoke-test the export.")
 
     print(f"Created KiCad 10.0.5 compatibility project: {output}")
     for name, st in stats.items():
