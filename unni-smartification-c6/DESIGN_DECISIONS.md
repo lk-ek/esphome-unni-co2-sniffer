@@ -30,3 +30,11 @@ The project targets inexpensive JLCPCB 1 oz fabrication without routing at the f
 Predefined routing widths are 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00 and 1.20 mm. Net classes select useful defaults from these presets: Signal 0.20 mm, Sensitive 0.20 mm with 0.25 mm clearance, USB 0.20/0.20 mm width/gap, +3V3 0.40 mm, VBUS/+5V/UNNI_AC 0.50 mm, battery/SYS/BOOST_IN 0.80 mm, switch nodes 0.80 mm with extra clearance, and GND tracks 0.50 mm. USB width/gap is a practical routing default only; if controlled impedance is ordered, it must be recalculated for the selected JLCPCB stackup.
 
 Copper zones default to 0.25 mm clearance, 0.20 mm minimum copper thickness, 0.30 mm thermal gap, 0.40 mm thermal spokes and 1 mm² minimum island area. Existing copper zones are normalized to these values. `unni-smartification-c6.kicad_dru` adds DRC guards for zone clearance and per-netclass minimum/preferred widths.
+
+## Rules / net-label cleanup (2026-08-23)
+
+The PCB rules were simplified after the power stages moved onto the ESP board.  Netclass trace widths remain the preferred interactive-router defaults, but hard minimum-width rules for 3V3, 5V, battery/SYS, switching and GND were removed because they incorrectly rejected the short neck-downs required at fine-pitch IC pads.  Switching and Battery_SYS clearances are 0.20 mm so the TPS63031 package itself is legal; zone geometry still defaults to 0.25 mm clearance, with a 0.20 mm hard DRC floor to avoid 0.2499 mm rounding false positives.  The general copper-edge hard minimum is 0.25 mm.
+
+Physical wire-pad aliases that were electrically identical to existing nets were removed: CONN_GND, CONN_VBUS, CONN_USB_P, CONN_USB_N and CONN_+BATT now use GND, VBUS, USB_RAW_P, USB_RAW_N and +BATT directly.  Connector-side USB nets before U4 remain deliberately named USBPort_P/USBPort_N; the protected side remains USB_RAW_P/USB_RAW_N.
+
+The ESP sheet is now included in SPICE because MCP73831 and TPS63031 live there.  Physical solder-wire pads and the ESP32-C6 module are explicitly excluded from simulation, preserving the complete power-stage simulation without placeholder devices.

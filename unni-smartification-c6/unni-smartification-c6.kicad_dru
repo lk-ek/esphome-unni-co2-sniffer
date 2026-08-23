@@ -1,51 +1,30 @@
 (version 1)
 
-# Conservative JLCPCB low-cost baseline for 1 oz copper.
-# These are design targets, intentionally looser than JLCPCB's absolute 4/4 mil capability.
-(rule "JLCPCB zone clearance"
-  (constraint clearance (min 0.25mm))
+# Conservative JLCPCB baseline.  Zone objects are normally configured for 0.25 mm
+# clearance; this 0.20 mm hard floor avoids 0.2499 mm rounding false positives while
+# still catching genuinely too-close copper.
+(rule "JLCPCB zone hard minimum"
+  (constraint clearance (min 0.20mm))
   (condition "(A.Type == 'Zone') || (B.Type == 'Zone')")
 )
 
-# Net-class routing guards.  The netclass default width is the preferred/interactive width;
-# these rules only prevent accidentally routing a class much narrower than intended.
-(rule "Signal width"
-  (constraint track_width (min 0.15mm) (opt 0.20mm))
-  (condition "A.NetClass == 'Signal'")
-)
-
-(rule "Sensitive width"
-  (constraint track_width (min 0.15mm) (opt 0.20mm))
-  (condition "A.NetClass == 'Sensitive'")
-)
-
-(rule "USB width"
+# Only rules that can be enforced without rejecting valid IC pad escapes live here.
+# Preferred trace widths and vias are defined by the netclasses in the project file.
+# Power/switch nets intentionally do NOT have a global hard minimum track width:
+# short neck-downs at fine-pitch IC pads are required, after which the interactive
+# router defaults to the wider netclass width.
+(rule "USB routing"
   (constraint track_width (min 0.15mm) (opt 0.20mm) (max 0.30mm))
   (constraint diff_pair_gap (min 0.15mm) (opt 0.20mm))
   (condition "A.NetClass == 'USB'")
 )
 
-(rule "3V3 power width"
-  (constraint track_width (min 0.30mm) (opt 0.40mm))
-  (condition "A.NetClass == 'Power_3V3'")
+(rule "Signal hard minimum"
+  (constraint track_width (min 0.15mm) (opt 0.20mm))
+  (condition "A.NetClass == 'Signal'")
 )
 
-(rule "5V power width"
-  (constraint track_width (min 0.40mm) (opt 0.50mm))
-  (condition "A.NetClass == 'Power_5V'")
-)
-
-(rule "Battery SYS width"
-  (constraint track_width (min 0.60mm) (opt 0.80mm))
-  (condition "A.NetClass == 'Battery_SYS'")
-)
-
-(rule "Switch-node width"
-  (constraint track_width (min 0.50mm) (opt 0.80mm))
-  (condition "A.NetClass == 'Switching'")
-)
-
-(rule "Ground track width"
-  (constraint track_width (min 0.40mm) (opt 0.50mm))
-  (condition "A.NetClass == 'Ground'")
+(rule "Sensitive hard minimum"
+  (constraint track_width (min 0.15mm) (opt 0.20mm))
+  (condition "A.NetClass == 'Sensitive'")
 )

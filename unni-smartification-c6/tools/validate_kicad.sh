@@ -48,7 +48,7 @@ checks={
  ('U3','1'):'+5V', ('U3','3'):'GND',
  ('D3','2'):'VBUS', ('D3','1'):'UNNI_AC', ('D4','2'):'+5V', ('D4','1'):'UNNI_AC',
  ('U10','17'):'/ESP32-C6 + Auxiliary/USB_N', ('U10','18'):'/ESP32-C6 + Auxiliary/USB_P',
- ('J1','A7'):'USB_RAW_N', ('J1','A6'):'USB_RAW_P',
+ ('J1','A7'):'USBPort_N', ('J1','A6'):'USBPort_P',
  ('U10','12'):'BAT_ADC', ('U10','13'):'USB_ADC', ('U10','5'):'BAT_TEMP_ADC', ('U10','6'):'BACKLIGHT_ADC',
  ('U10','27'):'BOOST_CMD', ('U10','19'):'CHARGE_STAT',
  ('R12','1'):'CHARGE_STAT', ('C9','1'):'UNNI_AC', ('C20','1'):'BAT_ADC', ('C21','1'):'BAT_TEMP_ADC', ('C33','1'):'BACKLIGHT_ADC',
@@ -79,7 +79,7 @@ import re
 from pathlib import Path
 s=Path('validation/erc.rpt').read_text(errors='replace')
 cats=re.findall(r'^\[([^]]+)\]:',s,re.M)
-allowed={'lib_symbol_issues','footprint_link_issues','same_local_global_label'}
+allowed={'lib_symbol_issues','footprint_link_issues'}
 bad=sorted(set(cats)-allowed)
 if bad:
     raise SystemExit('Unexpected electrical ERC categories: '+', '.join(bad))

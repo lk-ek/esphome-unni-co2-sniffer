@@ -1,43 +1,64 @@
 .title KiCad schematic
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/AO3400A.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/AO3401A.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/MCP73831.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/SS14.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/TPS613222A.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/TPS63031.lib"
-.include "/mnt/data/unni_cfg/unni-smartification-c6/spice/models/USB_HOTPLUG.lib"
-R11 Net-_U1-STAT_ CHARGE_STAT 150k
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/AO3400A.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/AO3401A.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/MCP73831.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/SS14.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/TPS613222A.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/TPS63031.lib"
+.include "/mnt/data/unni_fix/unni-smartification-c6/spice/models/USB_HOTPLUG.lib"
 R1 Net-_J1-CC1_ GND 5.1k
-R6 GND Net-_Q1-G_ 1Meg
-L1 Net-_U2-L1_ Net-_U2-L2_ 1.5u
 XQ2 Net-_Q2-G_ +BATT /USB_+_Power/BOOST_IN AO3401A
-C6 +3V3 GND 10u
 R9 Net-_Q3-G_ GND 1Meg
-XD1 SYS VBUS SS14_SUB
 XU3 +5V Net-_U3-SW_ GND TPS613222A
-R12 CHARGE_STAT GND 220k
-R5 VBUS Net-_Q1-G_ 100k
 C8 +5V GND 22u
 R13 GND VBUS 47k
 R8 BOOST_CMD Net-_Q3-G_ 10k
-XU1 Net-_U1-STAT_ GND +BATT VBUS Net-_U1-PROG_ MCP73831
-C5 +3V3 GND 10u
 R2 Net-_J1-CC2_ GND 5.1k
-C2 +BATT GND 4.7u
-XQ1 Net-_Q1-G_ SYS +BATT AO3401A
 XQ3 Net-_Q3-G_ GND Net-_Q2-G_ AO3400A
 C9 UNNI_AC GND 1u
-R3 Net-_U1-PROG_ GND 3.3k
 XD4 UNNI_AC +5V SS14_SUB
 R7 Net-_Q2-G_ +BATT 1Meg
-C1 VBUS GND 4.7u
-C4 SYS GND 100n
-XU2 +3V3 Net-_U2-L2_ GND Net-_U2-L1_ SYS SYS GND SYS GND +3V3 GND TPS63031
 L2 /USB_+_Power/BOOST_IN Net-_U3-SW_ 2.2u
 XQ4 VBUS GND Net-_Q3-G_ AO3400A
 C7 /USB_+_Power/BOOST_IN GND 10u
 XD3 UNNI_AC VBUS SS14_SUB
+R12 CHARGE_STAT GND 220k
+R52 TOUCH_TRIGGER GND 100k
+R34 BAT_TEMP_EXCITE BAT_TEMP_ADC 10k
+R41 CONN_SCL CO2_SCL 10k
+C20 BAT_ADC GND 100n
+R11 Net-_U1-STAT_ CHARGE_STAT 150k
+C5 +3V3 GND 10u
+C2 +BATT GND 4.7u
+R5 VBUS Net-_Q1-G_ 100k
+R30 +BATT BAT_ADC 1Meg
+R23 /ESP32-C6_+_Auxiliary/USB_P USB_RAW_P 22
+R33 USB_ADC GND 220k
+XQ1 Net-_Q1-G_ SYS +BATT AO3401A
+C1 VBUS GND 4.7u
+R42 CONN_RT RT 10k
+R51 BACKLIGHT_ADC GND 220k
+XU2 +3V3 Net-_U2-L2_ GND Net-_U2-L1_ SYS SYS GND SYS GND +3V3 GND TPS63031
+C21 BAT_TEMP_ADC GND 100n
 C3 SYS GND 10u
+XQ10 TOUCH_TRIGGER GND Net-_Q10-D_ AO3400A
+R6 GND Net-_Q1-G_ 1Meg
+R22 /ESP32-C6_+_Auxiliary/USB_N USB_RAW_N 22
+R40 CONN_SDA CO2_SDA 10k
+C6 +3V3 GND 10u
+R43 CONN_RH RH 10k
+C4 SYS GND 100n
+C10 +3V3 GND 10u
+R20 +3V3 /ESP32-C6_+_Auxiliary/ESP_EN 10k
+R31 BAT_ADC GND 1Meg
+C11 +3V3 GND 100n
+XD1 SYS VBUS SS14_SUB
+R21 +3V3 /ESP32-C6_+_Auxiliary/BOOT_GPIO9 10k
+XU1 Net-_U1-STAT_ GND +BATT VBUS Net-_U1-PROG_ MCP73831
+L1 Net-_U2-L1_ Net-_U2-L2_ 2.2u
+R50 CONN_LED+ BACKLIGHT_ADC 330k
+R32 VBUS USB_ADC 220k
+R3 Net-_U1-PROG_ GND 3.3k
 R301 UNNI_AC GND 100
 BBOOSTEXTRA /USB_+_Power/BOOST_IN GND I={min(max((0.30/max(V(/USB_+_Power/BOOST_IN),1.0)-V(/USB_+_Power/BOOST_IN)/56)*min(max(V(+5V)/4.5,0),1),0),1.0)}
 V3 BOOST_CMD GND PULSE( 0 3.3 0.5 5m 5m 4.5 6.5 ) 

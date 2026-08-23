@@ -37,7 +37,7 @@
 	(sheet
 		(at 165.1 50.8)
 		(size 101.6 63.5)
-		(exclude_from_sim yes)
+		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
