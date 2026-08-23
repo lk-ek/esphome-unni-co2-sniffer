@@ -1,6 +1,6 @@
 {
   "board": {
-    "active_layer": 0,
+    "active_layer": 5,
     "active_layer_preset": "",
     "auto_track_width": true,
     "hidden_netclasses": [],
@@ -55,7 +55,7 @@
       "grid_items",
       "via_stitching"
     ],
-    "visible_layers": "ffffffff_ffffffff_ffffffff_ffffffff",
+    "visible_layers": "00000000_00000000_00000008_82000027",
     "zone_display_mode": 0
   },
   "git": {
@@ -136,7 +136,32 @@
   },
   "open_jobsets": [],
   "project": {
-    "files": []
+    "files": [
+      {
+        "name": "unni-smartification-c6.kicad_sch",
+        "open": true,
+        "window": {
+          "display": 0,
+          "maximized": true,
+          "pos_x": 524,
+          "pos_y": 261,
+          "size_x": 1512,
+          "size_y": 948
+        }
+      },
+      {
+        "name": "unni-smartification-c6.kicad_pcb",
+        "open": true,
+        "window": {
+          "display": 0,
+          "maximized": true,
+          "pos_x": 42,
+          "pos_y": 273,
+          "size_x": 1800,
+          "size_y": 1129
+        }
+      }
+    ]
   },
   "schematic": {
     "hierarchy_collapsed": [],

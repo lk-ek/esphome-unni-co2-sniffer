@@ -176,42 +176,7 @@
           "width": 0.25
         }
       ],
-      "drc_exclusions": [
-        {
-          "marker": {
-            "error_type": "DRCET_HOLE_CLEARANCE",
-            "items": [
-              {
-                "value": "1064ce78-2d0f-4473-a036-47d11903c479"
-              },
-              {
-                "value": "be402d81-e0af-40f3-812b-32aa5bd80b6e"
-              }
-            ],
-            "position": {
-              "x_nm": "228250000",
-              "y_nm": "84000000"
-            }
-          }
-        },
-        {
-          "marker": {
-            "error_type": "DRCET_HOLE_CLEARANCE",
-            "items": [
-              {
-                "value": "500b18d9-e620-4745-9893-55d5a23da4fe"
-              },
-              {
-                "value": "121ace04-21c3-4211-8d38-bdb626995b15"
-              }
-            ],
-            "position": {
-              "x_nm": "234050000",
-              "y_nm": "84000000"
-            }
-          }
-        }
-      ],
+      "drc_exclusions": [],
       "meta": {
         "version": 3
       },

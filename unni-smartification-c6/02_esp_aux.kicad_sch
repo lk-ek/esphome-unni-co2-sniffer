@@ -4640,12 +4640,6 @@
 		(uuid "001b858f-38bf-419a-a69b-d6f7fd468474")
 	)
 	(junction
-		(at 292.1 163.83)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "008e9a57-d312-40f7-b896-5aad8139dd1c")
-	)
-	(junction
 		(at 289.56 228.6)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4728,12 +4722,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "60f68658-0955-47b2-90f7-ac461a3bc932")
-	)
-	(junction
-		(at 317.5 156.21)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "61ac6f31-2c8e-4b22-97a1-c35bb67c3cce")
 	)
 	(junction
 		(at 52.07 139.7)
@@ -4874,22 +4862,10 @@
 		(uuid "d742c2d9-f747-4834-9c90-ee0172482cf9")
 	)
 	(junction
-		(at 292.1 156.21)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "ec76192f-4e90-4cfb-bcbd-2586401c886f")
-	)
-	(junction
 		(at 298.45 228.6)
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "f41cf209-d6ec-4e9a-abc6-fd0eb8ff725c")
-	)
-	(junction
-		(at 317.5 163.83)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "f6da1e15-7700-4c2c-b026-23cdbd7d3185")
 	)
 	(junction
 		(at 67.31 167.64)
@@ -5067,16 +5043,6 @@
 	)
 	(wire
 		(pts
-			(xy 308.61 163.83) (xy 317.5 163.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "1360483b-9bdb-47f3-bd21-da43fa1cde18")
-	)
-	(wire
-		(pts
 			(xy 320.04 177.8) (xy 330.2 177.8)
 		)
 		(stroke
@@ -5167,7 +5133,7 @@
 	)
 	(wire
 		(pts
-			(xy 292.1 163.83) (xy 300.99 163.83)
+			(xy 289.56 163.83) (xy 300.99 163.83)
 		)
 		(stroke
 			(width 0)
@@ -5304,16 +5270,6 @@
 			(type default)
 		)
 		(uuid "29b73b1e-b0f4-4b34-9d9f-991b18da9479")
-	)
-	(wire
-		(pts
-			(xy 308.61 148.59) (xy 317.5 148.59)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "2c2c88ba-e578-4239-a9ff-ea585885a8b8")
 	)
 	(wire
 		(pts
@@ -5737,7 +5693,7 @@
 	)
 	(wire
 		(pts
-			(xy 317.5 163.83) (xy 337.82 163.83)
+			(xy 308.61 163.83) (xy 337.82 163.83)
 		)
 		(stroke
 			(width 0)
@@ -5794,16 +5750,6 @@
 			(type default)
 		)
 		(uuid "66456887-ff25-40c9-ac4c-e4e051c7e8b9")
-	)
-	(wire
-		(pts
-			(xy 292.1 148.59) (xy 292.1 156.21)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "67826728-c0b9-4854-9d8d-bc48244a55e5")
 	)
 	(wire
 		(pts
@@ -6107,16 +6053,6 @@
 	)
 	(wire
 		(pts
-			(xy 317.5 156.21) (xy 317.5 163.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "94c46bd0-cb35-4110-87b7-1ae11177f437")
-	)
-	(wire
-		(pts
 			(xy 24.13 153.67) (xy 24.13 158.75)
 		)
 		(stroke
@@ -6307,16 +6243,6 @@
 	)
 	(wire
 		(pts
-			(xy 289.56 163.83) (xy 292.1 163.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "add7e747-e3c7-4ce8-89da-88075ad380e7")
-	)
-	(wire
-		(pts
 			(xy 135.89 36.83) (xy 138.43 36.83)
 		)
 		(stroke
@@ -6467,16 +6393,6 @@
 	)
 	(wire
 		(pts
-			(xy 292.1 156.21) (xy 300.99 156.21)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c47be4f9-78e0-4bd0-bcb6-fd5277778783")
-	)
-	(wire
-		(pts
 			(xy 53.34 104.14) (xy 78.74 104.14)
 		)
 		(stroke
@@ -6484,16 +6400,6 @@
 			(type default)
 		)
 		(uuid "c5048001-94fb-465f-b05f-40428a484f47")
-	)
-	(wire
-		(pts
-			(xy 292.1 156.21) (xy 292.1 163.83)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c560cea8-180a-4b3f-a8a8-a486c6edc6b4")
 	)
 	(wire
 		(pts
@@ -6597,16 +6503,6 @@
 	)
 	(wire
 		(pts
-			(xy 292.1 148.59) (xy 300.99 148.59)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "d017149a-7671-4e84-b571-44dd80268f9a")
-	)
-	(wire
-		(pts
 			(xy 222.25 210.82) (xy 231.14 210.82)
 		)
 		(stroke
@@ -6704,16 +6600,6 @@
 			(type default)
 		)
 		(uuid "dd1eafa1-7dc4-4b65-a7ae-0403182528c0")
-	)
-	(wire
-		(pts
-			(xy 308.61 156.21) (xy 317.5 156.21)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e0da32b2-cb53-481d-872f-24eb2dfa6f0c")
 	)
 	(wire
 		(pts
@@ -6854,16 +6740,6 @@
 			(type default)
 		)
 		(uuid "f11cde8b-3954-402c-a1fe-460cb15dbdd2")
-	)
-	(wire
-		(pts
-			(xy 317.5 148.59) (xy 317.5 156.21)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "f34ff18e-64ef-476a-880d-884587170562")
 	)
 	(wire
 		(pts
@@ -10628,86 +10504,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Device:C")
-		(at 304.8 148.59 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim yes)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp yes)
-		(fields_autoplaced yes)
-		(uuid "63de4a75-ee2a-453f-85e1-47e18e922977")
-		(property "Reference" "C30"
-			(at 304.8 140.97 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Value" "47pF DNP"
-			(at 304.8 143.51 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
-			(at 304.8 148.59 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 304.8 148.59 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 304.8 148.59 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "b38cbf21-c977-4a9d-b580-388e34b51edb")
-		)
-		(pin "2"
-			(uuid "485ad0a5-66f9-4531-b4e4-81a385546b86")
-		)
-		(instances
-			(project "unni-smartification-c6"
-				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb"
-					(reference "C30")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:R")
 		(at 218.44 233.68 90)
 		(unit 1)
@@ -12350,7 +12146,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
-		(dnp yes)
+		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "93d26644-65d5-4af2-a05e-2c99e4f71836")
 		(property "Reference" "C32"
@@ -13539,86 +13335,6 @@
 			(project "unni-smartification-c6"
 				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb"
 					(reference "R20")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Device:C")
-		(at 304.8 156.21 90)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim yes)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp yes)
-		(fields_autoplaced yes)
-		(uuid "c322e150-cdbd-4204-bde7-b78386dbdded")
-		(property "Reference" "C31"
-			(at 304.8 148.59 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Value" "100pF DNP"
-			(at 304.8 151.13 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Footprint" "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder"
-			(at 304.8 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 304.8 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 304.8 156.21 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "c786409a-4fd3-4fdf-9b84-66136b11a910")
-		)
-		(pin "2"
-			(uuid "a1197f69-0ed6-4c58-ac44-5a9955aaf1b6")
-		)
-		(instances
-			(project "unni-smartification-c6"
-				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb"
-					(reference "C31")
 					(unit 1)
 				)
 			)
