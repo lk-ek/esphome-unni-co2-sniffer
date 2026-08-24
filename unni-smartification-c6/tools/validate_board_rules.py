@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assert project routing rules and the selected JLCPCB-near 4-layer stackup."""
+"""Assert project routing rules and the selected PCBWay 4-layer stackup."""
 import json
 import math
 import re
@@ -22,18 +22,18 @@ want_rules = {
     'min_clearance': 0.15,
     'min_copper_edge_clearance': 0.25,
     'min_hole_clearance': 0.20,
-    'min_hole_to_hole': 0.20,
+    'min_hole_to_hole': 0.30,
     'min_track_width': 0.15,
-    'min_via_annular_width': 0.10,
-    'min_via_diameter': 0.50,
-    'min_through_hole_diameter': 0.20,
+    'min_via_annular_width': 0.15,
+    'min_via_diameter': 0.60,
+    'min_through_hole_diameter': 0.30,
 }
 for k,v in want_rules.items():
     if not close(r.get(k,-1),v): die(f'{k}={r.get(k)!r}, expected {v}')
 
 want_widths=[0.0,0.15,0.20,0.25,0.30,0.40,0.50,0.60,0.80,1.00,1.20]
 if ds.get('track_widths') != want_widths: die('predefined track widths changed')
-want_vias=[(0.0,0.0),(0.50,0.20),(0.60,0.30),(0.80,0.40),(1.00,0.50)]
+want_vias=[(0.0,0.0),(0.60,0.30),(0.80,0.40),(1.00,0.50)]
 got_vias=[(x['diameter'],x['drill']) for x in ds.get('via_dimensions',[])]
 if got_vias != want_vias: die(f'via presets {got_vias!r}')
 
@@ -54,7 +54,7 @@ for name,(tw,cl,vd,vdr) in want_classes.items():
     got=(c['track_width'],c['clearance'],c['via_diameter'],c['via_drill'])
     if got!=(tw,cl,vd,vdr): die(f'{name}={got}, expected {(tw,cl,vd,vdr)}')
 
-# Stackup values track JLCPCB's current 4-layer / 1.0 mm JLC3313 construction.
+# Stackup values track PCBWay's current regular 4-layer / 1.0 mm / 1 oz-inner construction.
 s=PCB.read_text()
 def layer_block(name):
     m=re.search(rf'\(layer "{re.escape(name)}"\n(.*?)\n\t\t\t\)',s,re.S)
@@ -68,12 +68,12 @@ def textval(block,key):
     m=re.search(rf'\({key} "([^"]+)"\)',block)
     return m.group(1) if m else None
 
-for name,t in [('F.Cu',0.035),('In1.Cu',0.0152),('In2.Cu',0.0152),('B.Cu',0.035)]:
+for name,t in [('F.Cu',0.035),('In1.Cu',0.035),('In2.Cu',0.035),('B.Cu',0.035)]:
     if not close(val(layer_block(name),'thickness'),t): die(f'{name} copper thickness is not {t} mm')
 for name,t,er,material in [
-    ('dielectric 1',0.0994,4.1,'JLCPCB 3313 / NP-155F'),
-    ('dielectric 2',0.7000,4.53,'Nan Ya NP-155F core'),
-    ('dielectric 3',0.0994,4.1,'JLCPCB 3313 / NP-155F'),
+    ('dielectric 1',0.1855,4.74,'PCBWay 7628 RC46% prepreg'),
+    ('dielectric 2',0.4300,4.6,'PCBWay FR-4 core'),
+    ('dielectric 3',0.1855,4.74,'PCBWay 7628 RC46% prepreg'),
 ]:
     b=layer_block(name)
     if not close(val(b,'thickness'),t): die(f'{name} thickness is not {t} mm')
@@ -142,7 +142,7 @@ for r in rects:
 
 # Ensure the custom manufacturing-rule file contains the via/pad distinction.
 dru=(ROOT/'unni-smartification-c6.kicad_dru').read_text()
-for needle in ('JLCPCB zone hard minimum','JLCPCB drilled pad hole spacing','hole_to_hole (min 0.45mm)'):
+for needle in ('PCBWay zone hard minimum','PCBWay drilled pad hole spacing','hole_to_hole (min 0.45mm)'):
     if needle not in dru: die(f'custom rule missing: {needle}')
 
-print('Board-rule assertions passed: JLCPCB baseline, routing presets, 9 netclasses and JLC3313 1.0 mm near-stackup.')
+print('Board-rule assertions passed: PCBWay baseline, routing presets, 9 netclasses and 1.0 mm 1/1 oz stackup.')

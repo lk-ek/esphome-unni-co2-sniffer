@@ -23,11 +23,11 @@
 - USB shield nominal span measured from B.Cu is X=6.0..15.0 mm; in PCBNew/F.Cu coordinates it is X=4.0..13.0 mm, center X=8.5 mm. The metal shield mouth, not the contact/pad end, protrudes 1.0 mm beyond the top PCB edge.
 - KiCad 10.99 is now the project target and native geometric constraints live in the manufacturing-master PCB. The mechanical validator remains authoritative for exact mounting-hole footprint locations because whole-footprint rigid constraints are still less convenient than primitive geometry constraints.
 
-## PCB routing / fabrication baseline (2026-08-21)
+## PCB routing / fabrication baseline (2026-08-24)
 
-The project targets inexpensive JLCPCB 1 oz fabrication without routing at the fab's absolute limits. Board Setup therefore uses a conservative 0.15 mm global minimum trace/clearance baseline, 0.25 mm copper-to-edge clearance, 0.20 mm hole-to-copper clearance, and a preferred general-purpose 0.60/0.30 mm via. A 0.50/0.20 mm via is available as a dense-routing preset, not the normal default.
+The project targets inexpensive PCBWay four-layer 1 oz / 1 oz fabrication without routing at the fab's absolute limits. Board Setup therefore uses a conservative 0.15 mm global minimum trace/clearance baseline, 0.25 mm copper-to-edge clearance, 0.20 mm hole-to-copper clearance, 0.30 mm hole-to-hole baseline, 0.15 mm minimum annular ring, and a preferred general-purpose 0.60/0.30 mm via. The previous 0.50/0.20 mm dense-via preset was removed because its 0.10 mm annular ring is below PCBWay's published standard 0.15 mm minimum.
 
-Predefined routing widths are 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00 and 1.20 mm. Net classes select useful defaults from these presets: Signal 0.20 mm, Sensitive 0.20 mm with 0.25 mm clearance, USB 0.20/0.20 mm width/gap, +3V3 0.40 mm, VBUS/+5V/UNNI_AC 0.50 mm, battery/SYS/BOOST_IN 0.80 mm, switch nodes 0.80 mm with extra clearance, and GND tracks 0.50 mm. USB width/gap is a practical routing default only; if controlled impedance is ordered, it must be recalculated for the selected JLCPCB stackup.
+Predefined routing widths are 0.15, 0.20, 0.25, 0.30, 0.40, 0.50, 0.60, 0.80, 1.00 and 1.20 mm. Net classes select useful defaults from these presets: Signal 0.20 mm, Sensitive 0.20 mm with 0.25 mm clearance, USB 0.20/0.20 mm width/gap, +3V3 0.40 mm, VBUS/+5V/UNNI_AC 0.50 mm, battery/SYS/BOOST_IN 0.80 mm, switch nodes 0.80 mm with extra clearance, and GND tracks 0.50 mm. USB width/gap is a practical routing default only; if controlled impedance is ordered, it must be recalculated for the selected PCBWay production stackup.
 
 Copper zones default to 0.25 mm clearance, 0.20 mm minimum copper thickness, 0.30 mm thermal gap, 0.40 mm thermal spokes and 1 mm² minimum island area. Existing copper zones are normalized to these values. `unni-smartification-c6.kicad_dru` adds DRC guards for zone clearance and per-netclass minimum/preferred widths.
 
@@ -46,10 +46,10 @@ The ESP sheet is now included in SPICE because MCP73831 and TPS63031 live there.
 - USB data ESD protection is TI TPD2E009DBZR. It is a ground-referenced two-line shunt with no VCC/VBUS rail, avoiding the possibility of USB data clamps back-powering the VBUS net used by the hardware boost inhibit.
 - USB_ADC is RC filtered locally.
 - Both inner layers are intended as GND reference planes. +3V3, SYS, VBUS and +BATT are distributed with outer-layer pours and same-net F/B stitching vias; switch nodes remain compact local copper.
-- The PCB stackup is modeled after JLCPCB's current 4-layer 1.0 mm JLC3313 construction: 35 µm outer Cu, 15.2 µm inner Cu, 99.4 µm 3313 prepreg and a 0.70 mm NP-155F core. KiCad's uniform soldermask model is only an approximation; JLCPCB's impedance calculator is authoritative for final USB geometry.
+- The PCB stackup is modeled after PCBWay's published regular 4-layer 1.0 mm, 1 oz outer / 1 oz inner construction (70% residual-copper option): 35 µm Cu on all four layers, 185.5 µm 7628 RC46% prepreg and a 0.43 mm FR-4 core. KiCad's soldermask/material model is approximate; a PCBWay-confirmed production stackup remains authoritative for controlled impedance.
 
 ## KiCad 10.0.5 fabrication compatibility target (2026-08-23)
 
 KiCad 10.99 remains the canonical editable source because the PCB uses native geometric constraints and generated via-stitch metadata. A generated KiCad 10.0.5 compatibility tree is used for stable-version-only plugins and fabrication/export workflows. `tools/make_kicad_10_0_5_copy.py` removes unsupported editing metadata, converts footprint placement transforms to the 10.0.x representation, preserves explicit generated vias, and rewrites file-format headers to the stable KiCad 10 format. The compatibility copy is disposable and must not become a second editable source of truth.
 
-- Both PCB islands remain in one PCB document for visible inter-board connectivity, but are positioned wholly inside the A4 drawing sheet. Manufacturing exports are generated per island by `tools/export_jlc_gerbers.py`; the script uses the stable-KiCad compatibility conversion and therefore does not require maintaining separate editable PCB files.
+- Both PCB islands remain in one PCB document for visible inter-board connectivity, but are positioned wholly inside the A4 drawing sheet. Manufacturing exports for PCBWay are generated per island by `tools/export_pcbway_gerbers.py`; the script uses the stable-KiCad compatibility conversion and therefore does not require maintaining separate editable PCB files.

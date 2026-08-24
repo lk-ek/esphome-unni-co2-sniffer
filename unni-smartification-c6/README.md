@@ -104,30 +104,30 @@ Hardware VBUS inhibit prevents the battery 5 V boost from being enabled while re
 - Native ESP32-C6 USB Full-Speed is routed through 22 Ω series resistors near the ESP.
 - USB ESD: **TI TPD2E009DBZR**, a two-line ground-referenced shunt device with no VBUS/VCC rail. This avoids a clamp path that could back-power VBUS and interfere with the hardware boost inhibit.
 - `USB_ADC` includes local RC filtering.
-- USB differential geometry is intentionally **not final yet**. Route it only after the selected JLCPCB stackup is loaded; final impedance geometry should be checked with JLCPCB's impedance calculator.
+- USB differential geometry is intentionally **not final yet**. Route it only after the selected PCBWay stackup is loaded; final impedance geometry should be checked against PCBWay's impedance/stackup data if controlled impedance is ordered.
 
-## 4-layer JLCPCB-near stackup
+## 4-layer PCBWay stackup
 
-The KiCad stackup models JLCPCB's current 4-layer 1.0 mm **JLC3313** construction closely:
+The KiCad stackup now models PCBWay's published regular 4-layer **1.0 mm / 1 oz outer / 1 oz inner** construction (70% inner-layer residual-copper variant):
 
 | Layer | KiCad model |
 | --- | --- |
-| F.Cu | 0.035 mm Cu (1 oz external) |
-| dielectric 1 | 0.0994 mm 3313 prepreg, εr 4.1 |
-| In1.Cu | 0.0152 mm Cu (0.5 oz internal) |
-| core | 0.700 mm Nan Ya NP-155F, εr 4.53 |
-| In2.Cu | 0.0152 mm Cu (0.5 oz internal) |
-| dielectric 3 | 0.0994 mm 3313 prepreg, εr 4.1 |
-| B.Cu | 0.035 mm Cu (1 oz external) |
+| F.Cu | 0.035 mm finished Cu (1 oz) |
+| dielectric 1 | 0.1855 mm 7628 RC46% prepreg, εr 4.74 |
+| In1.Cu | 0.035 mm Cu (1 oz) |
+| core | 0.430 mm FR-4, εr 4.6 |
+| In2.Cu | 0.035 mm Cu (1 oz) |
+| dielectric 3 | 0.1855 mm 7628 RC46% prepreg, εr 4.74 |
+| B.Cu | 0.035 mm finished Cu (1 oz) |
 
-Soldermask is modeled approximately (εr 3.8); JLCPCB's calculator models mask geometry in more detail and remains authoritative for controlled impedance. The manufacturer nominal layer dimensions sum to approximately the requested 1.0 mm construction; finished-board thickness has normal fabrication tolerance.
+PCBWay publishes this as a nominal 1.0 mm four-layer construction; the finished board remains subject to normal fabrication tolerance. Soldermask is modeled only approximately in KiCad. If controlled impedance is ordered, use PCBWay's confirmed production stackup/impedance data rather than treating the KiCad material model as a fabrication guarantee.
 
 Both internal layers are intended to remain GND reference planes. Power distribution uses F.Cu/B.Cu pours and stitching vias. High-dv/dt switch nodes remain small local outer-layer copper only. The ESP module antenna has an all-copper-layer keepout.
 
-Current JLCPCB references:
-- https://jlcpcb.com/impedance
-- https://jlcpcb.com/help/article/user-guide-to-the-jlcpcb-impedance-calculator
-- https://jlcpcb.com/capabilities/pcb-capabilities
+Current PCBWay references:
+- https://www.pcbway.com/multi-layer-laminated-structure.html
+- https://www.pcbway.com/capabilities.html
+- https://www.pcbway.com/helpcenter/ordering_parameter_instruction/What_is_the_PCB_Copper_Weight_.html
 
 ## Schematic sheets
 
@@ -137,15 +137,16 @@ Current JLCPCB references:
 
 ## Routing / fabrication baseline
 
-The Board Setup intentionally targets comfortable low-cost JLCPCB geometry rather than absolute fab limits:
+The Board Setup intentionally targets comfortable low-cost PCBWay geometry rather than absolute fab limits:
 
 - general minimum trace width / copper clearance: 0.15 mm
 - routed-edge copper clearance: 0.25 mm
 - hole-to-copper baseline: 0.20 mm
-- via-hole-to-via-hole baseline: 0.20 mm
+- via-hole-to-via-hole baseline: 0.30 mm
 - drilled component pad hole-to-hole: 0.45 mm via `.kicad_dru`
+- minimum annular ring: 0.15 mm
 - normal preferred via: 0.60/0.30 mm
-- dense preset: 0.50/0.20 mm
+- larger power via preset: 0.80/0.40 mm
 - zones: 0.25 mm nominal clearance, 0.20 mm hard floor, 0.30 mm thermal gap, 0.40 mm thermal spokes
 
 Preferred netclass widths remain wider than the hard manufacturing minimum. Fine-pitch IC pad escapes may neck down briefly before returning to their preferred class width.
@@ -163,7 +164,7 @@ KICAD_CLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli" ./tools/valid
 If KiCad's ngspice shared library is not auto-discovered, set `NGSPICE_LIB` explicitly. Validation checks:
 
 1. fixed mechanics and both board envelopes;
-2. JLCPCB-near stackup and routing-rule presets;
+2. PCBWay stackup and routing-rule presets;
 3. schematic load, PDF and KiCad/XML/SPICE netlist export;
 4. schematic↔PCB pad/net parity;
 5. critical power/USB connectivity, the TPD2E009 pinout, RPROG=5.1 kΩ and USB_ADC filtering;
@@ -205,18 +206,20 @@ KICAD_10_0_5_CLI=/path/to/kicad-cli tools/validate_kicad_10_0_5_export.sh
 
 The converter removes only 10.99 editing/link metadata that stable 10.0.x cannot safely consume: native geometric constraint objects, generated via-stitch descriptors and design-block `lib_id` links attached to instantiated groups. The group members themselves remain local in the schematic/PCB, already-instantiated vias remain explicit PCB vias, footprint placements are translated to the 10.0.x representation, and the mechanical geometry continues to be guarded by `tools/validate_mechanics.py` in the master project.
 
-## Per-board JLCPCB Gerber export
+## Per-board PCBWay Gerber export
 
-The design intentionally keeps both physical boards in one `.kicad_pcb`, while JLCPCB fabrication needs one closed board outline per order. Generate separate fabrication packages with:
+The design intentionally keeps both physical boards in one `.kicad_pcb`, while fabrication requires one closed board outline per order. Generate separate PCBWay upload packages with:
 
 ```sh
 KICAD_10_0_X_CLI=/path/to/KiCad-10.0.x/kicad-cli \
-  python3 tools/export_jlc_gerbers.py
+  python3 tools/export_pcbway_gerbers.py
 ```
 
-The script first creates a temporary stable-KiCad compatibility copy, identifies the 19 mm USB/power island and the 46 x 32 mm ESP/interface island from `Edge.Cuts`, then creates isolated temporary boards and exports each with KiCad 10.0.x. Outputs are written to `dist/jlc/`:
+The script creates a temporary stable-KiCad compatibility copy, identifies the 19 mm USB/power island and the 46 x 32 mm ESP/interface island from `Edge.Cuts`, then exports each board independently. Outputs are written to `dist/pcbway/`:
 
-- `unni-usb-power-jlc-gerbers.zip`
-- `unni-esp-interface-jlc-gerbers.zip`
+- `unni-usb-power-pcbway-gerbers.zip`
+- `unni-esp-interface-pcbway-gerbers.zip`
 
-Each ZIP contains the four copper layers, front/back solder mask, front/back silkscreen, `Edge.Cuts`, Gerber job file and separate PTH/NPTH Excellon drill files. Paste layers are intentionally omitted from the bare-PCB fabrication ZIPs. Regenerate the packages after every PCB change.
+Each ZIP contains four copper layers, front/back solder mask, front/back silkscreen, `Edge.Cuts`, Gerber job data and separate PTH/NPTH Excellon drill files. The Gerbers are emitted as classic RS-274-X with X2/netlist attributes disabled and Protel-style layer extensions for maximum PCBWay compatibility. Paste layers are intentionally omitted from bare-PCB fabrication packages.
+
+Recommended PCBWay order parameters for this revision: **FR-4, 4 layers, 1.0 mm board thickness, 1 oz finished outer copper, 1 oz inner copper**. Regenerate the ZIPs after every PCB change.
