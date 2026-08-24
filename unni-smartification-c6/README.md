@@ -4,6 +4,80 @@ Target: **KiCad 10.99 nightly or newer**. The current manufacturing master uses 
 
 This repository contains two physical PCBs in one KiCad PCB file so cross-board connectivity remains visible while routing. Placement and routing are still work in progress; the schematic and power architecture are substantially defined and covered by reproducible connectivity/SPICE checks.
 
+
+## Hardware overview
+
+The images below are generated directly from the current KiCad project with `kicad-cli`; they are not hand-maintained screenshots. The two physical boards intentionally remain in one PCB file during design so their interconnect nets can be routed and validated together.
+
+### PCB — component side
+
+![3D render of both Unni smartification PCBs, component side](docs/images/pcb-overview-top.png)
+
+The long, narrow board on the left is the **USB / power board**. The larger board on the right is the **ESP / battery board**. The USB board carries the forced-awake 5 V power stage and the enclosure-specific USB interface, while the ESP board carries the charger, 3.3 V supply, ESP32-C6 and the sensor/control interfaces.
+
+For placement and routing inspection, the orthographic top view is also useful:
+
+![Orthographic top render of both PCBs](docs/images/pcb-top.png)
+
+### PCB — back side
+
+![3D render of both Unni smartification PCBs, back side](docs/images/pcb-overview-bottom.png)
+
+The USB-C receptacle is deliberately a **back-side component** because the mechanical measurements describe the rear side of the original enclosure. Only the measured 19 x 18 mm rear clearance area may contain back-side components; the rest of that board lies against the enclosure. A footprint without an installed 3D model will naturally not appear in these renders even though its pads and board placement are present in KiCad.
+
+### Schematics
+
+#### USB, forced-awake boost and Unni power interface
+
+![USB and power schematic](docs/images/schematic/usb-power.png)
+
+#### ESP32-C6, charger, 3.3 V regulator and auxiliary interfaces
+
+![ESP32-C6 and auxiliary schematic](docs/images/schematic/esp-aux.png)
+
+The simulation harness is intentionally not shown here because it is not part of the manufactured hardware. Its generated image remains available at `docs/images/schematic/simulation-harness.png` for debugging.
+
+### Power sequencing and source handover
+
+There are two independent questions in the power architecture: **how the ESP stays alive**, and **whether the Unni is being fed 5 V so that it behaves as USB-powered rather than entering its battery energy-save mode**.
+
+**1. USB disconnected, normal battery operation.** The protected 1S Li-ion feeds `+BATT`. The discrete load-share path connects the battery to `SYS`, and the TPS63031 generates the regulated `+3V3` rail for the ESP32-C6. The Unni can continue to run from its own battery/DC input without needing the ESP-generated 5 V path. This is the low-power baseline state.
+
+**2. ESP requests forced-awake operation while USB is absent.** Once the ESP is alive from `+3V3`, it may assert `BOOST_CMD`. The hardware-enable network then allows the TPS613222A 5 V boost stage on the USB/power board to run from `+BATT`. Its `+5V` output reaches `UNNI_AC` through the output Schottky diode. Electrically, the Unni now sees the same AC/VBUS-style 5 V condition it would see from USB, so firmware can deliberately pull the Unni out of its battery energy-save behavior.
+
+**3. Real USB is plugged in.** `VBUS` immediately supplies `SYS` through the Schottky/load-share path, so the TPS63031 and ESP are powered from USB rather than discharging the cell. In parallel, the MCP73831 charges `+BATT` at the resistor-programmed current, and the ESP can observe `CHARGE_STAT` as well as the filtered `USB_ADC` divider. USB VBUS also feeds `UNNI_AC` directly through its own Schottky path.
+
+**4. USB always wins over the battery-generated 5 V path.** The forced-awake boost has a hardware VBUS inhibit. When real `VBUS` is present, the MOSFET inhibit network prevents the TPS613222A path from being enabled even if firmware leaves `BOOST_CMD` asserted or crashes in the wrong state. The two 5 V sources therefore do not intentionally drive each other. The output diodes provide the final source isolation at `UNNI_AC`.
+
+**5. USB is removed again.** The charger stops, the battery load-share path retakes `SYS`, and the TPS63031 keeps the ESP on `+3V3` across the source transition. The forced-awake 5 V rail remains off unless firmware explicitly requests it after USB has disappeared. This separation is important: keeping the ESP alive does not automatically force the Unni into its higher-power USB mode.
+
+The practical state table is therefore:
+
+| External USB | `BOOST_CMD` | ESP source | Unni `UNNI_AC` | Result |
+| --- | --- | --- | --- | --- |
+| absent | 0 | battery -> `SYS` -> TPS63031 | no ESP-generated 5 V | normal battery / energy-save capable |
+| absent | 1 | battery -> `SYS` -> TPS63031 | TPS613222A -> `+5V` -> diode | forced-awake / USB-like Unni power state |
+| present | 0 | VBUS -> `SYS` -> TPS63031 | VBUS -> diode | USB-powered; battery charging |
+| present | 1 | VBUS -> `SYS` -> TPS63031 | VBUS -> diode; boost hardware-inhibited | same safe USB-powered state |
+
+The ADC paths (`BAT_ADC`, `USB_ADC`, `BACKLIGHT_ADC`) and `CHARGE_STAT` let firmware distinguish these power states without making the safety-critical source arbitration depend on software alone.
+
+### Re-generating the README images
+
+With a KiCad 10.99 nightly `kicad-cli` on `PATH`, run:
+
+```sh
+./tools/render_readme_assets.sh
+```
+
+Or point it at a specific build:
+
+```sh
+KICAD_CLI=/path/to/kicad-cli ./tools/render_readme_assets.sh
+```
+
+This refreshes all PCB renders and schematic PNGs under `docs/images/`.
+
 ## Physical boards
 
 - **USB / power board** — 19 mm fixed width, 1.0 mm finished-board target, USB-C on B.Cu at the measured enclosure datum. It contains USB-C/CC, the TPD2E009DBZR USB ESD shunt, the battery-driven 5 V forced-awake boost and the Unni AC/DC interface.
