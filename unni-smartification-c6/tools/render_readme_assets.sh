@@ -19,7 +19,8 @@ mkdir -p "$IMG" "$SCH_IMG"
 "$KICAD_CLI" pcb render \
   -o "$IMG/pcb-overview-bottom.png" \
   --width 1800 --height 1100 --quality basic --floor --perspective \
-  --side bottom --rotate 35,0,330 \
+  --side bottom --rotate 325,0,330 \
+  --zoom 0.85 \
   "$PCB"
 
 "$KICAD_CLI" pcb render \
