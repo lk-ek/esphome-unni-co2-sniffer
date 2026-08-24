@@ -13,7 +13,7 @@ mkdir -p "$IMG" "$SCH_IMG"
 "$KICAD_CLI" pcb render \
   -o "$IMG/pcb-overview-top.png" \
   --width 1800 --height 1100 --quality basic --floor --perspective \
-  --rotate 35,0,30 \
+  --rotate 325,0,30 \
   "$PCB"
 
 "$KICAD_CLI" pcb render \
