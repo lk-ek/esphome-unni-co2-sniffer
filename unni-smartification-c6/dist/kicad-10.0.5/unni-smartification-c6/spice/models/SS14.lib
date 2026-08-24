@@ -1,0 +1,6 @@
+* SS14 1A 40V Schottky - system model
+* KiCad Diode:SB120 pin order: 1=K, 2=A
+.SUBCKT SS14_SUB K A
+D1 A K SS14_D
+.MODEL SS14_D D(IS=5u N=1.08 RS=0.055 BV=40 IBV=100u CJO=110p M=0.33 VJ=0.35 TT=5n)
+.ENDS SS14_SUB

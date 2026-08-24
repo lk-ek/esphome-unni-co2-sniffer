@@ -1,0 +1,163 @@
+** Drc report for unni-smartification-c6.kicad_pcb **
+** Created on 2026-08-24T12:59:56 **
+** Report includes: Errors, Warnings **
+
+** Found 36 DRC violations **
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2000 mm; actual 0.1651 mm)
+    Rule: board setup constraints hole; error
+    @(77.9500 mm, 129.5750 mm): Pad A1_B12 [GND] of J1 on B.Cu
+    @(78.2600 mm, 128.5100 mm): NPTH pad of J1
+[hole_clearance]: Hole clearance violation (board setup constraints hole clearance 0.2000 mm; actual 0.1651 mm)
+    Rule: board setup constraints hole; error
+    @(84.3500 mm, 129.5750 mm): Pad B1_A12 [GND] of J1 on B.Cu
+    @(84.0400 mm, 128.5100 mm): NPTH pad of J1
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(72.6500 mm, 123.2000 mm): Segment on Edge.Cuts
+    @(76.6800 mm, 123.5800 mm): Segment of J1 on B.Silkscreen
+[silk_edge_clearance]: Silkscreen clipped by board edge
+    Rule: board setup constraints silk; warning
+    @(72.6500 mm, 123.2000 mm): Segment on Edge.Cuts
+    @(85.6200 mm, 123.5800 mm): Segment of J1 on B.Silkscreen
+[lib_footprint_mismatch]: Footprint 'L_Murata_LQH3NPN_3.0x3.0mm_HandSolder' does not match copy in library 'Unni_Inductor'
+    Local override; warning
+    @(115.5250 mm, 134.0950 mm): Footprint L1
+[lib_footprint_issues]: The current configuration does not include the footprint library 'UNNI_Mechanical'
+    Local override; warning
+    @(82.1500 mm, 136.9000 mm): Footprint H3
+[lib_footprint_mismatch]: Footprint 'JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(153.9800 mm, 146.5800 mm): Footprint J6
+[lib_footprint_mismatch]: Footprint 'ESP32-C6-MINI-1' does not match copy in library 'RF_Module'
+    Local override; warning
+    @(142.5811 mm, 136.3250 mm): Footprint U10
+[lib_footprint_mismatch]: Footprint 'JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(125.3682 mm, 135.1700 mm): Footprint J5
+[lib_footprint_issues]: The current configuration does not include the footprint library 'UNNI_Mechanical'
+    Local override; warning
+    @(90.1500 mm, 136.2000 mm): Footprint H2
+[lib_footprint_mismatch]: Footprint 'D_SMA_Handsoldering' does not match copy in library 'Diode_SMD'
+    Local override; warning
+    @(86.9000 mm, 163.3000 mm): Footprint D3
+[lib_footprint_mismatch]: Footprint 'D_SMA_Handsoldering' does not match copy in library 'Diode_SMD'
+    Local override; warning
+    @(123.0100 mm, 149.7200 mm): Footprint D1
+[lib_footprint_mismatch]: Footprint 'JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(112.4600 mm, 153.9900 mm): Footprint J2
+[lib_footprint_mismatch]: Footprint 'L_Murata_DFE322520FD_3.2x2.5mm_HandSolder' does not match copy in library 'Unni_Inductor'
+    Local override; warning
+    @(79.8500 mm, 149.9000 mm): Footprint L2
+[lib_footprint_mismatch]: Footprint 'R_0805_2012Metric_Pad1.20x1.40mm_HandSolder' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(129.2100 mm, 152.5300 mm): Footprint R5
+[lib_footprint_mismatch]: Footprint 'JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(87.1600 mm, 185.9400 mm): Footprint J3
+[lib_footprint_mismatch]: Footprint 'C_0603_1608Metric_Pad1.08x0.95mm_HandSolder' does not match copy in library 'Capacitor_SMD'
+    Local override; warning
+    @(134.5800 mm, 132.5200 mm): Footprint C10
+[lib_footprint_mismatch]: Footprint 'D_SMA_Handsoldering' does not match copy in library 'Diode_SMD'
+    Local override; warning
+    @(83.7500 mm, 156.9500 mm): Footprint D4
+[lib_footprint_issues]: The current configuration does not include the footprint library 'UNNI_Mechanical'
+    Local override; warning
+    @(89.6500 mm, 132.2000 mm): Footprint H1
+[lib_footprint_mismatch]: Footprint 'JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(153.6400 mm, 136.6800 mm): Footprint RT1
+[lib_footprint_mismatch]: Footprint 'JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(148.2300 mm, 154.6600 mm): Footprint J10
+[lib_footprint_issues]: The current configuration does not include the footprint library 'UNNI_Mechanical'
+    Local override; warning
+    @(75.1500 mm, 136.7000 mm): Footprint H4
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(111.6800 mm, 152.5400 mm): PCB text 'B-B+' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(151.4300 mm, 156.0700 mm): PCB text 'GND RT RH SDA SCL' on F.Silkscreen
+[text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
+    Rule: board setup constraints silk text height; warning
+    @(127.8800 mm, 131.6700 mm): PCB text 'LED TOUCH' on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(145.9750 mm, 144.1250 mm): Segment of SW2 on F.Silkscreen
+    @(146.3500 mm, 143.9000 mm): Pad 2 [/ESP32-C6 + Auxiliary/BOOT_GPIO9] of SW2 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(145.9750 mm, 144.1250 mm): Segment of SW2 on F.Silkscreen
+    @(146.3500 mm, 147.3500 mm): Pad 2 [/ESP32-C6 + Auxiliary/BOOT_GPIO9] of SW2 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(131.1000 mm, 134.9300 mm): Segment of SW1 on F.Silkscreen
+    @(134.3250 mm, 135.3050 mm): Pad 1 [GND] of SW1 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(131.1000 mm, 134.9300 mm): Segment of SW1 on F.Silkscreen
+    @(130.8750 mm, 135.3050 mm): Pad 1 [GND] of SW1 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(131.1000 mm, 137.9300 mm): Segment of SW1 on F.Silkscreen
+    @(134.3250 mm, 137.5550 mm): Pad 2 [/ESP32-C6 + Auxiliary/ESP_EN] of SW1 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(131.1000 mm, 137.9300 mm): Segment of SW1 on F.Silkscreen
+    @(130.8750 mm, 137.5550 mm): Pad 2 [/ESP32-C6 + Auxiliary/ESP_EN] of SW1 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(148.9750 mm, 144.1250 mm): Segment of SW2 on F.Silkscreen
+    @(148.6000 mm, 143.9000 mm): Pad 1 [GND] of SW2 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(148.9750 mm, 144.1250 mm): Segment of SW2 on F.Silkscreen
+    @(148.6000 mm, 147.3500 mm): Pad 1 [GND] of SW2 on F.Cu
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; warning
+    @(120.4500 mm, 152.2000 mm): Reference field of C1
+    @(120.1900 mm, 151.1275 mm): Pad 1 [VBUS] of C1 on F.Cu
+[nonmirrored_text_on_back_layer]: Non-Mirrored text on back layer
+    Local override; warning
+    @(89.9000 mm, 126.6500 mm): Footprint text of R2 (R2)
+[nonmirrored_text_on_back_layer]: Non-Mirrored text on back layer
+    Local override; warning
+    @(87.8500 mm, 125.6500 mm): Footprint text of R1 (R1)
+
+** Found 6 unconnected pads **
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(116.6900 mm, 154.1700 mm): Zone [VBUS] on F.Cu and B.Cu, priority 11
+    @(91.3658 mm, 145.4828 mm): Zone 'F VBUS_1' [VBUS] on F.Cu, priority 23
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(110.3000 mm, 125.3000 mm): Zone 'Inner GND' [GND] on In1.Cu and In2.Cu, priority 2
+    @(81.1600 mm, 145.3000 mm): Zone 'F-GND CONNECT_1' [GND] on F.Cu, priority 26
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(110.4400 mm, 150.0900 mm): Zone '+BATT ESP' [+BATT] on F.Cu and B.Cu, priority 10
+    @(72.8500 mm, 138.3000 mm): Zone 'F +BATT CONNECT' [+BATT] on F.Cu, priority 24
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(138.8775 mm, 149.4150 mm): Track [USB_RAW_N] on F.Cu, length 0.8450 mm
+    @(83.4800 mm, 133.5428 mm): Track [USB_RAW_N] on B.Cu, length 44.1500 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(141.1650 mm, 150.3025 mm): Track [USB_RAW_P] on F.Cu, length 1.1137 mm
+    @(83.8800 mm, 133.3772 mm): Track [USB_RAW_P] on B.Cu, length 44.1500 mm
+[unconnected_items]: Missing connection between items
+    Local override; error
+    @(88.5500 mm, 150.7874 mm): Track [BOOST_CMD] on F.Cu, length 1.9253 mm
+    @(142.2300 mm, 153.4900 mm): Track [BOOST_CMD] on B.Cu, length 13.6749 mm
+
+** Found 0 Footprint errors **
+
+** Ignored checks **
+    - Footprint has no courtyard defined
+    - Track endpoint not centered on via
+    - Tuning profile track geometries
+    - Footprint doesn't match symbol's footprint filters
+    - Footprint component type doesn't match footprint pads
+
+** End of Report **

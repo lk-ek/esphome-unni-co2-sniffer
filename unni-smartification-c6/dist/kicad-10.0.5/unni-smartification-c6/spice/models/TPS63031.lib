@@ -1,0 +1,21 @@
+* TPS63031 system-level behavioral model for KiCad/ngspice power-path simulations.
+* Smooth 3.3 V regulation with finite output impedance.
+* Input-power conversion is represented by simulation-harness proxy load I2.
+* NOT suitable for switching ripple, loop stability or EMI analysis.
+.SUBCKT TPS63031_SYS IN EN OUT GND
+BDRIVE DRIVE GND V={3.3*min(max((V(EN,GND)-0.8)/0.25,0),1)*min(max((V(IN,GND)-1.6)/0.25,0),1)}
+RREG DRIVE OUT 0.08
+RLEAK OUT GND 10MEG
+RIN IN GND 10MEG
+.ENDS TPS63031_SYS
+
+* Physical-pin wrapper: 1 VOUT 2 L2 3 PGND 4 L1 5 VIN 6 EN 7 PS/SYNC 8 VINA 9 GND 10 FB 11 EP
+.SUBCKT TPS63031 VOUT L2 PGND L1 VIN EN PSSYNC VINA GND FB EP
+XCORE VIN EN VOUT GND TPS63031_SYS
+RPG PGND GND 1m
+REP EP GND 1m
+RVA VINA VIN 1m
+RFB FB VOUT 1m
+RL1 L1 VIN 10MEG
+RL2 L2 VIN 10MEG
+.ENDS TPS63031

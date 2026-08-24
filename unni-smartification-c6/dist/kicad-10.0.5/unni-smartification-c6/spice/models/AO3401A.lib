@@ -1,0 +1,13 @@
+* AO3401A P-channel MOSFET system-level model.
+* CONNECTIONS: G S D
+* Intended for slow power-path/load-sharing simulation, not switching-loss prediction.
+.SUBCKT AO3401A G S D
+ECTRL CTRL 0 S G 1
+SDS S D CTRL 0 SWP
+DBODY D S DBP
+CGS G S 590p
+CGD G D 55p
+CDS D S 25p
+.MODEL SWP SW(RON=0.070 ROFF=1e9 VT=0.90 VH=0.05)
+.MODEL DBP D(IS=1e-10 N=1.05 RS=0.03 BV=30 IBV=100u CJO=80p)
+.ENDS AO3401A

@@ -1,0 +1,55 @@
+ERC report (2026-08-24T12:59:53, Encoding UTF8)
+Report includes: Errors, Warnings
+
+***** Sheet /
+[label_dangling]: Label not connected
+    ; error
+    @(224.79 mm, 88.90 mm): Global Label '+BATT'
+[wire_dangling]: Wires not connected to anything
+    ; error
+    @(232.41 mm, 88.90 mm): Horizontal Wire, length 3.81 mm
+    @(236.22 mm, 88.90 mm): Vertical Wire, length 5.08 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(114.30 mm, 66.04 mm): Vertical Wire, length 2.54 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(190.50 mm, 66.04 mm): Vertical Wire, length 2.54 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(190.50 mm, 80.01 mm): Vertical Wire, length 8.89 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(190.50 mm, 99.06 mm): Vertical Wire, length 2.54 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(232.41 mm, 88.90 mm): Horizontal Wire, length 3.81 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(236.22 mm, 55.88 mm): Vertical Wire, length 5.08 mm
+[unconnected_wire_endpoint]: Unconnected wire endpoint
+    ; warning
+    @(236.22 mm, 88.90 mm): Vertical Wire, length 5.08 mm
+
+***** Sheet /USB + Power/
+
+***** Sheet /ESP32-C6 + Auxiliary/
+
+***** Sheet /Simulation Harness/
+[pin_not_connected]: Pin not connected
+    ; error
+    @(114.30 mm, 66.04 mm): Symbol V3 Pin 2 [Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(190.50 mm, 66.04 mm): Symbol I1 Pin 2 [Passive, Line]
+[pin_not_connected]: Pin not connected
+    ; error
+    @(232.41 mm, 55.88 mm): Symbol R301 Pin 2 [Passive, Line]
+
+ ** ERC messages: 12  Errors 5  Warnings 7
+
+ ** Ignored checks:
+    - Global label only appears once in the schematic
+    - Four connection points are joined together
+    - SPICE model issue
+    - Assigned footprint doesn't match footprint filters

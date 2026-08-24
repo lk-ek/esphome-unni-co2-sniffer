@@ -1,0 +1,18 @@
+* MCP73831 autonomous charger functional test
+.include ../models/MCP73831.lib
+* USB hot-plug at 10 ms.
+VUSB vdd 0 PULSE(0 5 10m 20u 20u 80m 120m)
+* Simple battery source + internal impedance.
+VBAT0 b0 0 3.75
+RBAT b0 batt 0.12
+CBAT batt 0 2000u
+* Final hardware topology: PROG is permanently returned to GND through 5.1k.
+RPROG prog 0 5.1k
+XCHG stat 0 batt vdd prog MCP73831
+RSTATLOAD stat 0 220k
+.control
+set wr_singlescale
+tran 20u 100m
+wrdata results/mcp73831_charge.csv time v(vdd) v(batt) v(stat) i(vbat0) i(vusb)
+.endc
+.end

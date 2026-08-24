@@ -1,0 +1,34 @@
+{
+  "target": "KiCad 10.0.5",
+  "source": "KiCad 10.99 master",
+  "pcb_target_format": "20260206",
+  "schematic_target_format": "20260306",
+  "pcb_conversion": {
+    "unni-smartification-c6.kicad_pcb": {
+      "constraints_removed": 24,
+      "generated_via_stitch_removed": 12,
+      "design_block_group_links_removed": 1,
+      "footprint_transforms_converted": 74,
+      "explicit_vias_preserved": 203,
+      "spec_frequency_removed": 3,
+      "dielectric_model_removed": 3
+    },
+    "experimental/unni-smartification-c6-10.99-constraints.kicad_pcb": {
+      "constraints_removed": 10,
+      "generated_via_stitch_removed": 0,
+      "design_block_group_links_removed": 0,
+      "footprint_transforms_converted": 0,
+      "explicit_vias_preserved": 0,
+      "spec_frequency_removed": 0,
+      "dielectric_model_removed": 0
+    }
+  },
+  "notes": [
+    "10.99 geometric constraints removed; geometry is preserved and checked by project validators.",
+    "10.99 generated via-stitch descriptors removed; already-instantiated explicit vias are preserved.",
+    "10.99 footprint transforms converted to KiCad 10.0.x footprint placements.",
+    "10.99 stackup spec_frequency/dielectric_model metadata removed; physical stackup values preserved.",
+    "Design-block lib_id links on instantiated groups removed; group contents remain local and intact.",
+    "Do not edit this compatibility tree as the project master."
+  ]
+}

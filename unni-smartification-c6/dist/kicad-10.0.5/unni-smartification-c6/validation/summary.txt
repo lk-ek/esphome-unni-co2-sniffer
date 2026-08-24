@@ -1,0 +1,1 @@
+KiCad 10.99 schematic, connectivity, ERC classification and SPICE validation passed.

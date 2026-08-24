@@ -1,0 +1,13 @@
+KiCad 10.0.5 compatibility export
+=================================
+
+Generated from the KiCad 10.99 master by tools/make_kicad_10_0_5_copy.py.
+Use this tree for KiCad 10.0.5-only plugins and fabrication export.
+Make design edits in the 10.99 master and regenerate this copy.
+
+Removed editing-only 10.99 features:
+- native PCB geometric constraint objects
+- generated via-stitch descriptors (explicit generated vias remain)
+- 10.99 footprint transform wrappers (converted to KiCad 10 placements)
+- 10.99 stackup frequency/model metadata (thickness/material/Dk preserved)
+- design-block library links on instantiated groups (group contents preserved)

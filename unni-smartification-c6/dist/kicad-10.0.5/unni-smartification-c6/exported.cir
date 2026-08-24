@@ -1,0 +1,82 @@
+.title KiCad schematic
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/AO3400A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/AO3401A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/MCP73831.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/SS14.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/TPS613222A.lib"
+.include "/mnt/data/unni-smartification-c6-kicad10-revA-v25-kicad-spice/spice/models/TPS63031.lib"
+XD3 /USB_+_Power/UNNI_AC VBUS SS14_SUB
+XD4 /USB_+_Power/UNNI_AC +5V SS14_SUB
+J4 __J4
+C9 /USB_+_Power/UNNI_AC GND 1u
+J3 __J3
+XD1 /USB_+_Power/SYS VBUS SS14_SUB
+XQ1 Net-_Q1-G_ /USB_+_Power/SYS +BATT AO3401A
+R5 VBUS Net-_Q1-G_ 100k
+C2 +BATT GND 4.7u
+C1 VBUS GND 4.7u
+R12 CHARGE_STAT GND 220k
+R11 Net-_U1-STAT_ CHARGE_STAT 150k
+C6 +3V3 GND 10u
+C5 +3V3 GND 10u
+XU2 +3V3 Net-_U2-L2_ GND Net-_U2-L1_ /USB_+_Power/SYS /USB_+_Power/SYS GND /USB_+_Power/SYS GND +3V3 GND TPS63031
+L2 /USB_+_Power/BOOST_IN Net-_D2-A_ 2.2u
+XU3 +5V Net-_D2-A_ GND TPS613222A
+C7 /USB_+_Power/BOOST_IN GND 10u
+C8 +5V GND 22u
+XD2 +5V Net-_D2-A_ SS14_SUB
+J1 __J1
+R1 Net-_J1-CC1_ GND 5.1k
+R2 Net-_J1-CC2_ GND 5.1k
+J2 __J2
+R4 CHARGE_EN GND 100k
+R6 Net-_Q1-G_ GND 1Meg
+C3 /USB_+_Power/SYS GND 10u
+C4 /USB_+_Power/SYS GND 100n
+L1 Net-_U2-L1_ Net-_U2-L2_ 1.5u
+XQ5 CHARGE_EN GND Net-_Q5-D_ AO3400A
+R3 Net-_U1-PROG_ Net-_Q5-D_ 3.3k
+XU1 Net-_U1-STAT_ GND +BATT VBUS Net-_U1-PROG_ MCP73831
+R7 +BATT Net-_Q2-G_ 1Meg
+XQ2 Net-_Q2-G_ +BATT /USB_+_Power/BOOST_IN AO3401A
+XQ3 Net-_Q3-G_ GND Net-_Q2-G_ AO3400A
+XQ4 VBUS GND Net-_Q3-G_ AO3400A
+R9 Net-_Q3-G_ GND 100k
+R8 BOOST_CMD Net-_Q3-G_ 10k
+C11 +3V3 GND 100n
+C10 +3V3 GND 10u
+U10 __U10
+R20 +3V3 /ESP32-C6_+_Auxiliary/ESP_EN 10k
+SW1 __SW1
+SW2 __SW2
+R21 +3V3 /ESP32-C6_+_Auxiliary/BOOT_GPIO9 10k
+C21 BAT_TEMP_ADC GND 100n
+J20 __J20
+R41 Net-_J20-Pin_2_ CO2_SCL 10k
+R40 Net-_J20-Pin_1_ CO2_SDA 10k
+R42 Net-_J21-Pin_1_ RT 10k
+R43 Net-_J21-Pin_2_ RH 10k
+J21 __J21
+R22 Net-_U10-IO12_ USB_RAW_N 22
+R23 Net-_U10-IO13_ USB_RAW_P 22
+C12 USB_RAW_N GND 22pF DNP
+C13 USB_RAW_P GND 22pF DNP
+J10 __J10
+R30 +BATT BAT_ADC 1Meg
+R32 VBUS USB_ADC 220k
+R34 BAT_TEMP_EXCITE BAT_TEMP_ADC 10k
+C20 BAT_ADC GND 100n
+RT1 BAT_TEMP_ADC GND 10k NTC @25C
+R33 USB_ADC GND 220k
+R31 BAT_ADC GND 1Meg
+J22 __J22
+C30 Net-_J22-Pin_1_ Net-_Q10-D_ 47pF DNP
+C31 Net-_J22-Pin_1_ Net-_Q10-D_ 100pF DNP
+XQ10 TOUCH_TRIGGER GND Net-_Q10-D_ AO3400A
+TP1 __TP1
+C32 Net-_J22-Pin_1_ Net-_Q10-D_ 220pF DNP
+R52 TOUCH_TRIGGER GND 100k
+R50 Net-_J22-Pin_2_ BACKLIGHT_ADC 330k
+R51 BACKLIGHT_ADC GND 220k
+C33 BACKLIGHT_ADC GND 10nF DNP
+.end

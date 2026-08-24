@@ -1,0 +1,19 @@
+* TPS613222A fixed-5V DC/system behavioral model for KiCad/ngspice.
+* Purpose: power-path, handover and forced-awake validation.
+* NOT a switch-node, ripple, loop-stability or EMI model.
+*
+* Physical wrapper pins: 1 VOUT, 2 SW, 3 GND.
+* The real IC has no VIN pin. BOOST_IN reaches SW through L2, so SW is used as
+* the input-side state node. A 56-ohm equivalent input load is included to model
+* roughly 65 mA input at 3.7 V for the current ~50 mA UNNI_AC test load and,
+* importantly, to discharge BOOST_IN/SW promptly when Q2 opens.
+.SUBCKT TPS613222A_SYS IN OUT GND
+BDRIVE DRIVE GND V={5.0*min(max((V(IN,GND)-0.85)/0.30,0),1)}
+RREG DRIVE OUT 0.10
+RINPUT_EQ IN GND 56
+RLEAK_OUT OUT GND 10MEG
+.ENDS TPS613222A_SYS
+
+.SUBCKT TPS613222A VOUT SW GND
+XCORE SW VOUT GND TPS613222A_SYS
+.ENDS TPS613222A
