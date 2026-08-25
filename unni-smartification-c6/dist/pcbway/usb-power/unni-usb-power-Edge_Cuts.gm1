@@ -1,11 +1,11 @@
 G04 #@! TF.GenerationSoftware,KiCad,Pcbnew,10.0.6-rc2*
-G04 #@! TF.CreationDate,2026-08-25T12:43:25+02:00*
+G04 #@! TF.CreationDate,2026-08-25T12:55:28+02:00*
 G04 #@! TF.ProjectId,unni-usb-power,756e6e69-2d75-4736-922d-706f7765722e,rev?*
 G04 #@! TF.SameCoordinates,Original*
 G04 #@! TF.FileFunction,Profile,NP*
 %FSLAX46Y46*%
 G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
-G04 Created by KiCad (PCBNEW 10.0.6-rc2) date 2026-08-25 12:43:25*
+G04 Created by KiCad (PCBNEW 10.0.6-rc2) date 2026-08-25 12:55:28*
 %MOMM*%
 %LPD*%
 G01*
