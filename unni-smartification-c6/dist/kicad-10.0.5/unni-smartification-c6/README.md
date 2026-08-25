@@ -85,6 +85,8 @@ This refreshes all PCB renders and schematic PNGs under `docs/images/`.
 
 The boards currently use JST-PH connectors where serviceability is useful. If enclosure clearance proves too tight, their exposed through-hole/SMT pads are also suitable for direct wire soldering; this is an assembly fallback, not a separate electrical architecture.
 
+The 3-pin auxiliary connector **J5** is ordered **pin 1 = `CONN_TOUCH`, pin 2 = `CONN_LED+`, pin 3 = `CONN_BTN`**. `CONN_BTN` goes to ESP32-C6 IO22 (module pin 28); the touch-emulation path couples Q10 to `CONN_TOUCH` through populated C32 = 220 pF.
+
 ## Power architecture
 
 ```text

@@ -5061,6 +5061,10 @@
 		(uuid "f9893b05-78a3-482d-b2bd-f9c5b1923a5d")
 	)
 	(no_connect
+		(at 267.97 76.2)
+		(uuid "69cd9b85-56eb-4c10-aa96-ef16def5c8cb")
+	)
+	(no_connect
 		(at 298.45 50.8)
 		(uuid "03303cf9-514e-4715-adff-91fc1a717b5e")
 	)
@@ -12386,7 +12390,7 @@
 				)
 			)
 		)
-		(property "Value" "220pF DNP"
+		(property "Value" "220pF"
 			(at 304.8 171.45 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15428,7 +15432,7 @@
 		(at 87.63 199.39 0)
 		(unit 1)
 		(body_style 1)
-		(exclude_from_sim no)
+		(exclude_from_sim yes)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
@@ -15446,7 +15450,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x02"
+		(property "Value" "Conn_01x03"
 			(at 90.17 200.6599 0)
 			(show_name no)
 			(do_not_autoplace no)

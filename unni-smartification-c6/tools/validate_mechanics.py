@@ -256,14 +256,17 @@ if 'JST_PH_S' not in j4 or '-PH-SM4-TB_' not in j4 or '(attr smd)' not in j4:
 if fp_layer(j4) != "F.Cu":
     fail("J4 must be on F.Cu")
 
-for ref, pins in (("J2",2),("J3",6),("J5",2),("J6",5),("J10",6)):
+for ref, pins in (("J2",2),("J3",6),("J5",3),("J6",5),("J10",6)):
     b = footprint_for_reference(ref)
     if 'Connector_JST:JST_PH_' not in b:
         fail(f"{ref} is not a JST-PH footprint")
     if fp_layer(b) != "F.Cu":
         fail(f"{ref} must be on F.Cu")
-    if ref != "J4" and '(attr through_hole)' not in b:
+    if not re.search(r'\(attr\s+through_hole(?:\s|\))', b):
         fail(f"{ref} is expected to be a THT JST-PH connector on the ESP board")
+    pad_numbers = re.findall(r'\(pad\s+"([^"]+)"', b)
+    if len(pad_numbers) != pins or set(pad_numbers) != {str(i) for i in range(1, pins + 1)}:
+        fail(f"{ref} pad set {pad_numbers!r} does not match expected 1..{pins}")
 
 # Hand-solder variants for all 0603/0805 capacitors currently used in the design.
 for mref in re.finditer(r'\(property\s+"Reference"\s+"(C[0-9]+)"', S):

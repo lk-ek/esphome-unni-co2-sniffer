@@ -5069,6 +5069,10 @@
 		(uuid "1fa1cd7b-74e4-495f-b8a9-5ae9caf9e0ac")
 	)
 	(no_connect
+		(at 267.97 76.2)
+		(uuid "69cd9b85-56eb-4c10-aa96-ef16def5c8cb")
+	)
+	(no_connect
 		(at 298.45 66.04)
 		(uuid "8a466788-b5bf-44d9-a5c5-3559c6c520dc")
 	)
@@ -6052,7 +6056,7 @@
 	)
 	(wire
 		(pts
-			(xy 298.45 81.28) (xy 311.15 81.28)
+			(xy 298.45 81.28) (xy 328.93 81.28)
 		)
 		(stroke
 			(width 0)
@@ -6662,6 +6666,16 @@
 	)
 	(wire
 		(pts
+			(xy 340.36 81.28) (xy 336.55 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cd6425a3-30d0-4f15-9bc4-37940ff3e541")
+	)
+	(wire
+		(pts
 			(xy 78.74 68.58) (xy 78.74 71.12)
 		)
 		(stroke
@@ -7011,6 +7025,30 @@
 		(uuid "d32a87e1-17d9-48ed-a26c-e0361c359be2")
 	)
 	(global_label "TOUCH_TRIGGER"
+		(shape bidirectional)
+		(at 311.15 76.2 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "02ecbb74-c014-4daa-91ef-8ccf20c024e9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 326.1848 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "TOUCH_TRIGGER"
 		(shape input)
 		(at 308.61 177.8 180)
 		(fields_autoplaced yes)
@@ -7223,6 +7261,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_BTN"
+		(shape input)
+		(at 340.36 81.28 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "38e4523f-c2cb-41b5-b8e7-77b9054f1fbb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 350.4245 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -7439,30 +7501,6 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
-			)
-		)
-	)
-	(global_label "CONN_BTN"
-		(shape input)
-		(at 311.15 81.28 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1 1)
-			)
-			(justify left)
-		)
-		(uuid "7bd9df48-2260-4e23-a373-df184f1f29d0")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 321.2145 81.28 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
 			)
 		)
 	)
@@ -8199,30 +8237,6 @@
 		(uuid "ec50752e-57a4-4e3b-9eb6-1f665798c067")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 320.8991 73.66 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
-	(global_label "TOUCH_TRIGGER"
-		(shape bidirectional)
-		(at 311.15 76.2 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1 1)
-			)
-			(justify left)
-		)
-		(uuid "f4782fb6-6462-4ae1-a07c-809d746443a8")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 326.1848 76.2 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12386,7 +12400,7 @@
 				)
 			)
 		)
-		(property "Value" "220pF DNP"
+		(property "Value" "220pF"
 			(at 304.8 171.45 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15424,11 +15438,91 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 332.74 81.28 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f8cf26b8-fd6f-4087-850a-d4d03a32095a")
+		(property "Reference" "R24"
+			(at 332.74 74.93 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Value" "10K"
+			(at 332.74 77.47 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0387ea70-f9f8-4cc4-9328-fb3d3fa267d5")
+		)
+		(pin "2"
+			(uuid "1ee8856f-821a-4873-9a63-29a99e89ac92")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb"
+					(reference "R24")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x03")
 		(at 87.63 199.39 0)
 		(unit 1)
 		(body_style 1)
-		(exclude_from_sim no)
+		(exclude_from_sim yes)
 		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
@@ -15446,7 +15540,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x02"
+		(property "Value" "Conn_01x03"
 			(at 90.17 200.6599 0)
 			(show_name no)
 			(do_not_autoplace no)

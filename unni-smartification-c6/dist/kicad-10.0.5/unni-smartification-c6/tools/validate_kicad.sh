@@ -13,6 +13,8 @@ python3 tools/validate_board_rules.py
 "$KICAD_CLI" sch export netlist --format spice -o spice/exported-from-kicad.cir unni-smartification-c6.kicad_sch
 "$KICAD_CLI" sch export netlist --format kicadxml -o validation/netlist.xml unni-smartification-c6.kicad_sch
 python3 tools/validate_pcb_netmap.py unni-smartification-c6.kicad_pcb validation/netlist.xml
+"$KICAD_CLI" pcb drc --severity-all --refill-zones -o validation/pcb-drc.rpt unni-smartification-c6.kicad_pcb
+python3 tools/validate_pcb_drc.py validation/pcb-drc.rpt
 "$KICAD_CLI" sch erc --severity-all -o validation/erc.rpt unni-smartification-c6.kicad_sch || true
 
 # No unsimulatable placeholder symbols may leak into the SPICE netlist.
@@ -51,8 +53,10 @@ checks={
  ('J1','A7'):'USB_RAW_N', ('J1','A6'):'USB_RAW_P',
  ('U4','1'):'USB_RAW_P', ('U4','2'):'USB_RAW_N', ('U4','3'):'GND',
  ('U10','12'):'BAT_ADC', ('U10','13'):'USB_ADC', ('U10','5'):'BAT_TEMP_ADC', ('U10','6'):'BACKLIGHT_ADC',
- ('U10','27'):'BOOST_CMD', ('U10','19'):'CHARGE_STAT',
+ ('U10','27'):'BOOST_CMD', ('U10','28'):'CONN_BTN', ('U10','19'):'CHARGE_STAT',
  ('R12','1'):'CHARGE_STAT', ('C9','1'):'UNNI_AC', ('C20','1'):'BAT_ADC', ('C21','1'):'BAT_TEMP_ADC', ('C22','1'):'USB_ADC', ('C33','1'):'BACKLIGHT_ADC',
+ ('J5','1'):'CONN_TOUCH', ('J5','2'):'CONN_LED+', ('J5','3'):'CONN_BTN',
+ ('J6','1'):'CONN_SCL', ('J6','2'):'CONN_SDA', ('J6','3'):'CONN_RH', ('J6','4'):'CONN_RT', ('J6','5'):'GND',
 }
 bad=[]
 for key,want in checks.items():
@@ -76,10 +80,13 @@ for comp in root.find('components'):
 if values.get('R3') != '5.1k': bad.append((('R3','value'),'5.1k',values.get('R3')))
 if values.get('U4') != 'TPD2E009DBZR': bad.append((('U4','value'),'TPD2E009DBZR',values.get('U4')))
 if values.get('C22') not in {'100nF','100n'}: bad.append((('C22','value'),'100nF',values.get('C22')))
+if values.get('J5') != 'Conn_01x03': bad.append((('J5','value'),'Conn_01x03',values.get('J5')))
+if values.get('J6') != 'Conn_01x05': bad.append((('J6','value'),'Conn_01x05',values.get('J6')))
+if values.get('C32') != '220pF': bad.append((('C32','value'),'220pF populated touch-coupling capacitor',values.get('C32')))
 if bad:
     for x in bad: print('CONNECTIVITY ERROR:',x)
     raise SystemExit(4)
-print(f'Connectivity assertions passed: {len(checks)} critical pin/net checks + TPD2E009 + 5.1k MCP73831 PROG + USB_ADC RC filter.')
+print(f'Connectivity assertions passed: {len(checks)} critical pin/net checks + 3-pin J5 auxiliary connector + TPD2E009 + 5.1k MCP73831 PROG + USB_ADC RC filter.')
 PY
 
 # In the extracted AppImage environment only missing global library-table warnings are allowed.

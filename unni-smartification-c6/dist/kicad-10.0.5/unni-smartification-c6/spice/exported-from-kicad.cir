@@ -1,11 +1,11 @@
 .title KiCad schematic
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/AO3400A.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/AO3401A.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/MCP73831.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/SS14.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/TPS613222A.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/TPS63031.lib"
-.include "/mnt/data/pcbway_work/unni-smartification-c6/spice/models/USB_HOTPLUG.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/AO3400A.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/AO3401A.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/MCP73831.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/SS14.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/TPS613222A.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/TPS63031.lib"
+.include "/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/dist/kicad-10.0.5/unni-smartification-c6/spice/models/USB_HOTPLUG.lib"
 R1 Net-_J1-CC1_ GND 5.1k
 XQ2 Net-_Q2-G_ +BATT /USB_+_Power/BOOST_IN AO3401A
 R9 Net-_Q3-G_ GND 1Meg
