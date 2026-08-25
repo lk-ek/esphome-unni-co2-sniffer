@@ -4,6 +4,12 @@ Target: **KiCad 10.99 nightly or newer**. The current manufacturing master uses 
 
 This repository contains two physical PCBs in one KiCad PCB file so cross-board connectivity remains visible while routing. Placement and routing are still work in progress; the schematic and power architecture are substantially defined and covered by reproducible connectivity/SPICE checks.
 
+## PCB sponsorship
+
+The prototype PCBs for this project are kindly sponsored by [PCBWay](https://www.pcbway.com/). A big thank-you to PCBWay for supporting the project and helping turn the design into real hardware.
+
+<a href="https://www.pcbway.com/"><img src="docs/images/pcbway-logo.png" alt="PCBWay" width="420"></a>
+
 
 ## Hardware overview
 
