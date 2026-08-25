@@ -6,10 +6,10 @@
   "pcb_conversion": {
     "unni-smartification-c6.kicad_pcb": {
       "constraints_removed": 24,
-      "generated_via_stitch_removed": 12,
+      "generated_via_stitch_removed": 9,
       "design_block_group_links_removed": 1,
       "footprint_transforms_converted": 74,
-      "explicit_vias_preserved": 203,
+      "explicit_vias_preserved": 186,
       "spec_frequency_removed": 3,
       "dielectric_model_removed": 3
     },

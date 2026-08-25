@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <export version="E">
   <design>
-    <source>/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-23T22:20:21</date>
-    <tool>Eeschema 10.99.0-2756-gace8bf0470</tool>
+    <source>/mnt/data/pcbway_work/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
+    <date>2026-08-24T09:57:19</date>
+    <tool>Eeschema 10.99.0-2795-g77a613d64c</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>Unni CO2 Smartification — ESP32-C6 Rev A</title>
@@ -1925,28 +1925,28 @@
             <pin num="34"/>
             <pin num="35"/>
             <pin num="3"/>
-            <pin num="53"/>
-            <pin num="38"/>
-            <pin num="52"/>
-            <pin num="51"/>
-            <pin num="43"/>
-            <pin num="42"/>
-            <pin num="14"/>
-            <pin num="50"/>
-            <pin num="49"/>
-            <pin num="48"/>
-            <pin num="1"/>
-            <pin num="47"/>
-            <pin num="46"/>
-            <pin num="41"/>
-            <pin num="45"/>
-            <pin num="11"/>
-            <pin num="40"/>
-            <pin num="39"/>
-            <pin num="2"/>
             <pin num="36"/>
             <pin num="37"/>
+            <pin num="38"/>
+            <pin num="39"/>
+            <pin num="40"/>
+            <pin num="41"/>
+            <pin num="47"/>
+            <pin num="42"/>
+            <pin num="43"/>
             <pin num="44"/>
+            <pin num="45"/>
+            <pin num="46"/>
+            <pin num="2"/>
+            <pin num="48"/>
+            <pin num="49"/>
+            <pin num="50"/>
+            <pin num="51"/>
+            <pin num="52"/>
+            <pin num="53"/>
+            <pin num="1"/>
+            <pin num="11"/>
+            <pin num="14"/>
             <pin num="4"/>
             <pin num="7"/>
             <pin num="21"/>
@@ -2731,41 +2731,7 @@
       </pins>
     </libpart>
   </libparts>
-  <libraries>
-    <library logical="Battery_Management">
-      <uri>${KICAD10_SYMBOL_DIR}/Battery_Management.kicad_sym</uri>
-    </library>
-    <library logical="Connector_Generic">
-      <uri>${KICAD10_SYMBOL_DIR}/Connector_Generic.kicad_sym</uri>
-    </library>
-    <library logical="Device">
-      <uri>${KICAD10_SYMBOL_DIR}/Device.kicad_sym</uri>
-    </library>
-    <library logical="Diode">
-      <uri>${KICAD10_SYMBOL_DIR}/Diode.kicad_sym</uri>
-    </library>
-    <library logical="Misc">
-      <uri>/Users/lkolbe/Documents/Tinkering/Misc/Misc.kicad_sym</uri>
-    </library>
-    <library logical="Power_Protection">
-      <uri>${KICAD10_SYMBOL_DIR}/Power_Protection.kicad_sym</uri>
-    </library>
-    <library logical="RF_Module">
-      <uri>${KICAD10_SYMBOL_DIR}/RF_Module.kicad_sym</uri>
-    </library>
-    <library logical="Regulator_Switching">
-      <uri>${KICAD10_SYMBOL_DIR}/Regulator_Switching.kicad_sym</uri>
-    </library>
-    <library logical="Simulation_SPICE">
-      <uri>${KICAD10_SYMBOL_DIR}/Simulation_SPICE.kicad_sym</uri>
-    </library>
-    <library logical="Switch">
-      <uri>${KICAD10_SYMBOL_DIR}/Switch.kicad_sym</uri>
-    </library>
-    <library logical="Transistor_FET">
-      <uri>${KICAD10_SYMBOL_DIR}/Transistor_FET.kicad_sym</uri>
-    </library>
-  </libraries>
+  <libraries/>
   <nets>
     <net code="1" name="+3V3" class="Power_3V3">
       <node ref="C10" pin="1" pintype="passive"/>
