@@ -108,6 +108,9 @@ void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);
 
+// Task-context snapshot for cooperative BLE-history scheduling.
+bool capture_in_progress();
+
 #if RTRH_DEBUG_CAPTURE
 void register_debug_handlers();
 

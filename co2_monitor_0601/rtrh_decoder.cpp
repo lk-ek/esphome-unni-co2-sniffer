@@ -703,6 +703,8 @@ void loop() {
 #endif
 }
 
+bool capture_in_progress() { return decoder.collecting; }
+
 static bool temperature_is_valid(const Measurement &m) {
   if (!std::isfinite(m.ref_period_us) || m.ref_period_us < REF_PERIOD_MIN_US ||
       m.ref_period_us > REF_PERIOD_MAX_US)

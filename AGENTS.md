@@ -159,10 +159,11 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
   MyAmbience caches.
 - `runtime_diagnostics` is off in production and compiled out. Keep fast-loop
   capture completion and silence detection independent of housekeeping deadlines.
-- History notifications yield to predicted CO2 windows and any observed active
-  I2C capture. Preserve the connection/CCCD/cursor during normal guards, the
-  bounded reactive failsafe, and the 120-second/15-second transfer watchdogs.
-  Do not move BLE work or guard bookkeeping into the ISR.
+- History notifications yield 800 ms before predicted CO2 or RT/RH windows and
+  to either observed active capture. Preserve the connection/CCCD/cursor during
+  normal guards, BLE drain lead time, bounded reactive failsafe, and the
+  120-second/15-second transfer watchdogs. Do not move BLE work or guard
+  bookkeeping into either ISR.
 - Debug UDP capture may experience lwIP `ENOMEM`; bounded retry/drop behavior
   and the one-client native API limit in debug builds protect heap availability.
 

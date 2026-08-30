@@ -549,14 +549,15 @@ only intervals from 60 seconds through 24 hours. Changing the interval clears
 history incrementally from the main loop (at most one sector erase per loop),
 while sampling and download remain paused.
 
-During a history download, packet production is cooperatively paused around
-the approximately six-second CO2 measurement rhythm. Valid frames continuously
-adapt the predicted period; sending stops 300 ms before the next prediction and
-for at least 150 ms afterwards. Any observed I2C edge capture blocks sending
-reactively, with a 750 ms failsafe, so a malformed/stuck capture cannot starve
-BLE forever. The connection, CCCD subscription, and sample cursor remain intact
-during ordinary pauses. A transfer is aborted without deleting history after
-120 seconds total or 15 seconds without queueing a notification.
+During a history download, packet production is cooperatively paused around the
+approximately six-second CO2 and 30-second RT/RH rhythms. Completed measurements
+continuously adapt both predicted periods; sending stops 800 ms before either
+prediction and for at least 150 ms afterwards, allowing queued BLE work to drain.
+Any observed I2C or RT/RH capture blocks sending reactively, with a 750 ms
+failsafe, so a malformed/stuck capture cannot starve BLE forever. The connection,
+CCCD subscription, and sample cursor remain intact during ordinary pauses. A
+transfer is aborted without deleting history after 120 seconds total or 15
+seconds without queueing a notification.
 
 ---
 

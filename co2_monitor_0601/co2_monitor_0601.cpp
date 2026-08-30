@@ -71,6 +71,10 @@ struct BatteryLearningPersisted {
   uint32_t session_elapsed_minutes;
 };
 
+uint8_t sensor_capture_in_progress_() {
+  return static_cast<uint8_t>((i2c_sniffer::capture_in_progress() ? 0x01U : 0U) |
+                              (rtrh_decoder::capture_in_progress() ? 0x02U : 0U));
+}
 
 }  // namespace
 
@@ -1199,6 +1203,9 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   rtrh_decoder::Measurement m;
   if (!rtrh_decoder::poll(m)) return;
   power_save::on_rtrh_complete();
+#if UNNI_BLE_HISTORY_ENABLED
+  sensirion_history_note_rtrh_cycle();
+#endif
 
   ESP_LOGI(TAG,
            "RT/RH measurement %lu quality: REF %.3f us / %.3f ms / %u, "
@@ -1956,7 +1963,7 @@ void CO2Monitor0601::loop() {
   sensirion_settings_loop();
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_loop(this->io_initialized_ ? &i2c_sniffer::capture_in_progress : nullptr);
+  sensirion_history_loop(this->io_initialized_ ? &sensor_capture_in_progress_ : nullptr);
 #endif
 #if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_history_us,
@@ -2033,6 +2040,9 @@ void CO2Monitor0601::loop() {
     rtrh_decoder::Measurement discarded;
     if (rtrh_decoder::poll(discarded)) {
       power_save::on_rtrh_complete();
+#if UNNI_BLE_HISTORY_ENABLED
+      sensirion_history_note_rtrh_cycle();
+#endif
       ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
                static_cast<unsigned long>(discarded.sequence),
                discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);

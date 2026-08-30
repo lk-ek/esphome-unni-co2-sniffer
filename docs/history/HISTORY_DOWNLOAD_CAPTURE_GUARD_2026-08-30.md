@@ -3,7 +3,7 @@
 
 # History download versus CO2 capture, 2026-08-30
 
-Status: implemented; host build and hardware timing validation pending.
+Status: second guard iteration implemented; repeat hardware validation pending.
 
 ## Failure
 
@@ -29,16 +29,29 @@ and is updated by a 1/8 low-pass step. Elapsed time is divided by the nearest
 period multiple before adaptation, so one missed frame does not teach 12 s.
 Predictions expire after 30 s without a valid frame.
 
-Notification production pauses at `T-300 ms`, remains paused through
+Notification production pauses at `T-800 ms`, remains paused through
 `T+150 ms`, and then resumes from the same packet/sample cursor. It never stops
 GATT, disconnects, changes CCCD, or disables GPIO/RMT capture.
 
+The first hardware run proved the mechanism (`4096` samples, `2048` packets,
+`guard=6 pause(s)/2147 ms`) but still showed `SCL=116/124`, malformed frames,
+and RT/RH quality falling to 91%. The likely residual load was notification work
+already queued in the BLE host/controller. Iteration two therefore expands the
+lead from 300 to 800 ms as an explicit drain phase.
+
+RT/RH now has an independent adaptive 30 s predictor (20--40 s accepted period,
+90 s expiry), combined by OR with the CO2 predictor. Its completion timestamp is
+shifted back 500 ms to approximate the next cycle start, preserving the full
+800 ms drain before the first expected edge. A completed snapshot is an anchor
+even when its derived measurement is rejected: occurrence timing and measurement
+validity are separate concerns.
+
 ### [PATCH 3/4] history: add a reactive backstop
 
-Any observed non-empty I2C capture blocks the next notification immediately.
-Normal completion adds a 25 ms tail. A continuously active/stuck capture stops
-blocking after 750 ms; prediction and the RMT-SCL protocol-validated recovery
-remain independent layers.
+Any observed non-empty I2C capture or collecting RT/RH cycle blocks the next
+notification immediately. Normal completion adds a 25 ms tail. A continuously
+active/stuck capture stops blocking after 750 ms; prediction and the RMT-SCL
+protocol-validated recovery remain independent layers.
 
 ### [PATCH 4/4] history: bound transfer lifetime
 

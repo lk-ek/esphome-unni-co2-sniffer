@@ -152,18 +152,21 @@ the callback only copies fixed-size symbol chunks into SRAM.
 ## Cooperative BLE-history capture guard
 
 The history sender is the controllable source of that BLE load. It therefore
-stops queueing notifications from 300 ms before an adaptively predicted CO2
-frame until at least 150 ms after it. A protocol- and CRC-valid frame updates
-the period estimator; missed cycles are normalized to a multiple of the current
-roughly six-second estimate. Predictions expire after 30 seconds without a
-valid frame.
+stops queueing notifications 800 ms before an adaptively predicted CO2 or RT/RH
+completion until at least 150 ms afterwards. The wider lead time lets already
+queued BLE host/controller work drain. Protocol/CRC-valid CO2 frames and
+completed RT/RH snapshots update independent roughly 6 s/30 s estimators. The
+RT/RH completion anchor is shifted back 500 ms to approximate the cycle start
+(about 383 ms waveform plus 100 ms silence); missed cycles are normalized to a
+multiple of the current estimate. CO2/RT/RH predictions expire after 30/90
+seconds without a new anchor.
 
 Prediction is backed by a reactive task-context snapshot. The ISR still only
-records edges; `capture_in_progress()` reports whether the shared buffer has
-real samples or is frozen for decoding. History transmission pauses immediately
-when the loop observes that state, retains a 25 ms tail after normal completion,
-and ignores a continuously stuck state after 750 ms. RMT-SCL assist remains
-enabled and the sniffer ISR is never disabled by the history scheduler.
+records edges; the I2C and RT/RH `capture_in_progress()` probes report whether
+either decoder has live work. History transmission pauses immediately when the
+loop observes that state, retains a 25 ms tail after normal completion, and
+ignores a continuously stuck state after 750 ms. RMT-SCL assist remains enabled
+and neither ISR is disabled by the history scheduler.
 
 Ordinary pauses preserve the BLE connection, CCCD subscription, packet sequence,
 and sample cursor. The total/no-progress watchdogs abort only transfer state and

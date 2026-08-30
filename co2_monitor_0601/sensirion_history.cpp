@@ -587,7 +587,8 @@ void abort_download(const char *reason, uint32_t now) {
 
 bool capture_guard_blocked(SensirionHistoryCaptureProbe capture_probe) {
   const uint64_t current_us = now_us();
-  capture_guard.set_capture_active(capture_probe != nullptr && capture_probe(), current_us);
+  capture_guard.set_capture_mask(capture_probe != nullptr ? capture_probe() : 0U,
+                                 current_us);
   return capture_guard.blocked(current_us);
 }
 
@@ -792,8 +793,10 @@ void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe) {
 }
 
 void sensirion_history_note_valid_co2_frame() {
-  capture_guard.note_valid_frame(now_us());
+  capture_guard.note_co2_frame(now_us());
 }
+
+void sensirion_history_note_rtrh_cycle() { capture_guard.note_rtrh_cycle(now_us()); }
 
 void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server) {
   configure_gatt_impl(server);

@@ -203,9 +203,9 @@ bool CO2Monitor0601::run_portable_self_test_() {
 
   sensirion_history_guard::Guard history_guard{};
   constexpr uint64_t anchor_us = 1000000ULL;
-  history_guard.note_valid_frame(anchor_us);
-  if (history_guard.blocked(anchor_us + 5699999ULL) ||
-      !history_guard.blocked(anchor_us + 5700000ULL) ||
+  history_guard.note_co2_frame(anchor_us);
+  if (history_guard.blocked(anchor_us + 5199999ULL) ||
+      !history_guard.blocked(anchor_us + 5200000ULL) ||
       !history_guard.blocked(anchor_us + 6150000ULL) ||
       history_guard.blocked(anchor_us + 6150001ULL) ||
       history_guard.blocked(anchor_us + 31000000ULL)) {
@@ -234,16 +234,36 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
+  sensirion_history_guard::Guard overlap_guard{};
+  overlap_guard.set_capture_mask(0x01U, anchor_us);
+  overlap_guard.set_capture_mask(0x03U, anchor_us + 700000ULL);
+  if (!overlap_guard.blocked(anchor_us + 1400000ULL) ||
+      overlap_guard.blocked(anchor_us + 1450001ULL)) {
+    ESP_LOGE(TAG, "portable self-test: overlapping capture guards were not independent");
+    return false;
+  }
+
   sensirion_history_guard::Guard adaptive_guard{};
-  adaptive_guard.note_valid_frame(anchor_us);
-  adaptive_guard.note_valid_frame(anchor_us + 6400000ULL);
-  if (adaptive_guard.estimated_period_us != 6050000ULL) {
+  adaptive_guard.note_co2_frame(anchor_us);
+  adaptive_guard.note_co2_frame(anchor_us + 6400000ULL);
+  if (adaptive_guard.co2.estimated_period_us != 6050000ULL) {
     ESP_LOGE(TAG, "portable self-test: adaptive history period update failed");
     return false;
   }
-  adaptive_guard.note_valid_frame(anchor_us + 6400000ULL + 12100000ULL);
-  if (adaptive_guard.estimated_period_us != 6050000ULL) {
+  adaptive_guard.note_co2_frame(anchor_us + 6400000ULL + 12100000ULL);
+  if (adaptive_guard.co2.estimated_period_us != 6050000ULL) {
     ESP_LOGE(TAG, "portable self-test: missed-frame period normalization failed");
+    return false;
+  }
+
+  sensirion_history_guard::Guard rtrh_guard{};
+  rtrh_guard.note_rtrh_cycle(anchor_us + sensirion_history_guard::RTRH_COMPLETION_LAG_US);
+  if (rtrh_guard.blocked(anchor_us + 29199999ULL) ||
+      !rtrh_guard.blocked(anchor_us + 29200000ULL) ||
+      !rtrh_guard.blocked(anchor_us + 30150000ULL) ||
+      rtrh_guard.blocked(anchor_us + 30150001ULL) ||
+      rtrh_guard.blocked(anchor_us + 91000000ULL)) {
+    ESP_LOGE(TAG, "portable self-test: RT/RH history guard boundaries failed");
     return false;
   }
 
