@@ -27,6 +27,7 @@
 #include "esp_intr_alloc.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_heap_caps.h"
+#include "esp_sleep.h"
 #include "esp_timer.h"
 #include "esphome/core/log.h"
 #include "esphome/core/application.h"
@@ -1620,7 +1621,22 @@ void CO2Monitor0601::reset_co2_capture_gate_() {
   this->co2_gate_requested_ = false;
   this->co2_idle_since_ms_ = 0;
   this->co2_guard_since_ms_ = 0;
+  this->co2_wake_trace_.wake_observed_ms = 0;
+  this->co2_wake_trace_.capture_rearmed_ms = 0;
+  this->co2_wake_trace_.awaiting_first_capture = false;
   i2c_sniffer::set_capture_enabled(true);
+}
+
+void CO2Monitor0601::begin_co2_wake_trace_(const char *reason) {
+  auto &trace = this->co2_wake_trace_;
+  trace.sequence++;
+  trace.power_down_ms = millis();
+  trace.wake_observed_ms = 0;
+  trace.capture_rearmed_ms = 0;
+  trace.awaiting_first_capture = false;
+  ESP_LOGI(TAG, "CO2 wake trace: seq=%lu event=power_down t=%lu ms reason=%s",
+           static_cast<unsigned long>(trace.sequence),
+           static_cast<unsigned long>(trace.power_down_ms), reason);
 }
 
 void CO2Monitor0601::gate_co2_capture_after_window_() {
@@ -1687,6 +1703,7 @@ void CO2Monitor0601::process_co2_capture_gate_() {
         power_save::set_co2_bus_powered_down(true);
         this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WakeArmed;
         this->co2_window_observations_ = 0;
+        this->begin_co2_wake_trace_("quiet_fallback");
         ESP_LOGI(TAG, "CO2 bus quiet fallback: passive sniffer off; GPIO7 wake armed");
       }
       break;
@@ -1722,6 +1739,7 @@ void CO2Monitor0601::process_co2_capture_gate_() {
         power_save::set_co2_bus_powered_down(true);
         this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WakeArmed;
         this->co2_window_observations_ = 0;
+        this->begin_co2_wake_trace_("measurement_window");
         ESP_LOGI(TAG, "CO2 shutdown blanking complete: GPIO7 HIGH wake armed; I2C sniffer remains off");
       }
       break;
@@ -1730,9 +1748,29 @@ void CO2Monitor0601::process_co2_capture_gate_() {
       // The powered-down bus idles LOW/LOW. Its next power-up raises one or
       // both lines; GPIO7 HIGH wakes the ESP before the useful transaction.
       if (!low_low) {
+        auto &trace = this->co2_wake_trace_;
+        trace.wake_observed_ms = now;
+        const esp_sleep_wakeup_cause_t wake_cause = esp_sleep_get_wakeup_cause();
+        const uint64_t gpio_wakeup_status = esp_sleep_get_gpio_wakeup_status();
+        const bool scl_gpio_asserted =
+            this->co2_scl_pin_ < 64 && (gpio_wakeup_status & (1ULL << this->co2_scl_pin_)) != 0;
+        ESP_LOGI(TAG,
+                 "CO2 wake trace: seq=%lu event=gpio7_wake_observed t=%lu ms since_power_down=%lu ms "
+                 "observation=bus_left_low_low wake_cause=%d gpio_mask=0x%08lx scl_gpio=%u scl_asserted=%s",
+                 static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(now),
+                 static_cast<unsigned long>(now - trace.power_down_ms), static_cast<int>(wake_cause),
+                 static_cast<unsigned long>(gpio_wakeup_status & 0xFFFFFFFFULL),
+                 static_cast<unsigned>(this->co2_scl_pin_), scl_gpio_asserted ? "yes" : "no");
         power_save::set_co2_bus_powered_down(false);
         i2c_sniffer::set_capture_enabled(true);
         i2c_sniffer::rearm_after_light_sleep();
+        trace.capture_rearmed_ms = millis();
+        trace.awaiting_first_capture = true;
+        ESP_LOGI(TAG,
+                 "CO2 wake trace: seq=%lu event=capture_rearm t=%lu ms since_wake_observed=%lu ms",
+                 static_cast<unsigned long>(trace.sequence),
+                 static_cast<unsigned long>(trace.capture_rearmed_ms),
+                 static_cast<unsigned long>(trace.capture_rearmed_ms - trace.wake_observed_ms));
         this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
         this->co2_window_observations_ = 0;
         this->co2_gate_requested_ = false;
@@ -1750,6 +1788,7 @@ void CO2Monitor0601::process_co2_() {
 
   co2_decoder::Result result;
   result.frame_errors = capture.frame_errors;
+  bool co2_protocol_frame_seen = false;
 #if RTRH_DEBUG_CAPTURE
   const char *freeze_reason = capture.frame_errors ? "I2C framing/capture error" : nullptr;
   if (capture.rmt_scl_edges_recovered != 0) {
@@ -1794,6 +1833,7 @@ void CO2Monitor0601::process_co2_() {
     const uint32_t frame_errors_before = result.frame_errors;
 #endif
     if (co2_decoder::process_frame(frame, result)) {
+      co2_protocol_frame_seen = true;
 #if RTRH_DEBUG_CAPTURE
       if (result.crc_errors != crc_errors_before) {
         i2c_sniffer::log_frame(frame, "CO2 CRC error frame");
@@ -1814,6 +1854,36 @@ void CO2Monitor0601::process_co2_() {
   if (freeze_reason)
     i2c_sniffer::freeze_last_capture(capture.debug_raw_sequence, freeze_reason);
 #endif
+
+  if (this->co2_wake_trace_.awaiting_first_capture) {
+    auto &trace = this->co2_wake_trace_;
+    trace.awaiting_first_capture = false;
+    const uint32_t outcome_ms = millis();
+    if (result.have_co2) {
+      const char *outcome = (result.crc_errors != 0 || result.frame_errors != 0) ? "valid_with_errors" : "valid";
+      ESP_LOGI(TAG,
+               "CO2 wake trace: seq=%lu event=first_capture t=%lu ms since_rearm=%lu ms outcome=%s "
+               "ppm=%u frames=%u raw_scl_edges=%u capture_errors=%lu frame_errors=%lu crc_errors=%lu",
+               static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(outcome_ms),
+               static_cast<unsigned long>(outcome_ms - trace.capture_rearmed_ms), outcome,
+               static_cast<unsigned>(result.co2_ppm), static_cast<unsigned>(capture.frame_count),
+               static_cast<unsigned>(capture.raw_scl_edges), static_cast<unsigned long>(capture.frame_errors),
+               static_cast<unsigned long>(result.frame_errors), static_cast<unsigned long>(result.crc_errors));
+    } else {
+      const char *outcome = result.crc_errors != 0       ? "crc_error"
+                            : result.frame_errors != 0   ? "frame_error"
+                            : co2_protocol_frame_seen    ? "protocol_no_measurement"
+                                                         : "unhandled_capture";
+      ESP_LOGW(TAG,
+               "CO2 wake trace: seq=%lu event=first_capture t=%lu ms since_rearm=%lu ms outcome=%s "
+               "frames=%u raw_scl_edges=%u capture_errors=%lu frame_errors=%lu crc_errors=%lu",
+               static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(outcome_ms),
+               static_cast<unsigned long>(outcome_ms - trace.capture_rearmed_ms), outcome,
+               static_cast<unsigned>(capture.frame_count), static_cast<unsigned>(capture.raw_scl_edges),
+               static_cast<unsigned long>(capture.frame_errors), static_cast<unsigned long>(result.frame_errors),
+               static_cast<unsigned long>(result.crc_errors));
+    }
+  }
 
 #if UNNI_BLE_HISTORY_ENABLED
   if (result.have_co2 || result.frame_errors != 0) {

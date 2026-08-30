@@ -341,6 +341,7 @@ class CO2Monitor0601 : public Component {
   void process_active_i2c_probe_();
   void accept_co2_ppm_(uint16_t ppm, const char *source);
   void reset_co2_capture_gate_();
+  void begin_co2_wake_trace_(const char *reason);
   void gate_co2_capture_after_window_();
   void process_co2_capture_gate_();
   bool setup_battery_adc_();
@@ -402,6 +403,13 @@ class CO2Monitor0601 : public Component {
   uint32_t co2_guard_since_ms_{0};
   uint32_t co2_wake_idle_stable_ms_{500};
   uint32_t co2_wake_guard_time_ms_{500};
+  struct Co2WakeTrace {
+    uint32_t sequence{0};
+    uint32_t power_down_ms{0};
+    uint32_t wake_observed_ms{0};
+    uint32_t capture_rearmed_ms{0};
+    bool awaiting_first_capture{false};
+  } co2_wake_trace_;
   std::string debug_udp_host_;
   uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED
