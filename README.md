@@ -286,9 +286,8 @@ co2_monitor_0601:
   ble: true
   ble_live: true
   ble_history: true
-  # Keep legacy_fixed for existing bonds/caches. Use device_derived before
-  # commissioning multiple monitors that need unique BLE identities.
-  ble_identity_mode: legacy_fixed
+  # BLE identity defaults to device_derived; no identity option is required.
+  # Use legacy_fixed only to retain an older fixed identity/bond cache.
   ble_advertising_interval: 2s
   ble_battery_advertising_interval: 3s
 
@@ -490,12 +489,13 @@ co2_monitor_0601:
 
 `ble_device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option.
 
-`ble_identity_mode` defaults to `legacy_fixed`, preserving the address/device
-ID used by existing installations. `device_derived` instead derives a stable,
-locally administered Bluetooth address and Device ID from the ESP eFuse MAC so
-multiple monitors do not collide. Changing this option changes BLE identity and
-can invalidate existing bonds and MyAmbience caches; it is never migrated
-automatically.
+`ble_identity_mode` defaults to `device_derived` and therefore needs no YAML
+configuration. It derives a stable, locally administered Bluetooth address and
+Device ID from the ESP eFuse MAC so multiple monitors do not collide.
+`legacy_fixed` remains available only as an explicit compatibility override for
+installations that must retain the old fixed identity. Changing identity can
+invalidate existing bonds and MyAmbience caches and may require opening Pairing
+Mode once in Home Assistant.
 
 The GAP name used by the normal compatibility mode is:
 
@@ -541,13 +541,26 @@ The history ring is persistent across normal reboots.
 
 The 4096-sample history is flash-backed. Only a small pending write ring is kept in RAM, so enabling MyAmbience history does not require a second 32 KiB in-memory copy of the persistent sample store.
 
-History metadata uses a redundant version-3 A/B journal in the first and last
-sectors of the 64 KiB partition; the 14 data sectors and sample wire layout are
-unchanged. Version-2 metadata is read in place and migrated on the next metadata
-flush. Failed metadata writes remain dirty and are retried. A client may select
-only intervals from 60 seconds through 24 hours. Changing the interval clears
-history incrementally from the main loop (at most one sector erase per loop),
-while sampling and download remain paused.
+History metadata uses a redundant version-4 A/B journal in the first and last
+sectors of the 64 KiB partition; the 14 data sectors and 8-byte sample wire
+layout are unchanged. Version-2/3 metadata is read in place and migrated on the
+next metadata flush. V4 uses the two formerly reserved metadata words for a
+sparse wall-clock anchor and the sample count of the newest continuous run. The
+anchor is created only when a run starts after a reboot/cadence gap, when the
+wall clock first becomes valid, or after a material wall-clock correction; it is
+not stored per sample. API-enabled variants obtain UTC from Home Assistant. The
+BLE-only build has no wall-clock source and therefore starts a new relative run
+after reboot rather than inventing timestamps. Failed metadata writes remain
+dirty and are retried. A client may select only intervals from 60 seconds
+through 24 hours. Changing the interval clears history incrementally from the
+main loop (at most one sector erase per loop), while sampling and download
+remain paused.
+
+The official Sensirion download format has one header with one interval and one
+`age-of-latest-sample`, so it cannot describe gaps inside a transfer. MyAmbience
+therefore receives only the newest continuous run (or the newest requested
+subset of that run). Older samples remain stored in the flash ring but are not
+misrepresented as contiguous data after a gap.
 
 During a history download, packet production is cooperatively paused around the
 approximately six-second CO2 and 30-second RT/RH rhythms. Completed measurements

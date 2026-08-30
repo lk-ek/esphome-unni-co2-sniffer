@@ -3,7 +3,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor, switch
+from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor, switch, time as time_component
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
@@ -61,6 +61,7 @@ CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_BLE_DEVICE_NAME = "ble_device_name"
 CONF_BLE_IDENTITY_MODE = "ble_identity_mode"
+CONF_HISTORY_TIME_ID = "history_time_id"
 CONF_RUNTIME_DIAGNOSTICS = "runtime_diagnostics"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_HOME_ASSISTANT = "home_assistant"
@@ -383,6 +384,7 @@ def _validate_features(config):
     if CORE.is_host:
         config.pop(CONF_BLE_ID, None)
         config.pop(CONF_BLE_SERVER_ID, None)
+        config.pop(CONF_HISTORY_TIME_ID, None)
 
     if not config[CONF_BLE]:
         config.pop(CONF_BLE_ID, None)
@@ -412,9 +414,10 @@ _SCHEMA = {
     cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
     cv.Optional(CONF_BLE_DEVICE_NAME, default="Unni CO2 Monitor"): _ble_name,
-    cv.Optional(CONF_BLE_IDENTITY_MODE, default="legacy_fixed"): cv.one_of(
+    cv.Optional(CONF_BLE_IDENTITY_MODE, default="device_derived"): cv.one_of(
         "legacy_fixed", "device_derived", lower=True
     ),
+    cv.Optional(CONF_HISTORY_TIME_ID): cv.use_id(time_component.RealTimeClock),
     cv.GenerateID(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
     cv.GenerateID(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
     cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="2s"): cv.All(
@@ -606,6 +609,10 @@ async def to_code(config):
         # windows as well. The callback itself is IRAM_ATTR and uses only
         # fixed internal-SRAM storage.
         add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
+
+    if CONF_HISTORY_TIME_ID in config and not CORE.is_host:
+        history_time = await cg.get_variable(config[CONF_HISTORY_TIME_ID])
+        cg.add(var.set_history_time(history_time))
 
     if ble_enabled:
         cg.add(var.set_ble_device_name(config[CONF_BLE_DEVICE_NAME]))

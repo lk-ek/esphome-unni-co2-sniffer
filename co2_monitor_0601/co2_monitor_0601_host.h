@@ -13,6 +13,7 @@
 #include <string>
 
 namespace esphome {
+namespace time { class RealTimeClock; }
 namespace co2_monitor_0601 {
 
 class CO2Monitor0601;
@@ -56,6 +57,7 @@ class CO2Monitor0601 : public Component {
   void set_ble_device_name(const std::string &value) { this->ble_device_name_ = value; }
 
   void set_ha_publish_interval(uint32_t value) { this->ha_publish_interval_ms_ = value; }
+  void set_history_time(time::RealTimeClock *) {}
   void set_sniffer_enabled(bool value) { this->sniffer_enabled_ = value; }
   void set_rtrh_enabled(bool value) { this->rtrh_enabled_ = value; }
   void set_rtrh_edge_capture(bool value) { this->rtrh_edge_capture_ = value; }

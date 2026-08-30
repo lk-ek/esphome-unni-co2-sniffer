@@ -43,6 +43,12 @@ wifi:
     password: !secret i2csniffer__ap_password
 
 
+# Wall clock for sparse persistent history anchors.
+time:
+  - platform: homeassistant
+    id: unni_wall_clock
+
+
 # Match the SHT43 DemoBoard security model closely enough to probe
 # MyAmbience pairing and Device Settings behavior.
 esp32_ble:
@@ -57,6 +63,7 @@ esp32:
     type: esp-idf
 
 co2_monitor_0601:
+  history_time_id: unni_wall_clock
   id: unni_co2_monitor
   home_assistant: true
   # Experimental identity only: advertise as a new SHT43 DemoBoard so

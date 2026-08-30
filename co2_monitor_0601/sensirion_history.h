@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <esp_gatts_api.h>
+#include "esphome/components/time/real_time_clock.h"
 #include "esphome/components/esp32_ble_server/ble_server.h"
 
 namespace esphome {
@@ -14,7 +15,7 @@ namespace co2_monitor_0601 {
 // Bit 0: I2C capture, bit 1: RT/RH capture.
 using SensirionHistoryCaptureProbe = uint8_t (*)();
 
-void sensirion_history_setup();
+void sensirion_history_setup(time::RealTimeClock *wall_clock);
 void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe);
 void sensirion_history_note_valid_co2_frame();
 void sensirion_history_note_rtrh_cycle();

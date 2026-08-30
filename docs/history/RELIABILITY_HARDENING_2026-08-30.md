@@ -3,7 +3,7 @@
 
 # Reliability hardening, 2026-08-30
 
-Status: implemented; host, target, radio, power, and PCB validation pending.
+Status: implemented at this revision; later same-day sparse-time V4 metadata and device-derived-default changes supersede the history/identity defaults below.
 
 This note is the review map for one large working-tree change. It records the
 logical patch order, compatibility contract, and remaining proof obligations.

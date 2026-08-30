@@ -26,6 +26,7 @@
 #endif
 
 namespace esphome {
+namespace time { class RealTimeClock; }
 namespace co2_monitor_0601 {
 
 class CO2Monitor0601;
@@ -76,6 +77,7 @@ class CO2Monitor0601 : public Component {
 #endif
 
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
+  void set_history_time(time::RealTimeClock *value) { this->history_time_ = value; }
   void set_sniffer_enabled(bool value) { this->sniffer_enabled_ = value; }
   void set_rtrh_enabled(bool value) { this->rtrh_enabled_ = value; }
   void set_rtrh_edge_capture(bool value) { this->rtrh_edge_capture_ = value; }
@@ -347,6 +349,7 @@ class CO2Monitor0601 : public Component {
   static void runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us);
 #endif
 
+  time::RealTimeClock *history_time_{nullptr};
   bool sniffer_enabled_{true};
   bool i2c_rmt_scl_assist_{false};
   bool rtrh_enabled_{true};

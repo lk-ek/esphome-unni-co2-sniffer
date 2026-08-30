@@ -45,6 +45,7 @@ REMOVE_TOP_LEVEL = {
     "captive_portal",
     "esp32_ble",
     "esp32",
+    "time",
 }
 
 TOP_LEVEL_KEY = re.compile(r"^([a-zA-Z0-9_]+):(?:\s|$)")

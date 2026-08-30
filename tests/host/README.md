@@ -5,8 +5,8 @@ external component. It uses ESPHome's official `host:` platform.
 
 `run_host_tests.py` derives a temporary native-host configuration from each of
 the five shipped device YAML files. It removes only top-level blocks that are
-ESP32/network/radio specific (`esp32`, `esp32_ble`, `wifi`, `api`, `ota`, and
-`captive_portal`) and retains the real `co2_monitor_0601:` feature block.
+ESP32/network/radio specific (`esp32`, `esp32_ble`, `wifi`, `api`, `ota`, `captive_portal`, and
+`time`) and retains the real `co2_monitor_0601:` feature block.
 Therefore changes to a shipped variant automatically flow into its host test.
 
 The component's native host implementation keeps the same code-generation

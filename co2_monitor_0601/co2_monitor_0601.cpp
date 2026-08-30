@@ -1039,7 +1039,7 @@ void CO2Monitor0601::setup() {
   }
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_setup();
+  sensirion_history_setup(this->history_time_);
 #endif
 
   this->setup_usb_power_();

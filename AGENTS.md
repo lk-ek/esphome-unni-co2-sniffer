@@ -147,16 +147,16 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
 - History is a flash-backed 4096-sample ring with a small pending RAM queue.
   Avoid large in-RAM duplication and preserve persistence compatibility unless
   an explicit migration is designed and tested.
-- History metadata V3 is an A/B journal in 4-KiB erase sectors 0 and 15 of the
+- History metadata V4 is an A/B journal in 4-KiB erase sectors 0 and 15 of the
   64-KiB partition; data sectors 1..14 and the sample wire format remain stable.
-  Keep V2 read/migration support, wrap-safe generation comparison, and retry
-  dirty metadata until checkpointed.
+  Keep V2/V3 read/migration support, wrap-safe generation comparison, sparse
+  latest-run time anchors, and retry dirty metadata until checkpointed.
 - History intervals are limited to 60 seconds through 24 hours. Changing one
   queues asynchronous clearing: pause sampling/download and erase at most one
   sector per loop. BLE callbacks must not erase flash or synchronize preferences.
-- `ble_identity_mode: legacy_fixed` is the compatibility default. Treat
-  `device_derived` as an explicit migration because it can invalidate bonds and
-  MyAmbience caches.
+- `ble_identity_mode: device_derived` is the production default and requires no
+  YAML entry. `legacy_fixed` remains an explicit compatibility override for old
+  bonds/caches; changing identity in either direction can require re-pairing.
 - `runtime_diagnostics` is off in production and compiled out. Keep fast-loop
   capture completion and silence detection independent of housekeeping deadlines.
 - History notifications yield 800 ms before predicted CO2 or RT/RH windows and

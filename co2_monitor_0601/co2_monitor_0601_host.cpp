@@ -196,7 +196,12 @@ bool CO2Monitor0601::run_portable_self_test_() {
       sensirion_history_format::interval_valid(59999) ||
       sensirion_history_format::interval_valid(86400001) ||
       !sensirion_history_format::generation_newer(0, UINT32_MAX) ||
-      sensirion_history_format::generation_newer(UINT32_MAX, 0)) {
+      sensirion_history_format::generation_newer(UINT32_MAX, 0) ||
+      !sensirion_history_format::cadence_gap(120000, 60000) ||
+      sensirion_history_format::cadence_gap(119999, 60000) ||
+      !sensirion_history_format::wall_clock_valid(1577836800UL) ||
+      sensirion_history_format::wall_clock_valid(1577836799UL) ||
+      sensirion_history_format::run_latest_epoch_s(1700000000UL, 3, 60000) != 1700000120UL) {
     ESP_LOGE(TAG, "portable self-test: history bounds/generation wrap failed");
     return false;
   }

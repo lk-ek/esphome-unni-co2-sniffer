@@ -18,6 +18,7 @@
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include "esphome/components/esp32_ble_server/ble_service.h"
 #include "esphome/core/log.h"
+#include "esphome/components/time/real_time_clock.h"
 
 #include "esp_partition.h"
 #include "esp_timer.h"
@@ -52,7 +53,8 @@ constexpr uint16_t FLASH_CAPACITY = FLASH_DATA_SECTORS * FLASH_SAMPLES_PER_SECTO
 static_assert(HISTORY_CAPACITY <= FLASH_CAPACITY);
 constexpr uint32_t META_MAGIC = 0x53474832;  // "SGH2"
 constexpr uint16_t META_VERSION_V2 = 2;
-constexpr uint16_t META_VERSION = 3;
+constexpr uint16_t META_VERSION_V3 = 3;
+constexpr uint16_t META_VERSION = 4;
 constexpr uint16_t DOWNLOAD_TYPE = 7;
 
 using Sample = std::array<uint8_t, SAMPLE_SIZE>;
@@ -82,7 +84,12 @@ struct HistoryState {
   uint32_t interval_ms{DEFAULT_INTERVAL_MS};
   uint32_t latest_ms{0};
   uint32_t last_sample_ms{0};
+  uint32_t run_anchor_epoch_s{0};
+  uint32_t last_sample_epoch_s{0};
+  uint16_t run_count{0};
   bool clock_started{false};
+  bool run_relative_age_valid{false};
+  bool force_new_run_on_next_sample{false};
 };
 
 struct FlashState {
@@ -146,6 +153,8 @@ DownloadState download;
 ClearState clearing;
 sensirion_history_guard::Guard capture_guard;
 uint32_t last_sampling_poll_ms = 0;
+uint16_t last_synced_downloadable_count = UINT16_MAX;
+time::RealTimeClock *wall_clock = nullptr;
 
 uint64_t now_us() {
   return static_cast<uint64_t>(esp_timer_get_time());
@@ -172,22 +181,41 @@ void put_u32_le(uint8_t *p, uint32_t v) {
     p[i] = static_cast<uint8_t>(v >> (8 * i));
 }
 
-uint32_t meta_crc(const FlashMeta &meta) {
-  const auto *p = reinterpret_cast<const uint8_t *>(&meta);
-  uint32_t hash = 2166136261UL;
-  for (size_t i = 0; i < offsetof(FlashMeta, crc); ++i) {
+uint32_t fnv1a_update(uint32_t hash, const uint8_t *p, size_t size) {
+  for (size_t i = 0; i < size; ++i) {
     hash ^= p[i];
     hash *= 16777619UL;
   }
   return hash;
 }
 
+uint32_t meta_crc_legacy(const FlashMeta &meta) {
+  const auto *p = reinterpret_cast<const uint8_t *>(&meta);
+  return fnv1a_update(2166136261UL, p, offsetof(FlashMeta, crc));
+}
+
+uint32_t meta_crc_v4(const FlashMeta &meta) {
+  const auto *p = reinterpret_cast<const uint8_t *>(&meta);
+  uint32_t hash = fnv1a_update(2166136261UL, p, offsetof(FlashMeta, crc));
+  return fnv1a_update(hash, reinterpret_cast<const uint8_t *>(&meta.reserved1),
+                      sizeof(meta.reserved1));
+}
+
+uint32_t meta_crc(const FlashMeta &meta) {
+  return meta.version >= META_VERSION ? meta_crc_v4(meta) : meta_crc_legacy(meta);
+}
+
 bool valid_meta(const FlashMeta &meta) {
-  return meta.magic == META_MAGIC &&
-         (meta.version == META_VERSION_V2 || meta.version == META_VERSION) &&
-         meta.size == sizeof(FlashMeta) && meta.count <= HISTORY_CAPACITY &&
-         meta.flash_write_slot < FLASH_CAPACITY && meta.interval_ms > 0 &&
-         meta.crc == meta_crc(meta);
+  if (meta.magic != META_MAGIC ||
+      (meta.version != META_VERSION_V2 && meta.version != META_VERSION_V3 &&
+       meta.version != META_VERSION) ||
+      meta.size != sizeof(FlashMeta) || meta.count > HISTORY_CAPACITY ||
+      meta.flash_write_slot >= FLASH_CAPACITY || meta.interval_ms == 0 ||
+      meta.crc != meta_crc(meta))
+    return false;
+  if (meta.version == META_VERSION && meta.reserved1 > meta.count)
+    return false;
+  return true;
 }
 
 size_t meta_offset(uint16_t sector, uint16_t slot) {
@@ -230,13 +258,40 @@ bool logical_sample(uint16_t logical, Sample &sample) {
   return true;
 }
 
+uint32_t wall_clock_epoch_s() {
+  if (wall_clock == nullptr) return 0;
+  const auto utc = wall_clock->utcnow();
+  if (!utc.is_valid()) return 0;
+  const auto epoch = static_cast<uint64_t>(utc.timestamp);
+  if (epoch > UINT32_MAX) return 0;
+  const uint32_t epoch_s = static_cast<uint32_t>(epoch);
+  return sensirion_history_format::wall_clock_valid(epoch_s) ? epoch_s : 0;
+}
+
+bool restored_run_age_available() {
+  if (history.run_count == 0 || history.run_anchor_epoch_s == 0) return false;
+  const uint32_t now_epoch_s = wall_clock_epoch_s();
+  if (now_epoch_s == 0) return false;
+  const uint32_t latest_epoch_s = sensirion_history_format::run_latest_epoch_s(
+      history.run_anchor_epoch_s, history.run_count, history.interval_ms);
+  return latest_epoch_s != 0 && now_epoch_s >= latest_epoch_s;
+}
+
+uint16_t downloadable_count() {
+  if (history.run_count == 0) return 0;
+  if (history.run_relative_age_valid || restored_run_age_available()) return history.run_count;
+  return 0;
+}
+
 void sync_gatt() {
   auto u32 = [](uint32_t v) {
     return std::vector<uint8_t>{static_cast<uint8_t>(v), static_cast<uint8_t>(v >> 8),
                                 static_cast<uint8_t>(v >> 16), static_cast<uint8_t>(v >> 24)};
   };
+  const uint16_t visible_count = downloadable_count();
   if (gatt.count != nullptr)
-    gatt.count->set_value(u32(history.count));
+    gatt.count->set_value(u32(visible_count));
+  last_synced_downloadable_count = visible_count;
   if (gatt.interval != nullptr)
     gatt.interval->set_value(u32(history.interval_ms));
 }
@@ -269,6 +324,8 @@ bool write_meta() {
   meta.interval_ms = history.interval_ms;
   meta.count = flash.persisted;
   meta.flash_write_slot = flash.write_slot;
+  meta.reserved0 = history.run_anchor_epoch_s;
+  meta.reserved1 = history.run_count;
   meta.crc = meta_crc(meta);
 
   const size_t offset = meta_offset(flash.meta_sector, flash.next_meta_slot);
@@ -287,7 +344,11 @@ bool write_meta() {
 void reset_history_in_memory() {
   history.pending_head = history.count = history.pending = 0;
   history.latest_ms = history.last_sample_ms = 0;
+  history.run_anchor_epoch_s = history.last_sample_epoch_s = 0;
+  history.run_count = 0;
   history.clock_started = false;
+  history.run_relative_age_valid = false;
+  history.force_new_run_on_next_sample = false;
   flash.write_slot = flash.persisted = 0;
   download = {};
 }
@@ -482,22 +543,34 @@ void init_flash() {
   flash.generation = best.generation;
   flash.meta_sector = best_sector;
   flash.next_meta_slot = std::max<uint16_t>(best_slot + 1, occupied_after_best_sector);
-  flash.metadata_dirty = best.version == META_VERSION_V2;
+  flash.metadata_dirty = best.version != META_VERSION;
 
   history.count = best.count;
   history.pending = 0;
   history.pending_head = 0;
   flash.persisted = best.count;
   history.latest_ms = flash.last_flush_ms = now_ms();
+  if (best.version == META_VERSION) {
+    history.run_anchor_epoch_s = best.reserved0;
+    history.run_count = static_cast<uint16_t>(std::min<uint32_t>(best.reserved1, best.count));
+  } else {
+    // V2/V3 did not persist gap/run timing. Keep the samples, but do not expose
+    // them as a falsely continuous MyAmbience run after migration.
+    history.run_anchor_epoch_s = 0;
+    history.run_count = 0;
+  }
+  history.run_relative_age_valid = false;
+  history.force_new_run_on_next_sample = history.count != 0;
 
-  ESP_LOGI(TAG, "restored %u sample(s), interval=%u ms, flash_slot=%u",
-           static_cast<unsigned>(history.count), static_cast<unsigned>(history.interval_ms),
-           static_cast<unsigned>(flash.write_slot));
+  ESP_LOGI(TAG, "restored %u sample(s), latest continuous run=%u, interval=%u ms, flash_slot=%u",
+           static_cast<unsigned>(history.count), static_cast<unsigned>(history.run_count),
+           static_cast<unsigned>(history.interval_ms), static_cast<unsigned>(flash.write_slot));
   if (flash.metadata_dirty)
-    ESP_LOGI(TAG, "version-2 history metadata will migrate to redundant version 3 on next loop flush");
+    ESP_LOGI(TAG, "legacy history metadata v%u will migrate to sparse-time version 4 on next loop flush",
+             static_cast<unsigned>(best.version));
 }
 
-void commit_sample() {
+void commit_sample(bool new_run) {
   const auto &sample = sensirion_ble_sample();
   if (!sample.complete())
     return;
@@ -508,12 +581,48 @@ void commit_sample() {
     ESP_LOGW(TAG, "history pending ring full; dropping newest sample because flash flush failed");
     return;
   }
+  const uint32_t sample_now_ms = now_ms();
+  const uint32_t sample_epoch_s = wall_clock_epoch_s();
+
+  if (!new_run && history.run_count > 0 && history.last_sample_epoch_s != 0 && sample_epoch_s != 0) {
+    const uint32_t expected_epoch_s = history.last_sample_epoch_s + history.interval_ms / 1000U;
+    const uint32_t delta_s = sample_epoch_s > expected_epoch_s
+                                 ? sample_epoch_s - expected_epoch_s
+                                 : expected_epoch_s - sample_epoch_s;
+    if (delta_s > 2U) new_run = true;
+  }
+
   history.pending_samples[history.pending_head] = sample.encoded();
   history.pending_head = (history.pending_head + 1) % PENDING_CAPACITY;
-  if (history.count < HISTORY_CAPACITY)
-    ++history.count;
+  if (history.count < HISTORY_CAPACITY) ++history.count;
   ++history.pending;
-  history.latest_ms = now_ms();
+
+  if (new_run || history.run_count == 0) {
+    history.run_count = 1;
+    history.run_anchor_epoch_s = sample_epoch_s;
+    flash.metadata_dirty = true;
+    ESP_LOGI(TAG, "history continuous run started at sample %u%s",
+             static_cast<unsigned>(history.count),
+             sample_epoch_s != 0 ? " with wall-clock anchor" : " without wall-clock anchor");
+  } else {
+    if (history.run_count < HISTORY_CAPACITY) ++history.run_count;
+    if (history.run_anchor_epoch_s == 0 && sample_epoch_s != 0) {
+      // Time became valid after the run started. Cadence is still known from
+      // uptime, so reconstruct the run's first-sample anchor once.
+      const uint64_t prior_ms = static_cast<uint64_t>(history.run_count - 1U) * history.interval_ms;
+      const uint32_t prior_s = static_cast<uint32_t>(prior_ms / 1000ULL);
+      if (sample_epoch_s >= prior_s) {
+        history.run_anchor_epoch_s = sample_epoch_s - prior_s;
+        flash.metadata_dirty = true;
+        ESP_LOGI(TAG, "history wall-clock acquired; anchored current %u-sample run",
+                 static_cast<unsigned>(history.run_count));
+      }
+    }
+  }
+  history.last_sample_epoch_s = sample_epoch_s;
+  history.force_new_run_on_next_sample = false;
+  history.run_relative_age_valid = true;
+  history.latest_ms = sample_now_ms;
   sync_gatt();
 
   ESP_LOGI(TAG, "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
@@ -528,13 +637,17 @@ void sampling_tick() {
     if (sensirion_ble_sample().complete()) {
       history.clock_started = true;
       history.last_sample_ms = now;
-      commit_sample();
+      commit_sample(history.force_new_run_on_next_sample || history.run_count == 0);
     }
-  } else if (static_cast<uint32_t>(now - history.last_sample_ms) >= history.interval_ms) {
-    history.last_sample_ms += history.interval_ms;
-    if (static_cast<uint32_t>(now - history.last_sample_ms) >= history.interval_ms)
-      history.last_sample_ms = now;  // no stale backfill after a long pause
-    commit_sample();
+  } else {
+    const uint32_t elapsed = static_cast<uint32_t>(now - history.last_sample_ms);
+    if (elapsed >= history.interval_ms) {
+      const bool cadence_gap = sensirion_history_format::cadence_gap(elapsed, history.interval_ms);
+      history.last_sample_ms += history.interval_ms;
+      if (static_cast<uint32_t>(now - history.last_sample_ms) >= history.interval_ms)
+        history.last_sample_ms = now;  // no stale backfill after a long pause
+      commit_sample(history.force_new_run_on_next_sample || cadence_gap);
+    }
   }
 
   if (history.pending > 0 &&
@@ -550,23 +663,37 @@ void start_download() {
       clearing.phase != ClearPhase::INACTIVE)
     return;
 
-  uint16_t n = history.count;
+  const uint16_t available = downloadable_count();
+  uint16_t n = available;
   if (download.requested > 0 && download.requested < n)
     n = static_cast<uint16_t>(download.requested);
 
   download.count = n;
   download.sent = 0;
   download.sequence = 0;
-  download.start_logical = history.count - n;
-  download.age_ms = history.count ? now_ms() - history.latest_ms : 0;
+  download.start_logical = static_cast<uint16_t>(history.count - n);
+  if (n == 0) {
+    download.age_ms = 0;
+  } else if (history.run_relative_age_valid) {
+    download.age_ms = now_ms() - history.latest_ms;
+  } else {
+    const uint32_t now_epoch_s = wall_clock_epoch_s();
+    const uint32_t latest_epoch_s = sensirion_history_format::run_latest_epoch_s(
+        history.run_anchor_epoch_s, history.run_count, history.interval_ms);
+    download.age_ms = (now_epoch_s >= latest_epoch_s)
+                          ? (now_epoch_s - latest_epoch_s) * 1000U
+                          : 0U;
+  }
   download.phase = DownloadPhase::HEADER;
   download.last_packet_ms = 0;
   download.started_ms = now_ms();
   download.last_progress_ms = download.started_ms;
 
-  ESP_LOGI(TAG, "history download subscribed: requested=%u available=%u sending=%u age=%u ms",
+  ESP_LOGI(TAG,
+           "history download subscribed: requested=%u stored=%u latest_run=%u sending=%u age=%u ms",
            static_cast<unsigned>(download.requested), static_cast<unsigned>(history.count),
-           static_cast<unsigned>(n), static_cast<unsigned>(download.age_ms));
+           static_cast<unsigned>(available), static_cast<unsigned>(n),
+           static_cast<unsigned>(download.age_ms));
 }
 
 uint32_t current_guard_paused_ms(uint32_t now) {
@@ -766,11 +893,13 @@ void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
 
 }  // namespace
 
-void sensirion_history_setup() {
+void sensirion_history_setup(time::RealTimeClock *clock) {
+  wall_clock = clock;
   init_flash();
   sync_gatt();
   flash.last_flush_ms = now_ms();
-  ESP_LOGI(TAG, "history storage: flash-backed %u samples, RAM pending ring %u samples (%u bytes)",
+  ESP_LOGI(TAG,
+           "history storage: flash-backed %u samples, RAM pending ring %u samples (%u bytes), sparse-time metadata v4",
            static_cast<unsigned>(HISTORY_CAPACITY), static_cast<unsigned>(PENDING_CAPACITY),
            static_cast<unsigned>(PENDING_CAPACITY * SAMPLE_SIZE));
 }
@@ -787,6 +916,8 @@ void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe) {
         static_cast<uint32_t>(now - last_sampling_poll_ms) >= 100U) {
       last_sampling_poll_ms = now;
       sampling_tick();
+      const uint16_t visible_count = downloadable_count();
+      if (visible_count != last_synced_downloadable_count) sync_gatt();
     }
   }
   download_tick(capture_probe);
