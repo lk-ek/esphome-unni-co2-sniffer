@@ -747,7 +747,7 @@ static bool udp_export_pending_step() {
 
 static bool udp_begin_raw_capture(uint16_t count, uint8_t initial_value,
                                   bool overflow, uint32_t sequence) {
-  if (!debug_udp::enabled() || !count || udp_pending.active) return false;
+  if (!debug_udp::ready_for_export() || !count || udp_pending.active) return false;
   udp_pending.active = true;
   udp_pending.count = count;
   udp_pending.initial_value = initial_value;
@@ -763,14 +763,22 @@ static uint32_t store_raw_capture(const EdgeBuffer &data, uint16_t count,
   if (!count || !last_capture_mutex) return 0;
 
   if (debug_udp::enabled()) {
-    uint32_t sequence = 0;
-    if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-      sequence = ++next_capture_sequence;
-      last_capture_sequence = sequence;
-      xSemaphoreGive(last_capture_mutex);
+    if (debug_udp::ready_for_export()) {
+      uint32_t sequence = 0;
+      if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        sequence = ++next_capture_sequence;
+        last_capture_sequence = sequence;
+        xSemaphoreGive(last_capture_mutex);
+      }
+      if (sequence != 0) udp_begin_raw_capture(count, initial_value, overflow, sequence);
+      return sequence;
     }
-    if (sequence != 0) udp_begin_raw_capture(count, initial_value, overflow, sequence);
-    return sequence;
+#if !defined(USE_WEB_SERVER_BASE)
+    // UDP is configured but its circuit breaker is open. The normal debug
+    // firmware has no HTTP capture endpoint, so retaining a heap-backed copy
+    // here would only waste memory while the collector is unavailable.
+    return 0;
+#endif
   }
 
   // Do not serialize and allocate ~20 KiB every cycle while an earlier
@@ -893,7 +901,7 @@ void register_debug_handler() {
 
 bool freeze_last_capture(uint32_t sequence, const char *reason) {
   if (sequence == 0) return false;
-  if (debug_udp::enabled()) {
+  if (debug_udp::ready_for_export()) {
     ESP_LOGD(TAG, "Suspicious raw I2C capture #%lu already exported via UDP (%s)",
              static_cast<unsigned long>(sequence), reason ? reason : "unknown reason");
     return true;

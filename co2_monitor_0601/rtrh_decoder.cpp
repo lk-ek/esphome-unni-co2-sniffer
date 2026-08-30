@@ -436,6 +436,20 @@ static void debug_udp_timing_loop();
 
 static void debug_udp_loop() {
   if (!debug_udp::enabled()) return;
+  if (!debug_udp::ready_for_export()) {
+    // A missing/unreachable collector must never pin the RT/RH debug snapshot
+    // or continuously allocate lwIP resources. Measurement decoding continues
+    // independently; raw UDP export resumes automatically after the cooldown.
+    if (debug.ready) {
+      debug.sample_count = debug.edge_count = debug.unusual_count = 0;
+      debug.overflow = debug.ready = debug.capturing = false;
+      debug_udp_packet_index = 0;
+    }
+    debug_udp_timing_pending = false;
+    debug_udp_timing_copies_remaining = 0;
+    debug_udp_timing_next_send_ms = 0;
+    return;
+  }
   if (!debug.ready || !debug.sample_count) {
     debug_udp_timing_loop();
     return;
@@ -908,7 +922,7 @@ static void debug_udp_timing_loop() {
 }
 
 static void send_timing_udp(const Measurement &m) {
-  if (!debug_udp::enabled()) return;
+  if (!debug_udp::ready_for_export()) return;
   TimingPayload payload{};
   payload.sequence = m.sequence;
   payload.valid = m.valid ? 1U : 0U;

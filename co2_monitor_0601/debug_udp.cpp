@@ -25,10 +25,14 @@ static bool configured = false;
 static uint32_t last_send_ms = 0;
 static constexpr uint32_t MIN_SEND_GAP_MS = 5;
 static constexpr uint32_t ENOMEM_RETRY_BACKOFF_MS = 50;
+static constexpr uint16_t ENOMEM_TRIP_THRESHOLD = 3;
+static constexpr uint32_t COLLECTOR_COOLDOWN_INITIAL_MS = 5000;
+static constexpr uint32_t COLLECTOR_COOLDOWN_MAX_MS = 60000;
 static uint32_t retry_not_before_ms = 0;
+static uint32_t suspended_until_ms = 0;
+static uint32_t collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
 static uint32_t enomem_count = 0;
 static uint16_t consecutive_enomem = 0;
-static constexpr uint16_t ENOMEM_ABANDON_THRESHOLD = 20;
 
 struct __attribute__((packed)) PacketHeader {
   char magic[4];          // "UND1"
@@ -75,9 +79,34 @@ bool setup(const char *host, uint16_t port) {
 
 bool enabled() { return configured; }
 
-bool sustained_resource_pressure() { return consecutive_enomem >= ENOMEM_ABANDON_THRESHOLD; }
+static bool suspension_active(uint32_t now_ms) {
+  if (suspended_until_ms == 0) return false;
+  if (static_cast<int32_t>(now_ms - suspended_until_ms) < 0) return true;
+
+  // The cooldown expired. Allow exactly the normal exporter traffic to probe
+  // the path again; a successful datagram fully closes the circuit breaker,
+  // while another short ENOMEM burst opens it with a longer cooldown.
+  suspended_until_ms = 0;
+  consecutive_enomem = 0;
+  retry_not_before_ms = 0;
+  ESP_LOGI(TAG, "UDP debug collector cooldown expired; probing export path again");
+  return false;
+}
+
+bool ready_for_export() {
+  if (!configured) return false;
+  return !suspension_active(millis());
+}
+
+bool sustained_resource_pressure() {
+  if (!configured) return false;
+  return suspension_active(millis());
+}
 
 void reset_after_resource_pressure() {
+  // This is called by exporters after they abandon the packet/capture that
+  // tripped the circuit breaker. Keep the cooldown intact: clearing it here
+  // used to make the very next loop reopen a socket and hammer lwIP again.
   consecutive_enomem = 0;
   retry_not_before_ms = 0;
   last_send_ms = 0;
@@ -85,6 +114,22 @@ void reset_after_resource_pressure() {
     lwip_close(udp_socket);
     udp_socket = -1;
   }
+}
+
+static void suspend_export(uint32_t now_ms) {
+  const uint32_t cooldown = collector_cooldown_ms;
+  suspended_until_ms = now_ms + cooldown;
+  collector_cooldown_ms =
+      cooldown >= COLLECTOR_COOLDOWN_MAX_MS / 2U ? COLLECTOR_COOLDOWN_MAX_MS : cooldown * 2U;
+  retry_not_before_ms = 0;
+  if (udp_socket >= 0) {
+    lwip_close(udp_socket);
+    udp_socket = -1;
+  }
+  ESP_LOGW(TAG,
+           "UDP debug export suspended for %lu ms after %u consecutive ENOMEM failures; "
+           "capture/measurement paths remain active",
+           static_cast<unsigned long>(cooldown), static_cast<unsigned>(ENOMEM_TRIP_THRESHOLD));
 }
 
 static bool ensure_socket() {
@@ -107,6 +152,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   if (!enabled() || payload == nullptr || payload_length > MAX_PAYLOAD || packet_count == 0 ||
       packet_index >= packet_count)
     return false;
+  if (!ready_for_export()) return false;
 
   // Do not touch the UDP socket until the STA has a real IPv4 address.
   // Association alone is not sufficient: esp_wifi_sta_get_ap_info() can already
@@ -146,6 +192,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
       // resources available. Do not hammer sendto() again every component loop;
       // leave the exporter pending and let the network stack recover first.
       retry_not_before_ms = now_ms + ENOMEM_RETRY_BACKOFF_MS;
+      if (consecutive_enomem >= ENOMEM_TRIP_THRESHOLD) suspend_export(now_ms);
     }
 
     static uint32_t last_error_log_ms = 0;
@@ -173,6 +220,8 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   }
   retry_not_before_ms = 0;
   consecutive_enomem = 0;
+  suspended_until_ms = 0;
+  collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
   last_send_ms = now_ms;
   return true;
 }

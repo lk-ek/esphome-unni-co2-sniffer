@@ -23,6 +23,7 @@ static constexpr size_t MAX_PAYLOAD = 512;
 
 bool setup(const char *host, uint16_t port);
 bool enabled();
+bool ready_for_export();
 bool sustained_resource_pressure();
 void reset_after_resource_pressure();
 bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
