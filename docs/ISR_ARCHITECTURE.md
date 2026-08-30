@@ -73,16 +73,24 @@ The passive I²C ISR does this:
 6. Store `{timestamp, combined_state}` in the fixed capture buffer.
 7. If the buffer is full, mark the capture as overflowed and finished.
 
-The buffer contains 4096 entries:
+The buffer contains 4096 entries, stored as two aligned arrays:
 
 ```cpp
-struct Sample {
-  uint32_t t;
-  uint8_t value;
+struct EdgeBuffer {
+  volatile uint32_t t[4096];
+  volatile uint8_t value[4096];
 };
 ```
 
-No I²C decoding occurs in the ISR.
+Keeping timestamp and state in separate arrays is deliberate. A conventional
+`{uint32_t,uint8_t}` array is padded to 8 bytes per entry on ESP32, consuming
+32 KiB. The structure-of-arrays representation preserves the same 4096-edge
+capture depth and LA02 data while using exactly 20 KiB.
+
+The ISR also reads the combined SDA/SCL state before taking the timestamp or
+updating diagnostic counters. This minimizes the latency between interrupt entry
+and observing the bus, reducing the chance that a second edge is already present
+when both pins are sampled. No I²C decoding occurs in the ISR.
 
 ## Protocol-validated GPIO missing-clock recovery
 

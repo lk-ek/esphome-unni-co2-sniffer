@@ -34,12 +34,18 @@ static gpio_num_t pin_sda = GPIO_NUM_6;
 static constexpr uint16_t MAX_SAMPLES = 4096;
 static constexpr uint32_t CAPTURE_TIMEOUT_US = 5000;
 
-struct Sample {
-  uint32_t t;
-  uint8_t value;
+struct EdgeBuffer {
+  // Structure-of-arrays keeps timestamps naturally aligned while avoiding the
+  // 3 bytes of padding that a {uint32_t,uint8_t} Sample needs on ESP32.
+  // 4096 entries therefore use 20 KiB instead of 32 KiB without reducing the
+  // capture depth or changing the LA02 debug format.
+  volatile uint32_t t[MAX_SAMPLES];
+  volatile uint8_t value[MAX_SAMPLES];
 };
 
-static volatile Sample samples[MAX_SAMPLES];
+static EdgeBuffer samples;
+static_assert(sizeof(EdgeBuffer) == MAX_SAMPLES * (sizeof(uint32_t) + sizeof(uint8_t)),
+              "EdgeBuffer unexpectedly contains padding");
 static volatile uint16_t sample_count = 0;
 static volatile uint32_t last_edge = 0;
 static volatile uint8_t last_value = 0xff;
@@ -76,10 +82,18 @@ static inline bool scl_level(uint8_t value) { return (value & 0x01) != 0; }
 static inline bool sda_level(uint8_t value) { return (value & 0x02) != 0; }
 
 static void IRAM_ATTR gpio_isr(void *) {
-  diag_isr_calls++;
-  if (!capturing) return;
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  if (!capturing) {
+    diag_isr_calls++;
+    return;
+  }
+
+  // Sample the bus before doing timestamp or diagnostic work. The precise
+  // timestamp may move by a few CPU cycles, but reading SDA/SCL as early as
+  // possible reduces the window in which a second physical edge can collapse
+  // into the same observed GPIO state.
   const uint8_t value = read_gpio_state();
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  diag_isr_calls++;
   const uint8_t previous_value = last_value;
   if (value == previous_value) return;
   diag_state_changes++;
@@ -91,8 +105,8 @@ static void IRAM_ATTR gpio_isr(void *) {
 
   const uint16_t index = sample_count;
   if (index < MAX_SAMPLES) {
-    samples[index].t = now;
-    samples[index].value = value;
+    samples.t[index] = now;
+    samples.value[index] = value;
     sample_count = index + 1;
   } else {
     capture_overflow = true;
@@ -165,7 +179,7 @@ static void finish_active_frame(const RawFrame &raw, EndCondition end_condition,
   capture.frame_errors++;
 }
 
-static void decode_capture(const volatile Sample *data, uint16_t count,
+static void decode_capture(const EdgeBuffer &data, uint16_t count,
                            uint8_t initial_value, Capture &capture) {
   if (count == 0) return;
 
@@ -177,7 +191,7 @@ static void decode_capture(const volatile Sample *data, uint16_t count,
   uint8_t previous = initial_value;
 
   for (uint16_t i = 0; i < count; i++) {
-    const uint8_t current = data[i].value;
+    const uint8_t current = data.value[i];
     const bool prev_scl = scl_level(previous);
     const bool cur_scl = scl_level(current);
     const bool prev_sda = sda_level(previous);
@@ -292,20 +306,20 @@ static uint32_t median_duration(uint32_t *values, uint8_t count) {
 // Estimate normal HIGH and LOW pulse widths independently. Durations above
 // 60 us are deliberately excluded from the baseline because those are the
 // intervals we may later investigate for a completely missed opposite pulse.
-static bool estimate_scl_level_timing(const volatile Sample *data, uint16_t count,
+static bool estimate_scl_level_timing(const EdgeBuffer &data, uint16_t count,
                                       uint8_t initial_value, LevelTiming &timing) {
   uint32_t low[96]{};
   uint32_t high[96]{};
   uint8_t low_count = 0;
   uint8_t high_count = 0;
   bool level = scl_level(initial_value);
-  uint32_t interval_start = count ? data[0].t : 0;
+  uint32_t interval_start = count ? data.t[0] : 0;
 
   for (uint16_t i = 0; i < count; i++) {
-    const bool next_level = scl_level(data[i].value);
+    const bool next_level = scl_level(data.value[i]);
     if (next_level == level) continue;
 
-    const uint32_t duration = static_cast<uint32_t>(data[i].t - interval_start);
+    const uint32_t duration = static_cast<uint32_t>(data.t[i] - interval_start);
     if (duration >= 10 && duration <= 60) {
       if (level) {
         if (high_count < 96) high[high_count++] = duration;
@@ -313,7 +327,7 @@ static bool estimate_scl_level_timing(const volatile Sample *data, uint16_t coun
         if (low_count < 96) low[low_count++] = duration;
       }
     }
-    interval_start = data[i].t;
+    interval_start = data.t[i];
     level = next_level;
   }
 
@@ -389,7 +403,7 @@ static bool add_interval_candidates(PulseCandidate *out, uint8_t &count,
   return true;
 }
 
-static bool collect_pulse_candidates(const volatile Sample *data, uint16_t count,
+static bool collect_pulse_candidates(const EdgeBuffer &data, uint16_t count,
                                      uint8_t initial_value,
                                      const LevelTiming &timing,
                                      PulseCandidate *out, uint8_t &out_count) {
@@ -397,20 +411,20 @@ static bool collect_pulse_candidates(const volatile Sample *data, uint16_t count
   if (count < 2) return true;
 
   bool level = scl_level(initial_value);
-  uint32_t interval_start = data[0].t;
+  uint32_t interval_start = data.t[0];
   uint32_t sda_times[MAX_RECOVERY_SDA_EVENTS]{};
   uint8_t sda_count = 0;
   uint8_t interval_id = 0;
   uint8_t previous = initial_value;
 
   for (uint16_t i = 0; i < count; i++) {
-    const uint8_t current = data[i].value;
+    const uint8_t current = data.value[i];
     const bool next_level = scl_level(current);
     const bool scl_changed = next_level != level;
     const bool sda_changed = sda_level(current) != sda_level(previous);
 
     if (scl_changed) {
-      const uint32_t end_t = data[i].t;
+      const uint32_t end_t = data.t[i];
       const uint32_t duration = static_cast<uint32_t>(end_t - interval_start);
       const uint32_t same_level_us = level ? timing.high_us : timing.low_us;
       const uint32_t opposite_level_us = level ? timing.low_us : timing.high_us;
@@ -431,7 +445,7 @@ static bool collect_pulse_candidates(const volatile Sample *data, uint16_t count
       level = next_level;
       sda_count = 0;
     } else if (sda_changed && sda_count < MAX_RECOVERY_SDA_EVENTS) {
-      sda_times[sda_count++] = data[i].t;
+      sda_times[sda_count++] = data.t[i];
     } else if (sda_changed) {
       // More SDA transitions than the bounded candidate model can represent.
       // Skip recovery rather than silently omit possible orderings.
@@ -442,72 +456,72 @@ static bool collect_pulse_candidates(const volatile Sample *data, uint16_t count
   return true;
 }
 
-static bool remove_sample_at(volatile Sample *data, uint16_t &count,
+static bool remove_sample_at(EdgeBuffer &data, uint16_t &count,
                              uint16_t index) {
   if (index >= count) return false;
   for (uint16_t i = index; i + 1 < count; i++) {
-    data[i].t = data[i + 1].t;
-    data[i].value = data[i + 1].value;
+    data.t[i] = data.t[i + 1];
+    data.value[i] = data.value[i + 1];
   }
   count--;
   return true;
 }
 
-static uint16_t find_insert_position(const volatile Sample *data, uint16_t count,
+static uint16_t find_insert_position(const EdgeBuffer &data, uint16_t count,
                                      uint32_t t) {
   uint16_t pos = 0;
-  while (pos < count && static_cast<int32_t>(data[pos].t - t) < 0) pos++;
+  while (pos < count && static_cast<int32_t>(data.t[pos] - t) < 0) pos++;
   return pos;
 }
 
 // Apply one synthetic opposite-level SCL pulse in-place. Existing SDA-only
 // samples between t1/t2 keep their SDA value but inherit the synthetic SCL
 // level. poll() has paused ISR writes, so this scratch transformation is safe.
-static bool apply_pulse(volatile Sample *data, uint16_t &count,
+static bool apply_pulse(EdgeBuffer &data, uint16_t &count,
                         uint8_t initial_value, const PulseCandidate &pulse) {
   if (count > MAX_SAMPLES - 2 || pulse.t2 <= pulse.t1) return false;
   uint16_t pos1 = find_insert_position(data, count, pulse.t1);
   uint16_t pos2 = find_insert_position(data, count, pulse.t2);
-  if ((pos1 < count && data[pos1].t == pulse.t1) ||
-      (pos2 < count && data[pos2].t == pulse.t2))
+  if ((pos1 < count && data.t[pos1] == pulse.t1) ||
+      (pos2 < count && data.t[pos2] == pulse.t2))
     return false;
 
-  const uint8_t before1 = pos1 == 0 ? initial_value : data[pos1 - 1].value;
+  const uint8_t before1 = pos1 == 0 ? initial_value : data.value[pos1 - 1];
 
   // Flip SCL on all already-captured SDA transitions that occurred while the
   // missing opposite-level pulse should have been active.
-  for (uint16_t i = pos1; i < count && data[i].t < pulse.t2; i++)
-    data[i].value ^= 0x01U;
+  for (uint16_t i = pos1; i < count && data.t[i] < pulse.t2; i++)
+    data.value[i] ^= 0x01U;
 
   // Insert first edge.
   for (uint16_t i = count; i > pos1; i--) {
-    data[i].t = data[i - 1].t;
-    data[i].value = data[i - 1].value;
+    data.t[i] = data.t[i - 1];
+    data.value[i] = data.value[i - 1];
   }
-  data[pos1].t = pulse.t1;
-  data[pos1].value = static_cast<uint8_t>(before1 ^ 0x01U);
+  data.t[pos1] = pulse.t1;
+  data.value[pos1] = static_cast<uint8_t>(before1 ^ 0x01U);
   count++;
 
   // Insert return edge using the current SDA state immediately before t2.
   pos2 = find_insert_position(data, count, pulse.t2);
-  const uint8_t before2 = pos2 == 0 ? initial_value : data[pos2 - 1].value;
+  const uint8_t before2 = pos2 == 0 ? initial_value : data.value[pos2 - 1];
   for (uint16_t i = count; i > pos2; i--) {
-    data[i].t = data[i - 1].t;
-    data[i].value = data[i - 1].value;
+    data.t[i] = data.t[i - 1];
+    data.value[i] = data.value[i - 1];
   }
-  data[pos2].t = pulse.t2;
-  data[pos2].value = static_cast<uint8_t>(before2 ^ 0x01U);
+  data.t[pos2] = pulse.t2;
+  data.value[pos2] = static_cast<uint8_t>(before2 ^ 0x01U);
   count++;
   return true;
 }
 
-static bool undo_pulse(volatile Sample *data, uint16_t &count,
+static bool undo_pulse(EdgeBuffer &data, uint16_t &count,
                        const PulseCandidate &pulse) {
   uint16_t p1 = count;
   uint16_t p2 = count;
   for (uint16_t i = 0; i < count; i++) {
-    if (data[i].t == pulse.t1) p1 = i;
-    if (data[i].t == pulse.t2) p2 = i;
+    if (data.t[i] == pulse.t1) p1 = i;
+    if (data.t[i] == pulse.t2) p2 = i;
   }
   if (p1 == count || p2 == count) return false;
   if (p2 < p1) {
@@ -520,8 +534,8 @@ static bool undo_pulse(volatile Sample *data, uint16_t &count,
 
   // Restore the original SCL bit on SDA-only samples inside the interval.
   for (uint16_t i = 0; i < count; i++) {
-    if (data[i].t > pulse.t1 && data[i].t < pulse.t2)
-      data[i].value ^= 0x01U;
+    if (data.t[i] > pulse.t1 && data.t[i] < pulse.t2)
+      data.value[i] ^= 0x01U;
   }
   return true;
 }
@@ -570,7 +584,7 @@ static bool remember_valid_recovery(const Capture &candidate,
   return true;
 }
 
-static bool try_missing_clock_recovery(volatile Sample *data, uint16_t count,
+static bool try_missing_clock_recovery(EdgeBuffer &data, uint16_t count,
                                        uint8_t initial_value,
                                        CaptureValidator validator,
                                        Capture &accepted) {
@@ -656,7 +670,7 @@ static bool last_capture_frozen = false;
 static uint32_t last_capture_sequence = 0;
 static uint32_t next_capture_sequence = 0;
 
-static uint8_t la02_stream_byte(const volatile Sample *data, uint16_t count,
+static uint8_t la02_stream_byte(const EdgeBuffer &data, uint16_t count,
                                 uint8_t initial_value, bool overflow, uint32_t base,
                                 size_t offset) {
   if (offset < 4U) return static_cast<uint8_t>("LA02"[offset]);
@@ -668,10 +682,10 @@ static uint8_t la02_stream_byte(const volatile Sample *data, uint16_t count,
   const size_t field_byte = offset % 5U;
   if (sample_index >= count) return 0;
   if (field_byte < 4U) {
-    const uint32_t timestamp = static_cast<uint32_t>(data[sample_index].t - base);
+    const uint32_t timestamp = static_cast<uint32_t>(data.t[sample_index] - base);
     return static_cast<uint8_t>((timestamp >> (field_byte * 8U)) & 0xFFU);
   }
-  return data[sample_index].value;
+  return data.value[sample_index];
 }
 
 struct UdpPendingCapture {
@@ -695,7 +709,7 @@ static bool udp_export_pending_step() {
   }
   if (udp_pending.packet_index >= udp_pending.packet_count) return true;
 
-  const uint32_t base = samples[0].t;
+  const uint32_t base = samples.t[0];
   const size_t offset = static_cast<size_t>(udp_pending.packet_index) * debug_udp::MAX_PAYLOAD;
   const uint16_t len = static_cast<uint16_t>(
       std::min<size_t>(debug_udp::MAX_PAYLOAD, total_bytes - offset));
@@ -744,7 +758,7 @@ static bool udp_begin_raw_capture(uint16_t count, uint8_t initial_value,
   return true;
 }
 
-static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
+static uint32_t store_raw_capture(const EdgeBuffer &data, uint16_t count,
                                   uint8_t initial_value, bool overflow) {
   if (!count || !last_capture_mutex) return 0;
 
@@ -777,11 +791,11 @@ static uint32_t store_raw_capture(const volatile Sample *data, uint16_t count,
   memcpy(p, &count32, sizeof(count32)); p += 4;
   *p++ = overflow ? 0x01 : 0x00;
   *p++ = static_cast<char>(initial_value);
-  const uint32_t base = data[0].t;
+  const uint32_t base = data.t[0];
   for (uint16_t i = 0; i < count; i++) {
-    const uint32_t timestamp = static_cast<uint32_t>(data[i].t - base);
+    const uint32_t timestamp = static_cast<uint32_t>(data.t[i] - base);
     memcpy(p, &timestamp, sizeof(timestamp)); p += 4;
-    *p++ = static_cast<char>(data[i].value);
+    *p++ = static_cast<char>(data.value[i]);
   }
 
   if (xSemaphoreTake(last_capture_mutex, pdMS_TO_TICKS(100)) != pdTRUE) return 0;
