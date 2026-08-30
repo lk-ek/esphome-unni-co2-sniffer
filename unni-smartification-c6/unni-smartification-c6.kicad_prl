@@ -35,6 +35,7 @@
       "footprint_text",
       "footprint_anchors",
       "ratsnest",
+      "grid",
       "footprints_front",
       "footprints_back",
       "footprint_values",
@@ -66,7 +67,7 @@
   },
   "meta": {
     "filename": "unni-smartification-c6.kicad_prl",
-    "version": 6
+    "version": 7
   },
   "net_inspector_panel": {
     "col_hidden": [
@@ -118,7 +119,7 @@
       103,
       103,
       103,
-      0
+      103
     ],
     "custom_group_rules": [],
     "expanded_rows": [],
@@ -136,32 +137,7 @@
   },
   "open_jobsets": [],
   "project": {
-    "files": [
-      {
-        "name": "unni-smartification-c6.kicad_sch",
-        "open": true,
-        "window": {
-          "display": 0,
-          "maximized": true,
-          "pos_x": 524,
-          "pos_y": 261,
-          "size_x": 1512,
-          "size_y": 948
-        }
-      },
-      {
-        "name": "unni-smartification-c6.kicad_pcb",
-        "open": true,
-        "window": {
-          "display": 0,
-          "maximized": true,
-          "pos_x": 42,
-          "pos_y": 273,
-          "size_x": 1800,
-          "size_y": 1129
-        }
-      }
-    ]
+    "files": []
   },
   "schematic": {
     "hierarchy_collapsed": [],

@@ -1,7 +1,13 @@
-ERC report (2026-08-25T13:57:49, Encoding UTF8)
+ERC report (2026-08-30T11:41:57, Encoding UTF8)
 Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /
+[lib_symbol_issues]: The current configuration does not include the symbol library 'Misc'
+    ; warning
+    @(33.02 mm, 50.80 mm): Symbol J1 [UJ20-C-H-G-SMT-1-P16-TR]
+[footprint_link_issues]: The current configuration does not include the footprint library 'Misc'
+    ; warning
+    @(33.02 mm, 50.80 mm): Symbol J1 [UJ20-C-H-G-SMT-1-P16-TR]
 
 ***** Sheet /USB + Power/
 
@@ -9,7 +15,7 @@ Report includes: Errors, Warnings, Exclusions
 
 ***** Sheet /Simulation Harness/
 
- ** ERC messages: 0  Errors 0  Warnings 0
+ ** ERC messages: 2  Errors 0  Warnings 2
 
  ** Ignored checks:
     - Global label only appears once in the schematic

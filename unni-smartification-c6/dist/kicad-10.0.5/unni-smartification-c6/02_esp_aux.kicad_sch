@@ -5061,16 +5061,16 @@
 		(uuid "f9893b05-78a3-482d-b2bd-f9c5b1923a5d")
 	)
 	(no_connect
-		(at 267.97 76.2)
-		(uuid "69cd9b85-56eb-4c10-aa96-ef16def5c8cb")
-	)
-	(no_connect
 		(at 298.45 50.8)
 		(uuid "03303cf9-514e-4715-adff-91fc1a717b5e")
 	)
 	(no_connect
 		(at 267.97 68.58)
 		(uuid "1fa1cd7b-74e4-495f-b8a9-5ae9caf9e0ac")
+	)
+	(no_connect
+		(at 267.97 76.2)
+		(uuid "69cd9b85-56eb-4c10-aa96-ef16def5c8cb")
 	)
 	(no_connect
 		(at 298.45 66.04)
@@ -6056,7 +6056,7 @@
 	)
 	(wire
 		(pts
-			(xy 298.45 81.28) (xy 311.15 81.28)
+			(xy 298.45 81.28) (xy 328.93 81.28)
 		)
 		(stroke
 			(width 0)
@@ -6666,6 +6666,16 @@
 	)
 	(wire
 		(pts
+			(xy 340.36 81.28) (xy 336.55 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cd6425a3-30d0-4f15-9bc4-37940ff3e541")
+	)
+	(wire
+		(pts
 			(xy 78.74 68.58) (xy 78.74 71.12)
 		)
 		(stroke
@@ -7015,6 +7025,30 @@
 		(uuid "d32a87e1-17d9-48ed-a26c-e0361c359be2")
 	)
 	(global_label "TOUCH_TRIGGER"
+		(shape bidirectional)
+		(at 311.15 76.2 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "02ecbb74-c014-4daa-91ef-8ccf20c024e9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 326.1848 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
+	(global_label "TOUCH_TRIGGER"
 		(shape input)
 		(at 308.61 177.8 180)
 		(fields_autoplaced yes)
@@ -7227,6 +7261,30 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+			)
+		)
+	)
+	(global_label "CONN_BTN"
+		(shape input)
+		(at 340.36 81.28 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1 1)
+			)
+			(justify left)
+		)
+		(uuid "38e4523f-c2cb-41b5-b8e7-77b9054f1fbb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 350.4245 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 			)
 		)
 	)
@@ -7443,30 +7501,6 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
-			)
-		)
-	)
-	(global_label "CONN_BTN"
-		(shape input)
-		(at 311.15 81.28 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1 1)
-			)
-			(justify left)
-		)
-		(uuid "7bd9df48-2260-4e23-a373-df184f1f29d0")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 321.2145 81.28 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
 			)
 		)
 	)
@@ -8214,30 +8248,6 @@
 			)
 		)
 	)
-	(global_label "TOUCH_TRIGGER"
-		(shape bidirectional)
-		(at 311.15 76.2 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1 1)
-			)
-			(justify left)
-		)
-		(uuid "f4782fb6-6462-4ae1-a07c-809d746443a8")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 326.1848 76.2 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
 	(global_label "CONN_TOUCH"
 		(shape input)
 		(at 284.48 170.18 180)
@@ -8410,7 +8420,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 78.74 97.79 0)
 			(hide yes)
 			(show_name no)
@@ -8422,6 +8432,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 78.74 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 78.74 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07220KL"
+			(at 78.74 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07220K"
+			(at 78.74 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"
 			(at 78.74 97.79 0)
 			(hide yes)
 			(show_name no)
@@ -8729,7 +8783,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 320.04 193.04 0)
 			(hide yes)
 			(show_name no)
@@ -8741,6 +8795,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 320.04 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 320.04 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07100KL"
+			(at 320.04 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07100K"
+			(at 320.04 193.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL"
 			(at 320.04 193.04 0)
 			(hide yes)
 			(show_name no)
@@ -8811,7 +8909,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 247.65 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -8823,6 +8921,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 247.65 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 247.65 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0710KL"
+			(at 247.65 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0710K"
+			(at 247.65 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"
 			(at 247.65 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -8891,7 +9033,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 218.44 210.82 0)
 			(hide yes)
 			(show_name no)
@@ -8904,6 +9046,50 @@
 		)
 		(property "Description" ""
 			(at 218.44 210.82 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 218.44 210.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0603FR-0710KL"
+			(at 218.44 210.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0603FR-0710K"
+			(at 218.44 210.82 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"
+			(at 218.44 210.82 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8973,7 +9159,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 179.07 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -8985,6 +9171,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 179.07 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 179.07 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B104KB8NNNC"
+			(at 179.07 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B104KB8NNNC"
+			(at 179.07 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 179.07 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -9290,7 +9520,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 69.85 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -9303,6 +9533,50 @@
 		)
 		(property "Description" ""
 			(at 69.85 88.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 69.85 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07150KL"
+			(at 69.85 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07150K"
+			(at 69.85 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07150KL"
+			(at 69.85 88.9 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9372,7 +9646,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 78.74 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -9384,6 +9658,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 78.74 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 78.74 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A106KAYNNNE"
+			(at 78.74 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A106KAYNNNE"
+			(at 78.74 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 78.74 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -9454,7 +9772,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"
 			(at 91.44 64.77 0)
 			(hide yes)
 			(show_name no)
@@ -9466,6 +9784,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 91.44 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 91.44 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A475KAQNNNE"
+			(at 91.44 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A475KAQNNNE"
+			(at 91.44 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"
 			(at 91.44 64.77 0)
 			(hide yes)
 			(show_name no)
@@ -9536,7 +9898,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 116.84 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -9548,6 +9910,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 116.84 45.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 116.84 45.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07100KL"
+			(at 116.84 45.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07100K"
+			(at 116.84 45.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL"
 			(at 116.84 45.72 0)
 			(hide yes)
 			(show_name no)
@@ -9618,7 +10024,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 166.37 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -9630,6 +10036,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 166.37 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 166.37 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-071ML"
+			(at 166.37 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-071M"
+			(at 166.37 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"
 			(at 166.37 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -9698,7 +10148,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 332.74 60.96 0)
 			(hide yes)
 			(show_name no)
@@ -9711,6 +10161,50 @@
 		)
 		(property "Description" ""
 			(at 332.74 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 332.74 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0722RL"
+			(at 332.74 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0722R"
+			(at 332.74 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL"
+			(at 332.74 60.96 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -9780,7 +10274,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 209.55 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -9792,6 +10286,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 209.55 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 209.55 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07220KL"
+			(at 209.55 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07220K"
+			(at 209.55 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"
 			(at 209.55 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -9862,7 +10400,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R"
 			(at 236.22 88.9 0)
 			(hide yes)
 			(show_name no)
@@ -9875,6 +10413,50 @@
 		)
 		(property "Description" ""
 			(at 236.22 88.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Jianfu"
+			(at 236.22 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "TVAF36-N014JW-R"
+			(at 236.22 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "TVAF36N014JWR"
+			(at 236.22 88.9 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/"
+			(at 236.22 88.9 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10024,7 +10606,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf"
 			(at 135.89 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -10036,6 +10618,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 135.89 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Alpha & Omega Semiconductor"
+			(at 135.89 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "AO3401A"
+			(at 135.89 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "AO3401A"
+			(at 135.89 52.07 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/"
 			(at 135.89 52.07 0)
 			(hide yes)
 			(show_name no)
@@ -10142,7 +10768,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"
 			(at 78.74 64.77 0)
 			(hide yes)
 			(show_name no)
@@ -10154,6 +10780,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 78.74 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 78.74 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A475KAQNNNE"
+			(at 78.74 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A475KAQNNNE"
+			(at 78.74 64.77 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"
 			(at 78.74 64.77 0)
 			(hide yes)
 			(show_name no)
@@ -10461,7 +11131,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R"
 			(at 224.79 66.04 0)
 			(hide yes)
 			(show_name no)
@@ -10474,6 +11144,50 @@
 		)
 		(property "Description" ""
 			(at 224.79 66.04 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Jianfu"
+			(at 224.79 66.04 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "TVAF36-N014JW-R"
+			(at 224.79 66.04 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "TVAF36N014JWR"
+			(at 224.79 66.04 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/"
+			(at 224.79 66.04 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10777,7 +11491,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 218.44 233.68 0)
 			(hide yes)
 			(show_name no)
@@ -10790,6 +11504,50 @@
 		)
 		(property "Description" ""
 			(at 218.44 233.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 218.44 233.68 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0603FR-0710KL"
+			(at 218.44 233.68 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0603FR-0710K"
+			(at 218.44 233.68 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"
+			(at 218.44 233.68 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10836,7 +11594,7 @@
 				)
 			)
 		)
-		(property "Value" "Li-Ion 1S JST-PH"
+		(property "Value" "B2B-PH-K-S"
 			(at 35.56 36.83 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10857,7 +11615,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 35.56 43.18 0)
 			(hide yes)
 			(show_name no)
@@ -10870,6 +11628,50 @@
 		)
 		(property "Description" ""
 			(at 35.56 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 35.56 43.18 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "B2B-PH-K-S (LF)(SN)"
+			(at 35.56 43.18 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "B2B-PH-K-S"
+			(at 35.56 43.18 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/b2b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b2b-ph-k-s-lf-sn/"
+			(at 35.56 43.18 180)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -10939,7 +11741,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 289.56 219.71 0)
 			(hide yes)
 			(show_name no)
@@ -10951,6 +11753,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 289.56 219.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 289.56 219.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07220KL"
+			(at 289.56 219.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07220K"
+			(at 289.56 219.71 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"
 			(at 289.56 219.71 0)
 			(hide yes)
 			(show_name no)
@@ -10998,7 +11844,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS63031DSK"
+		(property "Value" "TPS63031"
 			(at 64.77 132.08 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11019,7 +11865,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps63030.pdf"
 			(at 64.77 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -11031,6 +11877,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 64.77 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Texas Instruments"
+			(at 64.77 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "TPS63031DSKR"
+			(at 64.77 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "TPS63031DSKR"
+			(at 64.77 147.32 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/tps63031dskr/voltage-regulators-dc-dc-circuits/texas-instruments/"
 			(at 64.77 147.32 0)
 			(hide yes)
 			(show_name no)
@@ -11218,7 +12108,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x06"
+		(property "Value" "B6B-PH-K-S"
 			(at 53.34 209.5499 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11240,7 +12130,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 50.8 207.01 0)
 			(hide yes)
 			(show_name no)
@@ -11259,6 +12149,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 50.8 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "B6B-PH-K-S (LF)(SN)"
+			(at 50.8 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "B6B-PH-K-S"
+			(at 50.8 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/"
+			(at 50.8 207.01 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)
@@ -11413,7 +12347,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 262.89 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -11425,6 +12359,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 262.89 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 262.89 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B104KB8NNNC"
+			(at 262.89 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B104KB8NNNC"
+			(at 262.89 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 262.89 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -11495,7 +12473,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 24.13 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -11507,6 +12485,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 24.13 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 24.13 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A106KAYNNNE"
+			(at 24.13 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A106KAYNNNE"
+			(at 24.13 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 24.13 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -11577,7 +12599,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 222.25 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -11589,6 +12611,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 222.25 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 222.25 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B104KB8NNNC"
+			(at 222.25 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B104KB8NNNC"
+			(at 222.25 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 222.25 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -11637,7 +12703,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "AO3400A touch emulator"
+		(property "Value" "AO3400A"
 			(at 341.63 179.07 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11659,7 +12725,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf"
 			(at 335.28 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -11671,6 +12737,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 335.28 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Alpha & Omega Semiconductor"
+			(at 335.28 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "AO3400A"
+			(at 335.28 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "AO3400A"
+			(at 335.28 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"
 			(at 335.28 177.8 0)
 			(hide yes)
 			(show_name no)
@@ -11834,7 +12944,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "ESP32-C6-MINI-1"
+		(property "Value" "ESP32-C6-MINI-1-N4"
 			(at 285.3533 45.72 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11875,6 +12985,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Espressif Systems"
+			(at 283.21 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "ESP32-C6-MINI-1-N4"
+			(at 283.21 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "ESP32-C6-MINI-1-N4"
+			(at 283.21 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/esp32-c6-mini-1-n4/iot-wifi-bluetooth-module/espressif/"
+			(at 283.21 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)
@@ -12226,7 +13380,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "10k NTC @25C"
+		(property "Value" "NTCC-10K"
 			(at 243.84 147.6375 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12248,7 +13402,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/Document/f06e7f4c0fd5fd1c49c3e9fd8ceb0529/NTCC-10K.pdf"
 			(at 247.65 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -12260,6 +13414,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 247.65 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "SR Passives"
+			(at 247.65 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "NTCC-10K"
+			(at 247.65 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "NTCC-10K"
+			(at 247.65 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ntcc-10k/ntc-mess-thermistoren-tht/sr-passives/"
 			(at 247.65 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -12331,7 +13529,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 116.84 60.96 0)
 			(hide yes)
 			(show_name no)
@@ -12343,6 +13541,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 116.84 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 116.84 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-071ML"
+			(at 116.84 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-071M"
+			(at 116.84 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"
 			(at 116.84 60.96 0)
 			(hide yes)
 			(show_name no)
@@ -12411,7 +13653,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC"
 			(at 304.8 163.83 0)
 			(hide yes)
 			(show_name no)
@@ -12424,6 +13666,50 @@
 		)
 		(property "Description" ""
 			(at 304.8 163.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 304.8 163.83 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B221KB8NNNC"
+			(at 304.8 163.83 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B221KB8NNNC"
+			(at 304.8 163.83 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC"
+			(at 304.8 163.83 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12570,7 +13856,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 332.74 58.42 0)
 			(hide yes)
 			(show_name no)
@@ -12583,6 +13869,50 @@
 		)
 		(property "Description" ""
 			(at 332.74 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 332.74 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0722RL"
+			(at 332.74 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0722R"
+			(at 332.74 58.42 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL"
+			(at 332.74 58.42 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -12888,7 +14218,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 218.44 205.74 0)
 			(hide yes)
 			(show_name no)
@@ -12901,6 +14231,50 @@
 		)
 		(property "Description" ""
 			(at 218.44 205.74 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 218.44 205.74 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0603FR-0710KL"
+			(at 218.44 205.74 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0603FR-0710K"
+			(at 218.44 205.74 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"
+			(at 218.44 205.74 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13049,7 +14423,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 88.9 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -13061,6 +14435,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 88.9 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 88.9 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A106KAYNNNE"
+			(at 88.9 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A106KAYNNNE"
+			(at 88.9 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 88.9 157.48 0)
 			(hide yes)
 			(show_name no)
@@ -13129,7 +14547,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 218.44 238.76 0)
 			(hide yes)
 			(show_name no)
@@ -13142,6 +14560,50 @@
 		)
 		(property "Description" ""
 			(at 218.44 238.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 218.44 238.76 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0603FR-0710KL"
+			(at 218.44 238.76 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0603FR-0710K"
+			(at 218.44 238.76 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"
+			(at 218.44 238.76 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13211,7 +14673,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 34.29 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -13223,6 +14685,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 34.29 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 34.29 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B104KB8NNNC"
+			(at 34.29 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B104KB8NNNC"
+			(at 34.29 149.86 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 34.29 149.86 0)
 			(hide yes)
 			(show_name no)
@@ -13452,7 +14958,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC"
 			(at 248.92 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -13464,6 +14970,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 248.92 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 248.92 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10A106MQ8NNNC"
+			(at 248.92 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10A106MQ8NNNC"
+			(at 248.92 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC"
 			(at 248.92 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -13534,7 +15084,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 224.79 43.18 0)
 			(hide yes)
 			(show_name no)
@@ -13546,6 +15096,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 224.79 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 224.79 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0710KL"
+			(at 224.79 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0710K"
+			(at 224.79 43.18 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"
 			(at 224.79 43.18 0)
 			(hide yes)
 			(show_name no)
@@ -13616,7 +15210,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"
 			(at 382.27 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -13628,6 +15222,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 382.27 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 382.27 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10C220JB8NNNC"
+			(at 382.27 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10C220JB8NNNC"
+			(at 382.27 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"
 			(at 382.27 68.58 0)
 			(hide yes)
 			(show_name no)
@@ -13698,7 +15336,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 166.37 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -13710,6 +15348,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 166.37 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 166.37 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-071ML"
+			(at 166.37 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-071M"
+			(at 166.37 146.05 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"
 			(at 166.37 146.05 0)
 			(hide yes)
 			(show_name no)
@@ -13859,7 +15541,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 260.35 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -13871,6 +15553,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 260.35 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 260.35 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B104KB8NNNC"
+			(at 260.35 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B104KB8NNNC"
+			(at 260.35 33.02 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"
 			(at 260.35 33.02 0)
 			(hide yes)
 			(show_name no)
@@ -13941,7 +15667,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC"
 			(at 309.88 220.98 0)
 			(hide yes)
 			(show_name no)
@@ -13953,6 +15679,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 309.88 220.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 309.88 220.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10B103KB8NNNC"
+			(at 309.88 220.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10B103KB8NNNC"
+			(at 309.88 220.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC"
 			(at 309.88 220.98 0)
 			(hide yes)
 			(show_name no)
@@ -14021,7 +15791,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.onsemi.com/pdf/datasheet/ss12-d.pdf"
 			(at 132.08 36.83 0)
 			(hide yes)
 			(show_name no)
@@ -14034,6 +15804,50 @@
 		)
 		(property "Description" ""
 			(at 132.08 36.83 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "onsemi"
+			(at 132.08 36.83 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "SS14"
+			(at 132.08 36.83 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "SS14-FAI"
+			(at 132.08 36.83 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"
+			(at 132.08 36.83 180)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14215,7 +16029,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 236.22 71.12 0)
 			(hide yes)
 			(show_name no)
@@ -14227,6 +16041,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 236.22 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 236.22 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0710KL"
+			(at 236.22 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0710K"
+			(at 236.22 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"
 			(at 236.22 71.12 0)
 			(hide yes)
 			(show_name no)
@@ -14510,7 +16368,7 @@
 				)
 			)
 		)
-		(property "Value" "MCP73831T-2ACI/OT"
+		(property "Value" "MCP73831"
 			(at 34.29 85.0199 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14531,7 +16389,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "http://ww1.microchip.com/downloads/en/DeviceDoc/20001984g.pdf"
 			(at 50.8 86.36 0)
 			(hide yes)
 			(show_name no)
@@ -14543,6 +16401,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 50.8 86.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Microchip Technology"
+			(at 50.8 86.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "MCP73831T-2ACI/OT"
+			(at 50.8 86.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "MCP73831T-2ACI/OT"
+			(at 50.8 86.36 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/mcp73831t-2aci_ot/batterie-u-akku-controller-schaltungen/microchip-technology/"
 			(at 50.8 86.36 0)
 			(hide yes)
 			(show_name no)
@@ -14813,7 +16715,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0021.pdf"
 			(at 49.53 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -14825,6 +16727,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 49.53 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Murata"
+			(at 49.53 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "LQH3NPN2R2MJRL"
+			(at 49.53 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "LQH3NPN2R2MJRL"
+			(at 49.53 152.4 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/lqh3npn2r2mjrl/inductors/murata/"
 			(at 49.53 152.4 0)
 			(hide yes)
 			(show_name no)
@@ -14873,7 +16819,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x05"
+		(property "Value" "B5B-PH-K-S"
 			(at 92.71 217.1699 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14895,7 +16841,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 90.17 215.9 0)
 			(hide yes)
 			(show_name no)
@@ -14914,6 +16860,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 90.17 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "B5B-PH-K-S (LF)(SN)"
+			(at 90.17 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "B5B-PH-K-S"
+			(at 90.17 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/b5b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b5b-ph-k-s-lf-sn/"
+			(at 90.17 215.9 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)
@@ -14986,7 +16976,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 289.56 198.12 0)
 			(hide yes)
 			(show_name no)
@@ -14998,6 +16988,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 289.56 198.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 289.56 198.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07330KL"
+			(at 289.56 198.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07330K"
+			(at 289.56 198.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07330KL"
 			(at 289.56 198.12 0)
 			(hide yes)
 			(show_name no)
@@ -15147,7 +17181,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 209.55 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -15159,6 +17193,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 209.55 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 209.55 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-07220KL"
+			(at 209.55 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-07220K"
+			(at 209.55 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"
 			(at 209.55 123.19 0)
 			(hide yes)
 			(show_name no)
@@ -15229,7 +17307,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"
 			(at 361.95 71.12 0)
 			(hide yes)
 			(show_name no)
@@ -15241,6 +17319,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 361.95 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 361.95 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10C220JB8NNNC"
+			(at 361.95 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10C220JB8NNNC"
+			(at 361.95 71.12 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"
 			(at 361.95 71.12 0)
 			(hide yes)
 			(show_name no)
@@ -15311,7 +17433,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 35.56 97.79 0)
 			(hide yes)
 			(show_name no)
@@ -15323,6 +17445,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 35.56 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 35.56 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-075K1L"
+			(at 35.56 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-075K1"
+			(at 35.56 97.79 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"
 			(at 35.56 97.79 0)
 			(hide yes)
 			(show_name no)
@@ -15428,6 +17594,130 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 332.74 81.28 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f8cf26b8-fd6f-4087-850a-d4d03a32095a")
+		(property "Reference" "R24"
+			(at 332.74 74.93 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Value" "10K"
+			(at 332.74 77.47 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder"
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 332.74 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 332.74 81.28 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0603FR-0710KL"
+			(at 332.74 81.28 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0603FR-0710K"
+			(at 332.74 81.28 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"
+			(at 332.74 81.28 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0387ea70-f9f8-4cc4-9328-fb3d3fa267d5")
+		)
+		(pin "2"
+			(uuid "1ee8856f-821a-4873-9a63-29a99e89ac92")
+		)
+		(instances
+			(project "unni-smartification-c6"
+				(path "/15fd0edf-be3e-44ec-8dd6-6b1cf69b7c51/706aea83-d0d2-469c-a6dd-7c6a9d9c51bb"
+					(reference "R24")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x03")
 		(at 87.63 199.39 0)
 		(unit 1)
@@ -15450,7 +17740,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x03"
+		(property "Value" "B3B-PH-K-S"
 			(at 90.17 200.6599 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -15472,7 +17762,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 87.63 199.39 0)
 			(hide yes)
 			(show_name no)
@@ -15491,6 +17781,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 87.63 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "B3B-PH-K-S (LF)(SN)"
+			(at 87.63 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "B3B-PH-K-S"
+			(at 87.63 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/b3b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b3b-ph-k-s-lf-sn/"
+			(at 87.63 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)

@@ -53,7 +53,7 @@ checks={
  ('J1','A7'):'USB_RAW_N', ('J1','A6'):'USB_RAW_P',
  ('U4','1'):'USB_RAW_P', ('U4','2'):'USB_RAW_N', ('U4','3'):'GND',
  ('U10','12'):'BAT_ADC', ('U10','13'):'USB_ADC', ('U10','5'):'BAT_TEMP_ADC', ('U10','6'):'BACKLIGHT_ADC',
- ('U10','27'):'BOOST_CMD', ('U10','28'):'CONN_BTN', ('U10','19'):'CHARGE_STAT',
+ ('U10','27'):'BOOST_CMD', ('U10','19'):'CHARGE_STAT',
  ('R12','1'):'CHARGE_STAT', ('C9','1'):'UNNI_AC', ('C20','1'):'BAT_ADC', ('C21','1'):'BAT_TEMP_ADC', ('C22','1'):'USB_ADC', ('C33','1'):'BACKLIGHT_ADC',
  ('J5','1'):'CONN_TOUCH', ('J5','2'):'CONN_LED+', ('J5','3'):'CONN_BTN',
  ('J6','1'):'CONN_SCL', ('J6','2'):'CONN_SDA', ('J6','3'):'CONN_RH', ('J6','4'):'CONN_RT', ('J6','5'):'GND',
@@ -62,6 +62,19 @@ bad=[]
 for key,want in checks.items():
     got=pin_net.get(key)
     if got!=want: bad.append((key,want,got))
+# CONN_BTN is intentionally connected to ESP IO22 through the 10k series resistor R24.
+# Assert topology instead of KiCad's generated MCU-side net name.
+u10_io22 = pin_net.get(('U10','28'))
+r24_1 = pin_net.get(('R24','1'))
+r24_2 = pin_net.get(('R24','2'))
+if not u10_io22:
+    bad.append((('U10','28'),'connected to R24',None))
+elif u10_io22 not in {r24_1, r24_2}:
+    bad.append((('R24','*'),u10_io22,{r24_1,r24_2}))
+else:
+    r24_other = r24_2 if r24_1 == u10_io22 else r24_1
+    if r24_other != 'CONN_BTN':
+        bad.append((('R24','other'),'CONN_BTN',r24_other))
 # R13 is passive: orientation is irrelevant, but it must be the 47k VBUS pulldown.
 if {pin_net.get(('R13','1')), pin_net.get(('R13','2'))} != {'VBUS','GND'}:
     bad.append((('R13','1/2'),{'VBUS','GND'},{pin_net.get(('R13','1')),pin_net.get(('R13','2'))}))
@@ -80,8 +93,10 @@ for comp in root.find('components'):
 if values.get('R3') != '5.1k': bad.append((('R3','value'),'5.1k',values.get('R3')))
 if values.get('U4') != 'TPD2E009DBZR': bad.append((('U4','value'),'TPD2E009DBZR',values.get('U4')))
 if values.get('C22') not in {'100nF','100n'}: bad.append((('C22','value'),'100nF',values.get('C22')))
-if values.get('J5') != 'Conn_01x03': bad.append((('J5','value'),'Conn_01x03',values.get('J5')))
-if values.get('J6') != 'Conn_01x05': bad.append((('J6','value'),'Conn_01x05',values.get('J6')))
+if values.get('J5') != 'B3B-PH-K-S': bad.append((('J5','value'),'B3B-PH-K-S',values.get('J5')))
+if values.get('J6') != 'B5B-PH-K-S': bad.append((('J6','value'),'B5B-PH-K-S',values.get('J6')))
+if values.get('R24') not in {'10k','10K'}:
+    bad.append((('R24','value'),'10k/10K',values.get('R24')))
 if values.get('C32') != '220pF': bad.append((('C32','value'),'220pF populated touch-coupling capacitor',values.get('C32')))
 if bad:
     for x in bad: print('CONNECTIVITY ERROR:',x)

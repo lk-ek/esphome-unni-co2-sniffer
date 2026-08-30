@@ -1,5 +1,5 @@
 (kicad_sch
-	(version 20260818)
+	(version 20260826)
 	(generator "eeschema")
 	(generator_version "10.99")
 	(uuid "80d8cd67-024e-4141-a3c9-b5c37e62bab8")
@@ -3430,6 +3430,12 @@
 		(uuid "80ef8885-40b9-4172-8dba-470039196b00")
 	)
 	(junction
+		(at 66.04 81.28)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "8348b534-25e5-4037-b3bf-129deaac7b52")
+	)
+	(junction
 		(at 149.86 173.99)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3452,6 +3458,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "9de74dec-364c-42bd-87e4-67094aded2a9")
+	)
+	(junction
+		(at 50.8 26.67)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9f6432ad-dfad-4b70-829a-14648cbb941f")
 	)
 	(junction
 		(at 116.84 173.99)
@@ -4984,7 +4996,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 55.88 53.34 0)
 			(hide yes)
 			(show_name no)
@@ -4997,6 +5009,50 @@
 		)
 		(property "Description" ""
 			(at 55.88 53.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 55.88 53.34 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-075K1L"
+			(at 55.88 53.34 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-075K1"
+			(at 55.88 53.34 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"
+			(at 55.88 53.34 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5064,7 +5120,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.onsemi.com/pdf/datasheet/ss12-d.pdf"
 			(at 133.35 156.21 0)
 			(hide yes)
 			(show_name no)
@@ -5077,6 +5133,50 @@
 		)
 		(property "Description" ""
 			(at 133.35 156.21 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "onsemi"
+			(at 133.35 156.21 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "SS14"
+			(at 133.35 156.21 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "SS14-FAI"
+			(at 133.35 156.21 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"
+			(at 133.35 156.21 180)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5177,7 +5277,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf"
 			(at 50.8 154.94 0)
 			(hide yes)
 			(show_name no)
@@ -5190,6 +5290,50 @@
 		)
 		(property "Description" ""
 			(at 50.8 154.94 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Alpha & Omega Semiconductor"
+			(at 50.8 154.94 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "AO3401A"
+			(at 50.8 154.94 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "AO3401A"
+			(at 50.8 154.94 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/"
+			(at 50.8 154.94 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5295,7 +5439,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 39.37 199.39 0)
 			(hide yes)
 			(show_name no)
@@ -5307,6 +5451,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 39.37 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 39.37 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-071ML"
+			(at 39.37 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-071M"
+			(at 39.37 199.39 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"
 			(at 39.37 199.39 0)
 			(hide yes)
 			(show_name no)
@@ -5399,6 +5587,50 @@
 				)
 			)
 		)
+		(property "Manufacturer" "Texas Instruments"
+			(at 78.74 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "TPD2E009DBZR"
+			(at 78.74 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "TPD2E009DBZR"
+			(at 78.74 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/tpd2e009dbzr/protection-diodes-arrays/texas-instruments/"
+			(at 78.74 39.37 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
 		(pin "1"
 			(uuid "12c8cd28-e57f-4077-9d1e-8d2309632b9a")
 		)
@@ -5439,7 +5671,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS613222ADBZ (5V)"
+		(property "Value" "TPS613222A"
 			(at 133.35 168.91 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5460,7 +5692,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps61322.pdf"
 			(at 133.35 176.53 0)
 			(hide yes)
 			(show_name no)
@@ -5472,6 +5704,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 133.35 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Texas Instruments"
+			(at 133.35 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "TPS613222ADBZR"
+			(at 133.35 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "N/A — not listed at TME"
+			(at 133.35 176.53 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=TPS613222ADBZR"
 			(at 133.35 176.53 0)
 			(hide yes)
 			(show_name no)
@@ -5578,7 +5854,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC"
 			(at 149.86 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -5590,6 +5866,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 149.86 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 149.86 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A226KPCLRNC"
+			(at 149.86 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A226KPCLRNC"
+			(at 149.86 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC"
 			(at 149.86 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -5739,7 +6059,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 76.2 185.42 0)
 			(hide yes)
 			(show_name no)
@@ -5752,6 +6072,50 @@
 		)
 		(property "Description" ""
 			(at 76.2 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 76.2 185.42 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0747KL"
+			(at 76.2 185.42 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0747K"
+			(at 76.2 185.42 180)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0747KL"
+			(at 76.2 185.42 180)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -5897,7 +6261,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 34.29 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -5910,6 +6274,50 @@
 		)
 		(property "Description" ""
 			(at 34.29 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 34.29 172.72 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-0710KL"
+			(at 34.29 172.72 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-0710K"
+			(at 34.29 172.72 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"
+			(at 34.29 172.72 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6293,7 +6701,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 59.69 60.96 0)
 			(hide yes)
 			(show_name no)
@@ -6306,6 +6714,50 @@
 		)
 		(property "Description" ""
 			(at 59.69 60.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 59.69 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-075K1L"
+			(at 59.69 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-075K1"
+			(at 59.69 60.96 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"
+			(at 59.69 60.96 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6353,7 +6805,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "UNNI DC / battery input - AC / 5V Input"
+		(property "Value" "S3B-PH-SM4-TB"
 			(at 261.62 189.23 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -6375,7 +6827,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 259.08 187.96 0)
 			(hide yes)
 			(show_name no)
@@ -6394,6 +6846,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 259.08 187.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "S3B-PH-SM4-TB(LF)(SN)"
+			(at 259.08 187.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "S3B-PH-SM4-TB"
+			(at 259.08 187.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=S3B-PH-SM4-TB"
+			(at 259.08 187.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)
@@ -6855,7 +7351,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf"
 			(at 48.26 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -6867,6 +7363,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 48.26 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Alpha & Omega Semiconductor"
+			(at 48.26 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "AO3400A"
+			(at 48.26 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "AO3400A"
+			(at 48.26 172.72 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"
 			(at 48.26 172.72 0)
 			(hide yes)
 			(show_name no)
@@ -6973,7 +7513,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC"
 			(at 245.11 194.31 0)
 			(hide yes)
 			(show_name no)
@@ -6985,6 +7525,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 245.11 194.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 245.11 194.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL10A105KB8NNNC"
+			(at 245.11 194.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL10A105KB8NNNC"
+			(at 245.11 194.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC"
 			(at 245.11 194.31 0)
 			(hide yes)
 			(show_name no)
@@ -7032,7 +7616,7 @@
 				)
 			)
 		)
-		(property "Value" "USB-C (replacement daughterboard)"
+		(property "Value" "UJ20-C-H-G-SMT-1-P16-TR"
 			(at 33.02 91.44 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7054,7 +7638,7 @@
 				(justify bottom)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://jp.sameskydevices.com/product/resource/uj20-c-h-g-smt-1-p16-tr.pdf"
 			(at 33.02 50.8 0)
 			(hide yes)
 			(show_name no)
@@ -7076,19 +7660,51 @@
 				)
 			)
 		)
-		(property "PARTREV" "1.0"
+		(property "Manufacturer" "Same Sky"
 			(at 33.02 50.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1.27 1.27)
+					(size 1 1)
 				)
-				(justify bottom)
 			)
 		)
-		(property "MANUFACTURER" "Same Sky"
+		(property "Manufacturer Part Number" "UJ20-C-H-G-SMT-1-P16-TR"
+			(at 33.02 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "N/A — not listed at TME"
+			(at 33.02 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=UJ20-C-H-G-SMT-1-P16-TR"
+			(at 33.02 50.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "PARTREV" "1.0"
 			(at 33.02 50.8 0)
 			(hide yes)
 			(show_name no)
@@ -7204,7 +7820,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SS14 BOOST -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 229.87 184.4675 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7226,7 +7842,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.onsemi.com/pdf/datasheet/ss12-d.pdf"
 			(at 227.33 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -7239,6 +7855,50 @@
 		)
 		(property "Description" ""
 			(at 227.33 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "onsemi"
+			(at 227.33 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "SS14"
+			(at 227.33 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "SS14-FAI"
+			(at 227.33 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"
+			(at 227.33 182.88 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7339,7 +7999,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf"
 			(at 57.15 165.1 0)
 			(hide yes)
 			(show_name no)
@@ -7352,6 +8012,50 @@
 		)
 		(property "Description" ""
 			(at 57.15 165.1 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Yageo"
+			(at 57.15 165.1 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "RC0805FR-071ML"
+			(at 57.15 165.1 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "RC0805FR-071M"
+			(at 57.15 165.1 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"
+			(at 57.15 165.1 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7399,7 +8103,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "Conn_01x06"
+		(property "Value" "B6B-PH-K-S"
 			(at 135.89 58.4199 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7421,7 +8125,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.jst-mfg.com/product/pdf/eng/ePH.pdf"
 			(at 133.35 55.88 0)
 			(hide yes)
 			(show_name no)
@@ -7440,6 +8144,50 @@
 			(effects
 				(font
 					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "JST"
+			(at 133.35 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "B6B-PH-K-S (LF)(SN)"
+			(at 133.35 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "B6B-PH-K-S"
+			(at 133.35 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/"
+			(at 133.35 55.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
 				)
 			)
 		)
@@ -7750,7 +8498,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0133.pdf"
 			(at 110.49 173.99 0)
 			(hide yes)
 			(show_name no)
@@ -7763,6 +8511,50 @@
 		)
 		(property "Description" ""
 			(at 110.49 173.99 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Murata"
+			(at 110.49 173.99 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "DFE322520FD-2R2M=P2"
+			(at 110.49 173.99 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "DFE322520FD-2R2M"
+			(at 110.49 173.99 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/dfe322520fd-2r2m/inductors/murata/dfe322520fd-2r2m-p2/"
+			(at 110.49 173.99 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -7831,7 +8623,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf"
 			(at 62.23 190.5 0)
 			(hide yes)
 			(show_name no)
@@ -7844,6 +8636,50 @@
 		)
 		(property "Description" ""
 			(at 62.23 190.5 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Alpha & Omega Semiconductor"
+			(at 62.23 190.5 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "AO3400A"
+			(at 62.23 190.5 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "AO3400A"
+			(at 62.23 190.5 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"
+			(at 62.23 190.5 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8028,7 +8864,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 102.87 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -8040,6 +8876,50 @@
 			)
 		)
 		(property "Description" ""
+			(at 102.87 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "Samsung Electro-Mechanics"
+			(at 102.87 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "CL21A106KAYNNNE"
+			(at 102.87 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "CL21A106KAYNNNE"
+			(at 102.87 181.61 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"
 			(at 102.87 181.61 0)
 			(hide yes)
 			(show_name no)
@@ -8088,7 +8968,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "SS14 USB -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 217.17 184.4675 90)
 			(show_name no)
 			(do_not_autoplace no)
@@ -8110,7 +8990,7 @@
 				)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "https://www.onsemi.com/pdf/datasheet/ss12-d.pdf"
 			(at 219.71 182.88 0)
 			(hide yes)
 			(show_name no)
@@ -8123,6 +9003,50 @@
 		)
 		(property "Description" ""
 			(at 219.71 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer" "onsemi"
+			(at 219.71 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "Manufacturer Part Number" "SS14"
+			(at 219.71 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Part Number" "SS14-FAI"
+			(at 219.71 182.88 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1 1)
+				)
+			)
+		)
+		(property "TME Link" "https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"
+			(at 219.71 182.88 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)

@@ -1,8 +1,11 @@
 ** Drc report for unni-smartification-c6.kicad_pcb **
-** Created on 2026-08-25T13:57:47 **
+** Created on 2026-08-30T11:41:55 **
 ** Report includes: Errors, Warnings, Exclusions **
 
-** Found 70 DRC violations **
+** Found 71 DRC violations **
+[via_dangling]: Via is not connected or connected on only one layer
+    Local override; warning
+    @(147.2000 mm, 135.5300 mm): Via [CONN_BTN] on F.Cu - B.Cu
 [silk_edge_clearance]: Silkscreen clipped by board edge
     Rule: board setup constraints silk; warning
     @(72.6500 mm, 123.2000 mm): Segment on Edge.Cuts
@@ -23,6 +26,9 @@
 [lib_footprint_mismatch]: Footprint 'ESP32-C6-MINI-1' does not match copy in library 'RF_Module'
     Local override; warning
     @(142.5811 mm, 136.3250 mm): Footprint U10
+[lib_footprint_mismatch]: Footprint 'JST_PH_B3B-PH-K_1x03_P2.00mm_Vertical' does not match copy in library 'Connector_JST'
+    Local override; warning
+    @(125.3600 mm, 137.2000 mm): Footprint J5
 [lib_footprint_issues]: The current configuration does not include the footprint library 'UNNI_Mechanical'
     Local override; warning
     @(90.1500 mm, 136.2000 mm): Footprint H2
@@ -65,7 +71,7 @@
 [lib_footprint_mismatch]: Footprint 'R_0805_2012Metric_Pad1.20x1.40mm_HandSolder' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(87.2700 mm, 130.8300 mm): Footprint R2
-[lib_footprint_mismatch]: Footprint 'SAMESKY_UJ20-C-H-G-SMT-1-P16-TR' does not match copy in library 'Misc'
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Misc'
     Local override; warning
     @(81.1500 mm, 122.2300 mm): Footprint J1
 [lib_footprint_mismatch]: Footprint 'SOT-23_Handsoldering' does not match copy in library 'Package_TO_SOT_SMD'
@@ -74,6 +80,9 @@
 [lib_footprint_mismatch]: Footprint 'R_0805_2012Metric_Pad1.20x1.40mm_HandSolder' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(87.2800 mm, 125.4100 mm): Footprint R1
+[lib_footprint_mismatch]: Footprint 'R_0603_1608Metric_Pad0.98x0.95mm_HandSolder' does not match copy in library 'Resistor_SMD'
+    Local override; warning
+    @(147.2350 mm, 137.4550 mm): Footprint R24
 [text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
     Rule: board setup constraints silk text height; warning
     @(72.9000 mm, 175.1800 mm): PCB text 'UNNI_DC GND UNNI_AC' on F.Silkscreen
@@ -88,10 +97,10 @@
     @(136.1314 mm, 156.7689 mm): PCB text '+B VCC CMD GND D+ D-' on F.Silkscreen
 [text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
     Rule: board setup constraints silk text height; warning
-    @(151.4300 mm, 156.0700 mm): PCB text 'GND RT RH SDA SCL' on F.Silkscreen
+    @(128.7800 mm, 140.0600 mm): PCB text 'TOUCH LED BTN' on F.Silkscreen
 [text_height]: Text height out of range (board setup constraints silk text height min height 0.8000 mm; actual 0.7000 mm)
     Rule: board setup constraints silk text height; warning
-    @(127.8800 mm, 131.6700 mm): PCB text 'TOUCH LED BTN' on F.Silkscreen
+    @(151.4300 mm, 156.0700 mm): PCB text 'GND RT RH SDA SCL' on F.Silkscreen
 [silk_overlap]: Silkscreen clearance
     Rule: board setup constraints silk; warning
     @(111.6800 mm, 152.5400 mm): PCB text 'B-B+' on F.Silkscreen
@@ -222,16 +231,8 @@
     @(133.3200 mm, 138.6100 mm): Reference field of C20
 [silk_overlap]: Silkscreen clearance
     Rule: board setup constraints silk; warning
-    @(123.5500 mm, 131.1400 mm): Rectangle of J5 on F.Silkscreen
-    @(127.8800 mm, 131.6700 mm): PCB text 'TOUCH LED BTN' on F.Silkscreen
-[silk_overlap]: Silkscreen clearance
-    Rule: board setup constraints silk; warning
     @(115.4750 mm, 137.9875 mm): Reference field of C4
     @(115.1000 mm, 139.0925 mm): Segment of U2 on F.Silkscreen
-[silk_overlap]: Silkscreen clearance
-    Rule: board setup constraints silk; warning
-    @(122.8850 mm, 136.1950 mm): Reference field of C6
-    @(123.5500 mm, 131.1400 mm): Rectangle of J5 on F.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; warning
     @(120.4500 mm, 152.2000 mm): Reference field of C1
@@ -274,12 +275,12 @@
     @(83.4800 mm, 133.5428 mm): Track [USB_RAW_N] on B.Cu, length 44.1500 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(141.1650 mm, 150.9822 mm): Track [USB_RAW_P] on F.Cu, length 0.6797 mm
+    @(141.1650 mm, 150.3025 mm): Track [USB_RAW_P] on F.Cu, length 1.1137 mm
     @(80.8500 mm, 130.3472 mm): Track [USB_RAW_P] on B.Cu, length 4.2851 mm
 [unconnected_items]: Missing connection between items
     Local override; error
     @(142.2300 mm, 153.4900 mm): Track [BOOST_CMD] on B.Cu, length 13.6749 mm
-    @(82.6700 mm, 147.9400 mm): Track [BOOST_CMD] on F.Cu, length 6.1235 mm
+    @(87.0000 mm, 152.2700 mm): Track [BOOST_CMD] on F.Cu, length 23.0400 mm
 
 ** Found 0 Footprint errors **
 

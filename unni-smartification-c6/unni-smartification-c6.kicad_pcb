@@ -1713,7 +1713,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS63031DSK"
+		(property "Value" "TPS63031"
 			(at 0 2.2 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -2642,7 +2642,7 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x05"
+		(property "Value" "B5B-PH-K-S"
 			(at 4 4 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -3569,7 +3569,7 @@
 				)
 			)
 		)
-		(property "Value" "UNNI DC / battery input - AC / 5V Input"
+		(property "Value" "S3B-PH-SM4-TB"
 			(at 0 5.8 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -4078,7 +4078,7 @@
 				)
 			)
 		)
-		(property "Value" "ESP32-C6-MINI-1"
+		(property "Value" "ESP32-C6-MINI-1-N4"
 			(at 0 6.9 0)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -4967,7 +4967,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS613222ADBZ (5V)"
+		(property "Value" "TPS613222A"
 			(at 0 2.5 360)
 			(layer "F.Fab")
 			(hide yes)
@@ -5284,7 +5284,7 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x03"
+		(property "Value" "B3B-PH-K-S"
 			(at 2 4 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -5867,7 +5867,7 @@
 				)
 			)
 		)
-		(property "Value" "SS14 USB -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 0 2.6 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -6643,7 +6643,7 @@
 				)
 			)
 		)
-		(property "Value" "Li-Ion 1S JST-PH"
+		(property "Value" "B2B-PH-K-S"
 			(at 1 4 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -8167,7 +8167,7 @@
 				)
 			)
 		)
-		(property "Value" "AO3400A touch emulator"
+		(property "Value" "AO3400A"
 			(at 0 2.5 360)
 			(layer "F.Fab")
 			(hide yes)
@@ -9297,7 +9297,7 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x06"
+		(property "Value" "B6B-PH-K-S"
 			(at 5 4 360)
 			(layer "F.Fab")
 			(hide yes)
@@ -9780,7 +9780,7 @@
 				)
 			)
 		)
-		(property "Value" "MCP73831T-2ACI/OT"
+		(property "Value" "MCP73831"
 			(at 0 2.9 0)
 			(layer "F.Fab")
 			(hide yes)
@@ -10573,7 +10573,7 @@
 				)
 			)
 		)
-		(property "Value" "SS14 BOOST -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 0 2.6 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -12612,7 +12612,7 @@
 				)
 			)
 		)
-		(property "Value" "10k NTC @25C"
+		(property "Value" "NTCC-10K"
 			(at 1 4 90)
 			(layer "F.Fab")
 			(hide yes)
@@ -13053,7 +13053,7 @@
 				)
 			)
 		)
-		(property "Value" "Conn_01x06"
+		(property "Value" "B6B-PH-K-S"
 			(at 5 4 360)
 			(layer "F.Fab")
 			(hide yes)
@@ -15589,7 +15589,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "USB-C (replacement daughterboard)"
+		(property "Value" "UJ20-C-H-G-SMT-1-P16-TR"
 			(at 3.05375 -21.11625 90)
 			(layer "B.Fab")
 			(hide yes)

@@ -262,7 +262,7 @@
 				)
 			)
 		)
-		(property "Value" "UNNI DC / battery input"
+		(property "Value" "S3B-PH-SM4-TB"
 			(at 1.25 4.6 0)
 			(layer "F.Fab")
 			(uuid "60801310-d238-4c66-bc2e-66466d00c872")
@@ -2077,7 +2077,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS63031DSK"
+		(property "Value" "TPS63031"
 			(at 0 2.2 0)
 			(layer "F.Fab")
 			(uuid "629d0daa-dfeb-4ce9-a034-948a8d2ccccb")
@@ -3412,7 +3412,7 @@
 				)
 			)
 		)
-		(property "Value" "UNNI AC / 5V input"
+		(property "Value" "B6B-PH-K-S"
 			(at 1.25 4.6 0)
 			(layer "F.Fab")
 			(uuid "86c2e97b-6e08-49d8-bb23-c2eeded235d9")
@@ -3699,7 +3699,7 @@
 				)
 			)
 		)
-		(property "Value" "TPS613222ADBZ (5V)"
+		(property "Value" "TPS613222A"
 			(at 0 2.4 0)
 			(layer "F.Fab")
 			(uuid "2b4b2edf-6220-4a67-8756-4e7e5ad0bbb6")
@@ -4120,7 +4120,7 @@
 				)
 			)
 		)
-		(property "Value" "100k"
+		(property "Value" "1M"
 			(at 0 1.43 0)
 			(layer "F.Fab")
 			(uuid "b23214da-0954-4b83-94c2-c53bff960c19")
@@ -4891,7 +4891,7 @@
 				)
 			)
 		)
-		(property "Value" "SS14 USB -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 0 2.6 0)
 			(layer "F.Fab")
 			(uuid "a72f0b23-196a-4e78-bd05-7ad435d1f429")
@@ -6997,7 +6997,7 @@
 				)
 			)
 		)
-		(property "Value" "Li-Ion 1S JST-PH"
+		(property "Value" "B2B-PH-K-S"
 			(at 1 4 0)
 			(layer "F.Fab")
 			(uuid "0c04143b-d4cf-46ca-a148-fce32b401133")
@@ -7961,7 +7961,7 @@
 				)
 			)
 		)
-		(property "Value" "USB-C (replacement daughterboard)"
+		(property "Value" "UJ20-C-H-G-SMT-1-P16-TR"
 			(at 0 5 180)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -8341,7 +8341,7 @@
 				)
 			)
 		)
-		(property "Value" "220pF DNP"
+		(property "Value" "220pF"
 			(at 0 1.43 90)
 			(layer "F.Fab")
 			(uuid "4b6a0efa-7ff4-4b56-8573-1129a8505428")
@@ -8499,7 +8499,7 @@
 				)
 			)
 		)
-		(property "Value" "AO3400A touch emulator"
+		(property "Value" "AO3400A"
 			(at 0 2.4 90)
 			(layer "F.Fab")
 			(uuid "52f1073e-ede2-46e6-b33d-2c21ca4ebaa6")
@@ -9866,7 +9866,7 @@
 				)
 			)
 		)
-		(property "Value" "MCP73831T-2ACI/OT"
+		(property "Value" "MCP73831"
 			(at 0 2.4 0)
 			(layer "F.Fab")
 			(uuid "7b973522-666c-44ab-a4c0-04e539d2a162")
@@ -10308,7 +10308,7 @@
 				)
 			)
 		)
-		(property "Value" "ESP32-C6-MINI-1"
+		(property "Value" "ESP32-C6-MINI-1-N4"
 			(at 0 6.9 90)
 			(unlocked yes)
 			(layer "F.Fab")
@@ -11377,7 +11377,7 @@
 				)
 			)
 		)
-		(property "Value" "3.3k"
+		(property "Value" "5.1k"
 			(at 0 1.65 0)
 			(layer "F.Fab")
 			(uuid "3a2e1ccd-1446-40c6-ae22-852933cdd8d6")
@@ -11851,7 +11851,7 @@
 				)
 			)
 		)
-		(property "Value" "SS14 BOOST -> UNNI_AC"
+		(property "Value" "SS14"
 			(at 0 2.6 0)
 			(layer "F.Fab")
 			(uuid "9a94738d-366c-4543-9565-776e4bd381a9")

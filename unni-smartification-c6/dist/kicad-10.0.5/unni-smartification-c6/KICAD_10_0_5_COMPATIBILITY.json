@@ -8,8 +8,8 @@
       "constraints_removed": 24,
       "generated_via_stitch_removed": 9,
       "design_block_group_links_removed": 1,
-      "footprint_transforms_converted": 74,
-      "explicit_vias_preserved": 186,
+      "footprint_transforms_converted": 75,
+      "explicit_vias_preserved": 187,
       "spec_frequency_removed": 3,
       "dielectric_model_removed": 3
     },
@@ -21,6 +21,15 @@
       "explicit_vias_preserved": 0,
       "spec_frequency_removed": 0,
       "dielectric_model_removed": 0
+    },
+    ".history/unni-smartification-c6.kicad_pcb": {
+      "constraints_removed": 24,
+      "generated_via_stitch_removed": 9,
+      "design_block_group_links_removed": 1,
+      "footprint_transforms_converted": 75,
+      "explicit_vias_preserved": 187,
+      "spec_frequency_removed": 3,
+      "dielectric_model_removed": 3
     }
   },
   "notes": [

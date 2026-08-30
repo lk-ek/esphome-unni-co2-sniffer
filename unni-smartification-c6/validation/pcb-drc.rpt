@@ -1,5 +1,5 @@
 ** Drc report for unni-smartification-c6.kicad_pcb **
-** Created on 2026-08-25T13:56:51 **
+** Created on 2026-08-30T11:41:55 **
 ** Report includes: Errors, Warnings, Exclusions **
 
 ** Found 71 DRC violations **
@@ -71,7 +71,7 @@
 [lib_footprint_mismatch]: Footprint 'R_0805_2012Metric_Pad1.20x1.40mm_HandSolder' does not match copy in library 'Resistor_SMD'
     Local override; warning
     @(87.2700 mm, 130.8300 mm): Footprint R2
-[lib_footprint_mismatch]: Footprint 'SAMESKY_UJ20-C-H-G-SMT-1-P16-TR' does not match copy in library 'Misc'
+[lib_footprint_issues]: The current configuration does not include the footprint library 'Misc'
     Local override; warning
     @(81.1500 mm, 122.2300 mm): Footprint J1
 [lib_footprint_mismatch]: Footprint 'SOT-23_Handsoldering' does not match copy in library 'Package_TO_SOT_SMD'
@@ -275,12 +275,12 @@
     @(83.4800 mm, 133.5428 mm): Track [USB_RAW_N] on B.Cu, length 44.1500 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(141.1650 mm, 150.9822 mm): Track [USB_RAW_P] on F.Cu, length 0.6797 mm
-    @(83.8800 mm, 133.3772 mm): Track [USB_RAW_P] on B.Cu, length 44.1500 mm
+    @(141.1650 mm, 150.3025 mm): Track [USB_RAW_P] on F.Cu, length 1.1137 mm
+    @(80.8500 mm, 130.3472 mm): Track [USB_RAW_P] on B.Cu, length 4.2851 mm
 [unconnected_items]: Missing connection between items
     Local override; error
-    @(142.2300 mm, 154.6300 mm): Track [BOOST_CMD] on B.Cu, length 1.1400 mm
-    @(82.6700 mm, 147.9400 mm): Track [BOOST_CMD] on F.Cu, length 6.1235 mm
+    @(142.2300 mm, 153.4900 mm): Track [BOOST_CMD] on B.Cu, length 13.6749 mm
+    @(87.0000 mm, 152.2700 mm): Track [BOOST_CMD] on F.Cu, length 23.0400 mm
 
 ** Found 0 Footprint errors **
 

@@ -2,8 +2,8 @@
 <export version="E">
   <design>
     <source>/Users/lkolbe/work/PlatformIO/Projects/esphome-i2c-sniffer/unni-smartification-c6/unni-smartification-c6.kicad_sch</source>
-    <date>2026-08-25T13:56:49</date>
-    <tool>Eeschema 10.99.0-2756-gace8bf0470</tool>
+    <date>2026-08-30T11:41:53</date>
+    <tool>Eeschema 10.99.0-3277-gdfba7e335e</tool>
     <sheet number="1" name="/" tstamps="/">
       <title_block>
         <title>Unni CO2 Smartification — ESP32-C6 Rev A</title>
@@ -81,12 +81,21 @@
     <comp ref="C7">
       <value>10uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -105,12 +114,21 @@
     <comp ref="C8">
       <value>22uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A226KPCLRNC</field>
+        <field name="TME Part Number">CL21A226KPCLRNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A226KPCLRNC"/>
+      <property name="TME Part Number" value="CL21A226KPCLRNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A226KPCLRNC"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -129,12 +147,21 @@
     <comp ref="C9">
       <value>1uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10A105KB8NNNC</field>
+        <field name="TME Part Number">CL10A105KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10A105KB8NNNC"/>
+      <property name="TME Part Number" value="CL10A105KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10A105KB8NNNC"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -153,15 +180,24 @@
     <comp ref="D2">
       <value>SS14 DNP</value>
       <footprint>Diode_SMD:D_SMA</footprint>
+      <datasheet>https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">onsemi</field>
+        <field name="Manufacturer Part Number">SS14</field>
+        <field name="TME Part Number">SS14-FAI</field>
+        <field name="TME Link">https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/</field>
         <field name="Sim.Library">spice/models/SS14.lib</field>
         <field name="Sim.Name">SS14_SUB</field>
         <field name="Sim.Pins">1=1 2=2</field>
         <field name="Footprint">Diode_SMD:D_SMA</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Diode" part="SB120" description="20V 1A Schottky Barrier Rectifier Diode, DO-41"/>
+      <property name="Manufacturer" value="onsemi"/>
+      <property name="Manufacturer Part Number" value="SS14"/>
+      <property name="TME Part Number" value="SS14-FAI"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"/>
       <property name="Sim.Library" value="spice/models/SS14.lib"/>
       <property name="Sim.Name" value="SS14_SUB"/>
       <property name="Sim.Pins" value="1=1 2=2"/>
@@ -184,17 +220,26 @@
       </units>
     </comp>
     <comp ref="D3">
-      <value>SS14 USB -&gt; UNNI_AC</value>
+      <value>SS14</value>
       <footprint>Diode_SMD:D_SMA_Handsoldering</footprint>
+      <datasheet>https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">onsemi</field>
+        <field name="Manufacturer Part Number">SS14</field>
+        <field name="TME Part Number">SS14-FAI</field>
+        <field name="TME Link">https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/</field>
         <field name="Sim.Library">spice/models/SS14.lib</field>
         <field name="Sim.Name">SS14_SUB</field>
         <field name="Sim.Pins">1=1 2=2</field>
         <field name="Footprint">Diode_SMD:D_SMA_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Diode" part="SB120" description="20V 1A Schottky Barrier Rectifier Diode, DO-41"/>
+      <property name="Manufacturer" value="onsemi"/>
+      <property name="Manufacturer Part Number" value="SS14"/>
+      <property name="TME Part Number" value="SS14-FAI"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"/>
       <property name="Sim.Library" value="spice/models/SS14.lib"/>
       <property name="Sim.Name" value="SS14_SUB"/>
       <property name="Sim.Pins" value="1=1 2=2"/>
@@ -214,17 +259,26 @@
       </units>
     </comp>
     <comp ref="D4">
-      <value>SS14 BOOST -&gt; UNNI_AC</value>
+      <value>SS14</value>
       <footprint>Diode_SMD:D_SMA_Handsoldering</footprint>
+      <datasheet>https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">onsemi</field>
+        <field name="Manufacturer Part Number">SS14</field>
+        <field name="TME Part Number">SS14-FAI</field>
+        <field name="TME Link">https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/</field>
         <field name="Sim.Library">spice/models/SS14.lib</field>
         <field name="Sim.Name">SS14_SUB</field>
         <field name="Sim.Pins">1=1 2=2</field>
         <field name="Footprint">Diode_SMD:D_SMA_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Diode" part="SB120" description="20V 1A Schottky Barrier Rectifier Diode, DO-41"/>
+      <property name="Manufacturer" value="onsemi"/>
+      <property name="Manufacturer Part Number" value="SS14"/>
+      <property name="TME Part Number" value="SS14-FAI"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"/>
       <property name="Sim.Library" value="spice/models/SS14.lib"/>
       <property name="Sim.Name" value="SS14_SUB"/>
       <property name="Sim.Pins" value="1=1 2=2"/>
@@ -244,20 +298,27 @@
       </units>
     </comp>
     <comp ref="J1">
-      <value>USB-C (replacement daughterboard)</value>
+      <value>UJ20-C-H-G-SMT-1-P16-TR</value>
       <footprint>Misc:SAMESKY_UJ20-C-H-G-SMT-1-P16-TR</footprint>
+      <datasheet>https://jp.sameskydevices.com/product/resource/uj20-c-h-g-smt-1-p16-tr.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Same Sky</field>
+        <field name="Manufacturer Part Number">UJ20-C-H-G-SMT-1-P16-TR</field>
+        <field name="TME Part Number">N/A — not listed at TME</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=UJ20-C-H-G-SMT-1-P16-TR</field>
         <field name="PARTREV">1.0</field>
-        <field name="MANUFACTURER">Same Sky</field>
         <field name="MAXIMUM_PACKAGE_HEIGHT">3.46mm</field>
         <field name="STANDARD">Manufacturer Recommendations</field>
         <field name="Footprint">Misc:SAMESKY_UJ20-C-H-G-SMT-1-P16-TR</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://jp.sameskydevices.com/product/resource/uj20-c-h-g-smt-1-p16-tr.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Misc" part="UJ20-C-H-G-SMT-1-P16-TR" description=""/>
+      <property name="Manufacturer" value="Same Sky"/>
+      <property name="Manufacturer Part Number" value="UJ20-C-H-G-SMT-1-P16-TR"/>
+      <property name="TME Part Number" value="N/A — not listed at TME"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=UJ20-C-H-G-SMT-1-P16-TR"/>
       <property name="PARTREV" value="1.0"/>
-      <property name="MANUFACTURER" value="Same Sky"/>
       <property name="MAXIMUM_PACKAGE_HEIGHT" value="3.46mm"/>
       <property name="STANDARD" value="Manufacturer Recommendations"/>
       <property name="Sheetname" value="USB + Power"/>
@@ -288,15 +349,24 @@
       </units>
     </comp>
     <comp ref="J3">
-      <value>Conn_01x06</value>
+      <value>B6B-PH-K-S</value>
       <footprint>Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">B6B-PH-K-S (LF)(SN)</field>
+        <field name="TME Part Number">B6B-PH-K-S</field>
+        <field name="TME Link">https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/</field>
         <field name="Footprint">Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x06" description="Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="B6B-PH-K-S (LF)(SN)"/>
+      <property name="TME Part Number" value="B6B-PH-K-S"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="dnp"/>
@@ -318,15 +388,24 @@
       </units>
     </comp>
     <comp ref="J4">
-      <value>UNNI DC / battery input - AC / 5V Input</value>
+      <value>S3B-PH-SM4-TB</value>
       <footprint>Connector_JST:JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <description>Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">S3B-PH-SM4-TB(LF)(SN)</field>
+        <field name="TME Part Number">S3B-PH-SM4-TB</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=S3B-PH-SM4-TB</field>
         <field name="Footprint">Connector_JST:JST_PH_S3B-PH-SM4-TB_1x03-1MP_P2.00mm_Horizontal</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description">Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x03" description="Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="S3B-PH-SM4-TB(LF)(SN)"/>
+      <property name="TME Part Number" value="S3B-PH-SM4-TB"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=S3B-PH-SM4-TB"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
@@ -346,12 +425,21 @@
     <comp ref="L2">
       <value>2.2uH</value>
       <footprint>Unni_Inductor:L_Murata_DFE322520FD_3.2x2.5mm_HandSolder</footprint>
+      <datasheet>https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0133.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Murata</field>
+        <field name="Manufacturer Part Number">DFE322520FD-2R2M=P2</field>
+        <field name="TME Part Number">DFE322520FD-2R2M</field>
+        <field name="TME Link">https://www.tme.eu/en/details/dfe322520fd-2r2m/inductors/murata/dfe322520fd-2r2m-p2/</field>
         <field name="Footprint">Unni_Inductor:L_Murata_DFE322520FD_3.2x2.5mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0133.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="L" description="Inductor"/>
+      <property name="Manufacturer" value="Murata"/>
+      <property name="Manufacturer Part Number" value="DFE322520FD-2R2M=P2"/>
+      <property name="TME Part Number" value="DFE322520FD-2R2M"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/dfe322520fd-2r2m/inductors/murata/dfe322520fd-2r2m-p2/"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="inductor choke coil reactor magnetic"/>
@@ -370,15 +458,24 @@
     <comp ref="Q2">
       <value>AO3401A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Alpha &amp; Omega Semiconductor</field>
+        <field name="Manufacturer Part Number">AO3401A</field>
+        <field name="TME Part Number">AO3401A</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/</field>
         <field name="Sim.Library">spice/models/AO3401A.lib</field>
         <field name="Sim.Name">AO3401A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Transistor_FET" part="TP0610T" description="-0.18A Id, -60V Vds, P-Channel MOSFET, SOT-23"/>
+      <property name="Manufacturer" value="Alpha &amp; Omega Semiconductor"/>
+      <property name="Manufacturer Part Number" value="AO3401A"/>
+      <property name="TME Part Number" value="AO3401A"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/"/>
       <property name="Sim.Library" value="spice/models/AO3401A.lib"/>
       <property name="Sim.Name" value="AO3401A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -401,15 +498,24 @@
     <comp ref="Q3">
       <value>AO3400A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Alpha &amp; Omega Semiconductor</field>
+        <field name="Manufacturer Part Number">AO3400A</field>
+        <field name="TME Part Number">AO3400A</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/</field>
         <field name="Sim.Library">spice/models/AO3400A.lib</field>
         <field name="Sim.Name">AO3400A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Transistor_FET" part="Q_NMOS_GSD" description="N-MOSFET transistor, gate/source/drain"/>
+      <property name="Manufacturer" value="Alpha &amp; Omega Semiconductor"/>
+      <property name="Manufacturer Part Number" value="AO3400A"/>
+      <property name="TME Part Number" value="AO3400A"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"/>
       <property name="Sim.Library" value="spice/models/AO3400A.lib"/>
       <property name="Sim.Name" value="AO3400A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -431,15 +537,24 @@
     <comp ref="Q4">
       <value>AO3400A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Alpha &amp; Omega Semiconductor</field>
+        <field name="Manufacturer Part Number">AO3400A</field>
+        <field name="TME Part Number">AO3400A</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/</field>
         <field name="Sim.Library">spice/models/AO3400A.lib</field>
         <field name="Sim.Name">AO3400A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Transistor_FET" part="Q_NMOS_GSD" description="N-MOSFET transistor, gate/source/drain"/>
+      <property name="Manufacturer" value="Alpha &amp; Omega Semiconductor"/>
+      <property name="Manufacturer Part Number" value="AO3400A"/>
+      <property name="TME Part Number" value="AO3400A"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"/>
       <property name="Sim.Library" value="spice/models/AO3400A.lib"/>
       <property name="Sim.Name" value="AO3400A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -461,12 +576,21 @@
     <comp ref="R1">
       <value>5.1k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-075K1L</field>
+        <field name="TME Part Number">RC0805FR-075K1</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-075K1L"/>
+      <property name="TME Part Number" value="RC0805FR-075K1"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -485,12 +609,21 @@
     <comp ref="R2">
       <value>5.1k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-075K1L</field>
+        <field name="TME Part Number">RC0805FR-075K1</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-075K1L"/>
+      <property name="TME Part Number" value="RC0805FR-075K1"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -509,12 +642,21 @@
     <comp ref="R7">
       <value>1M</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-071ML</field>
+        <field name="TME Part Number">RC0805FR-071M</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-071ML</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-071ML"/>
+      <property name="TME Part Number" value="RC0805FR-071M"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -533,12 +675,21 @@
     <comp ref="R8">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0710KL</field>
+        <field name="TME Part Number">RC0805FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0710KL"/>
+      <property name="TME Part Number" value="RC0805FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -557,12 +708,21 @@
     <comp ref="R9">
       <value>1M</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-071ML</field>
+        <field name="TME Part Number">RC0805FR-071M</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-071ML</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-071ML"/>
+      <property name="TME Part Number" value="RC0805FR-071M"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -581,12 +741,21 @@
     <comp ref="R13">
       <value>47k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0747KL</field>
+        <field name="TME Part Number">RC0805FR-0747K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0747KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0747KL"/>
+      <property name="TME Part Number" value="RC0805FR-0747K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0747KL"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -603,17 +772,26 @@
       </units>
     </comp>
     <comp ref="U3">
-      <value>TPS613222ADBZ (5V)</value>
+      <value>TPS613222A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.ti.com/lit/ds/symlink/tps61322.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Texas Instruments</field>
+        <field name="Manufacturer Part Number">TPS613222ADBZR</field>
+        <field name="TME Part Number">N/A — not listed at TME</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=TPS613222ADBZR</field>
         <field name="Sim.Library">spice/models/TPS613222A.lib</field>
         <field name="Sim.Name">TPS613222A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.ti.com/lit/ds/symlink/tps61322.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Regulator_Switching" part="TPS613221ADBZ" description="1.2A Step-Up Converter, 3.3V Output Voltage, 0.9-5.5V Input Voltage, SOT-23"/>
+      <property name="Manufacturer" value="Texas Instruments"/>
+      <property name="Manufacturer Part Number" value="TPS613222ADBZR"/>
+      <property name="TME Part Number" value="N/A — not listed at TME"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=TPS613222ADBZR"/>
       <property name="Sim.Library" value="spice/models/TPS613222A.lib"/>
       <property name="Sim.Name" value="TPS613222A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -639,11 +817,19 @@
       <datasheet>https://www.ti.com/lit/ds/symlink/tpd2e009.pdf</datasheet>
       <description>2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</description>
       <fields>
+        <field name="Manufacturer">Texas Instruments</field>
+        <field name="Manufacturer Part Number">TPD2E009DBZR</field>
+        <field name="TME Part Number">TPD2E009DBZR</field>
+        <field name="TME Link">https://www.tme.eu/en/details/tpd2e009dbzr/protection-diodes-arrays/texas-instruments/</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
         <field name="Datasheet">https://www.ti.com/lit/ds/symlink/tpd2e009.pdf</field>
         <field name="Description">2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3</field>
       </fields>
       <libsource lib="Power_Protection" part="TPD2EUSB30" description="2-Channel ESD Protection for Super-Speed USB 3.0 Interface, DRT-3"/>
+      <property name="Manufacturer" value="Texas Instruments"/>
+      <property name="Manufacturer Part Number" value="TPD2E009DBZR"/>
+      <property name="TME Part Number" value="TPD2E009DBZR"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/tpd2e009dbzr/protection-diodes-arrays/texas-instruments/"/>
       <property name="Sheetname" value="USB + Power"/>
       <property name="Sheetfile" value="01_usb_power.kicad_sch"/>
       <property name="ki_keywords" value="ESD protection USB 3.0"/>
@@ -663,12 +849,21 @@
     <comp ref="C1">
       <value>4.7uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A475KAQNNNE</field>
+        <field name="TME Part Number">CL21A475KAQNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A475KAQNNNE"/>
+      <property name="TME Part Number" value="CL21A475KAQNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -687,12 +882,21 @@
     <comp ref="C2">
       <value>4.7uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A475KAQNNNE</field>
+        <field name="TME Part Number">CL21A475KAQNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A475KAQNNNE"/>
+      <property name="TME Part Number" value="CL21A475KAQNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A475KAQNNNE"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -711,12 +915,21 @@
     <comp ref="C3">
       <value>10uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -735,12 +948,21 @@
     <comp ref="C4">
       <value>100nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -759,12 +981,21 @@
     <comp ref="C5">
       <value>10uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -783,12 +1014,21 @@
     <comp ref="C6">
       <value>10uF</value>
       <footprint>Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Part Number">CL21A106KAYNNNE</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Footprint">Capacitor_SMD:C_0805_2012Metric_Pad1.18x1.45mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Part Number" value="CL21A106KAYNNNE"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL21A106KAYNNNE"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -807,12 +1047,21 @@
     <comp ref="C10">
       <value>10uF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10A106MQ8NNNC</field>
+        <field name="TME Part Number">CL10A106MQ8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10A106MQ8NNNC"/>
+      <property name="TME Part Number" value="CL10A106MQ8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10A106MQ8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -831,12 +1080,21 @@
     <comp ref="C11">
       <value>100nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -855,12 +1113,21 @@
     <comp ref="C12">
       <value>22pF DNP</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10C220JB8NNNC</field>
+        <field name="TME Part Number">CL10C220JB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10C220JB8NNNC"/>
+      <property name="TME Part Number" value="CL10C220JB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="dnp"/>
@@ -880,12 +1147,21 @@
     <comp ref="C13">
       <value>22pF DNP</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10C220JB8NNNC</field>
+        <field name="TME Part Number">CL10C220JB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10C220JB8NNNC"/>
+      <property name="TME Part Number" value="CL10C220JB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10C220JB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="dnp"/>
@@ -905,12 +1181,21 @@
     <comp ref="C20">
       <value>100nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -929,12 +1214,21 @@
     <comp ref="C21">
       <value>100nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -953,12 +1247,21 @@
     <comp ref="C22">
       <value>100nF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Part Number">CL10B104KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B104KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B104KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -977,12 +1280,21 @@
     <comp ref="C32">
       <value>220pF</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B221KB8NNNC</field>
+        <field name="TME Part Number">CL10B221KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B221KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B221KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B221KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="cap capacitor"/>
@@ -1001,12 +1313,21 @@
     <comp ref="C33">
       <value>10nF DNP</value>
       <footprint>Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC</datasheet>
       <fields>
+        <field name="Manufacturer">Samsung Electro-Mechanics</field>
+        <field name="Manufacturer Part Number">CL10B103KB8NNNC</field>
+        <field name="TME Part Number">CL10B103KB8NNNC</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC</field>
         <field name="Footprint">Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="C" description="Unpolarized capacitor"/>
+      <property name="Manufacturer" value="Samsung Electro-Mechanics"/>
+      <property name="Manufacturer Part Number" value="CL10B103KB8NNNC"/>
+      <property name="TME Part Number" value="CL10B103KB8NNNC"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=CL10B103KB8NNNC"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="dnp"/>
@@ -1026,15 +1347,24 @@
     <comp ref="D1">
       <value>SS14</value>
       <footprint>Diode_SMD:D_SMA_Handsoldering</footprint>
+      <datasheet>https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">onsemi</field>
+        <field name="Manufacturer Part Number">SS14</field>
+        <field name="TME Part Number">SS14-FAI</field>
+        <field name="TME Link">https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/</field>
         <field name="Sim.Library">spice/models/SS14.lib</field>
         <field name="Sim.Name">SS14_SUB</field>
         <field name="Sim.Pins">1=1 2=2</field>
         <field name="Footprint">Diode_SMD:D_SMA_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.onsemi.com/pdf/datasheet/ss12-d.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Diode" part="SB120" description="20V 1A Schottky Barrier Rectifier Diode, DO-41"/>
+      <property name="Manufacturer" value="onsemi"/>
+      <property name="Manufacturer Part Number" value="SS14"/>
+      <property name="TME Part Number" value="SS14-FAI"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/ss14-fai/smd-schottky-diodes/onsemi/ss14/"/>
       <property name="Sim.Library" value="spice/models/SS14.lib"/>
       <property name="Sim.Name" value="SS14_SUB"/>
       <property name="Sim.Pins" value="1=1 2=2"/>
@@ -1054,14 +1384,23 @@
       </units>
     </comp>
     <comp ref="J2">
-      <value>Li-Ion 1S JST-PH</value>
+      <value>B2B-PH-K-S</value>
       <footprint>Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">B2B-PH-K-S (LF)(SN)</field>
+        <field name="TME Part Number">B2B-PH-K-S</field>
+        <field name="TME Link">https://www.tme.eu/de/details/b2b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b2b-ph-k-s-lf-sn/</field>
         <field name="Footprint">Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x02" description="Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="B2B-PH-K-S (LF)(SN)"/>
+      <property name="TME Part Number" value="B2B-PH-K-S"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/b2b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b2b-ph-k-s-lf-sn/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
@@ -1078,15 +1417,24 @@
       </units>
     </comp>
     <comp ref="J5">
-      <value>Conn_01x03</value>
+      <value>B3B-PH-K-S</value>
       <footprint>Connector_JST:JST_PH_B3B-PH-K_1x03_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <description>Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">B3B-PH-K-S (LF)(SN)</field>
+        <field name="TME Part Number">B3B-PH-K-S</field>
+        <field name="TME Link">https://www.tme.eu/de/details/b3b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b3b-ph-k-s-lf-sn/</field>
         <field name="Footprint">Connector_JST:JST_PH_B3B-PH-K_1x03_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description">Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x03" description="Generic connector, single row, 01x03, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="B3B-PH-K-S (LF)(SN)"/>
+      <property name="TME Part Number" value="B3B-PH-K-S"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/b3b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b3b-ph-k-s-lf-sn/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="dnp"/>
@@ -1105,15 +1453,24 @@
       </units>
     </comp>
     <comp ref="J6">
-      <value>Conn_01x05</value>
+      <value>B5B-PH-K-S</value>
       <footprint>Connector_JST:JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <description>Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">B5B-PH-K-S (LF)(SN)</field>
+        <field name="TME Part Number">B5B-PH-K-S</field>
+        <field name="TME Link">https://www.tme.eu/de/details/b5b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b5b-ph-k-s-lf-sn/</field>
         <field name="Footprint">Connector_JST:JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description">Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x05" description="Generic connector, single row, 01x05, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="B5B-PH-K-S (LF)(SN)"/>
+      <property name="TME Part Number" value="B5B-PH-K-S"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/b5b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b5b-ph-k-s-lf-sn/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="dnp"/>
@@ -1134,15 +1491,24 @@
       </units>
     </comp>
     <comp ref="J10">
-      <value>Conn_01x06</value>
+      <value>B6B-PH-K-S</value>
       <footprint>Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</datasheet>
       <description>Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</description>
       <fields>
+        <field name="Manufacturer">JST</field>
+        <field name="Manufacturer Part Number">B6B-PH-K-S (LF)(SN)</field>
+        <field name="TME Part Number">B6B-PH-K-S</field>
+        <field name="TME Link">https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/</field>
         <field name="Footprint">Connector_JST:JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.jst-mfg.com/product/pdf/eng/ePH.pdf</field>
         <field name="Description">Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)</field>
       </fields>
       <libsource lib="Connector_Generic" part="Conn_01x06" description="Generic connector, single row, 01x06, script generated (kicad-library-utils/schlib/autogen/connector/)"/>
+      <property name="Manufacturer" value="JST"/>
+      <property name="Manufacturer Part Number" value="B6B-PH-K-S (LF)(SN)"/>
+      <property name="TME Part Number" value="B6B-PH-K-S"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/b6b-ph-k-s/signalsteckverbinder-raster-2-00mm/jst/b6b-ph-k-s-lf-sn/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="connector"/>
@@ -1165,12 +1531,21 @@
     <comp ref="L1">
       <value>2.2uH</value>
       <footprint>Unni_Inductor:L_Murata_LQH3NPN_3.0x3.0mm_HandSolder</footprint>
+      <datasheet>https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0021.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Murata</field>
+        <field name="Manufacturer Part Number">LQH3NPN2R2MJRL</field>
+        <field name="TME Part Number">LQH3NPN2R2MJRL</field>
+        <field name="TME Link">https://www.tme.eu/en/details/lqh3npn2r2mjrl/inductors/murata/</field>
         <field name="Footprint">Unni_Inductor:L_Murata_LQH3NPN_3.0x3.0mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://search.murata.co.jp/Ceramy/image/img/P02/JELF243A-0021.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="L" description="Inductor"/>
+      <property name="Manufacturer" value="Murata"/>
+      <property name="Manufacturer Part Number" value="LQH3NPN2R2MJRL"/>
+      <property name="TME Part Number" value="LQH3NPN2R2MJRL"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/lqh3npn2r2mjrl/inductors/murata/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="inductor choke coil reactor magnetic"/>
@@ -1189,15 +1564,24 @@
     <comp ref="Q1">
       <value>AO3401A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Alpha &amp; Omega Semiconductor</field>
+        <field name="Manufacturer Part Number">AO3401A</field>
+        <field name="TME Part Number">AO3401A</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/</field>
         <field name="Sim.Library">spice/models/AO3401A.lib</field>
         <field name="Sim.Name">AO3401A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.aosmd.com/sites/default/files/res/datasheets/AO3401A.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Transistor_FET" part="TP0610T" description="-0.18A Id, -60V Vds, P-Channel MOSFET, SOT-23"/>
+      <property name="Manufacturer" value="Alpha &amp; Omega Semiconductor"/>
+      <property name="Manufacturer Part Number" value="AO3401A"/>
+      <property name="TME Part Number" value="AO3401A"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ao3401a/p-kanal-transistoren-smd/alpha-omega-semiconductor/"/>
       <property name="Sim.Library" value="spice/models/AO3401A.lib"/>
       <property name="Sim.Name" value="AO3401A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -1218,17 +1602,26 @@
       </units>
     </comp>
     <comp ref="Q10">
-      <value>AO3400A touch emulator</value>
+      <value>AO3400A</value>
       <footprint>Package_TO_SOT_SMD:SOT-23_Handsoldering</footprint>
+      <datasheet>https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Alpha &amp; Omega Semiconductor</field>
+        <field name="Manufacturer Part Number">AO3400A</field>
+        <field name="TME Part Number">AO3400A</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/</field>
         <field name="Sim.Library">spice/models/AO3400A.lib</field>
         <field name="Sim.Name">AO3400A</field>
         <field name="Sim.Pins">1=1 2=2 3=3</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23_Handsoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.aosmd.com/sites/default/files/res/datasheets/AO3400A.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Transistor_FET" part="Q_NMOS_GSD" description="N-MOSFET transistor, gate/source/drain"/>
+      <property name="Manufacturer" value="Alpha &amp; Omega Semiconductor"/>
+      <property name="Manufacturer Part Number" value="AO3400A"/>
+      <property name="TME Part Number" value="AO3400A"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ao3400a/n-kanal-transistoren-smd/alpha-omega-semiconductor/"/>
       <property name="Sim.Library" value="spice/models/AO3400A.lib"/>
       <property name="Sim.Name" value="AO3400A"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3"/>
@@ -1250,12 +1643,21 @@
     <comp ref="R3">
       <value>5.1k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-075K1L</field>
+        <field name="TME Part Number">RC0805FR-075K1</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-075K1L"/>
+      <property name="TME Part Number" value="RC0805FR-075K1"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-075K1L"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1274,12 +1676,21 @@
     <comp ref="R5">
       <value>100k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07100KL</field>
+        <field name="TME Part Number">RC0805FR-07100K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07100KL"/>
+      <property name="TME Part Number" value="RC0805FR-07100K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1298,12 +1709,21 @@
     <comp ref="R6">
       <value>1M</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-071ML</field>
+        <field name="TME Part Number">RC0805FR-071M</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-071ML</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-071ML"/>
+      <property name="TME Part Number" value="RC0805FR-071M"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1322,12 +1742,21 @@
     <comp ref="R11">
       <value>150k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07150KL</field>
+        <field name="TME Part Number">RC0805FR-07150K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07150KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07150KL"/>
+      <property name="TME Part Number" value="RC0805FR-07150K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07150KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1346,12 +1775,21 @@
     <comp ref="R12">
       <value>220k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07220KL</field>
+        <field name="TME Part Number">RC0805FR-07220K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07220KL"/>
+      <property name="TME Part Number" value="RC0805FR-07220K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1370,12 +1808,21 @@
     <comp ref="R20">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0710KL</field>
+        <field name="TME Part Number">RC0805FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0710KL"/>
+      <property name="TME Part Number" value="RC0805FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1394,12 +1841,21 @@
     <comp ref="R21">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0710KL</field>
+        <field name="TME Part Number">RC0805FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0710KL"/>
+      <property name="TME Part Number" value="RC0805FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1418,12 +1874,21 @@
     <comp ref="R22">
       <value>22R</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0722RL</field>
+        <field name="TME Part Number">RC0805FR-0722R</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0722RL"/>
+      <property name="TME Part Number" value="RC0805FR-0722R"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1442,12 +1907,21 @@
     <comp ref="R23">
       <value>22R</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0722RL</field>
+        <field name="TME Part Number">RC0805FR-0722R</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0722RL"/>
+      <property name="TME Part Number" value="RC0805FR-0722R"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0722RL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1466,12 +1940,21 @@
     <comp ref="R24">
       <value>10K</value>
       <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0603FR-0710KL</field>
+        <field name="TME Part Number">RC0603FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0603FR-0710KL"/>
+      <property name="TME Part Number" value="RC0603FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1490,12 +1973,21 @@
     <comp ref="R30">
       <value>1M</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-071ML</field>
+        <field name="TME Part Number">RC0805FR-071M</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-071ML</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-071ML"/>
+      <property name="TME Part Number" value="RC0805FR-071M"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1514,12 +2006,21 @@
     <comp ref="R31">
       <value>1M</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-071ML</field>
+        <field name="TME Part Number">RC0805FR-071M</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-071ML</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-071ML"/>
+      <property name="TME Part Number" value="RC0805FR-071M"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-071ML"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1538,12 +2039,21 @@
     <comp ref="R32">
       <value>220k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07220KL</field>
+        <field name="TME Part Number">RC0805FR-07220K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07220KL"/>
+      <property name="TME Part Number" value="RC0805FR-07220K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1562,12 +2072,21 @@
     <comp ref="R33">
       <value>220k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07220KL</field>
+        <field name="TME Part Number">RC0805FR-07220K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07220KL"/>
+      <property name="TME Part Number" value="RC0805FR-07220K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1586,12 +2105,21 @@
     <comp ref="R34">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-0710KL</field>
+        <field name="TME Part Number">RC0805FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-0710KL"/>
+      <property name="TME Part Number" value="RC0805FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1610,12 +2138,21 @@
     <comp ref="R40">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0603FR-0710KL</field>
+        <field name="TME Part Number">RC0603FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0603FR-0710KL"/>
+      <property name="TME Part Number" value="RC0603FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1634,12 +2171,21 @@
     <comp ref="R41">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0603FR-0710KL</field>
+        <field name="TME Part Number">RC0603FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0603FR-0710KL"/>
+      <property name="TME Part Number" value="RC0603FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1658,12 +2204,21 @@
     <comp ref="R42">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0603FR-0710KL</field>
+        <field name="TME Part Number">RC0603FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0603FR-0710KL"/>
+      <property name="TME Part Number" value="RC0603FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1682,12 +2237,21 @@
     <comp ref="R43">
       <value>10k</value>
       <footprint>Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0603FR-0710KL</field>
+        <field name="TME Part Number">RC0603FR-0710K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL</field>
         <field name="Footprint">Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0603FR-0710KL"/>
+      <property name="TME Part Number" value="RC0603FR-0710K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0603FR-0710KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1706,12 +2270,21 @@
     <comp ref="R50">
       <value>330k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07330KL</field>
+        <field name="TME Part Number">RC0805FR-07330K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07330KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07330KL"/>
+      <property name="TME Part Number" value="RC0805FR-07330K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07330KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1730,12 +2303,21 @@
     <comp ref="R51">
       <value>220k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07220KL</field>
+        <field name="TME Part Number">RC0805FR-07220K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07220KL"/>
+      <property name="TME Part Number" value="RC0805FR-07220K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07220KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1754,12 +2336,21 @@
     <comp ref="R52">
       <value>100k</value>
       <footprint>Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</footprint>
+      <datasheet>https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Yageo</field>
+        <field name="Manufacturer Part Number">RC0805FR-07100KL</field>
+        <field name="TME Part Number">RC0805FR-07100K</field>
+        <field name="TME Link">https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL</field>
         <field name="Footprint">Resistor_SMD:R_0805_2012Metric_Pad1.20x1.40mm_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_12.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="R" description="Resistor"/>
+      <property name="Manufacturer" value="Yageo"/>
+      <property name="Manufacturer Part Number" value="RC0805FR-07100KL"/>
+      <property name="TME Part Number" value="RC0805FR-07100K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/katalog/?search=RC0805FR-07100KL"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="R res resistor"/>
@@ -1776,14 +2367,23 @@
       </units>
     </comp>
     <comp ref="RT1">
-      <value>10k NTC @25C</value>
+      <value>NTCC-10K</value>
       <footprint>Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</footprint>
+      <datasheet>https://www.tme.eu/Document/f06e7f4c0fd5fd1c49c3e9fd8ceb0529/NTCC-10K.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">SR Passives</field>
+        <field name="Manufacturer Part Number">NTCC-10K</field>
+        <field name="TME Part Number">NTCC-10K</field>
+        <field name="TME Link">https://www.tme.eu/de/details/ntcc-10k/ntc-mess-thermistoren-tht/sr-passives/</field>
         <field name="Footprint">Connector_JST:JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/Document/f06e7f4c0fd5fd1c49c3e9fd8ceb0529/NTCC-10K.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Device" part="Thermistor_NTC" description="Temperature dependent resistor, negative temperature coefficient"/>
+      <property name="Manufacturer" value="SR Passives"/>
+      <property name="Manufacturer Part Number" value="NTCC-10K"/>
+      <property name="TME Part Number" value="NTCC-10K"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/ntcc-10k/ntc-mess-thermistoren-tht/sr-passives/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="thermistor NTC resistor sensor RTD"/>
@@ -1802,12 +2402,21 @@
     <comp ref="SW1">
       <value>RESET</value>
       <footprint>Unni_Switch:SW_Jianfu_TVAF36-N014JW-R_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R</datasheet>
       <fields>
+        <field name="Manufacturer">Jianfu</field>
+        <field name="Manufacturer Part Number">TVAF36-N014JW-R</field>
+        <field name="TME Part Number">TVAF36N014JWR</field>
+        <field name="TME Link">https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/</field>
         <field name="Footprint">Unni_Switch:SW_Jianfu_TVAF36-N014JW-R_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Switch" part="SW_Push" description="Push button switch, generic, two pins"/>
+      <property name="Manufacturer" value="Jianfu"/>
+      <property name="Manufacturer Part Number" value="TVAF36-N014JW-R"/>
+      <property name="TME Part Number" value="TVAF36N014JWR"/>
+      <property name="TME Link" value="https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="switch normally-open pushbutton push-button"/>
@@ -1825,12 +2434,21 @@
     <comp ref="SW2">
       <value>BOOT</value>
       <footprint>Unni_Switch:SW_Jianfu_TVAF36-N014JW-R_HandSolder</footprint>
+      <datasheet>https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R</datasheet>
       <fields>
+        <field name="Manufacturer">Jianfu</field>
+        <field name="Manufacturer Part Number">TVAF36-N014JW-R</field>
+        <field name="TME Part Number">TVAF36N014JWR</field>
+        <field name="TME Link">https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/</field>
         <field name="Footprint">Unni_Switch:SW_Jianfu_TVAF36-N014JW-R_HandSolder</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.tme.eu/de/katalog/?search=TVAF36-N014JW-R</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Switch" part="SW_Push" description="Push button switch, generic, two pins"/>
+      <property name="Manufacturer" value="Jianfu"/>
+      <property name="Manufacturer Part Number" value="TVAF36-N014JW-R"/>
+      <property name="TME Part Number" value="TVAF36N014JWR"/>
+      <property name="TME Link" value="https://www.tme.eu/gb/details/tvaf36n014jwr/microswitches-tact/jianfu/tvaf36-n014jw-r/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="switch normally-open pushbutton push-button"/>
@@ -1846,17 +2464,26 @@
       </units>
     </comp>
     <comp ref="U1">
-      <value>MCP73831T-2ACI/OT</value>
+      <value>MCP73831</value>
       <footprint>Package_TO_SOT_SMD:SOT-23-5_HandSoldering</footprint>
+      <datasheet>http://ww1.microchip.com/downloads/en/DeviceDoc/20001984g.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Microchip Technology</field>
+        <field name="Manufacturer Part Number">MCP73831T-2ACI/OT</field>
+        <field name="TME Part Number">MCP73831T-2ACI/OT</field>
+        <field name="TME Link">https://www.tme.eu/de/details/mcp73831t-2aci_ot/batterie-u-akku-controller-schaltungen/microchip-technology/</field>
         <field name="Sim.Library">spice/models/MCP73831.lib</field>
         <field name="Sim.Name">MCP73831</field>
         <field name="Sim.Pins">1=1 2=2 3=3 4=4 5=5</field>
         <field name="Footprint">Package_TO_SOT_SMD:SOT-23-5_HandSoldering</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">http://ww1.microchip.com/downloads/en/DeviceDoc/20001984g.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Battery_Management" part="MCP73831-2-OT" description="Single cell, Li-Ion/Li-Po charge management controller, 4.20V, Tri-State Status Output, in SOT23-5 package"/>
+      <property name="Manufacturer" value="Microchip Technology"/>
+      <property name="Manufacturer Part Number" value="MCP73831T-2ACI/OT"/>
+      <property name="TME Part Number" value="MCP73831T-2ACI/OT"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/mcp73831t-2aci_ot/batterie-u-akku-controller-schaltungen/microchip-technology/"/>
       <property name="Sim.Library" value="spice/models/MCP73831.lib"/>
       <property name="Sim.Name" value="MCP73831"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3 4=4 5=5"/>
@@ -1879,17 +2506,26 @@
       </units>
     </comp>
     <comp ref="U2">
-      <value>TPS63031DSK</value>
+      <value>TPS63031</value>
       <footprint>Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm</footprint>
+      <datasheet>https://www.ti.com/lit/ds/symlink/tps63030.pdf</datasheet>
       <fields>
+        <field name="Manufacturer">Texas Instruments</field>
+        <field name="Manufacturer Part Number">TPS63031DSKR</field>
+        <field name="TME Part Number">TPS63031DSKR</field>
+        <field name="TME Link">https://www.tme.eu/en/details/tps63031dskr/voltage-regulators-dc-dc-circuits/texas-instruments/</field>
         <field name="Sim.Library">spice/models/TPS63031.lib</field>
         <field name="Sim.Name">TPS63031</field>
         <field name="Sim.Pins">1=1 2=2 3=3 4=4 5=5 6=6 7=7 8=8 9=9 10=10 11=11</field>
         <field name="Footprint">Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm</field>
-        <field name="Datasheet"/>
+        <field name="Datasheet">https://www.ti.com/lit/ds/symlink/tps63030.pdf</field>
         <field name="Description"/>
       </fields>
       <libsource lib="Regulator_Switching" part="TPS63030DSK" description="Buck-Boost Converter, 1.8-5.5V Input Voltage, 1A Switch Current, Adjustable Output Voltage, VSON-10 (DSK0010A)"/>
+      <property name="Manufacturer" value="Texas Instruments"/>
+      <property name="Manufacturer Part Number" value="TPS63031DSKR"/>
+      <property name="TME Part Number" value="TPS63031DSKR"/>
+      <property name="TME Link" value="https://www.tme.eu/en/details/tps63031dskr/voltage-regulators-dc-dc-circuits/texas-instruments/"/>
       <property name="Sim.Library" value="spice/models/TPS63031.lib"/>
       <property name="Sim.Name" value="TPS63031"/>
       <property name="Sim.Pins" value="1=1 2=2 3=3 4=4 5=5 6=6 7=7 8=8 9=9 10=10 11=11"/>
@@ -1918,16 +2554,24 @@
       </units>
     </comp>
     <comp ref="U10">
-      <value>ESP32-C6-MINI-1</value>
+      <value>ESP32-C6-MINI-1-N4</value>
       <footprint>RF_Module:ESP32-C6-MINI-1</footprint>
       <datasheet>https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf</datasheet>
       <description>RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna</description>
       <fields>
+        <field name="Manufacturer">Espressif Systems</field>
+        <field name="Manufacturer Part Number">ESP32-C6-MINI-1-N4</field>
+        <field name="TME Part Number">ESP32-C6-MINI-1-N4</field>
+        <field name="TME Link">https://www.tme.eu/de/details/esp32-c6-mini-1-n4/iot-wifi-bluetooth-module/espressif/</field>
         <field name="Footprint">RF_Module:ESP32-C6-MINI-1</field>
         <field name="Datasheet">https://www.espressif.com/sites/default/files/documentation/esp32-c6-mini-1_mini-1u_datasheet_en.pdf</field>
         <field name="Description">RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna</field>
       </fields>
       <libsource lib="RF_Module" part="ESP32-C6-MINI-1" description="RF Module, ESP32-C6 SoC, Wi-Fi 802.11b/g/n/ax, Bluetooth, BLE, Zigbee, Thread, 32-bit, 3.3V, SMD, onboard antenna"/>
+      <property name="Manufacturer" value="Espressif Systems"/>
+      <property name="Manufacturer Part Number" value="ESP32-C6-MINI-1-N4"/>
+      <property name="TME Part Number" value="ESP32-C6-MINI-1-N4"/>
+      <property name="TME Link" value="https://www.tme.eu/de/details/esp32-c6-mini-1-n4/iot-wifi-bluetooth-module/espressif/"/>
       <property name="Sheetname" value="ESP32-C6 + Auxiliary"/>
       <property name="Sheetfile" value="02_esp_aux.kicad_sch"/>
       <property name="ki_keywords" value="Radio BT ESP Espressif"/>
@@ -2771,9 +3415,6 @@
     </library>
     <library logical="Diode">
       <uri>${KICAD10_SYMBOL_DIR}/Diode.kicad_sym</uri>
-    </library>
-    <library logical="Misc">
-      <uri>/Users/lkolbe/Documents/Tinkering/Misc/Misc.kicad_sym</uri>
     </library>
     <library logical="Power_Protection">
       <uri>${KICAD10_SYMBOL_DIR}/Power_Protection.kicad_sym</uri>
