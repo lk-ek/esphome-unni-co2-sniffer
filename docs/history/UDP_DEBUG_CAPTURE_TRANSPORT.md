@@ -66,7 +66,9 @@ suspended for 5 seconds. Repeated failed probe windows double the cooldown up to
 60 seconds. Individual successful datagrams do not reset the escalation, because
 small I2C packets can still get through while a larger RT/RH burst immediately
 runs into `ENOMEM`. The cooldown returns to 5 seconds only after at least 60
-seconds without any `ENOMEM` failure.
+seconds of continuously successful UDP exports after the first successful probe. Time spent
+in the suspended cooldown state does not count toward this healthy interval, and any failed
+send restarts the interval.
 
 This is important for a collector address on the local subnet that is currently
 offline. ARP/pbuf pressure must not leave the shared I2C edge buffer frozen or

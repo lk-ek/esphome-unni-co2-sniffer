@@ -34,6 +34,7 @@ static uint32_t suspended_until_ms = 0;
 static uint32_t collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
 static uint32_t enomem_count = 0;
 static uint32_t last_enomem_ms = 0;
+static uint32_t healthy_since_ms = 0;
 static uint16_t consecutive_enomem = 0;
 
 struct __attribute__((packed)) PacketHeader {
@@ -122,6 +123,7 @@ void reset_after_resource_pressure() {
 
 static void suspend_export(uint32_t now_ms) {
   const uint32_t cooldown = collector_cooldown_ms;
+  healthy_since_ms = 0;
   suspended_until_ms = now_ms + cooldown;
   collector_cooldown_ms =
       cooldown >= COLLECTOR_COOLDOWN_MAX_MS / 2U ? COLLECTOR_COOLDOWN_MAX_MS : cooldown * 2U;
@@ -189,6 +191,9 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
                           reinterpret_cast<const sockaddr *>(&destination), sizeof(destination));
   if (sent != static_cast<int>(total)) {
     const int send_errno = errno;
+    // A failed send breaks the continuous healthy-export window. Cooldown time
+    // and failed probes must never count toward recovery of the breaker state.
+    healthy_since_ms = 0;
     if (send_errno == ENOMEM) {
       enomem_count++;
       last_enomem_ms = now_ms;
@@ -228,19 +233,20 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   suspended_until_ms = 0;
 
   // Do not reset the exponential cooldown just because one datagram made it
-  // through. With an unreachable/local collector, small packets may succeed
-  // between ARP/pbuf pressure bursts while a multi-packet RT/RH export still
-  // fails. Only a genuinely quiet period without ENOMEM closes the breaker
-  // history and returns the next trip to the 5 s base cooldown.
-  if (last_enomem_ms != 0 &&
-      static_cast<uint32_t>(now_ms - last_enomem_ms) >= COLLECTOR_HEALTHY_RESET_MS) {
-    if (collector_cooldown_ms != COLLECTOR_COOLDOWN_INITIAL_MS) {
+  // through. The healthy interval starts only after an actual successful send
+  // following the last failure/cooldown; time spent suspended does not count.
+  // Any subsequent failed send clears healthy_since_ms above. Only 60 seconds
+  // of continuously successful export traffic return the next trip to 5 s.
+  if (collector_cooldown_ms != COLLECTOR_COOLDOWN_INITIAL_MS || last_enomem_ms != 0) {
+    if (healthy_since_ms == 0) healthy_since_ms = now_ms;
+    if (static_cast<uint32_t>(now_ms - healthy_since_ms) >= COLLECTOR_HEALTHY_RESET_MS) {
       ESP_LOGI(TAG, "UDP debug export healthy for %lu ms; resetting collector cooldown to %lu ms",
                static_cast<unsigned long>(COLLECTOR_HEALTHY_RESET_MS),
                static_cast<unsigned long>(COLLECTOR_COOLDOWN_INITIAL_MS));
+      collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
+      last_enomem_ms = 0;
+      healthy_since_ms = 0;
     }
-    collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
-    last_enomem_ms = 0;
   }
   last_send_ms = now_ms;
   return true;
