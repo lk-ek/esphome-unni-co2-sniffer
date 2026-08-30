@@ -189,6 +189,8 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
   never treat it as the normal device configuration.
 - `mobilesensor-sensirion.yaml`: permanently powered standalone AHT21 T/RH
   bridge with optional ENS160 TVOC/AQI; it has no Unni capture or battery policy.
+- `mobilesensor-sensirion-no-ens160.yaml`: the same standalone BLE/history
+  bridge without any ENS160 component or control path.
 
 Keep all variants valid when changing the schema or generated setters. BLE-off
 must compile without ESP-IDF Bluetooth headers, and host code must compile

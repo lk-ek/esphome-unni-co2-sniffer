@@ -34,6 +34,7 @@ VARIANTS = (
     "i2c-sniffer-ble-only.yaml",
     "i2c-sniffer-sht43-probe.yaml",
     "mobilesensor-sensirion.yaml",
+    "mobilesensor-sensirion-no-ens160.yaml",
 )
 
 # These components either do not exist on host or would test ESP32/network
@@ -86,6 +87,14 @@ def _mobile_host_config(text: str) -> str:
     # are hardware-only. Retain the exact bridge block while replacing those
     # sensors with portable templates carrying the same source/entity IDs.
     bridge = _top_level_block(text, "co2_monitor_0601")
+    ens160_templates = """
+  - platform: template
+    id: ens160_tvoc
+    name: ENS160 TVOC
+  - platform: template
+    id: ens160_aqi
+    name: ENS160 AQI
+""" if "platform: ens160_i2c" in text else ""
     return f"""esphome:
   name: mobilesensor-host
   friendly_name: mobilesensor host
@@ -105,12 +114,12 @@ sensor:
   - platform: template
     id: aht21_humi
     name: AHT21 Humidity
+{ens160_templates}
+
+binary_sensor:
   - platform: template
-    id: ens160_tvoc
-    name: ENS160 TVOC
-  - platform: template
-    id: ens160_aqi
-    name: ENS160 AQI
+    id: host_mobile_status
+    name: Host Mobile Status
 
 {bridge}"""
 
@@ -133,6 +142,8 @@ def _set_logger_debug(text: str) -> str:
 def _host_name(variant: str) -> str:
     if variant == "mobilesensor-sensirion.yaml":
         return "unni-host-mobile-sensirion"
+    if variant == "mobilesensor-sensirion-no-ens160.yaml":
+        return "unni-host-mobile-aht21"
     return "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
 
 
@@ -353,7 +364,7 @@ def _select_native_toolchain() -> tuple[NativeToolchain | None, str]:
 
 def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
     source_text = source.read_text(encoding="utf-8")
-    text = (_mobile_host_config(source_text) if source.name == "mobilesensor-sensirion.yaml"
+    text = (_mobile_host_config(source_text) if source.name.startswith("mobilesensor-sensirion")
             else _drop_top_level_blocks(source_text))
     text = _set_host_name(text, source.name)
     text = _set_logger_debug(text)
@@ -365,7 +376,7 @@ def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
     return generated
 
 
-def make_negative_schema_configs(toolchain: NativeToolchain) -> list[Path]:
+def make_negative_schema_configs(toolchain: NativeToolchain) -> list[tuple[Path, str]]:
     common = """esphome:
   name: {name}
   build_flags:
@@ -392,25 +403,37 @@ host:
 """
     flags = "\n".join(f"    - {_yaml_quote(flag)}" for flag in toolchain.compile_flags)
     cases = {
-        "missing-source-pair": """  standalone_sensirion_mode: true
+        "missing-source-pair": (
+            "neg-missing-pair",
+            "sensirion_temperature_id and sensirion_humidity_id must be configured together",
+            """  standalone_sensirion_mode: true
   sensirion_profile: sht43_trh
   sensirion_temperature_id: source_temperature
   sniffer_enabled: false
   rtrh_enabled: false
 """,
-        "sources-without-standalone": """  sensirion_temperature_id: source_temperature
+        ),
+        "sources-without-standalone": (
+            "neg-source-mode",
+            "Sensirion source IDs require standalone_sensirion_mode: true",
+            """  sensirion_temperature_id: source_temperature
   sensirion_humidity_id: source_humidity
 """,
-        "conflicting-profile-alias": """  sensirion_profile: trh_co2
+        ),
+        "conflicting-profile-alias": (
+            "neg-profile-alias",
+            "sht43_identity_probe: true conflicts with sensirion_profile: trh_co2",
+            """  sensirion_profile: trh_co2
   sht43_identity_probe: true
 """,
+        ),
     }
-    paths: list[Path] = []
-    for suffix, component in cases.items():
+    paths: list[tuple[Path, str]] = []
+    for suffix, (name, expected_error, component) in cases.items():
         path = ROOT / f"{GENERATED_PREFIX}negative-{suffix}.yaml"
-        path.write_text(common.format(name=f"negative-{suffix}", flags=flags, component=component),
+        path.write_text(common.format(name=name, flags=flags, component=component),
                         encoding="utf-8")
-        paths.append(path)
+        paths.append((path, expected_error))
     return paths
 
 
@@ -441,6 +464,32 @@ def _run_command(command: list[str], env: dict[str, str]) -> int:
     except FileNotFoundError as err:
         print(f"Command not found: {command[0]} ({err})", file=sys.stderr)
         return 127
+
+
+def _run_expected_config_failure(command: list[str], env: dict[str, str], expected_error: str) -> bool:
+    print("+", " ".join(command), flush=True)
+    try:
+        proc = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as err:
+        print(f"Command not found: {command[0]} ({err})", file=sys.stderr)
+        return False
+    sys.stdout.write(proc.stdout)
+    sys.stdout.flush()
+    if proc.returncode == 0:
+        print("Invalid configuration was accepted", file=sys.stderr)
+        return False
+    if expected_error not in proc.stdout:
+        print(f"Expected schema error not found: {expected_error}", file=sys.stderr)
+        return False
+    return True
 
 
 def _host_binary_path(variant: str) -> Path:
@@ -578,15 +627,14 @@ def main() -> int:
     generated_files: list[Path] = []
     try:
         negative_configs = make_negative_schema_configs(toolchain)
-        generated_files.extend(negative_configs)
+        generated_files.extend(path for path, _ in negative_configs)
         print("\n=== negative schema cases ===", flush=True)
-        for negative in negative_configs:
+        for negative, expected_error in negative_configs:
             env = os.environ.copy()
-            result = _run_command([args.esphome, "config", negative.name], env)
-            if result == 0:
-                failures.append(f"{negative.name}: invalid configuration was accepted")
-            elif result == 127:
-                failures.append(f"{negative.name}: ESPHome executable not found")
+            if not _run_expected_config_failure(
+                [args.esphome, "config", negative.name], env, expected_error
+            ):
+                failures.append(f"{negative.name}: expected schema rejection not observed")
 
         for variant in VARIANTS:
             source = ROOT / variant

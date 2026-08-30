@@ -4,14 +4,15 @@ This directory contains the first hardware-free regression layer for the UNNI
 external component. It uses ESPHome's official `host:` platform.
 
 `run_host_tests.py` derives a temporary native-host configuration from each of
-the six shipped device YAML files. It removes only top-level blocks that are
+the seven shipped device YAML files. It removes only top-level blocks that are
 ESP32/network/radio specific (`esp32`, `esp32_ble`, `wifi`, `api`, `ota`, `captive_portal`, and
 `time`) and retains the real `co2_monitor_0601:` feature block.
 Therefore changes to a shipped variant automatically flow into its host test.
-For `mobilesensor-sensirion.yaml`, the hardware-only AHT21 and ENS160 entries
-are replaced by template sensors with the same IDs. Three negative configs also
-verify paired source IDs, standalone-only source binding, and profile/alias
-conflict rejection.
+For both mobile YAMLs, the hardware-only AHT21 and optional ENS160 entries are
+replaced by template sensors with the same IDs. A template status binary sensor
+also preserves ESPHome 2026.8's generated entity-count contract on host. Three
+negative configs verify paired source IDs, standalone-only source binding, and
+profile/alias conflict rejection.
 
 The component's native host implementation keeps the same code-generation
 setter surface as the ESP32 implementation. At startup it:

@@ -46,5 +46,12 @@ entities; eCO2 is intentionally absent everywhere. AHT21 compensation remains
 active, while possible ENS160-on thermal influence is documented rather than
 hidden behind an unvalidated correction.
 
+History depends only on the configured AHT21 temperature/humidity IDs. ENS160
+enable, disable, warm-up, read failure, or absence is outside the sample clock
+and cannot pause or clear history. `mobilesensor-sensirion-no-ens160.yaml`
+provides the fully ENS-free build: it retains the same BLE/history component
+configuration and OTA flush while omitting every ENS160 driver, raw-I²C and HA
+control reference.
+
 Hardware/MyAmbience validation is still required on the ESP32/Wemos D1 Mini32,
 especially pairing, live type-0x06 data, first history entry and download.

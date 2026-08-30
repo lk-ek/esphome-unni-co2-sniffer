@@ -209,6 +209,7 @@ The repository contains several configurations for different purposes.
 | `i2c-sniffer-ble-only.yaml` | no | yes | no | BLE-only power measurement |
 | `i2c-sniffer-sht43-probe.yaml` | yes | experimental | yes | MyAmbience reverse engineering |
 | `mobilesensor-sensirion.yaml` | yes | SHT43-compatible | no | mains-powered AHT21/ENS160 room sensor |
+| `mobilesensor-sensirion-no-ens160.yaml` | yes | SHT43-compatible | no | mains-powered AHT21-only room sensor |
 
 The SHT43 probe is diagnostic firmware and should not be used as the normal device identity.
 
@@ -997,3 +998,11 @@ not exposed to HA and is never fed to BLE, GATT or history because it is an
 estimate rather than a direct CO₂ measurement. AHT21 compensation remains
 enabled for the ENS160. Its self-heating may influence the nearby AHT21 while
 active; no unvalidated correction curve is applied.
+
+For hardware without an ENS160, use
+`mobilesensor-sensirion-no-ens160.yaml`. It contains the same AHT21 source IDs,
+BLE profile, flash-backed history, OTA flush and MyAmbience GATT behavior, but
+does not instantiate the ENS160 driver, raw I²C device, control switch, or
+TVOC/AQI entities. In the ENS160 build, switching the gas sensor on or off does
+not reset, pause, or otherwise participate in Sensirion history; history always
+continues from AHT21 T/RH.
