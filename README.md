@@ -313,6 +313,10 @@ co2_monitor_0601:
 
   # Diagnostics
   debug_metrics: false
+  # Optional ESP32-C3/C6 hardware assist. "gpio" keeps the pure ISR backend;
+  # "rmt_scl" records SCL in RMT hardware and uses it only to repair strictly
+  # protocol-invalid GPIO captures.
+  i2c_capture_backend: gpio
   debug_capture: false
   # Experimental only: temporarily becomes an I2C master on a long-idle
   # LOW/LOW CO2 bus, using only the ESP32-C3 internal pull-ups through the

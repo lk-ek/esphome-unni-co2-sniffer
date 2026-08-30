@@ -82,6 +82,7 @@ CONF_RT_PIN = "rt_pin"
 CONF_RH_PIN = "rh_pin"
 CONF_CO2_SDA_PIN = "co2_sda_pin"
 CONF_CO2_SCL_PIN = "co2_scl_pin"
+CONF_I2C_CAPTURE_BACKEND = "i2c_capture_backend"
 CONF_BATTERY_PIN = "battery_pin"
 CONF_BATTERY_UPDATE_INTERVAL = "battery_update_interval"
 CONF_BATTERY_DIVIDER_RATIO = "battery_divider_ratio"
@@ -413,6 +414,7 @@ _SCHEMA = {
     cv.Optional(CONF_RH_PIN, default=4): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SCL_PIN, default=7): cv.int_range(min=0, max=21),
+    cv.Optional(CONF_I2C_CAPTURE_BACKEND, default="gpio"): cv.one_of("gpio", "rmt_scl", lower=True),
     cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
     cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
@@ -559,6 +561,11 @@ async def to_code(config):
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
     cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
+    if not CORE.is_host and config[CONF_I2C_CAPTURE_BACKEND] == "rmt_scl":
+        # Keep the RMT RX driver/callback operational through cache-disabled
+        # windows as well. The callback itself is IRAM_ATTR and uses only
+        # fixed internal-SRAM storage.
+        add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
 
     if ble_enabled:
         cg.add(var.set_ble_device_name(config[CONF_BLE_DEVICE_NAME]))
@@ -595,6 +602,7 @@ async def to_code(config):
     cg.add(var.set_co2_wake_guard_time(config[CONF_CO2_WAKE_GUARD_TIME]))
     cg.add(var.set_rtrh_pins(config[CONF_RT_PIN], config[CONF_RH_PIN]))
     cg.add(var.set_co2_pins(config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN]))
+    cg.add(var.set_i2c_rmt_scl_assist(config[CONF_I2C_CAPTURE_BACKEND] == "rmt_scl"))
     cg.add(var.set_battery_pin(config[CONF_BATTERY_PIN]))
     cg.add(var.set_battery_update_interval(config[CONF_BATTERY_UPDATE_INTERVAL]))
     cg.add(var.set_battery_divider_ratio(config[CONF_BATTERY_DIVIDER_RATIO]))

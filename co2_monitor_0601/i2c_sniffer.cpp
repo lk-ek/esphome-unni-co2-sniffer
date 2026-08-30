@@ -9,9 +9,15 @@
 #include "esp_rom_sys.h"
 #include "soc/gpio_reg.h"
 #include "soc/soc.h"
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+#include "driver/rmt_rx.h"
+#include "soc/soc_caps.h"
+#endif
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
+#include <functional>
 #include <cstdio>
 #include <cstring>
 
@@ -50,6 +56,8 @@ struct EdgeBuffer {
 static EdgeBuffer samples;
 static_assert(sizeof(EdgeBuffer) == MAX_SAMPLES * (sizeof(uint32_t) + sizeof(uint8_t)),
               "EdgeBuffer unexpectedly contains padding");
+static void decode_capture(const EdgeBuffer &data, uint16_t count,
+                           uint8_t initial_value, Capture &capture);
 static volatile uint16_t sample_count = 0;
 static volatile uint32_t last_edge = 0;
 static volatile uint8_t last_value = 0xff;
@@ -58,6 +66,90 @@ static volatile bool capturing = true;
 static bool capture_enabled = true;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
+
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+// RMT-SCL assist does not replace the GPIO stream. It records the clock line in
+// hardware and is consulted only when strict protocol validation rejects a GPIO
+// capture. This avoids the unsynchronised-timebase problem of dual RX-RMT while
+// still protecting the line on which we empirically lose most edges under BLE
+// load. C3/C6 have 48 RMT words/channel and RX ping-pong support.
+static constexpr uint32_t RMT_SCL_RESOLUTION_HZ = 5000000U;  // 0.2 us/tick
+static constexpr size_t RMT_RX_USER_SYMBOLS = SOC_RMT_MEM_WORDS_PER_CHANNEL;
+static constexpr size_t RMT_SCL_ACCUM_SYMBOLS = 128;
+static constexpr size_t RMT_SCL_MAX_EDGES = RMT_SCL_ACCUM_SYMBOLS * 2U + 1U;
+static constexpr uint32_t RMT_ALIGN_TOLERANCE_US = 12U;
+static constexpr uint8_t RMT_MAX_REPAIR_EDGES = 16U;
+
+static bool rmt_scl_assist_enabled = false;
+static rmt_channel_handle_t rmt_scl_channel = nullptr;
+static rmt_symbol_word_t rmt_scl_user_buffer[RMT_RX_USER_SYMBOLS];
+static rmt_symbol_word_t rmt_scl_accum[RMT_SCL_ACCUM_SYMBOLS];
+static volatile size_t rmt_scl_accum_count = 0;
+static volatile bool rmt_scl_done = false;
+static volatile bool rmt_scl_overflow = false;
+static uint32_t diag_rmt_captures = 0;
+static uint32_t diag_rmt_repairs = 0;
+static uint32_t diag_rmt_edges_restored = 0;
+static uint32_t diag_rmt_fallbacks = 0;
+static uint32_t diag_prev_rmt_captures = 0;
+static uint32_t diag_prev_rmt_repairs = 0;
+static uint32_t diag_prev_rmt_edges_restored = 0;
+static uint32_t diag_prev_rmt_fallbacks = 0;
+
+static bool IRAM_ATTR rmt_scl_done_callback(rmt_channel_handle_t,
+                                             const rmt_rx_done_event_data_t *edata,
+                                             void *) {
+  size_t out = rmt_scl_accum_count;
+  for (size_t i = 0; i < edata->num_symbols; ++i) {
+    if (out < RMT_SCL_ACCUM_SYMBOLS) {
+      rmt_scl_accum[out++] = edata->received_symbols[i];
+    } else {
+      rmt_scl_overflow = true;
+    }
+  }
+  rmt_scl_accum_count = out;
+  if (edata->flags.is_last) rmt_scl_done = true;
+  return false;
+}
+
+static bool rmt_scl_arm_() {
+  if (!rmt_scl_assist_enabled || !rmt_scl_channel || !capture_enabled) return true;
+  rmt_scl_accum_count = 0;
+  rmt_scl_done = false;
+  rmt_scl_overflow = false;
+  rmt_receive_config_t rx_cfg{};
+  rx_cfg.signal_range_min_ns = 400;  // reject sub-0.4-us glitches only
+  rx_cfg.signal_range_max_ns = CAPTURE_TIMEOUT_US * 1000U;
+#if SOC_RMT_SUPPORT_RX_PINGPONG
+  rx_cfg.flags.en_partial_rx = true;
+#endif
+  const esp_err_t err =
+      rmt_receive(rmt_scl_channel, rmt_scl_user_buffer, sizeof(rmt_scl_user_buffer), &rx_cfg);
+  if (err != ESP_OK) {
+    ESP_LOGW(TAG, "RMT SCL receive arm failed: %s", esp_err_to_name(err));
+    return false;
+  }
+  return true;
+}
+
+static void rmt_scl_suspend_() {
+  if (!rmt_scl_assist_enabled || !rmt_scl_channel) return;
+  rmt_disable(rmt_scl_channel);
+  rmt_scl_done = false;
+  rmt_scl_accum_count = 0;
+  rmt_scl_overflow = false;
+}
+
+static bool rmt_scl_resume_() {
+  if (!rmt_scl_assist_enabled || !rmt_scl_channel) return true;
+  const esp_err_t err = rmt_enable(rmt_scl_channel);
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+    ESP_LOGW(TAG, "RMT SCL enable failed: %s", esp_err_to_name(err));
+    return false;
+  }
+  return rmt_scl_arm_();
+}
+#endif
 
 // Low-overhead edge diagnostics used to distinguish decoder failures from an
 // electrically quiet or misconfigured passive I2C tap. Counters are updated
@@ -129,6 +221,201 @@ static void account_edge_diagnostics(const EdgeBuffer &data, uint16_t count,
   diag_scl_changes += delta.scl;
   diag_sda_changes += delta.sda;
 }
+
+
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+struct RmtSclEdge {
+  uint32_t rel_ticks{0};
+  uint8_t level{0};
+};
+
+static size_t build_rmt_scl_edges_(RmtSclEdge *out, size_t capacity) {
+  if (!out || capacity == 0 || rmt_scl_accum_count == 0 || rmt_scl_overflow) return 0;
+  uint32_t t = 0;
+  bool have_level = false;
+  uint8_t last_level = 0;
+  size_t count = 0;
+  const size_t symbols = std::min(static_cast<size_t>(rmt_scl_accum_count), RMT_SCL_ACCUM_SYMBOLS);
+  for (size_t i = 0; i < symbols; ++i) {
+    const rmt_symbol_word_t symbol = rmt_scl_accum[i];
+    const uint16_t durations[2] = {static_cast<uint16_t>(symbol.duration0),
+                                   static_cast<uint16_t>(symbol.duration1)};
+    const uint8_t levels[2] = {static_cast<uint8_t>(symbol.level0), static_cast<uint8_t>(symbol.level1)};
+    for (uint8_t half = 0; half < 2; ++half) {
+      const uint16_t duration = durations[half];
+      if (duration == 0) continue;
+      if (!have_level || levels[half] != last_level) {
+        if (count >= capacity) return 0;
+        out[count++] = RmtSclEdge{t, levels[half]};
+        last_level = levels[half];
+        have_level = true;
+      }
+      t += duration;
+    }
+  }
+  return count;
+}
+
+static inline uint32_t rmt_ticks_to_us_(uint32_t ticks) {
+  // Rounded conversion; at 5 MHz each tick is 0.2 us.
+  return static_cast<uint32_t>((static_cast<uint64_t>(ticks) * 1000000ULL +
+                                RMT_SCL_RESOLUTION_HZ / 2U) /
+                               RMT_SCL_RESOLUTION_HZ);
+}
+
+static bool insert_sample_(EdgeBuffer &data, uint16_t &count, uint32_t t, uint8_t value,
+                           uint16_t *inserted_index) {
+  if (count >= MAX_SAMPLES) return false;
+  uint16_t pos = 0;
+  while (pos < count && static_cast<int32_t>(data.t[pos] - t) <= 0) ++pos;
+  for (uint16_t i = count; i > pos; --i) {
+    data.t[i] = data.t[i - 1];
+    data.value[i] = data.value[i - 1];
+  }
+  data.t[pos] = t;
+  data.value[pos] = value;
+  count++;
+  if (inserted_index) *inserted_index = pos;
+  return true;
+}
+
+static void remove_sample_(EdgeBuffer &data, uint16_t &count, uint16_t pos) {
+  if (pos >= count) return;
+  for (uint16_t i = pos; i + 1U < count; ++i) {
+    data.t[i] = data.t[i + 1U];
+    data.value[i] = data.value[i + 1U];
+  }
+  count--;
+}
+
+static bool try_rmt_scl_repair_(EdgeBuffer &data, uint16_t &count, uint8_t initial_value,
+                                CaptureValidator validator, Capture &recovered) {
+  if (!rmt_scl_assist_enabled || !validator || !rmt_scl_done || rmt_scl_overflow) return false;
+
+  static RmtSclEdge rmt_edges[RMT_SCL_MAX_EDGES];
+  const size_t rmt_count = build_rmt_scl_edges_(rmt_edges, RMT_SCL_MAX_EDGES);
+  if (rmt_count < 16) return false;
+
+  struct GpioSclEdge {
+    uint32_t t;
+    uint8_t level;
+  };
+  static GpioSclEdge gpio_edges[512];
+  size_t gpio_count = 0;
+  uint8_t previous = initial_value;
+  for (uint16_t i = 0; i < count && gpio_count < 256; ++i) {
+    const uint8_t current = data.value[i];
+    if ((current ^ previous) & 0x01U)
+      gpio_edges[gpio_count++] = GpioSclEdge{data.t[i], static_cast<uint8_t>(scl_level(current))};
+    previous = current;
+  }
+  if (gpio_count < 12) return false;
+
+  // RMT RX has no shared absolute epoch with the GPIO timer. Find the epoch by
+  // fitting the first few hardware edges to the first few GPIO-observed SCL
+  // edges. Scoring all observed clocks prevents a single delayed ISR from
+  // deciding the alignment. Restricting the search to the beginning avoids the
+  // whole-cycle ambiguity of an almost periodic clock waveform.
+  int64_t best_offset = 0;
+  size_t best_score = 0;
+  const size_t gpio_seed = std::min<size_t>(gpio_count, 6);
+  const size_t rmt_seed = std::min<size_t>(rmt_count, 6);
+  for (size_t gi = 0; gi < gpio_seed; ++gi) {
+    for (size_t ri = 0; ri < rmt_seed; ++ri) {
+      if (gpio_edges[gi].level != rmt_edges[ri].level) continue;
+      const int64_t candidate = static_cast<int64_t>(gpio_edges[gi].t) -
+                                static_cast<int64_t>(rmt_ticks_to_us_(rmt_edges[ri].rel_ticks));
+      size_t score = 0;
+      size_t rp = 0;
+      for (size_t g = 0; g < gpio_count; ++g) {
+        while (rp + 1 < rmt_count) {
+          const int64_t here = candidate + rmt_ticks_to_us_(rmt_edges[rp].rel_ticks);
+          const int64_t next = candidate + rmt_ticks_to_us_(rmt_edges[rp + 1].rel_ticks);
+          if (llabs(next - static_cast<int64_t>(gpio_edges[g].t)) <
+              llabs(here - static_cast<int64_t>(gpio_edges[g].t)))
+            ++rp;
+          else
+            break;
+        }
+        const int64_t dt = candidate + rmt_ticks_to_us_(rmt_edges[rp].rel_ticks) -
+                           static_cast<int64_t>(gpio_edges[g].t);
+        if (rmt_edges[rp].level == gpio_edges[g].level &&
+            llabs(dt) <= static_cast<int64_t>(RMT_ALIGN_TOLERANCE_US))
+          ++score;
+      }
+      if (score > best_score || (score == best_score && ri < 2)) {
+        best_score = score;
+        best_offset = candidate;
+      }
+    }
+  }
+  if (best_score * 100U < gpio_count * 80U) return false;
+
+  uint16_t inserted_positions[RMT_MAX_REPAIR_EDGES]{};
+  uint8_t inserted = 0;
+  for (size_t ri = 0; ri < rmt_count; ++ri) {
+    const int64_t abs64 = best_offset + static_cast<int64_t>(rmt_ticks_to_us_(rmt_edges[ri].rel_ticks));
+    if (abs64 < 0 || abs64 > 0xFFFFFFFFLL) continue;
+    const uint32_t abs_t = static_cast<uint32_t>(abs64);
+    bool present = false;
+    for (size_t gi = 0; gi < gpio_count; ++gi) {
+      if (gpio_edges[gi].level != rmt_edges[ri].level) continue;
+      const int64_t dt = static_cast<int64_t>(gpio_edges[gi].t) - static_cast<int64_t>(abs_t);
+      if (llabs(dt) <= static_cast<int64_t>(RMT_ALIGN_TOLERANCE_US)) {
+        present = true;
+        break;
+      }
+    }
+    if (present) continue;
+    if (inserted >= RMT_MAX_REPAIR_EDGES) {
+      for (int i = inserted - 1; i >= 0; --i) remove_sample_(data, count, inserted_positions[i]);
+      return false;
+    }
+
+    // Preserve SDA from the latest known GPIO state at this instant and replace
+    // only the hardware-known SCL level.
+    uint8_t bus = initial_value;
+    uint16_t pos = 0;
+    while (pos < count && static_cast<int32_t>(data.t[pos] - abs_t) <= 0) {
+      bus = data.value[pos];
+      ++pos;
+    }
+    bus = static_cast<uint8_t>((bus & ~0x01U) | (rmt_edges[ri].level ? 0x01U : 0U));
+    if (scl_level(bus) == scl_level(pos ? data.value[pos - 1] : initial_value)) continue;
+
+    uint16_t inserted_pos = 0;
+    if (!insert_sample_(data, count, abs_t, bus, &inserted_pos)) {
+      for (int i = inserted - 1; i >= 0; --i) remove_sample_(data, count, inserted_positions[i]);
+      return false;
+    }
+    // Earlier insertions shift later positions. Keep positions sorted and update
+    // prior bookkeeping so rollback remains exact.
+    for (uint8_t i = 0; i < inserted; ++i)
+      if (inserted_positions[i] >= inserted_pos) inserted_positions[i]++;
+    inserted_positions[inserted++] = inserted_pos;
+  }
+
+  if (inserted == 0) return false;
+  Capture candidate{};
+  decode_capture(data, count, initial_value, candidate);
+  if (!validator(candidate)) {
+    // Roll back in descending index order.
+    std::sort(inserted_positions, inserted_positions + inserted, std::greater<uint16_t>());
+    for (uint8_t i = 0; i < inserted; ++i) remove_sample_(data, count, inserted_positions[i]);
+    return false;
+  }
+
+  candidate.rmt_scl_edges_recovered = inserted;
+  recovered = candidate;
+  // The RMT repair is decoder-side only. Restore the original GPIO waveform so
+  // diagnostics and /capture/UDP always expose what the ISR actually observed.
+  std::sort(inserted_positions, inserted_positions + inserted, std::greater<uint16_t>());
+  for (uint8_t i = 0; i < inserted; ++i) remove_sample_(data, count, inserted_positions[i]);
+  diag_rmt_repairs++;
+  diag_rmt_edges_restored += inserted;
+  return true;
+}
+#endif
 
 static void IRAM_ATTR gpio_isr(void *) {
   if (!capturing) {
@@ -1034,6 +1321,9 @@ void log_frame(const Frame &frame, const char *label) {
 
 
 static void restore_passive_gpio_() {
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) rmt_scl_suspend_();
+#endif
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
   gpio_set_intr_type(pin_scl, GPIO_INTR_DISABLE);
@@ -1061,6 +1351,9 @@ static void restore_passive_gpio_() {
   if (capture_enabled) {
     gpio_intr_enable(pin_scl);
     gpio_intr_enable(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+    if (rmt_scl_assist_enabled) rmt_scl_resume_();
+#endif
   }
 }
 
@@ -1075,6 +1368,9 @@ static void hard_sda_input_() {
 }
 
 static bool begin_active_master_() {
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) rmt_scl_suspend_();
+#endif
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
   capturing = false;
@@ -1191,7 +1487,7 @@ static bool master_read_byte_(uint8_t &value, bool ack) {
   return true;
 }
 
-bool setup(uint8_t sda_pin, uint8_t scl_pin) {
+bool setup(uint8_t sda_pin, uint8_t scl_pin, bool use_rmt_scl_assist) {
   pin_sda = static_cast<gpio_num_t>(sda_pin);
   pin_scl = static_cast<gpio_num_t>(scl_pin);
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
@@ -1222,6 +1518,49 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin) {
   err = gpio_isr_handler_add(pin_sda, gpio_isr, nullptr);
   if (err != ESP_OK) return false;
 
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  rmt_scl_assist_enabled = use_rmt_scl_assist;
+  if (rmt_scl_assist_enabled) {
+    rmt_rx_channel_config_t rmt_cfg{};
+    rmt_cfg.gpio_num = pin_scl;
+    rmt_cfg.clk_src = RMT_CLK_SRC_DEFAULT;
+    rmt_cfg.resolution_hz = RMT_SCL_RESOLUTION_HZ;
+    rmt_cfg.mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL;
+    rmt_cfg.intr_priority = 3;
+    rmt_cfg.flags.invert_in = false;
+    rmt_cfg.flags.with_dma = false;
+    rmt_cfg.flags.allow_pd = false;
+    err = rmt_new_rx_channel(&rmt_cfg, &rmt_scl_channel);
+    if (err == ESP_OK) {
+      rmt_rx_event_callbacks_t cbs{};
+      cbs.on_recv_done = rmt_scl_done_callback;
+      err = rmt_rx_register_event_callbacks(rmt_scl_channel, &cbs, nullptr);
+    }
+    if (err == ESP_OK) err = rmt_enable(rmt_scl_channel);
+    if (err == ESP_OK && !rmt_scl_arm_()) err = ESP_FAIL;
+    if (err != ESP_OK) {
+      ESP_LOGW(TAG, "RMT SCL assist unavailable (%s); continuing with GPIO backend",
+               esp_err_to_name(err));
+      if (rmt_scl_channel) {
+        rmt_disable(rmt_scl_channel);
+        rmt_del_channel(rmt_scl_channel);
+        rmt_scl_channel = nullptr;
+      }
+      rmt_scl_assist_enabled = false;
+    } else {
+      ESP_LOGI(TAG,
+               "I2C capture backend: GPIO + RMT-SCL assist (%lu Hz, %u-symbol HW block, partial RX)",
+               static_cast<unsigned long>(RMT_SCL_RESOLUTION_HZ),
+               static_cast<unsigned>(SOC_RMT_MEM_WORDS_PER_CHANNEL));
+    }
+  } else {
+    ESP_LOGI(TAG, "I2C capture backend: GPIO");
+  }
+#else
+  if (use_rmt_scl_assist)
+    ESP_LOGW(TAG, "RMT SCL assist requested but only implemented for ESP32-C3/C6; using GPIO");
+#endif
+
   return true;
 }
 
@@ -1233,6 +1572,9 @@ void set_capture_enabled(bool enabled) {
   // can leak across a sleep/awake boundary.
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) rmt_scl_suspend_();
+#endif
   capture_enabled = enabled;
   capturing = false;
   sample_count = 0;
@@ -1245,6 +1587,9 @@ void set_capture_enabled(bool enabled) {
   if (enabled) {
     gpio_intr_enable(pin_scl);
     gpio_intr_enable(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+    if (rmt_scl_assist_enabled) rmt_scl_resume_();
+#endif
   }
 }
 
@@ -1255,6 +1600,9 @@ void rearm_after_light_sleep() {
   // state here; never enable pulls and never drive either bus line.
   gpio_intr_disable(pin_scl);
   gpio_intr_disable(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) rmt_scl_suspend_();
+#endif
   gpio_set_intr_type(pin_scl, GPIO_INTR_DISABLE);
   gpio_set_intr_type(pin_sda, GPIO_INTR_DISABLE);
 
@@ -1281,6 +1629,9 @@ void rearm_after_light_sleep() {
   if (capture_enabled) {
     gpio_intr_enable(pin_scl);
     gpio_intr_enable(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+    if (rmt_scl_assist_enabled) rmt_scl_resume_();
+#endif
   }
 
   ESP_LOGI(TAG, "I2C GPIOs re-armed after Light-sleep wake: SCL=%d SDA=%d",
@@ -1303,6 +1654,9 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
     capture_initial_value = last_value;
     last_edge = static_cast<uint32_t>(esp_timer_get_time());
     capturing = true;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+    if (rmt_scl_assist_enabled) { rmt_scl_suspend_(); rmt_scl_resume_(); }
+#endif
     return false;
   }
 #endif
@@ -1319,6 +1673,9 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   if (count > MAX_SAMPLES) count = MAX_SAMPLES;
   const bool overflow = capture_overflow;
   const uint8_t initial_value = capture_initial_value;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled && rmt_scl_done) diag_rmt_captures++;
+#endif
   capture = Capture{};
 
   if (count) {
@@ -1339,8 +1696,22 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
       // protocol-valid candidates decode to the exact same transaction.
       if (recovery_validator && !recovery_validator(capture)) {
         Capture recovered{};
-        if (try_missing_clock_recovery(samples, count, initial_value,
-                                       recovery_validator, recovered)) {
+        bool repaired = false;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+        if (rmt_scl_assist_enabled) {
+          if (rmt_scl_done && !rmt_scl_overflow) {
+            repaired = try_rmt_scl_repair_(samples, count, initial_value,
+                                           recovery_validator, recovered);
+          } else {
+            diag_rmt_fallbacks++;
+          }
+        }
+#endif
+        if (!repaired) {
+          repaired = try_missing_clock_recovery(samples, count, initial_value,
+                                                recovery_validator, recovered);
+        }
+        if (repaired) {
 #if RTRH_DEBUG_CAPTURE
           recovered.debug_raw_sequence = capture.debug_raw_sequence;
 #endif
@@ -1367,6 +1738,9 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   last_edge = static_cast<uint32_t>(esp_timer_get_time());
 
   capturing = true;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) { rmt_scl_suspend_(); rmt_scl_resume_(); }
+#endif
   diag_completed_captures++;
   return true;
 }
@@ -1478,18 +1852,41 @@ void log_edge_diagnostics(uint32_t now_ms) {
       static_cast<uint32_t>(esp_timer_get_time()) - last_edge);
   const uint8_t levels = read_gpio_state();
 
-  ESP_LOGI(TAG,
-           "I2C edge diag: +ISR=%lu +state=%lu +SCL=%lu +SDA=%lu /5s; levels SCL=%u SDA=%u; samples=%u capturing=%s finished=%s enabled=%s; +captures=%lu overflows=%lu; last_edge=%lu us ago",
-           static_cast<unsigned long>(isr - diag_prev_isr_calls),
-           static_cast<unsigned long>(changes - diag_prev_state_changes),
-           static_cast<unsigned long>(scl - diag_prev_scl_changes),
-           static_cast<unsigned long>(sda - diag_prev_sda_changes),
-           scl_level(levels) ? 1U : 0U, sda_level(levels) ? 1U : 0U,
-           static_cast<unsigned>(sample_count), capturing ? "yes" : "no",
-           capture_finished ? "yes" : "no", capture_enabled ? "yes" : "no",
-           static_cast<unsigned long>(completed - diag_prev_completed_captures),
-           static_cast<unsigned long>(diag_overflows),
-           static_cast<unsigned long>(edge_age_us));
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_assist_enabled) {
+    ESP_LOGI(TAG,
+             "I2C edge diag: +ISR=%lu +state=%lu +SCL=%lu +SDA=%lu /5s; levels SCL=%u SDA=%u; samples=%u capturing=%s finished=%s enabled=%s; +captures=%lu overflows=%lu; RMT +captures=%lu +repairs=%lu +edges=%lu +fallbacks=%lu symbols=%u done=%s overflow=%s; last_edge=%lu us ago",
+             static_cast<unsigned long>(isr - diag_prev_isr_calls),
+             static_cast<unsigned long>(changes - diag_prev_state_changes),
+             static_cast<unsigned long>(scl - diag_prev_scl_changes),
+             static_cast<unsigned long>(sda - diag_prev_sda_changes),
+             scl_level(levels) ? 1U : 0U, sda_level(levels) ? 1U : 0U,
+             static_cast<unsigned>(sample_count), capturing ? "yes" : "no",
+             capture_finished ? "yes" : "no", capture_enabled ? "yes" : "no",
+             static_cast<unsigned long>(completed - diag_prev_completed_captures),
+             static_cast<unsigned long>(diag_overflows),
+             static_cast<unsigned long>(diag_rmt_captures - diag_prev_rmt_captures),
+             static_cast<unsigned long>(diag_rmt_repairs - diag_prev_rmt_repairs),
+             static_cast<unsigned long>(diag_rmt_edges_restored - diag_prev_rmt_edges_restored),
+             static_cast<unsigned long>(diag_rmt_fallbacks - diag_prev_rmt_fallbacks),
+             static_cast<unsigned>(rmt_scl_accum_count), rmt_scl_done ? "yes" : "no",
+             rmt_scl_overflow ? "yes" : "no", static_cast<unsigned long>(edge_age_us));
+  } else
+#endif
+  {
+    ESP_LOGI(TAG,
+             "I2C edge diag: +ISR=%lu +state=%lu +SCL=%lu +SDA=%lu /5s; levels SCL=%u SDA=%u; samples=%u capturing=%s finished=%s enabled=%s; +captures=%lu overflows=%lu; last_edge=%lu us ago",
+             static_cast<unsigned long>(isr - diag_prev_isr_calls),
+             static_cast<unsigned long>(changes - diag_prev_state_changes),
+             static_cast<unsigned long>(scl - diag_prev_scl_changes),
+             static_cast<unsigned long>(sda - diag_prev_sda_changes),
+             scl_level(levels) ? 1U : 0U, sda_level(levels) ? 1U : 0U,
+             static_cast<unsigned>(sample_count), capturing ? "yes" : "no",
+             capture_finished ? "yes" : "no", capture_enabled ? "yes" : "no",
+             static_cast<unsigned long>(completed - diag_prev_completed_captures),
+             static_cast<unsigned long>(diag_overflows),
+             static_cast<unsigned long>(edge_age_us));
+  }
 
   diag_last_report_ms = now_ms;
   diag_prev_isr_calls = isr;
@@ -1497,6 +1894,12 @@ void log_edge_diagnostics(uint32_t now_ms) {
   diag_prev_scl_changes = scl;
   diag_prev_sda_changes = sda;
   diag_prev_completed_captures = completed;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  diag_prev_rmt_captures = diag_rmt_captures;
+  diag_prev_rmt_repairs = diag_rmt_repairs;
+  diag_prev_rmt_edges_restored = diag_rmt_edges_restored;
+  diag_prev_rmt_fallbacks = diag_rmt_fallbacks;
+#endif
 }
 
 }  // namespace i2c_sniffer

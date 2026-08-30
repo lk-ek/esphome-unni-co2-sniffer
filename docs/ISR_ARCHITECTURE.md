@@ -69,8 +69,8 @@ The passive I²C ISR does this:
 2. Snapshot **both** bus pins as early as possible and encode them into a two-bit state.
    On ESP32-C3/C6 this is one atomic read of `GPIO_IN_REG`; other ESP32 families
    use the portable `gpio_get_level()` fallback.
-3. Read the current microsecond timestamp using `esp_timer_get_time()`.
-4. Ignore the interrupt if the combined state is unchanged.
+3. Ignore the interrupt immediately if the combined state is unchanged.
+4. Read the current microsecond timestamp using `esp_timer_get_time()` only for a real state transition.
 5. Remember the bus state that existed before the first captured transition.
 6. Store `{timestamp, combined_state}` in the fixed capture buffer.
 7. If the buffer is full, mark the capture as overflowed and finished.
@@ -100,6 +100,54 @@ The ISR also reads the combined SDA/SCL state before taking the timestamp or
 updating diagnostic counters. This minimizes the latency between interrupt entry
 and observing the bus, reducing the chance that a second edge is already present
 when both pins are sampled. No I²C decoding occurs in the ISR.
+
+## Optional RMT-SCL hardware assist
+
+On ESP32-C3/C6 the component can enable an additional RMT RX channel on SCL:
+
+```yaml
+co2_monitor_0601:
+  i2c_capture_backend: rmt_scl
+```
+
+The shipped `i2c-sniffer-debug.yaml` enables this backend. Normal GPIO capture
+remains active on both SDA and SCL and remains the absolute-time/raw-debug source.
+RMT is deliberately used only as an SCL hardware oracle.
+
+A seemingly simpler design with one RX-RMT channel for SDA and one for SCL was
+rejected after checking the ESP-IDF driver semantics: RX transactions begin on
+the first level change of each individual input, and the RMT sync manager is TX
+only. Two RX channels therefore have no guaranteed common epoch. Merging them as
+if their relative timestamps shared time zero could create false START/STOP or
+bit timing.
+
+The implemented path instead uses:
+
+- 5 MHz RMT resolution (0.2 us/tick),
+- the native C3/C6 48-symbol hardware block,
+- RX ping-pong/partial receive into a fixed 128-symbol SRAM accumulator,
+- RMT interrupt priority 3,
+- `CONFIG_RMT_RX_ISR_CACHE_SAFE`,
+- 5 ms signal-idle termination, matching the GPIO capture quiet period.
+
+No RMT data is used when the GPIO capture already passes the caller's strict
+protocol validator. When GPIO decoding fails, the decoder fits the relative RMT
+SCL edge train against the SCL edges that the GPIO stream did observe. Only a
+high-confidence alignment is accepted. Hardware-observed SCL transitions that
+are missing from GPIO are then inserted **temporarily**, preserving SDA from the
+GPIO state at that instant, and the complete capture is decoded again.
+
+The candidate is accepted only if the same strict CO2 validator succeeds (frame
+shape, address/direction, ACK/NACK pattern and Sensirion CRC). Otherwise every
+inserted edge is rolled back and the existing bounded software missing-clock
+recovery gets its normal chance. Even on success the insertions are rolled back
+after decoding: `/capture`, LA02, UDP debug and edge diagnostics continue to
+represent the raw GPIO observation, not a repaired waveform.
+
+This architecture is specifically intended for the observed failure under heavy
+BLE/GATT history traffic, where GPIO ISR latency can span a complete short SCL
+pulse. RMT records SCL durations in peripheral memory even while the CPU is busy;
+the callback only copies fixed-size symbol chunks into SRAM.
 
 ## Protocol-validated GPIO missing-clock recovery
 

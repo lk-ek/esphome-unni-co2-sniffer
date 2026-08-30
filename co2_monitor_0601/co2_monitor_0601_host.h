@@ -73,6 +73,7 @@ class CO2Monitor0601 : public Component {
   void set_co2_wake_guard_time(uint32_t value) { this->co2_wake_guard_time_ms_ = value; }
   void set_rtrh_pins(uint8_t rt, uint8_t rh) { this->rt_pin_ = rt; this->rh_pin_ = rh; }
   void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
+  void set_i2c_rmt_scl_assist(bool) {}
   void set_battery_pin(uint8_t value) { this->battery_pin_ = value; }
   void set_battery_update_interval(uint32_t value) { this->battery_update_interval_ms_ = value; }
   void set_battery_divider_ratio(float value) { this->battery_divider_ratio_ = value; }

@@ -873,7 +873,7 @@ void CO2Monitor0601::process_battery_() {
 bool CO2Monitor0601::initialize_sniffer_io_() {
   if (this->io_initialized_) return true;
 
-  if (!i2c_sniffer::setup(this->co2_sda_pin_, this->co2_scl_pin_)) {
+  if (!i2c_sniffer::setup(this->co2_sda_pin_, this->co2_scl_pin_, this->i2c_rmt_scl_assist_)) {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
     return false;
   }
@@ -1598,6 +1598,11 @@ void CO2Monitor0601::process_co2_() {
   result.frame_errors = capture.frame_errors;
 #if RTRH_DEBUG_CAPTURE
   const char *freeze_reason = capture.frame_errors ? "I2C framing/capture error" : nullptr;
+  if (capture.rmt_scl_edges_recovered != 0) {
+    ESP_LOGD(TAG, "RMT restored %u missing SCL edge(s) before strict CO2 protocol/CRC validation",
+             static_cast<unsigned>(capture.rmt_scl_edges_recovered));
+    if (!freeze_reason) freeze_reason = "RMT-restored missing SCL edge";
+  }
   if (capture.recovered_missing_clocks != 0) {
     if (capture.recovered_missing_clocks == 1) {
       ESP_LOGD(TAG,

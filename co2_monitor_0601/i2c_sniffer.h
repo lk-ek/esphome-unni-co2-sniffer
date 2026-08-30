@@ -78,6 +78,10 @@ struct Capture {
   // Timing alone can never make a repair valid.
   uint8_t recovered_missing_clocks{0};
   uint32_t recovered_gap_us[2]{};
+
+  // Optional RMT-SCL assist can use the hardware-captured clock waveform to
+  // restore SCL edges that were absent from the shared GPIO ISR stream.
+  uint8_t rmt_scl_edges_recovered{0};
 #if RTRH_DEBUG_CAPTURE
   // Sequence of the raw /capture snapshot corresponding to this decoded
   // capture. Zero means it was not stored (for example because an earlier
@@ -87,7 +91,7 @@ struct Capture {
 };
 
 // Passive GPIO capture. The sniffer never enables pulls and never drives SDA/SCL.
-bool setup(uint8_t sda_pin, uint8_t scl_pin);
+bool setup(uint8_t sda_pin, uint8_t scl_pin, bool rmt_scl_assist = false);
 
 // Enable/disable edge capture. Enabling starts with a clean decoder state;
 // disabling drops any partial frame collected so far.

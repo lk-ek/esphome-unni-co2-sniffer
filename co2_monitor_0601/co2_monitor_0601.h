@@ -93,6 +93,7 @@ class CO2Monitor0601 : public Component {
   void set_co2_wake_guard_time(uint32_t value) { this->co2_wake_guard_time_ms_ = value; }
   void set_rtrh_pins(uint8_t rt, uint8_t rh) { this->rt_pin_ = rt; this->rh_pin_ = rh; }
   void set_co2_pins(uint8_t sda, uint8_t scl) { this->co2_sda_pin_ = sda; this->co2_scl_pin_ = scl; }
+  void set_i2c_rmt_scl_assist(bool value) { this->i2c_rmt_scl_assist_ = value; }
   void set_battery_pin(uint8_t pin) { this->battery_.pin = pin; }
   void set_battery_update_interval(uint32_t value) { this->battery_.interval_ms = value; }
   void set_battery_divider_ratio(float value) { this->battery_.divider_ratio = value; }
@@ -342,6 +343,7 @@ class CO2Monitor0601 : public Component {
   static void runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us);
 
   bool sniffer_enabled_{true};
+  bool i2c_rmt_scl_assist_{false};
   bool rtrh_enabled_{true};
   bool rtrh_edge_capture_{false};
   bool rtrh_decode_only_{false};
