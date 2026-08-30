@@ -4,7 +4,7 @@
 #include "ble_options.h"
 #if UNNI_BLE_ENABLED && !defined(USE_HOST)
 
-#include "sensirion_sample.h"
+#include "sensirion_bridge_core.h"
 
 #include <cstdint>
 #include <esp_gap_ble_api.h>
@@ -24,7 +24,6 @@ void sensirion_ble_set_temperature_humidity(float temperature_c, float humidity_
 void sensirion_ble_set_co2(uint16_t ppm);
 void sensirion_ble_commit_live_advertisement();
 
-const SensirionSample &sensirion_ble_sample();
 uint16_t sensirion_ble_get_device_id();
 
 }  // namespace co2_monitor_0601

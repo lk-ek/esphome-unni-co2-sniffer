@@ -21,3 +21,4 @@ Do not copy code or configuration from a historical note without checking it aga
 - `CALIBRATION_2026-08-17_DISPLAY_HUMIDITY.md` — keeps Unni LCD humidity emulation separate from physical carrier RH.
 - `RELIABILITY_HARDENING_2026-08-30.md` — review map, invariants, compatibility contract, and validation debt for the PM/history/BLE/C6 hardening series.
 - `HISTORY_DOWNLOAD_CAPTURE_GUARD_2026-08-30.md` — cooperative scheduling of MyAmbience history traffic around passive CO2 capture windows.
+- `STANDALONE_SENSIRION_TRH_BRIDGE_2026-08-30.md` — profile-aware shared sample state for the batteryless AHT21/SHT43-compatible bridge and its ENS160 boundary.

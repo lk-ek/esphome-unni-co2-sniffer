@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Build and run every shipped UNNI YAML feature variant on ESPHome host.
+"""Build and run every shipped YAML feature variant on ESPHome host.
 
 The generated host YAML is derived mechanically from the real device YAML:
 ESP32/network/radio-only top-level blocks are removed, while the complete
@@ -33,6 +33,7 @@ VARIANTS = (
     "i2c-sniffer-no-ble.yaml",
     "i2c-sniffer-ble-only.yaml",
     "i2c-sniffer-sht43-probe.yaml",
+    "mobilesensor-sensirion.yaml",
 )
 
 # These components either do not exist on host or would test ESP32/network
@@ -63,6 +64,57 @@ def _drop_top_level_blocks(text: str) -> str:
     return "".join(output)
 
 
+def _top_level_block(text: str, key: str) -> str:
+    lines = text.splitlines(keepends=True)
+    output: list[str] = []
+    copying = False
+    for line in lines:
+        match = TOP_LEVEL_KEY.match(line)
+        if match:
+            if copying:
+                break
+            copying = match.group(1) == key
+        if copying:
+            output.append(line)
+    if not output:
+        raise RuntimeError(f"top-level block {key!r} not found")
+    return "".join(output)
+
+
+def _mobile_host_config(text: str) -> str:
+    # The real mobile YAML's AHT21/ENS160, raw I2C control and boot automation
+    # are hardware-only. Retain the exact bridge block while replacing those
+    # sensors with portable templates carrying the same source/entity IDs.
+    bridge = _top_level_block(text, "co2_monitor_0601")
+    return f"""esphome:
+  name: mobilesensor-host
+  friendly_name: mobilesensor host
+
+external_components:
+  - source:
+      type: local
+      path: .
+
+logger:
+  level: DEBUG
+
+sensor:
+  - platform: template
+    id: aht21_temp
+    name: AHT21 Temperature
+  - platform: template
+    id: aht21_humi
+    name: AHT21 Humidity
+  - platform: template
+    id: ens160_tvoc
+    name: ENS160 TVOC
+  - platform: template
+    id: ens160_aqi
+    name: ENS160 AQI
+
+{bridge}"""
+
+
 def _set_logger_debug(text: str) -> str:
     lines = text.splitlines()
     in_logger = False
@@ -79,6 +131,8 @@ def _set_logger_debug(text: str) -> str:
 
 
 def _host_name(variant: str) -> str:
+    if variant == "mobilesensor-sensirion.yaml":
+        return "unni-host-mobile-sensirion"
     return "unni-host-" + variant.removesuffix(".yaml").replace("i2c-sniffer", "base").replace("_", "-")
 
 
@@ -298,7 +352,9 @@ def _select_native_toolchain() -> tuple[NativeToolchain | None, str]:
     return None, "\n\n".join(diagnostics)
 
 def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
-    text = _drop_top_level_blocks(source.read_text(encoding="utf-8"))
+    source_text = source.read_text(encoding="utf-8")
+    text = (_mobile_host_config(source_text) if source.name == "mobilesensor-sensirion.yaml"
+            else _drop_top_level_blocks(source_text))
     text = _set_host_name(text, source.name)
     text = _set_logger_debug(text)
     text = _inject_host_build_flags(text, toolchain.compile_flags)
@@ -307,6 +363,55 @@ def make_host_config(source: Path, toolchain: NativeToolchain) -> Path:
     generated = ROOT / f"{GENERATED_PREFIX}{source.name}"
     generated.write_text(text, encoding="utf-8")
     return generated
+
+
+def make_negative_schema_configs(toolchain: NativeToolchain) -> list[Path]:
+    common = """esphome:
+  name: {name}
+  build_flags:
+{flags}
+external_components:
+  - source:
+      type: local
+      path: .
+logger:
+  level: DEBUG
+sensor:
+  - platform: template
+    id: source_temperature
+    name: Source Temperature
+  - platform: template
+    id: source_humidity
+    name: Source Humidity
+co2_monitor_0601:
+  ble: false
+  home_assistant: false
+{component}
+host:
+  mac_address: "02:00:00:00:06:02"
+"""
+    flags = "\n".join(f"    - {_yaml_quote(flag)}" for flag in toolchain.compile_flags)
+    cases = {
+        "missing-source-pair": """  standalone_sensirion_mode: true
+  sensirion_profile: sht43_trh
+  sensirion_temperature_id: source_temperature
+  sniffer_enabled: false
+  rtrh_enabled: false
+""",
+        "sources-without-standalone": """  sensirion_temperature_id: source_temperature
+  sensirion_humidity_id: source_humidity
+""",
+        "conflicting-profile-alias": """  sensirion_profile: trh_co2
+  sht43_identity_probe: true
+""",
+    }
+    paths: list[Path] = []
+    for suffix, component in cases.items():
+        path = ROOT / f"{GENERATED_PREFIX}negative-{suffix}.yaml"
+        path.write_text(common.format(name=f"negative-{suffix}", flags=flags, component=component),
+                        encoding="utf-8")
+        paths.append(path)
+    return paths
 
 
 def _default_esphome_executable() -> str:
@@ -472,6 +577,17 @@ def main() -> int:
     failures: list[str] = []
     generated_files: list[Path] = []
     try:
+        negative_configs = make_negative_schema_configs(toolchain)
+        generated_files.extend(negative_configs)
+        print("\n=== negative schema cases ===", flush=True)
+        for negative in negative_configs:
+            env = os.environ.copy()
+            result = _run_command([args.esphome, "config", negative.name], env)
+            if result == 0:
+                failures.append(f"{negative.name}: invalid configuration was accepted")
+            elif result == 127:
+                failures.append(f"{negative.name}: ESPHome executable not found")
+
         for variant in VARIANTS:
             source = ROOT / variant
             if not source.exists():

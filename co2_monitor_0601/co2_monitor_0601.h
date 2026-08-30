@@ -66,6 +66,9 @@ class CO2Monitor0601 : public Component {
   void loop() override;
   void prepare_for_ota();
   void set_standalone_sensirion_mode(bool value) { this->standalone_sensirion_mode_ = value; }
+  void set_sensirion_sht43_profile(bool value) { this->sensirion_sht43_profile_ = value; }
+  void set_sensirion_temperature_source(sensor::Sensor *value) { this->sensirion_temperature_source_ = value; }
+  void set_sensirion_humidity_source(sensor::Sensor *value) { this->sensirion_humidity_source_ = value; }
   void publish_external_temperature_humidity(float temperature_c, float humidity_percent);
 
 #if UNNI_BLE_ENABLED
@@ -345,6 +348,8 @@ class CO2Monitor0601 : public Component {
   void publish_battery_learning_();
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
+  void setup_sensirion_sources_();
+  void sensirion_sample_updated_();
 #if UNNI_RUNTIME_DIAGNOSTICS
   void runtime_diag_loop_begin_();
   void runtime_diag_loop_end_();
@@ -353,6 +358,9 @@ class CO2Monitor0601 : public Component {
 
   time::RealTimeClock *history_time_{nullptr};
   bool standalone_sensirion_mode_{false};
+  bool sensirion_sht43_profile_{false};
+  sensor::Sensor *sensirion_temperature_source_{nullptr};
+  sensor::Sensor *sensirion_humidity_source_{nullptr};
   bool sniffer_enabled_{true};
   bool i2c_rmt_scl_assist_{false};
   bool rtrh_enabled_{true};

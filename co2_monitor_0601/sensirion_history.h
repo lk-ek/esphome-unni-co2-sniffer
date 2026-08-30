@@ -17,6 +17,8 @@ using SensirionHistoryCaptureProbe = uint8_t (*)();
 
 void sensirion_history_setup(time::RealTimeClock *wall_clock);
 void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe);
+void sensirion_history_on_sample_updated();
+void sensirion_history_set_capture_guard_enabled(bool enabled);
 void sensirion_history_note_valid_co2_frame();
 void sensirion_history_note_rtrh_cycle();
 void sensirion_history_note_co2_capture(uint16_t raw_scl_edges, bool frame_error);

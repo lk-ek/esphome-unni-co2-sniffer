@@ -60,6 +60,8 @@ Keep responsibilities separated:
 - `co2_decoder.cpp/.h`: CO2 command/response and CRC decoding.
 - `rtrh_decoder.cpp/.h`: RT/RH capture, validation, quality, and calibration.
 - `sensirion_sample.h`: shared BLE/history sample representation.
+- `sensirion_bridge_core.cpp/.h`: portable profile-aware authoritative sample
+  state and external T/RH coalescing.
 - `sensirion_ble.cpp/.h`: advertising, GAP/GATT behavior, and live data.
 - `sensirion_history.cpp/.h`: persistent sample ring and history download.
 - `__init__.py`: ESPHome schema, validation, code generation, build flags,
@@ -138,6 +140,11 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
 - Compatibility-sensitive GAP/local identity, Device Information fields,
   manufacturer payload layout, GATT UUIDs, CRCs, history wire format, and flash
   metadata must not change casually.
+- BLE live advertisements, SHT43 GATT values, and persistent history must use
+  the same authoritative bridge sample. Do not reintroduce separate completeness
+  checks or independently retained T/RH values in those paths.
+- ENS160 eCO2 is not a direct CO2 measurement. Never publish it as real CO2 or
+  route it into Sensirion BLE, GATT, or persistent history.
 - `ble_device_name` controls the model/alternative name, not every
   compatibility-sensitive identity field.
 - Do not refresh/reconfigure advertising while a GATT client is connected.
@@ -180,6 +187,8 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
   captive portal, OTA, or HA exposure.
 - `i2c-sniffer-sht43-probe.yaml`: experimental reverse-engineering identity;
   never treat it as the normal device configuration.
+- `mobilesensor-sensirion.yaml`: permanently powered standalone AHT21 T/RH
+  bridge with optional ENS160 TVOC/AQI; it has no Unni capture or battery policy.
 
 Keep all variants valid when changing the schema or generated setters. BLE-off
 must compile without ESP-IDF Bluetooth headers, and host code must compile

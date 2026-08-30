@@ -5,6 +5,7 @@
 #include "calibration.h"
 #include "co2_decoder.h"
 #include "sensirion_sample.h"
+#include "sensirion_bridge_core.h"
 #include "sensirion_history_format.h"
 #include "sensirion_history_guard.h"
 #include "esphome/core/log.h"
@@ -188,6 +189,69 @@ bool CO2Monitor0601::run_portable_self_test_() {
   ble_sample.temperature_c = NAN;
   if (ble_sample.complete()) {
     ESP_LOGE(TAG, "portable self-test: non-finite BLE sample accepted");
+    return false;
+  }
+
+  SensirionBridgeCore sht43_core;
+  sht43_core.set_profile(SensirionProfile::SHT43_TRH);
+  if (!sht43_core.publish_temperature_humidity(25.0f, 50.0f) ||
+      !sht43_core.sample_complete() || sht43_core.sample().have_co2 ||
+      sht43_core.sample().encoded()[4] != 0 || sht43_core.sample().encoded()[5] != 0) {
+    ESP_LOGE(TAG, "portable self-test: SHT43 profile completeness/history encoding failed");
+    return false;
+  }
+  constexpr std::array<uint8_t, 10> expected_sht43_adv{
+      {0xD5, 0x06, 0x00, 0x06, 0x43, 0x68, 0x66, 0x66, 0xB0, 0x72}};
+  if (sht43_core.sht43_manufacturer_payload(0x6843) != expected_sht43_adv) {
+    ESP_LOGE(TAG, "portable self-test: SHT43 advertisement golden payload failed");
+    return false;
+  }
+  const SensirionSample retained = sht43_core.sample();
+  if (sht43_core.publish_temperature_humidity(NAN, 40.0f) ||
+      sht43_core.publish_temperature_humidity(INFINITY, 40.0f) ||
+      sht43_core.publish_temperature_humidity(-45.1f, 40.0f) ||
+      sht43_core.publish_temperature_humidity(20.0f, 100.1f) ||
+      sht43_core.sample().temperature_c != retained.temperature_c ||
+      sht43_core.sample().humidity_percent != retained.humidity_percent) {
+    ESP_LOGE(TAG, "portable self-test: invalid T/RH replaced retained bridge sample");
+    return false;
+  }
+
+  SensirionBridgeCore co2_profile;
+  co2_profile.set_profile(SensirionProfile::TRH_CO2);
+  co2_profile.publish_temperature_humidity(25.0f, 50.0f);
+  if (co2_profile.sample_complete()) {
+    ESP_LOGE(TAG, "portable self-test: CO2 profile accepted T/RH-only sample");
+    return false;
+  }
+  co2_profile.publish_co2(500);
+  if (!co2_profile.sample_complete()) {
+    ESP_LOGE(TAG, "portable self-test: complete CO2 profile sample rejected");
+    return false;
+  }
+
+  SensirionBridgeCore coalescer;
+  coalescer.set_profile(SensirionProfile::SHT43_TRH);
+  coalescer.note_external_temperature(20.0f, 1000);
+  coalescer.note_external_humidity(40.0f, 1050);
+  if (coalescer.commit_external_if_due(1149) || !coalescer.commit_external_if_due(1150) ||
+      !coalescer.sample_complete()) {
+    ESP_LOGE(TAG, "portable self-test: 100 ms external T/RH coalescing failed");
+    return false;
+  }
+  coalescer.note_external_temperature(21.0f, 2000);
+  coalescer.note_external_humidity(41.0f, 2010);
+  coalescer.note_external_temperature(22.0f, 2050);
+  coalescer.note_external_humidity(42.0f, 2060);
+  if (!coalescer.commit_external_if_due(2160) || coalescer.sample().temperature_c != 22.0f ||
+      coalescer.sample().humidity_percent != 42.0f || coalescer.commit_external_if_due(2161)) {
+    ESP_LOGE(TAG, "portable self-test: coalescer did not publish exactly the latest complete pair");
+    return false;
+  }
+  coalescer.note_external_temperature(23.0f, 3000);
+  if (coalescer.note_external_humidity(NAN, 3010) || coalescer.external_update_pending() ||
+      !coalescer.note_external_humidity(43.0f, 3020) || coalescer.commit_external_if_due(3120)) {
+    ESP_LOGE(TAG, "portable self-test: invalid source update left a stale half-pair");
     return false;
   }
 

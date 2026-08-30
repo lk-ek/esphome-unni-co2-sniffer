@@ -4,10 +4,14 @@ This directory contains the first hardware-free regression layer for the UNNI
 external component. It uses ESPHome's official `host:` platform.
 
 `run_host_tests.py` derives a temporary native-host configuration from each of
-the five shipped device YAML files. It removes only top-level blocks that are
+the six shipped device YAML files. It removes only top-level blocks that are
 ESP32/network/radio specific (`esp32`, `esp32_ble`, `wifi`, `api`, `ota`, `captive_portal`, and
 `time`) and retains the real `co2_monitor_0601:` feature block.
 Therefore changes to a shipped variant automatically flow into its host test.
+For `mobilesensor-sensirion.yaml`, the hardware-only AHT21 and ENS160 entries
+are replaced by template sensors with the same IDs. Three negative configs also
+verify paired source IDs, standalone-only source binding, and profile/alias
+conflict rejection.
 
 The component's native host implementation keeps the same code-generation
 setter surface as the ESP32 implementation. At startup it:
@@ -17,6 +21,9 @@ setter surface as the ESP32 implementation. At startup it:
 - exercises the shared RT/RH calibration functions and range invariants;
 - verifies the Sensirion sample serializer against a golden byte sequence,
   finite-value checks, and encoding clamps;
+- verifies profile completeness, invalid-sample retention, 100 ms T/RH
+  coalescing, newest-pair selection, zeroed SHT43 history CO2 bytes, and a
+  golden SHT43 type-0x06 manufacturer payload;
 - verifies history interval/generation handling and the portable predictive,
   reactive, adaptive-quality, stale-frame, overlap, and wrap-safe
   download-guard boundaries;

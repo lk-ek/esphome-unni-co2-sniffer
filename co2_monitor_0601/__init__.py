@@ -106,6 +106,9 @@ CONF_BLE_PAIRING_MODE = "ble_pairing_mode"
 CONF_BLE_PAIRING_WINDOW = "ble_pairing_window"
 CONF_SHT43_IDENTITY_PROBE = "sht43_identity_probe"
 CONF_STANDALONE_SENSIRION_MODE = "standalone_sensirion_mode"
+CONF_SENSIRION_PROFILE = "sensirion_profile"
+CONF_SENSIRION_TEMPERATURE_ID = "sensirion_temperature_id"
+CONF_SENSIRION_HUMIDITY_ID = "sensirion_humidity_id"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_WIFI_HA_ENABLED = "wifi_ha_enabled"
@@ -353,6 +356,18 @@ def _validate_features(config):
     config.setdefault(CONF_HOME_ASSISTANT, True)
 
     standalone_sensirion = config.get(CONF_STANDALONE_SENSIRION_MODE, False)
+    explicit_profile = config.get(CONF_SENSIRION_PROFILE)
+    if config.get(CONF_SHT43_IDENTITY_PROBE, False) and explicit_profile not in (None, "sht43_trh"):
+        raise cv.Invalid("sht43_identity_probe: true conflicts with sensirion_profile: trh_co2")
+    config[CONF_SENSIRION_PROFILE] = explicit_profile or (
+        "sht43_trh" if config.get(CONF_SHT43_IDENTITY_PROBE, False) else "trh_co2"
+    )
+    have_temperature_source = CONF_SENSIRION_TEMPERATURE_ID in config
+    have_humidity_source = CONF_SENSIRION_HUMIDITY_ID in config
+    if have_temperature_source != have_humidity_source:
+        raise cv.Invalid("sensirion_temperature_id and sensirion_humidity_id must be configured together")
+    if have_temperature_source and not standalone_sensirion:
+        raise cv.Invalid("Sensirion source IDs require standalone_sensirion_mode: true")
     if standalone_sensirion:
         if config[CONF_SNIFFER_ENABLED] or config[CONF_RTRH_ENABLED] or config[CONF_RTRH_GPIO_SETUP] or config[CONF_RTRH_EDGE_CAPTURE] or config[CONF_RTRH_DECODE_ONLY]:
             raise cv.Invalid(
@@ -450,6 +465,9 @@ _SCHEMA = {
     cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
     cv.Optional(CONF_STANDALONE_SENSIRION_MODE, default=False): cv.boolean,
+    cv.Optional(CONF_SENSIRION_PROFILE): cv.one_of("trh_co2", "sht43_trh", lower=True),
+    cv.Optional(CONF_SENSIRION_TEMPERATURE_ID): cv.use_id(sensor.Sensor),
+    cv.Optional(CONF_SENSIRION_HUMIDITY_ID): cv.use_id(sensor.Sensor),
     cv.Optional(CONF_SNIFFER_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_GPIO_SETUP, default=False): cv.boolean,
@@ -564,7 +582,7 @@ async def to_code(config):
 
     ble_enabled = config[CONF_BLE]
     home_assistant_enabled = config[CONF_HOME_ASSISTANT]
-    sht43_identity_probe = config.get(CONF_SHT43_IDENTITY_PROBE, False)
+    sht43_identity_probe = config[CONF_SENSIRION_PROFILE] == "sht43_trh"
     standalone_sensirion = config.get(CONF_STANDALONE_SENSIRION_MODE, False)
 
     if not CORE.is_host:
@@ -656,6 +674,12 @@ async def to_code(config):
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
     cg.add(var.set_standalone_sensirion_mode(standalone_sensirion))
+    cg.add(var.set_sensirion_sht43_profile(sht43_identity_probe))
+    if CONF_SENSIRION_TEMPERATURE_ID in config:
+        temperature_source = await cg.get_variable(config[CONF_SENSIRION_TEMPERATURE_ID])
+        humidity_source = await cg.get_variable(config[CONF_SENSIRION_HUMIDITY_ID])
+        cg.add(var.set_sensirion_temperature_source(temperature_source))
+        cg.add(var.set_sensirion_humidity_source(humidity_source))
     cg.add(var.set_sniffer_enabled(config[CONF_SNIFFER_ENABLED]))
     cg.add(var.set_rtrh_enabled(config[CONF_RTRH_ENABLED]))
     cg.add(var.set_rtrh_gpio_setup(config[CONF_RTRH_GPIO_SETUP]))

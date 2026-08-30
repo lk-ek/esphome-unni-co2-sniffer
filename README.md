@@ -208,6 +208,7 @@ The repository contains several configurations for different purposes.
 | `i2c-sniffer-no-ble.yaml` | yes | no | optional | BLE power comparison |
 | `i2c-sniffer-ble-only.yaml` | no | yes | no | BLE-only power measurement |
 | `i2c-sniffer-sht43-probe.yaml` | yes | experimental | yes | MyAmbience reverse engineering |
+| `mobilesensor-sensirion.yaml` | yes | SHT43-compatible | no | mains-powered AHT21/ENS160 room sensor |
 
 The SHT43 probe is diagnostic firmware and should not be used as the normal device identity.
 
@@ -855,6 +856,9 @@ co2_monitor_0601/
   calibration.h
       RT/RH calibration
 
+  sensirion_bridge_core.cpp/.h
+      shared profile-aware BLE/GATT/history sample and T/RH coalescer
+
   sensirion_ble.cpp/.h
       BLE live advertising
 
@@ -963,4 +967,33 @@ See `tests/host/README.md` for scope and limitations.
 
 ## Standalone Sensirion T/RH variant
 
-`mobilesensor-sensirion.yaml` exposes AHT21 temperature/humidity through the SHT43-compatible MyAmbience BLE/history path while keeping ENS160 eCO2, TVOC and AQI Home Assistant-only.
+`mobilesensor-sensirion.yaml` is a permanently powered, batteryless AHT21/ENS160
+node. It exposes AHT21 temperature/humidity through the SHT43-compatible
+MyAmbience BLE and persistent-history path:
+
+```yaml
+co2_monitor_0601:
+  standalone_sensirion_mode: true
+  sensirion_profile: sht43_trh
+  sensirion_temperature_id: aht21_temp
+  sensirion_humidity_id: aht21_humi
+  ble_advertising_interval: 2s
+```
+
+Both source IDs are required together. The component registers callbacks on
+the source sensors and coalesces their sequential updates for 100 ms, so BLE,
+SHT43 GATT and history consume one consistent, shared sample. The older
+`sht43_identity_probe: true` key remains a compatible alias for
+`sensirion_profile: sht43_trh`; contradictory settings are rejected.
+
+Standalone mode does not initialize Unni GPIO capture, battery ADC/learning,
+VBUS policy or automatic Light Sleep, and it creates none of the related HA
+entities. Only the fixed mains-powered advertising interval is configured.
+
+The `ENS160` HA switch restores `ALWAYS_OFF` after every boot. Turning it on
+wakes the sensor before resuming polling; turning it off suspends polling before
+Deep Sleep and publishes TVOC/AQI as unavailable. ENS160 eCO₂ is intentionally
+not exposed to HA and is never fed to BLE, GATT or history because it is an
+estimate rather than a direct CO₂ measurement. AHT21 compensation remains
+enabled for the ENS160. Its self-heating may influence the nearby AHT21 while
+active; no unvalidated correction curve is applied.

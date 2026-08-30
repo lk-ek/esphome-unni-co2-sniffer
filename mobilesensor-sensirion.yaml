@@ -4,8 +4,8 @@
 # Standalone mobile AHT21 + ENS160 sensor.
 # AHT21 temperature/humidity are also exposed as a Sensirion SHT43 DemoBoard-
 # compatible BLE device for MyAmbience, including persistent history.
-# ENS160 eCO2/TVOC/AQI remain Home Assistant-only; eCO2 is deliberately NOT
-# advertised as a real CO2 measurement.
+# ENS160 TVOC/AQI remain Home Assistant-only. Its estimated eCO2 is deliberately
+# not exposed or advertised as a real CO2 measurement.
 
 esphome:
   name: mobilesensor
@@ -41,7 +41,6 @@ esphome:
 
         # Don't leave stale air-quality values looking current in HA.
         - lambda: |-
-            id(ens160_eco2).publish_state(NAN);
             id(ens160_tvoc).publish_state(NAN);
             id(ens160_aqi).publish_state(NAN);
 
@@ -110,14 +109,16 @@ esp32_ble:
 co2_monitor_0601:
   id: sensirion_bridge
   standalone_sensirion_mode: true
+  sensirion_profile: sht43_trh
   sht43_identity_probe: true
+  sensirion_temperature_id: aht21_temp
+  sensirion_humidity_id: aht21_humi
   history_time_id: mobilesensor_wall_clock
 
   ble: true
   ble_live: true
   ble_history: true
   ble_advertising_interval: 2s
-  ble_battery_advertising_interval: 2s
 
   home_assistant: true
   sniffer_enabled: false
@@ -144,23 +145,6 @@ i2c_device:
     address: 0x53
 
 
-# Coalesce the AHT21's temperature and humidity callbacks. ESPHome publishes the
-# two values one after another; restarting this short script avoids briefly
-# advertising a new temperature together with the previous humidity sample.
-script:
-  - id: publish_sensirion_trh
-    mode: restart
-    then:
-      - delay: 100ms
-      - lambda: |-
-          if (!id(aht21_temp).has_state() || !id(aht21_humi).has_state()) {
-            return;
-          }
-          id(sensirion_bridge).publish_external_temperature_humidity(
-              id(aht21_temp).state,
-              id(aht21_humi).state);
-
-
 sensor:
   ###############################
   # AHT21 temperature / humidity
@@ -172,16 +156,10 @@ sensor:
     temperature:
       name: "AHT21 Temperature"
       id: aht21_temp
-      on_value:
-        then:
-          - script.execute: publish_sensirion_trh
 
     humidity:
       name: "AHT21 Humidity"
       id: aht21_humi
-      on_value:
-        then:
-          - script.execute: publish_sensirion_trh
 
     update_interval: 5s
 
@@ -192,10 +170,6 @@ sensor:
   - platform: ens160_i2c
     id: ens160_sensor
     address: 0x53
-
-    eco2:
-      name: "ENS160 eCO2"
-      id: ens160_eco2
 
     tvoc:
       name: "ENS160 Total Volatile Organic Compounds"
@@ -283,6 +257,5 @@ switch:
 
       # Clear the last measurements so HA doesn't display old values as current.
       - lambda: |-
-          id(ens160_eco2).publish_state(NAN);
           id(ens160_tvoc).publish_state(NAN);
           id(ens160_aqi).publish_state(NAN);

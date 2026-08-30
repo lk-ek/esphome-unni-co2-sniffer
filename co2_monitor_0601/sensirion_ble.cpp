@@ -61,13 +61,8 @@ __attribute__((constructor)) static void set_bt_identity_early() {
 #endif
 }
 
-static constexpr uint8_t COMPANY_ID_LO = 0xD5;
-static constexpr uint8_t COMPANY_ID_HI = 0x06;
 static constexpr uint8_t ADV_TYPE_SAMPLE = 0x00;
 static constexpr uint8_t SAMPLE_TYPE_T_RH_CO2_ALT = 0x08;
-static constexpr uint8_t SAMPLE_TYPE_SHT43 = 0x06;
-
-static SensirionSample sample;
 static uint16_t device_id = 0;
 static bool device_id_ready = false;
 static uint32_t advertising_interval_ms = 2000;
@@ -143,7 +138,7 @@ void sensirion_ble_set_advertise_data_enabled(bool enabled) {
   advertise_data_enabled = enabled;
   ESP_LOGI(TAG, "manufacturer sample advertising: %s%s", enabled ? "enabled" : "disabled",
            changed ? " (changed)" : "");
-  if (changed && sample.complete()) build_advertisement();
+  if (changed && sensirion_bridge_core().sample_complete()) build_advertisement();
 }
 
 void sensirion_ble_set_advertising_interval(uint32_t interval_ms) {
@@ -288,7 +283,9 @@ uint16_t sensirion_ble_get_device_id() {
 }
 
 static void build_advertisement() {
-  if (!sample.complete()) {
+  auto &core = sensirion_bridge_core();
+  const auto &sample = core.sample();
+  if (!core.sample_complete()) {
     static uint32_t last_incomplete_log_ms = 0;
     const uint32_t now = millis();
     if (now - last_incomplete_log_ms >= 10000) {
@@ -335,26 +332,11 @@ static void build_advertisement() {
   // Official SHT43 DemoBoard advertisement identity: Sensirion manufacturer
   // data, advertisement type 0x00, sample type 0x06, LSB-first device ID,
   // raw SHT4x T/RH ticks, and complete local name "SHT43 DB".
-  auto clamp_u16 = [](float value) -> uint16_t {
-    if (value < 0.0f) return 0;
-    if (value > 65535.0f) return 65535;
-    return static_cast<uint16_t>(value + 0.5f);
-  };
-  const uint16_t t_ticks = clamp_u16((sample.temperature_c + 45.0f) * 65535.0f / 175.0f);
-  const uint16_t rh_ticks = clamp_u16((sample.humidity_percent + 6.0f) * 65535.0f / 125.0f);
+  const auto manufacturer = core.sht43_manufacturer_payload(id);
 
   advertisement[p++] = 11;  // type byte + 10 bytes manufacturer data
   advertisement[p++] = ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE;
-  advertisement[p++] = COMPANY_ID_LO;
-  advertisement[p++] = COMPANY_ID_HI;
-  advertisement[p++] = ADV_TYPE_SAMPLE;
-  advertisement[p++] = SAMPLE_TYPE_SHT43;
-  advertisement[p++] = static_cast<uint8_t>(id & 0xFF);
-  advertisement[p++] = static_cast<uint8_t>(id >> 8);
-  advertisement[p++] = static_cast<uint8_t>(t_ticks & 0xFF);
-  advertisement[p++] = static_cast<uint8_t>(t_ticks >> 8);
-  advertisement[p++] = static_cast<uint8_t>(rh_ticks & 0xFF);
-  advertisement[p++] = static_cast<uint8_t>(rh_ticks >> 8);
+  for (uint8_t byte : manufacturer) advertisement[p++] = byte;
 
   static constexpr char PROBE_NAME[] = "SHT43 DB";
   advertisement[p++] = sizeof(PROBE_NAME);  // type + 8-byte name
@@ -363,8 +345,8 @@ static void build_advertisement() {
 #else
   advertisement[p++] = 19;  // type byte + 18 bytes manufacturer data
   advertisement[p++] = ESP_BLE_AD_MANUFACTURER_SPECIFIC_TYPE;
-  advertisement[p++] = COMPANY_ID_LO;
-  advertisement[p++] = COMPANY_ID_HI;
+  advertisement[p++] = 0xD5;
+  advertisement[p++] = 0x06;
   advertisement[p++] = ADV_TYPE_SAMPLE;
   advertisement[p++] = SAMPLE_TYPE_T_RH_CO2_ALT;
   advertisement[p++] = static_cast<uint8_t>(id >> 8);
@@ -393,26 +375,18 @@ static void build_advertisement() {
 }
 
 void sensirion_ble_set_temperature_humidity(float temperature_c, float humidity_percent) {
+  if (!sensirion_bridge_core().publish_temperature_humidity(temperature_c, humidity_percent)) return;
 #if UNNI_SHT43_IDENTITY_PROBE
   sensirion_sht43_probe_set_temperature_humidity(temperature_c, humidity_percent);
 #endif
-  sample.temperature_c = temperature_c;
-  sample.humidity_percent = humidity_percent;
-  sample.have_temperature = true;
-  sample.have_humidity = true;
 }
 
 void sensirion_ble_set_co2(uint16_t ppm) {
-  sample.co2_ppm = ppm;
-  sample.have_co2 = true;
+  sensirion_bridge_core().publish_co2(ppm);
 }
 
 void sensirion_ble_commit_live_advertisement() {
   build_advertisement();
-}
-
-const SensirionSample &sensirion_ble_sample() {
-  return sample;
 }
 
 void sensirion_ble_setup() {

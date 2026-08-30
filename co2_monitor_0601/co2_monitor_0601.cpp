@@ -8,6 +8,7 @@
 #include "i2c_sniffer.h"
 #include "rtrh_decoder.h"
 #include "power_save.h"
+#include "sensirion_bridge_core.h"
 
 #if UNNI_BLE_ENABLED
 #include "sensirion_ble.h"
@@ -555,17 +556,46 @@ void CO2Monitor0601::publish_external_temperature_humidity(float temperature_c, 
     ESP_LOGW(TAG, "Ignoring external T/RH sample because standalone_sensirion_mode is disabled");
     return;
   }
-  if (!std::isfinite(temperature_c) || !std::isfinite(humidity_percent) ||
-      humidity_percent < 0.0f || humidity_percent > 100.0f) {
+  if (!sensirion_bridge_core().publish_temperature_humidity(temperature_c, humidity_percent)) {
     ESP_LOGW(TAG, "Ignoring invalid external T/RH sample: %.2f C / %.1f %%",
              temperature_c, humidity_percent);
     return;
   }
+  this->sensirion_sample_updated_();
+}
+
+void CO2Monitor0601::setup_sensirion_sources_() {
+  if (this->sensirion_temperature_source_ == nullptr || this->sensirion_humidity_source_ == nullptr)
+    return;
+  this->sensirion_temperature_source_->add_on_state_callback([this](float value) {
+    if (!sensirion_bridge_core().note_external_temperature(value, millis())) return;
+    this->set_timeout("sensirion-trh-coalesce", SensirionBridgeCore::EXTERNAL_COALESCE_MS, [this]() {
+      if (sensirion_bridge_core().commit_external_if_due(millis())) this->sensirion_sample_updated_();
+    });
+  });
+  this->sensirion_humidity_source_->add_on_state_callback([this](float value) {
+    if (!sensirion_bridge_core().note_external_humidity(value, millis())) return;
+    this->set_timeout("sensirion-trh-coalesce", SensirionBridgeCore::EXTERNAL_COALESCE_MS, [this]() {
+      if (sensirion_bridge_core().commit_external_if_due(millis())) this->sensirion_sample_updated_();
+    });
+  });
+  ESP_LOGI(TAG, "External Sensirion T/RH sources registered with %u ms coalescing",
+           static_cast<unsigned>(SensirionBridgeCore::EXTERNAL_COALESCE_MS));
+}
+
+void CO2Monitor0601::sensirion_sample_updated_() {
 #if UNNI_BLE_ENABLED
-  sensirion_ble_set_temperature_humidity(temperature_c, humidity_percent);
+  const auto &sample = sensirion_bridge_core().sample();
+  // Keep the compatibility wrapper as the single task-context GATT update
+  // point; it delegates back to the same authoritative core sample.
+  if (sample.temperature_humidity_complete())
+    sensirion_ble_set_temperature_humidity(sample.temperature_c, sample.humidity_percent);
 #if UNNI_BLE_LIVE_ENABLED
   sensirion_ble_commit_live_advertisement();
 #endif
+#endif
+#if UNNI_BLE_HISTORY_ENABLED
+  sensirion_history_on_sample_updated();
 #endif
 }
 
@@ -972,6 +1002,10 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 }
 
 void CO2Monitor0601::setup() {
+  sensirion_bridge_core().set_profile(this->sensirion_sht43_profile_
+                                          ? SensirionProfile::SHT43_TRH
+                                          : SensirionProfile::TRH_CO2);
+  this->setup_sensirion_sources_();
   ESP_LOGI(TAG, "ESPHome entities registered normally; API/Wi-Fi presence is controlled by YAML");
 #if defined(USE_SENSOR) && defined(USE_BINARY_SENSOR) && defined(USE_SWITCH)
   ESP_LOGI(TAG, "ESPHome entity registry: sensors=%u binary_sensors=%u switches=%u",
@@ -1071,6 +1105,7 @@ void CO2Monitor0601::setup() {
   }
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
+  sensirion_history_set_capture_guard_enabled(!this->standalone_sensirion_mode_);
   sensirion_history_setup(this->history_time_);
 #endif
 
@@ -1450,9 +1485,7 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
     const float sensirion_temperature_c =
         std::isfinite(m.air_temperature_c) ? m.air_temperature_c : m.temperature_c;
     sensirion_ble_set_temperature_humidity(sensirion_temperature_c, m.humidity_percent);
-#if UNNI_BLE_LIVE_ENABLED
-    sensirion_ble_commit_live_advertisement();
-#endif
+    this->sensirion_sample_updated_();
 #endif
 
     this->ha_.temperature = m.temperature_c;
@@ -1810,9 +1843,7 @@ void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
   power_save::on_valid_co2();
 #if UNNI_BLE_ENABLED
   sensirion_ble_set_co2(ppm);
-#if UNNI_BLE_LIVE_ENABLED
-  sensirion_ble_commit_live_advertisement();
-#endif
+  this->sensirion_sample_updated_();
 #endif
 
   this->ha_.co2 = static_cast<float>(ppm);

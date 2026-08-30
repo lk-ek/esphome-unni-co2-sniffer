@@ -5,10 +5,19 @@ persistent-history implementation on an unrelated ESPHome sensor node. The
 source sensors are an AHT21 for temperature/humidity and an ENS160 for air
 quality.
 
-The new `standalone_sensirion_mode` deliberately disables all Unni-specific GPIO
+`standalone_sensirion_mode` deliberately disables all Unni-specific GPIO
 capture, USB-power, battery ADC/learning and C3-only power-policy setup. External
-T/RH values can be supplied through
-`CO2Monitor0601::publish_external_temperature_humidity()`.
+T/RH sources are bound with `sensirion_temperature_id` and
+`sensirion_humidity_id`. The public
+`CO2Monitor0601::publish_external_temperature_humidity()` method remains as a
+compatibility delegate.
+
+The original live-advertisement failure was caused by the SHT43 builder sharing
+the CO2 profile's unconditional `T/RH/CO2` completeness check. The portable
+`SensirionBridgeCore` now owns one profile-aware sample for advertisements,
+SHT43 GATT and history. `sht43_trh` requires only finite in-range T/RH;
+`trh_co2` retains the existing CO2 requirement. Invalid updates do not replace
+the last valid sample, and SHT43 samples always leave CO2 absent/zero on wire.
 
 The BLE identity uses the existing SHT43 DemoBoard compatibility path (sample
 type `0x06`), so no CO2 value is advertised. ENS160 `eCO2` is intentionally not
@@ -20,13 +29,22 @@ humidity pair complete without requiring `have_co2`. The on-flash sample width
 and existing history wire/storage format remain unchanged; unused CO2 bytes stay
 zero. This avoids a flash-format migration while allowing T/RH-only sampling.
 
-The AHT21 callbacks are coalesced by a short restartable ESPHome script before
-feeding BLE, preventing a transient mixed pair when temperature and humidity
-are published sequentially by the sensor component.
+The component itself registers AHT21 state callbacks. A restartable 100 ms
+coalescer commits only the newest complete pair, preventing a transient mixed
+sample when ESPHome publishes temperature and humidity sequentially. The first
+pair immediately starts history; later entries follow the configured interval.
+The standalone history download bypasses the Unni capture guard.
 
 The existing Unni-specific mapping of Sensirion setting `0x81FE` to Wi-Fi/HA
 disable is suppressed in standalone mode. The SHT43-compatible setting therefore
 cannot unexpectedly disconnect this independent sensor node from Home Assistant.
 
+The node is treated as permanently externally powered. It configures only the
+fixed 2 s advertising interval and creates no battery, VBUS or Energy Save
+entities. ENS160 polling is opt-in after every boot. Only TVOC and AQI are HA
+entities; eCO2 is intentionally absent everywhere. AHT21 compensation remains
+active, while possible ENS160-on thermal influence is documented rather than
+hidden behind an unvalidated correction.
+
 Hardware/MyAmbience validation is still required on the ESP32/Wemos D1 Mini32,
-especially pairing and SHT43-profile history download behavior.
+especially pairing, live type-0x06 data, first history entry and download.

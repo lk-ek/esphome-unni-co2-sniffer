@@ -52,6 +52,9 @@ class CO2Monitor0601 : public Component {
   void loop() override {}
   void prepare_for_ota() {}
   void set_standalone_sensirion_mode(bool) {}
+  void set_sensirion_sht43_profile(bool value) { this->sensirion_sht43_profile_ = value; }
+  void set_sensirion_temperature_source(sensor::Sensor *value) { this->sensirion_temperature_source_ = value; }
+  void set_sensirion_humidity_source(sensor::Sensor *value) { this->sensirion_humidity_source_ = value; }
   void publish_external_temperature_humidity(float, float) {}
 
   void set_ble_advertising_interval(uint32_t value) { this->ble_advertising_interval_ms_ = value; }
@@ -178,6 +181,9 @@ class CO2Monitor0601 : public Component {
   uint32_t ble_advertising_interval_ms_{0};
   uint32_t ble_battery_advertising_interval_ms_{0};
   uint32_t ha_publish_interval_ms_{0};
+  bool sensirion_sht43_profile_{false};
+  sensor::Sensor *sensirion_temperature_source_{nullptr};
+  sensor::Sensor *sensirion_humidity_source_{nullptr};
   uint32_t sniffer_start_delay_ms_{0};
   uint32_t active_i2c_probe_interval_ms_{0};
   uint32_t light_sleep_max_awake_ms_{0};

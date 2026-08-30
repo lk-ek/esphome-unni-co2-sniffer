@@ -9,7 +9,7 @@
 #include "ble_options.h"
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
-#include "sensirion_ble.h"
+#include "sensirion_bridge_core.h"
 #include "sensirion_history_format.h"
 #include "sensirion_history_guard.h"
 
@@ -157,13 +157,10 @@ uint16_t last_synced_downloadable_count = UINT16_MAX;
 time::RealTimeClock *wall_clock = nullptr;
 
 bool sample_complete_for_active_profile() {
-  const auto &sample = sensirion_ble_sample();
-#if UNNI_SHT43_IDENTITY_PROBE
-  return sample.temperature_humidity_complete();
-#else
-  return sample.complete();
-#endif
+  return sensirion_bridge_core().sample_complete();
 }
+
+bool capture_guard_enabled = true;
 
 uint64_t now_us() {
   return static_cast<uint64_t>(esp_timer_get_time());
@@ -580,7 +577,7 @@ void init_flash() {
 }
 
 void commit_sample(bool new_run) {
-  const auto &sample = sensirion_ble_sample();
+  const auto &sample = sensirion_bridge_core().sample();
   if (!sample_complete_for_active_profile())
     return;
 
@@ -728,6 +725,7 @@ void abort_download(const char *reason, uint32_t now) {
 }
 
 bool capture_guard_blocked(SensirionHistoryCaptureProbe capture_probe) {
+  if (!capture_guard_enabled) return false;
   const uint64_t current_us = now_us();
   capture_guard.set_capture_mask(capture_probe != nullptr ? capture_probe() : 0U,
                                  current_us);
@@ -938,13 +936,28 @@ void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe) {
   download_tick(capture_probe);
 }
 
+void sensirion_history_on_sample_updated() {
+  if (clearing.phase != ClearPhase::INACTIVE || history.clock_started) return;
+  sampling_tick();
+  const uint16_t visible_count = downloadable_count();
+  if (visible_count != last_synced_downloadable_count) sync_gatt();
+}
+
+void sensirion_history_set_capture_guard_enabled(bool enabled) {
+  capture_guard_enabled = enabled;
+}
+
 void sensirion_history_note_valid_co2_frame() {
+  if (!capture_guard_enabled) return;
   capture_guard.note_co2_frame(now_us());
 }
 
-void sensirion_history_note_rtrh_cycle() { capture_guard.note_rtrh_cycle(now_us()); }
+void sensirion_history_note_rtrh_cycle() {
+  if (capture_guard_enabled) capture_guard.note_rtrh_cycle(now_us());
+}
 
 void sensirion_history_note_co2_capture(uint16_t raw_scl_edges, bool frame_error) {
+  if (!capture_guard_enabled) return;
   if (download.phase == DownloadPhase::INACTIVE) return;
   const bool damaged = raw_scl_edges < 130U || frame_error;
   const uint64_t previous_us = capture_guard.pre_guard_us();

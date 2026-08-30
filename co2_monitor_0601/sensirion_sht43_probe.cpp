@@ -102,8 +102,8 @@ void sensirion_sht43_probe_configure_gatt(esp32_ble_server::BLEServer *server) {
   // advertisement uses a distinct test BLE identity/device ID (0x6843).
   const uint32_t serial = 0x68430001U;
   gatt.serial->set_value(ByteBuffer::wrap(serial));
-  set_float(gatt.temperature, 25.0f);
-  set_float(gatt.humidity, 50.0f);
+  // Leave T/RH unset until the authoritative bridge core receives its first
+  // complete sample. Placeholder readings would diverge from BLE/history.
 
   server->enqueue_start_service(sht);
   server->enqueue_start_service(temperature);
