@@ -495,6 +495,13 @@ When `light_sleep: true`, the first RT/RH GPIO ISR edge calls
 because ESP-IDF permits it from ISR context. The lock is guarded so subsequent
 RT/RH edges do not recursively acquire it.
 
+Ownership is tracked independently for the NO_LIGHT_SLEEP and CPU-frequency
+locks. A partial acquire is rolled back when possible; a failed rollback or
+release retains the corresponding owned state so task context retries only the
+still-held handle. USB and CO2-window lock pairs use the same per-handle rule,
+preventing both recursive underflow and a falsely unlocked state after one half
+of a pair fails.
+
 Do not move the first-edge lock acquisition out of the ISR: automatic
 Light-sleep between RT/RH edges would add wake latency to ISR timestamps and
 could corrupt period measurements. The lock is released only from normal task

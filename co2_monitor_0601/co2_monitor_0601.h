@@ -282,9 +282,11 @@ class CO2Monitor0601 : public Component {
     bool state{false};
     bool candidate{false};
     uint32_t candidate_since_ms{0};
+    uint32_t last_poll_ms{0};
   } usb_power_;
 
-  // Temporary runtime instrumentation for the intermittent Native API stall.
+#if UNNI_RUNTIME_DIAGNOSTICS
+  // Optional runtime instrumentation for the intermittent Native API stall.
   // All timing is collected from the normal component loop; no ISR path is
   // modified by this diagnostic. Maxima are reported/reset once per second.
   struct RuntimeDiagState {
@@ -303,6 +305,7 @@ class CO2Monitor0601 : public Component {
     uint32_t max_co2_us{0};
     uint32_t max_power_save_us{0};
   } runtime_diag_;
+#endif
 
   void maybe_publish_ha_();
   void publish_cached_ha_now_();
@@ -338,9 +341,11 @@ class CO2Monitor0601 : public Component {
   void publish_battery_learning_();
   float update_thermal_transient_(float temperature_c);
   bool initialize_sniffer_io_();
+#if UNNI_RUNTIME_DIAGNOSTICS
   void runtime_diag_loop_begin_();
   void runtime_diag_loop_end_();
   static void runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us);
+#endif
 
   bool sniffer_enabled_{true};
   bool i2c_rmt_scl_assist_{false};
@@ -351,6 +356,7 @@ class CO2Monitor0601 : public Component {
   uint32_t start_delay_ms_{0};
   uint32_t boot_ms_{0};
   bool io_initialized_{false};
+  bool io_initialization_attempted_{false};
   bool debug_metrics_{false};
   bool active_i2c_probe_enabled_{false};
   uint32_t active_i2c_probe_interval_ms_{60000};
@@ -375,7 +381,7 @@ class CO2Monitor0601 : public Component {
   uint16_t debug_udp_port_{0};
 #if UNNI_BLE_ENABLED
   esp32_ble_server::BLEServer *gatt_server_{nullptr};
-  uint32_t ble_usb_advertising_interval_ms_{1000};
+  uint32_t ble_usb_advertising_interval_ms_{2000};
   uint32_t ble_battery_advertising_interval_ms_{3000};
   std::string ble_device_name_{"Unni CO2 Monitor"};
 #endif

@@ -60,6 +60,8 @@ CONF_BLE_SERVER_ID = "ble_server_id"
 CONF_BLE_ADVERTISING_INTERVAL = "ble_advertising_interval"
 CONF_BLE_BATTERY_ADVERTISING_INTERVAL = "ble_battery_advertising_interval"
 CONF_BLE_DEVICE_NAME = "ble_device_name"
+CONF_BLE_IDENTITY_MODE = "ble_identity_mode"
+CONF_RUNTIME_DIAGNOSTICS = "runtime_diagnostics"
 CONF_HA_PUBLISH_INTERVAL = "ha_publish_interval"
 CONF_HOME_ASSISTANT = "home_assistant"
 CONF_SNIFFER_ENABLED = "sniffer_enabled"
@@ -126,6 +128,23 @@ CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
 EnergySaveModeSwitch = co2_monitor_0601_ns.class_("EnergySaveModeSwitch", switch.Switch)
 BlePairingModeSwitch = co2_monitor_0601_ns.class_("BlePairingModeSwitch", switch.Switch)
 WifiHaSwitch = co2_monitor_0601_ns.class_("WifiHaSwitch", switch.Switch)
+
+
+def _bounded_time(minimum, maximum):
+    return cv.All(
+        cv.positive_time_period_milliseconds,
+        cv.Range(min=TimePeriod(milliseconds=minimum), max=TimePeriod(milliseconds=maximum)),
+    )
+
+
+def _ble_name(value):
+    value = cv.string_strict(value)
+    encoded = value.encode("utf-8")
+    if not encoded or len(encoded) > 31:
+        raise cv.Invalid("ble_device_name must contain 1..31 UTF-8 bytes")
+    if b"\x00" in encoded:
+        raise cv.Invalid("ble_device_name must not contain NUL bytes")
+    return value
 
 
 def _sensor_schema(**kwargs):
@@ -343,6 +362,20 @@ def _validate_features(config):
         raise cv.Invalid("ble_history: true requires ble: true")
     if config.get(CONF_SHT43_IDENTITY_PROBE, False) and not config[CONF_BLE]:
         raise cv.Invalid("sht43_identity_probe: true requires ble: true")
+    capture_modes = sum(
+        bool(config[key])
+        for key in (CONF_RTRH_ENABLED, CONF_RTRH_EDGE_CAPTURE, CONF_RTRH_DECODE_ONLY)
+    )
+    if capture_modes > 1:
+        raise cv.Invalid(
+            "rtrh_enabled, rtrh_edge_capture and rtrh_decode_only are mutually exclusive"
+        )
+    if config[CONF_RTRH_GPIO_SETUP] and capture_modes == 0:
+        raise cv.Invalid("rtrh_gpio_setup: true requires an active RT/RH capture mode")
+    if config[CONF_ACTIVE_I2C_PROBE] and not config[CONF_SNIFFER_ENABLED]:
+        raise cv.Invalid("active_i2c_probe: true requires sniffer_enabled: true")
+    if config[CONF_DEBUG_UDP_HOST] and not config[CONF_DEBUG_CAPTURE]:
+        raise cv.Invalid("debug_udp_host requires debug_capture: true")
 
     # Host builds deliberately simulate BLE feature selection instead of loading
     # the ESP32 BLE stack. Remove generated BLE IDs so the same component schema
@@ -378,12 +411,13 @@ _SCHEMA = {
     cv.Optional(CONF_BLE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
     cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
-    cv.Optional(CONF_BLE_DEVICE_NAME, default="Unni CO2 Monitor"): cv.All(
-        cv.string_strict, cv.Length(min=1, max=31)
+    cv.Optional(CONF_BLE_DEVICE_NAME, default="Unni CO2 Monitor"): _ble_name,
+    cv.Optional(CONF_BLE_IDENTITY_MODE, default="legacy_fixed"): cv.one_of(
+        "legacy_fixed", "device_derived", lower=True
     ),
     cv.GenerateID(CONF_BLE_ID): cv.use_id(esp32_ble.ESP32BLE),
     cv.GenerateID(CONF_BLE_SERVER_ID): cv.use_id(esp32_ble_server.BLEServer),
-    cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="1s"): cv.All(
+    cv.Optional(CONF_BLE_ADVERTISING_INTERVAL, default="2s"): cv.All(
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
@@ -391,7 +425,7 @@ _SCHEMA = {
         cv.positive_time_period_milliseconds,
         cv.Range(min=TimePeriod(milliseconds=20), max=TimePeriod(milliseconds=10240)),
     ),
-    cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): _bounded_time(1000, 86400000),
     cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
     cv.Optional(CONF_SNIFFER_ENABLED, default=True): cv.boolean,
@@ -399,34 +433,35 @@ _SCHEMA = {
     cv.Optional(CONF_RTRH_GPIO_SETUP, default=False): cv.boolean,
     cv.Optional(CONF_RTRH_EDGE_CAPTURE, default=False): cv.boolean,
     cv.Optional(CONF_RTRH_DECODE_ONLY, default=False): cv.boolean,
-    cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_SNIFFER_START_DELAY, default="0s"): _bounded_time(0, 300000),
     cv.Optional(CONF_DEBUG_METRICS, default=False): cv.boolean,
+    cv.Optional(CONF_RUNTIME_DIAGNOSTICS, default=False): cv.boolean,
     cv.Optional(CONF_ACTIVE_I2C_PROBE, default=False): cv.boolean,
-    cv.Optional(CONF_ACTIVE_I2C_PROBE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_ACTIVE_I2C_PROBE_INTERVAL, default="60s"): _bounded_time(10000, 86400000),
     cv.Optional(CONF_DEBUG_CAPTURE, default=False): cv.boolean,
     cv.Optional(CONF_DEBUG_UDP_HOST, default=""): cv.string_strict,
     cv.Optional(CONF_DEBUG_UDP_PORT, default=45678): cv.int_range(min=1, max=65535),
     cv.Optional(CONF_LIGHT_SLEEP, default=True): cv.boolean,
-    cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_CO2_WAKE_IDLE_STABLE, default="500ms"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_CO2_WAKE_GUARD_TIME, default="500ms"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_LIGHT_SLEEP_MAX_AWAKE, default="10s"): _bounded_time(1000, 300000),
+    cv.Optional(CONF_CO2_WAKE_IDLE_STABLE, default="500ms"): _bounded_time(10, 10000),
+    cv.Optional(CONF_CO2_WAKE_GUARD_TIME, default="500ms"): _bounded_time(10, 10000),
     cv.Optional(CONF_RT_PIN, default=3): cv.int_range(min=0, max=21),
     cv.Optional(CONF_RH_PIN, default=4): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SDA_PIN, default=6): cv.int_range(min=0, max=21),
     cv.Optional(CONF_CO2_SCL_PIN, default=7): cv.int_range(min=0, max=21),
     cv.Optional(CONF_I2C_CAPTURE_BACKEND, default="gpio"): cv.one_of("gpio", "rmt_scl", lower=True),
     cv.Optional(CONF_BATTERY_PIN, default=2): cv.int_range(min=0, max=4),
-    cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_BATTERY_UPDATE_INTERVAL, default="60s"): _bounded_time(1000, 86400000),
     cv.Optional(CONF_BATTERY_DIVIDER_RATIO, default=2.0): cv.float_range(min=1.0, max=20.0),
-    cv.Optional(CONF_BATTERY_LEARNING_SAVE_INTERVAL, default="30min"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_BATTERY_LEARNING_SAVE_INTERVAL, default="30min"): _bounded_time(60000, 86400000),
     cv.Optional(CONF_USB_POWER_PIN, default=5): cv.int_range(min=0, max=21),
     cv.Optional(CONF_ENERGY_SAVE_MODE_DEFAULT, default=False): cv.boolean,
-    cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_ENERGY_SAVE_GRACE, default="3s"): _bounded_time(0, 300000),
     cv.Optional(CONF_ENERGY_SAVE_MODE, default={"name": "Energy Save Mode", "icon": "mdi:leaf"}): switch.switch_schema(EnergySaveModeSwitch),
     cv.Optional(CONF_BLE_PAIRING_MODE, default={"name": "BLE Pairing Mode", "icon": "mdi:bluetooth-connect"}): switch.switch_schema(BlePairingModeSwitch),
     cv.Optional(CONF_WIFI_HA_ENABLED, default={"name": "WiFi Home Assistant", "icon": "mdi:wifi"}): switch.switch_schema(WifiHaSwitch, default_restore_mode="RESTORE_DEFAULT_ON"),
-    cv.Optional(CONF_WIFI_RECOVERY_WINDOW, default="5min"): cv.positive_time_period_milliseconds,
-    cv.Optional(CONF_BLE_PAIRING_WINDOW, default="60s"): cv.positive_time_period_milliseconds,
+    cv.Optional(CONF_WIFI_RECOVERY_WINDOW, default="5min"): _bounded_time(10000, 86400000),
+    cv.Optional(CONF_BLE_PAIRING_WINDOW, default="60s"): _bounded_time(10000, 3600000),
     cv.Optional(CONF_THERMAL_TRANSIENT_ON_RATE, default=0.8): cv.float_range(min=0.05, max=20.0),
     cv.Optional(CONF_THERMAL_TRANSIENT_OFF_RATE, default=0.3): cv.float_range(min=0.01, max=20.0),
 }
@@ -560,6 +595,11 @@ async def to_code(config):
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
     cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
+    cg.add_define("UNNI_RUNTIME_DIAGNOSTICS", int(config[CONF_RUNTIME_DIAGNOSTICS]))
+    cg.add_define(
+        "UNNI_BLE_DEVICE_DERIVED_IDENTITY",
+        int(config[CONF_BLE_IDENTITY_MODE] == "device_derived"),
+    )
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
     if not CORE.is_host and config[CONF_I2C_CAPTURE_BACKEND] == "rmt_scl":
         # Keep the RMT RX driver/callback operational through cache-disabled

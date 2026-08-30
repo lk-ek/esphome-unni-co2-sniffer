@@ -93,6 +93,10 @@ struct Capture {
 // Passive GPIO capture. The sniffer never enables pulls and never drives SDA/SCL.
 bool setup(uint8_t sda_pin, uint8_t scl_pin, bool rmt_scl_assist = false);
 
+// Remove any installed GPIO handlers/RMT resources after a partial or failed
+// setup. Signal pins remain passive inputs without internal pulls.
+void shutdown();
+
 // Enable/disable edge capture. Enabling starts with a clean decoder state;
 // disabling drops any partial frame collected so far.
 void set_capture_enabled(bool enabled);

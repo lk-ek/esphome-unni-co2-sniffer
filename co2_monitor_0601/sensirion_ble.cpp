@@ -21,6 +21,7 @@
 
 #include "esp_mac.h"
 
+#include <algorithm>
 #include <array>
 
 namespace esphome {
@@ -36,9 +37,28 @@ static constexpr uint8_t TEST_BT_MAC[6] = {0x82, 0xF1, 0xB2, 0x61, 0x68, 0x43};
 static constexpr uint8_t TEST_BT_MAC[6] = {0x82, 0xF1, 0xB2, 0x61, 0x68, 0x3A};
 #endif
 static esp_err_t bt_mac_set_result = ESP_FAIL;
+static std::array<uint8_t, 6> configured_bt_mac{};
 
 __attribute__((constructor)) static void set_bt_identity_early() {
-  bt_mac_set_result = esp_iface_mac_addr_set(TEST_BT_MAC, ESP_MAC_BT);
+#if UNNI_BLE_DEVICE_DERIVED_IDENTITY
+  uint8_t factory_mac[6]{};
+  bt_mac_set_result = esp_efuse_mac_get_default(factory_mac);
+  if (bt_mac_set_result == ESP_OK) {
+    std::copy_n(factory_mac, configured_bt_mac.size(), configured_bt_mac.begin());
+    // Stable, unicast, locally administered address. Domain-separate the BLE
+    // identity from the factory Wi-Fi address while retaining per-device bits.
+    configured_bt_mac[0] = static_cast<uint8_t>((configured_bt_mac[0] | 0x02U) & 0xFEU);
+#if UNNI_SHT43_IDENTITY_PROBE
+    configured_bt_mac[5] ^= 0x43U;
+#else
+    configured_bt_mac[5] ^= 0x3AU;
+#endif
+    bt_mac_set_result = esp_iface_mac_addr_set(configured_bt_mac.data(), ESP_MAC_BT);
+  }
+#else
+  std::copy_n(TEST_BT_MAC, configured_bt_mac.size(), configured_bt_mac.begin());
+  bt_mac_set_result = esp_iface_mac_addr_set(configured_bt_mac.data(), ESP_MAC_BT);
+#endif
 }
 
 static constexpr uint8_t COMPANY_ID_LO = 0xD5;

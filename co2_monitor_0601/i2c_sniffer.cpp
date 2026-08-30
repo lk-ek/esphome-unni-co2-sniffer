@@ -1516,7 +1516,10 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin, bool use_rmt_scl_assist) {
   err = gpio_isr_handler_add(pin_scl, gpio_isr, nullptr);
   if (err != ESP_OK) return false;
   err = gpio_isr_handler_add(pin_sda, gpio_isr, nullptr);
-  if (err != ESP_OK) return false;
+  if (err != ESP_OK) {
+    gpio_isr_handler_remove(pin_scl);
+    return false;
+  }
 
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
   rmt_scl_assist_enabled = use_rmt_scl_assist;
@@ -1562,6 +1565,31 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin, bool use_rmt_scl_assist) {
 #endif
 
   return true;
+}
+
+void shutdown() {
+  capture_enabled = false;
+  capturing = false;
+  gpio_intr_disable(pin_scl);
+  gpio_intr_disable(pin_sda);
+  gpio_isr_handler_remove(pin_scl);
+  gpio_isr_handler_remove(pin_sda);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  if (rmt_scl_channel != nullptr) {
+    rmt_disable(rmt_scl_channel);
+    rmt_del_channel(rmt_scl_channel);
+    rmt_scl_channel = nullptr;
+  }
+  rmt_scl_assist_enabled = false;
+#endif
+  gpio_set_intr_type(pin_scl, GPIO_INTR_DISABLE);
+  gpio_set_intr_type(pin_sda, GPIO_INTR_DISABLE);
+  gpio_set_direction(pin_scl, GPIO_MODE_INPUT);
+  gpio_set_direction(pin_sda, GPIO_MODE_INPUT);
+  gpio_pullup_dis(pin_scl);
+  gpio_pullup_dis(pin_sda);
+  gpio_pulldown_dis(pin_scl);
+  gpio_pulldown_dis(pin_sda);
 }
 
 

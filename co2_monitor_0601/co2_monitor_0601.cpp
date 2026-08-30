@@ -224,6 +224,10 @@ void CO2Monitor0601::prepare_for_ota() {
   if (!sensirion_history_flush())
     ESP_LOGW(TAG, "OTA starting: Sensirion history flash flush failed");
 #endif
+#if UNNI_BLE_ENABLED
+  if (!sensirion_settings_flush())
+    ESP_LOGW(TAG, "OTA starting: Sensirion Device Settings flush failed");
+#endif
 }
 
 void CO2Monitor0601::publish_battery_learning_() {
@@ -521,8 +525,8 @@ void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
   if (enabled == this->wifi_ha_enabled_) return;
   ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi Home Assistant -> %s",
            enabled ? "ON" : "OFF");
-  // Apply without writing the same setting back; the GATT write has already
-  // persisted it.
+  // Apply without writing the same setting back; the GATT write already
+  // scheduled persistence in normal loop context.
   this->wifi_ha_enabled_ = enabled;
   if (this->wifi_ha_switch_ != nullptr) this->wifi_ha_switch_->publish_state(enabled);
   if (enabled) {
@@ -731,8 +735,17 @@ bool CO2Monitor0601::setup_usb_power_() {
 void CO2Monitor0601::process_usb_power_() {
   if (!this->usb_power_.initialized) return;
 
-  const bool raw = gpio_get_level(static_cast<gpio_num_t>(this->usb_power_.pin)) != 0;
   const uint32_t now = millis();
+  constexpr uint32_t STABLE_POLL_MS = 200;
+  constexpr uint32_t DEBOUNCE_POLL_MS = 10;
+  const bool candidate_active = !this->usb_power_.have_state ||
+                                this->usb_power_.candidate != this->usb_power_.state;
+  const uint32_t poll_interval = candidate_active ? DEBOUNCE_POLL_MS : STABLE_POLL_MS;
+  if (this->usb_power_.last_poll_ms != 0 &&
+      static_cast<uint32_t>(now - this->usb_power_.last_poll_ms) < poll_interval)
+    return;
+  this->usb_power_.last_poll_ms = now;
+  const bool raw = gpio_get_level(static_cast<gpio_num_t>(this->usb_power_.pin)) != 0;
   if (raw != this->usb_power_.candidate) {
     this->usb_power_.candidate = raw;
     this->usb_power_.candidate_since_ms = now;
@@ -872,16 +885,24 @@ void CO2Monitor0601::process_battery_() {
 
 bool CO2Monitor0601::initialize_sniffer_io_() {
   if (this->io_initialized_) return true;
+  if (this->io_initialization_attempted_) return false;
+  this->io_initialization_attempted_ = true;
 
   if (!i2c_sniffer::setup(this->co2_sda_pin_, this->co2_scl_pin_, this->i2c_rmt_scl_assist_)) {
     ESP_LOGE(TAG, "I2C sniffer GPIO/ISR setup failed");
+    i2c_sniffer::shutdown();
+    this->mark_failed();
     return false;
   }
-  const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
+  const bool setup_rtrh_gpio = this->rtrh_enabled_ || this->rtrh_gpio_setup_ ||
+                                this->rtrh_edge_capture_ || this->rtrh_decode_only_;
   if (setup_rtrh_gpio) {
-    const bool enable_rtrh_edge_isr = this->rtrh_enabled_ || this->rtrh_edge_capture_;
+    const bool enable_rtrh_edge_isr = this->rtrh_enabled_ || this->rtrh_edge_capture_ ||
+                                      this->rtrh_decode_only_;
     if (!enable_rtrh_edge_isr) {
       ESP_LOGE(TAG, "Known-good RT/RH restore test requires edge capture enabled");
+      i2c_sniffer::shutdown();
+      this->mark_failed();
       return false;
     }
     // A/B: use the exact pre-regression RT/RH setup path. In particular,
@@ -889,6 +910,9 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
     // as in the 16:05 build that produced valid temperature/humidity samples.
     if (!rtrh_decoder::setup(this->rt_pin_, this->rh_pin_)) {
       ESP_LOGE(TAG, "RT/RH decoder GPIO/ISR setup failed");
+      rtrh_decoder::shutdown();
+      i2c_sniffer::shutdown();
+      this->mark_failed();
       return false;
     }
     ESP_LOGW(TAG, "RT/RH A/B: exact known-good decoder and GPIO/ISR setup restored");
@@ -922,7 +946,9 @@ void CO2Monitor0601::setup() {
            static_cast<unsigned>(App.get_binary_sensors().size()),
            static_cast<unsigned>(App.get_switches().size()));
 #endif
-  ESP_LOGW(TAG, "API stall diagnostic enabled: 1 Hz main-loop timing + 10 s heap telemetry; ISR paths unchanged");
+#if UNNI_RUNTIME_DIAGNOSTICS
+  ESP_LOGW(TAG, "Runtime diagnostics enabled: main-loop timing + heap telemetry; ISR paths unchanged");
+#endif
   if (this->energy_save_switch_ != nullptr) this->energy_save_switch_->publish_state(this->energy_save_mode_);
   if (this->wifi_ha_switch_ != nullptr) {
 #if UNNI_BLE_ENABLED
@@ -1024,7 +1050,7 @@ void CO2Monitor0601::setup() {
   this->boot_ms_ = millis();
   if (this->sniffer_enabled_) {
     if (this->start_delay_ms_ == 0) {
-      this->initialize_sniffer_io_();
+      if (!this->initialize_sniffer_io_()) return;
     } else {
       ESP_LOGI(TAG, "Sniffer GPIO isolation active for first %lu ms; signal pins untouched",
                static_cast<unsigned long>(this->start_delay_ms_));
@@ -1032,7 +1058,8 @@ void CO2Monitor0601::setup() {
 
 #if RTRH_DEBUG_CAPTURE
     i2c_sniffer::register_debug_handler();
-    if (this->rtrh_enabled_) rtrh_decoder::register_debug_handlers();
+    if (this->rtrh_enabled_ || this->rtrh_decode_only_ || this->rtrh_edge_capture_)
+      rtrh_decoder::register_debug_handlers();
     if (debug_udp::enabled()) {
       ESP_LOGD(TAG, this->rtrh_enabled_ ? "Raw debug: UDP I2C + RT/RH capture export enabled"
                                        : "Raw debug: UDP I2C capture export enabled");
@@ -1860,6 +1887,7 @@ void CO2Monitor0601::process_active_i2c_probe_() {
   }
 }
 
+#if UNNI_RUNTIME_DIAGNOSTICS
 void CO2Monitor0601::runtime_diag_update_max_(uint32_t &slot, uint64_t elapsed_us) {
   const uint32_t value = elapsed_us > 0xFFFFFFFFULL ? 0xFFFFFFFFU : static_cast<uint32_t>(elapsed_us);
   if (value > slot) slot = value;
@@ -1893,9 +1921,12 @@ void CO2Monitor0601::runtime_diag_loop_end_() {
   runtime_diag_update_max_(this->runtime_diag_.max_component_us,
                            now_us - this->runtime_diag_.current_loop_start_us);
 }
+#endif
 
 void CO2Monitor0601::loop() {
+#if UNNI_RUNTIME_DIAGNOSTICS
   this->runtime_diag_loop_begin_();
+#endif
 
 #if UNNI_SHT43_IDENTITY_PROBE
   static uint32_t last_heap_log_ms = 0;
@@ -1907,11 +1938,13 @@ void CO2Monitor0601::loop() {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
   }
 #endif
-  if (this->sniffer_enabled_ && !this->io_initialized_ &&
+  if (this->sniffer_enabled_ && !this->io_initialized_ && !this->io_initialization_attempted_ &&
       static_cast<uint32_t>(millis() - this->boot_ms_) >= this->start_delay_ms_)
     this->initialize_sniffer_io_();
 
+#if UNNI_RUNTIME_DIAGNOSTICS
   uint64_t stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
 #if UNNI_BLE_ENABLED
   sensirion_ble_loop();
   sensirion_settings_loop();
@@ -1919,10 +1952,12 @@ void CO2Monitor0601::loop() {
 #if UNNI_BLE_HISTORY_ENABLED
   sensirion_history_loop();
 #endif
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_history_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
   this->process_usb_power_();
   this->process_energy_save_grace_();
 #if UNNI_BLE_ENABLED
@@ -1932,25 +1967,34 @@ void CO2Monitor0601::loop() {
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
 #endif
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_policy_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
   this->maybe_publish_ha_();
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_ha_publish_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
   this->process_battery_();
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_battery_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
+#endif
 
   if (!this->io_initialized_) {
+#if UNNI_RUNTIME_DIAGNOSTICS
     this->runtime_diag_loop_end_();
+#endif
     return;
   }
 
-  const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ || this->rtrh_edge_capture_;
+  const bool rtrh_power_path = this->rtrh_enabled_ || this->rtrh_gpio_setup_ ||
+                                this->rtrh_edge_capture_ || this->rtrh_decode_only_;
 
   // The first RT/RH edge after automatic Light-sleep opens the battery awake
   // window from ISR context. Restore the passive CO2 GPIO input/interrupt state
@@ -1968,7 +2012,9 @@ void CO2Monitor0601::loop() {
   // interval. USB keeps the sniffer continuously active.
   this->process_co2_capture_gate_();
 
+#if UNNI_RUNTIME_DIAGNOSTICS
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
   if (this->rtrh_enabled_) {
     this->process_rtrh_();
   } else if (this->rtrh_decode_only_) {
@@ -1986,17 +2032,21 @@ void CO2Monitor0601::loop() {
                discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);
     }
   }
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_rtrh_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
   this->process_co2_();
   this->process_active_i2c_probe_();
   i2c_sniffer::log_edge_diagnostics(millis());
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_co2_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
+#endif
 #if RTRH_DEBUG_CAPTURE
   power_save::set_transport_busy(i2c_sniffer::debug_export_pending() ||
                                  rtrh_decoder::debug_export_pending());
@@ -2004,10 +2054,12 @@ void CO2Monitor0601::loop() {
   power_save::set_transport_busy(false);
 #endif
   if (rtrh_power_path) power_save::loop();
+#if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_power_save_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);
 
   this->runtime_diag_loop_end_();
+#endif
 }
 
 }  // namespace co2_monitor_0601

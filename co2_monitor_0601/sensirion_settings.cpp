@@ -19,6 +19,7 @@
 #include "sensirion_settings.h"
 
 #include "sensirion_ble.h"
+#include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include "esphome/core/preferences.h"
 
@@ -94,6 +95,9 @@ struct SettingsGatt {
 
   ESPPreferenceObject preference{};
   bool preference_ready{false};
+  bool preference_dirty{false};
+  bool preference_attempted{false};
+  uint32_t preference_last_attempt_ms{0};
 } gatt;
 
 void load_settings(const std::string &configured_default_name) {
@@ -148,7 +152,17 @@ void load_settings(const std::string &configured_default_name) {
 }
 
 void save_settings() {
-  if (!gatt.preference_ready) return;
+  if (gatt.preference_ready) gatt.preference_dirty = true;
+}
+
+bool persist_settings(bool force = false) {
+  if (!gatt.preference_ready || !gatt.preference_dirty) return true;
+  const uint32_t now = millis();
+  if (!force && gatt.preference_attempted &&
+      static_cast<uint32_t>(now - gatt.preference_last_attempt_ms) < 1000U)
+    return false;
+  gatt.preference_attempted = true;
+  gatt.preference_last_attempt_ms = now;
   PersistedSettings saved{};
   saved.version = SETTINGS_PREF_VERSION;
   saved.log_enabled = gatt.log_enabled;
@@ -158,11 +172,14 @@ void save_settings() {
   saved.alternative_name[len] = '\0';
   if (!gatt.preference.save(&saved)) {
     ESP_LOGW(TAG, "failed to save Device Settings preference");
-    return;
+    return false;
   }
-  // These writes are initiated explicitly by the user from MyAmbience and are
-  // rare, so commit them immediately rather than risking loss on power removal.
-  global_preferences->sync();
+  if (!global_preferences->sync()) {
+    ESP_LOGW(TAG, "failed to sync Device Settings preference");
+    return false;
+  }
+  gatt.preference_dirty = false;
+  return true;
 }
 
 void set_stack_value(uint16_t handle, const uint8_t *data, size_t len) {
@@ -405,6 +422,9 @@ static void request_service_creation(esp_gatt_if_t gatts_if) {
 }
 
 void sensirion_settings_loop() {
+  // GATT callbacks only copy validated values and schedule persistence. NVS
+  // writes/sync happen here in normal component context after the response.
+  persist_settings();
   if (!gatt.configured || gatt.creation_requested || gatt.server == nullptr) return;
   // Wait until ESPHome has finished constructing and starting all of its own
   // services. This avoids interleaving our raw add-characteristic sequence with
@@ -412,6 +432,8 @@ void sensirion_settings_loop() {
   if (!gatt.server->is_running()) return;
   request_service_creation(gatt.server->get_gatts_if());
 }
+
+bool sensirion_settings_flush() { return persist_settings(true); }
 
 void sensirion_settings_gatts_event_handler(esp_gatts_cb_event_t event,
                                             esp_gatt_if_t gatts_if,

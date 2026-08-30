@@ -614,9 +614,28 @@ bool setup(uint8_t rt_pin, uint8_t rh_pin) {
   for (uint8_t i = 0; i < 2; i++) {
     err = gpio_isr_handler_add(pins[i], gpio_isr,
         reinterpret_cast<void *>(static_cast<intptr_t>(i + 1)));
-    if (err != ESP_OK) return false;
+    if (err != ESP_OK) {
+      while (i > 0) gpio_isr_handler_remove(pins[--i]);
+      return false;
+    }
   }
   return true;
+}
+
+void shutdown() {
+  for (gpio_num_t pin : pins) {
+    gpio_intr_disable(pin);
+    gpio_isr_handler_remove(pin);
+    gpio_set_intr_type(pin, GPIO_INTR_DISABLE);
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_pullup_dis(pin);
+    gpio_pulldown_dis(pin);
+  }
+  decoder.collecting = false;
+  decoder.snapshot_ready = false;
+#if RTRH_DEBUG_CAPTURE
+  debug.capturing = false;
+#endif
 }
 
 void rearm_after_light_sleep() {

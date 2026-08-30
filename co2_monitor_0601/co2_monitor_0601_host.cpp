@@ -4,6 +4,8 @@
 
 #include "calibration.h"
 #include "co2_decoder.h"
+#include "sensirion_sample.h"
+#include "sensirion_history_format.h"
 #include "esphome/core/log.h"
 
 #include <cerrno>
@@ -164,6 +166,37 @@ bool CO2Monitor0601::run_portable_self_test_() {
       !std::isfinite(display_temperature) || !std::isfinite(display_humidity) || display_humidity < 0.0f ||
       display_humidity > 100.0f) {
     ESP_LOGE(TAG, "portable self-test: calibration invariant failed");
+    return false;
+  }
+
+  // Golden Sensirion T/RH/CO2 byte sequence plus serializer safety bounds.
+  SensirionSample ble_sample{};
+  ble_sample.temperature_c = 0.0f;
+  ble_sample.humidity_percent = 50.0f;
+  ble_sample.co2_ppm = 500;
+  ble_sample.have_temperature = ble_sample.have_humidity = ble_sample.have_co2 = true;
+  constexpr std::array<uint8_t, 8> expected_ble{{0xD4, 0x41, 0x00, 0x80, 0xF4, 0x01, 0x00, 0x00}};
+  if (!ble_sample.complete() || ble_sample.encoded() != expected_ble ||
+      SensirionSample::encode_temperature(-100.0f) != 0 ||
+      SensirionSample::encode_temperature(200.0f) != 0xFFFF ||
+      SensirionSample::encode_humidity(-1.0f) != 0 ||
+      SensirionSample::encode_humidity(101.0f) != 0xFFFF) {
+    ESP_LOGE(TAG, "portable self-test: BLE sample golden encoding/bounds failed");
+    return false;
+  }
+  ble_sample.temperature_c = NAN;
+  if (ble_sample.complete()) {
+    ESP_LOGE(TAG, "portable self-test: non-finite BLE sample accepted");
+    return false;
+  }
+
+  if (!sensirion_history_format::interval_valid(60000) ||
+      !sensirion_history_format::interval_valid(86400000) ||
+      sensirion_history_format::interval_valid(59999) ||
+      sensirion_history_format::interval_valid(86400001) ||
+      !sensirion_history_format::generation_newer(0, UINT32_MAX) ||
+      sensirion_history_format::generation_newer(UINT32_MAX, 0)) {
+    ESP_LOGE(TAG, "portable self-test: history bounds/generation wrap failed");
     return false;
   }
 

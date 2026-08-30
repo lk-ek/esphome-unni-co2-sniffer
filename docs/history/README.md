@@ -19,3 +19,4 @@ Do not copy code or configuration from a historical note without checking it aga
 
 - `CALIBRATION_2026-08-17_DUAL_TEMPERATURE.md` — separates RT, physical-air, and Unni LCD temperature views.
 - `CALIBRATION_2026-08-17_DISPLAY_HUMIDITY.md` — keeps Unni LCD humidity emulation separate from physical carrier RH.
+- `RELIABILITY_HARDENING_2026-08-30.md` — review map, invariants, compatibility contract, and validation debt for the PM/history/BLE/C6 hardening series.

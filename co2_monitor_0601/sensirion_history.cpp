@@ -10,6 +10,7 @@
 #if UNNI_BLE_HISTORY_ENABLED
 #include "sensirion_history.h"
 #include "sensirion_ble.h"
+#include "sensirion_history_format.h"
 
 #include "esphome/components/esp32_ble_server/ble_2902.h"
 #include "esphome/components/esp32_ble_server/ble_characteristic.h"
@@ -20,6 +21,7 @@
 #include "esp_partition.h"
 #include "esp_timer.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -38,13 +40,18 @@ constexpr uint16_t HISTORY_CAPACITY = 4096;
 constexpr uint16_t PENDING_CAPACITY = 64;
 constexpr uint32_t DEFAULT_INTERVAL_MS = 600000;
 constexpr uint32_t FLASH_FLUSH_MS = 600000;
+constexpr uint32_t META_RETRY_MS = 1000;
 constexpr size_t FLASH_SECTOR_SIZE = 4096;
 constexpr uint16_t FLASH_DATA_SECTORS = 14;
+constexpr uint16_t FLASH_PRIMARY_META_SECTOR = 0;
+constexpr uint16_t FLASH_SECONDARY_META_SECTOR = FLASH_DATA_SECTORS + 1;
+constexpr uint16_t FLASH_TOTAL_SECTORS = FLASH_DATA_SECTORS + 2;
 constexpr uint16_t FLASH_SAMPLES_PER_SECTOR = FLASH_SECTOR_SIZE / SAMPLE_SIZE;
 constexpr uint16_t FLASH_CAPACITY = FLASH_DATA_SECTORS * FLASH_SAMPLES_PER_SECTOR;
 static_assert(HISTORY_CAPACITY <= FLASH_CAPACITY);
 constexpr uint32_t META_MAGIC = 0x53474832;  // "SGH2"
-constexpr uint16_t META_VERSION = 2;
+constexpr uint16_t META_VERSION_V2 = 2;
+constexpr uint16_t META_VERSION = 3;
 constexpr uint16_t DOWNLOAD_TYPE = 7;
 
 using Sample = std::array<uint8_t, SAMPLE_SIZE>;
@@ -83,8 +90,11 @@ struct FlashState {
   uint16_t write_slot{0};
   uint16_t persisted{0};
   uint32_t generation{0};
+  uint16_t meta_sector{FLASH_PRIMARY_META_SECTOR};
   uint16_t next_meta_slot{0};
   uint32_t last_flush_ms{0};
+  uint32_t last_meta_attempt_ms{0};
+  bool metadata_dirty{false};
 };
 
 class HistoryCCCD : public esp32_ble_server::BLE2902 {
@@ -99,6 +109,15 @@ struct GattState {
   esp32_ble_server::BLECharacteristic *download{nullptr};
   HistoryCCCD *download_cccd{nullptr};
   bool bound{false};
+  bool connected{false};
+  bool download_notify_enabled{false};
+};
+
+enum class ClearPhase : uint8_t { INACTIVE, PREPARE_JOURNAL, ERASE_SECTORS };
+struct ClearState {
+  ClearPhase phase{ClearPhase::INACTIVE};
+  uint16_t preserved_meta_sector{FLASH_PRIMARY_META_SECTOR};
+  uint16_t next_sector{0};
 };
 
 enum class DownloadPhase : uint8_t { INACTIVE, HEADER, DATA };
@@ -117,6 +136,8 @@ HistoryState history;
 FlashState flash;
 GattState gatt;
 DownloadState download;
+ClearState clearing;
+uint32_t last_sampling_poll_ms = 0;
 
 uint32_t now_ms() {
   return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
@@ -150,20 +171,26 @@ uint32_t meta_crc(const FlashMeta &meta) {
 }
 
 bool valid_meta(const FlashMeta &meta) {
-  return meta.magic == META_MAGIC && meta.version == META_VERSION &&
+  return meta.magic == META_MAGIC &&
+         (meta.version == META_VERSION_V2 || meta.version == META_VERSION) &&
          meta.size == sizeof(FlashMeta) && meta.count <= HISTORY_CAPACITY &&
          meta.flash_write_slot < FLASH_CAPACITY && meta.interval_ms > 0 &&
          meta.crc == meta_crc(meta);
+}
+
+size_t meta_offset(uint16_t sector, uint16_t slot) {
+  return static_cast<size_t>(sector) * FLASH_SECTOR_SIZE +
+         static_cast<size_t>(slot) * sizeof(FlashMeta);
 }
 
 size_t sample_offset(uint16_t slot) {
   return FLASH_SECTOR_SIZE + static_cast<size_t>(slot) * SAMPLE_SIZE;
 }
 
-Sample logical_sample(uint16_t logical) {
-  Sample sample{};
+bool logical_sample(uint16_t logical, Sample &sample) {
+  sample.fill(0);
   if (logical >= history.count)
-    return sample;
+    return false;
 
   // history.count is capped at HISTORY_CAPACITY. Pending samples are always the
   // newest entries. If the logical window is full, only the newest
@@ -171,21 +198,24 @@ Sample logical_sample(uint16_t logical) {
   const uint16_t visible_persisted = static_cast<uint16_t>(history.count - history.pending);
   if (logical < visible_persisted) {
     if (!flash.ready || flash.persisted == 0)
-      return sample;
+      return false;
     const uint16_t persisted_skip = static_cast<uint16_t>(flash.persisted - visible_persisted);
     const uint16_t oldest_flash = static_cast<uint16_t>(
         (flash.write_slot + FLASH_CAPACITY - flash.persisted) % FLASH_CAPACITY);
     const uint16_t slot = static_cast<uint16_t>(
         (oldest_flash + persisted_skip + logical) % FLASH_CAPACITY);
-    if (esp_partition_read(flash.partition, sample_offset(slot), sample.data(), SAMPLE_SIZE) != ESP_OK)
+    if (esp_partition_read(flash.partition, sample_offset(slot), sample.data(), SAMPLE_SIZE) != ESP_OK) {
       ESP_LOGW(TAG, "history sample flash read failed at slot %u", static_cast<unsigned>(slot));
-    return sample;
+      return false;
+    }
+    return true;
   }
 
   const uint16_t pending_logical = static_cast<uint16_t>(logical - visible_persisted);
   const uint16_t oldest_pending = static_cast<uint16_t>(
       (history.pending_head + PENDING_CAPACITY - history.pending) % PENDING_CAPACITY);
-  return history.pending_samples[(oldest_pending + pending_logical) % PENDING_CAPACITY];
+  sample = history.pending_samples[(oldest_pending + pending_logical) % PENDING_CAPACITY];
+  return true;
 }
 
 void sync_gatt() {
@@ -205,11 +235,17 @@ bool write_meta() {
 
   constexpr uint16_t RECORDS_PER_SECTOR = FLASH_SECTOR_SIZE / sizeof(FlashMeta);
   if (flash.next_meta_slot >= RECORDS_PER_SECTOR) {
-    const esp_err_t err = esp_partition_erase_range(flash.partition, 0, FLASH_SECTOR_SIZE);
+    const uint16_t next_sector = flash.meta_sector == FLASH_PRIMARY_META_SECTOR
+                                     ? FLASH_SECONDARY_META_SECTOR
+                                     : FLASH_PRIMARY_META_SECTOR;
+    const esp_err_t err = esp_partition_erase_range(
+        flash.partition, static_cast<size_t>(next_sector) * FLASH_SECTOR_SIZE,
+        FLASH_SECTOR_SIZE);
     if (err != ESP_OK) {
       ESP_LOGE(TAG, "metadata sector erase failed: %d", err);
       return false;
     }
+    flash.meta_sector = next_sector;
     flash.next_meta_slot = 0;
   }
 
@@ -217,55 +253,112 @@ bool write_meta() {
   meta.magic = META_MAGIC;
   meta.version = META_VERSION;
   meta.size = sizeof(FlashMeta);
-  meta.generation = ++flash.generation;
+  meta.generation = flash.generation + 1;
   meta.interval_ms = history.interval_ms;
   meta.count = flash.persisted;
   meta.flash_write_slot = flash.write_slot;
   meta.crc = meta_crc(meta);
 
-  const size_t offset = static_cast<size_t>(flash.next_meta_slot) * sizeof(meta);
+  const size_t offset = meta_offset(flash.meta_sector, flash.next_meta_slot);
+  flash.last_meta_attempt_ms = now_ms();
   const esp_err_t err = esp_partition_write(flash.partition, offset, &meta, sizeof(meta));
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "metadata write failed: %d", err);
     return false;
   }
+  flash.generation = meta.generation;
   ++flash.next_meta_slot;
+  flash.metadata_dirty = false;
   return true;
 }
 
-void clear_history() {
+void reset_history_in_memory() {
   history.pending_head = history.count = history.pending = 0;
   history.latest_ms = history.last_sample_ms = 0;
   history.clock_started = false;
   flash.write_slot = flash.persisted = 0;
   download = {};
+}
 
-  if (flash.ready) {
-    const size_t bytes = (1 + FLASH_DATA_SECTORS) * FLASH_SECTOR_SIZE;
-    const esp_err_t err = esp_partition_erase_range(flash.partition, 0, bytes);
-    if (err != ESP_OK) {
-      ESP_LOGE(TAG, "history erase failed: %d", err);
-    } else {
-      flash.generation = 0;
-      flash.next_meta_slot = 0;
-      write_meta();
-    }
+void request_clear() {
+  reset_history_in_memory();
+  if (!flash.ready) {
+    clearing = {};
+    sync_gatt();
+    return;
   }
+  clearing.phase = ClearPhase::PREPARE_JOURNAL;
+  clearing.preserved_meta_sector = flash.meta_sector == FLASH_PRIMARY_META_SECTOR
+                                       ? FLASH_SECONDARY_META_SECTOR
+                                       : FLASH_PRIMARY_META_SECTOR;
+  clearing.next_sector = 0;
   sync_gatt();
 }
 
 void set_interval(uint32_t ms) {
-  if (ms == 0 || ms == history.interval_ms)
+  if (!sensirion_history_format::interval_valid(ms)) {
+    ESP_LOGW(TAG, "rejected unsafe history interval %u ms (allowed %u..%u ms)",
+             static_cast<unsigned>(ms),
+             static_cast<unsigned>(sensirion_history_format::MIN_INTERVAL_MS),
+             static_cast<unsigned>(sensirion_history_format::MAX_INTERVAL_MS));
+    sync_gatt();
+    return;
+  }
+  if (ms == history.interval_ms)
     return;
   ESP_LOGI(TAG, "logging interval changed %u -> %u ms; clearing history",
            static_cast<unsigned>(history.interval_ms), static_cast<unsigned>(ms));
   history.interval_ms = ms;
-  clear_history();
+  request_clear();
+}
+
+void clear_tick() {
+  if (clearing.phase == ClearPhase::INACTIVE || !flash.ready) return;
+
+  if (clearing.phase == ClearPhase::PREPARE_JOURNAL) {
+    const size_t offset = static_cast<size_t>(clearing.preserved_meta_sector) * FLASH_SECTOR_SIZE;
+    const esp_err_t erase_err = esp_partition_erase_range(flash.partition, offset, FLASH_SECTOR_SIZE);
+    if (erase_err != ESP_OK) {
+      ESP_LOGE(TAG, "history clear journal erase failed: %d", erase_err);
+      return;
+    }
+    flash.meta_sector = clearing.preserved_meta_sector;
+    flash.next_meta_slot = 0;
+    flash.metadata_dirty = true;
+    if (!write_meta()) return;
+    clearing.phase = ClearPhase::ERASE_SECTORS;
+    clearing.next_sector = 0;
+    return;
+  }
+
+  while (clearing.next_sector < FLASH_TOTAL_SECTORS &&
+         clearing.next_sector == clearing.preserved_meta_sector)
+    ++clearing.next_sector;
+  if (clearing.next_sector >= FLASH_TOTAL_SECTORS) {
+    clearing = {};
+    flash.last_flush_ms = now_ms();
+    ESP_LOGI(TAG, "history clear complete; interval=%u ms", static_cast<unsigned>(history.interval_ms));
+    return;
+  }
+
+  const uint16_t sector = clearing.next_sector;
+  const esp_err_t err = esp_partition_erase_range(
+      flash.partition, static_cast<size_t>(sector) * FLASH_SECTOR_SIZE, FLASH_SECTOR_SIZE);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "history clear sector %u erase failed: %d", static_cast<unsigned>(sector), err);
+    return;
+  }
+  ++clearing.next_sector;
 }
 
 bool flush_flash() {
-  if (!flash.ready || history.pending == 0)
-    return true;
+  if (!flash.ready)
+    return history.pending == 0 && !flash.metadata_dirty;
+  if (clearing.phase != ClearPhase::INACTIVE) return false;
+  if (history.pending == 0) {
+    if (!flash.metadata_dirty) return true;
+    return write_meta();
+  }
 
   const uint16_t pending = history.pending;
   const uint16_t first_ram = static_cast<uint16_t>(
@@ -298,6 +391,7 @@ bool flush_flash() {
 
   flash.write_slot = write_slot;
   flash.persisted = persisted;
+  flash.metadata_dirty = true;
   history.pending = 0;
   history.pending_head = 0;
   flash.last_flush_ms = now_ms();
@@ -318,7 +412,7 @@ void init_flash() {
     return;
   }
 
-  const size_t required = (1 + FLASH_DATA_SECTORS) * FLASH_SECTOR_SIZE;
+  const size_t required = FLASH_TOTAL_SECTORS * FLASH_SECTOR_SIZE;
   if (flash.partition->size < required) {
     ESP_LOGE(TAG, "senshist partition too small: %u < %u",
              static_cast<unsigned>(flash.partition->size), static_cast<unsigned>(required));
@@ -330,22 +424,42 @@ void init_flash() {
   FlashMeta best{};
   bool found = false;
   uint16_t best_slot = 0;
-  for (uint16_t slot = 0; slot < RECORDS_PER_SECTOR; ++slot) {
-    FlashMeta meta{};
-    if (esp_partition_read(flash.partition, slot * sizeof(meta), &meta, sizeof(meta)) != ESP_OK)
-      break;
-    if (valid_meta(meta) && (!found || meta.generation > best.generation)) {
-      best = meta;
-      best_slot = slot;
-      found = true;
+  uint16_t best_sector = FLASH_PRIMARY_META_SECTOR;
+  uint16_t occupied_after_best_sector = 0;
+  for (const uint16_t sector : {FLASH_PRIMARY_META_SECTOR, FLASH_SECONDARY_META_SECTOR}) {
+    uint16_t occupied = 0;
+    for (uint16_t slot = 0; slot < RECORDS_PER_SECTOR; ++slot) {
+      FlashMeta meta{};
+      if (esp_partition_read(flash.partition, meta_offset(sector, slot), &meta, sizeof(meta)) != ESP_OK)
+        break;
+      const auto *bytes = reinterpret_cast<const uint8_t *>(&meta);
+      bool erased = true;
+      for (size_t i = 0; i < sizeof(meta); ++i) erased &= bytes[i] == 0xFF;
+      if (!erased) occupied = slot + 1;
+      if (valid_meta(meta) &&
+          (!found || sensirion_history_format::generation_newer(meta.generation, best.generation))) {
+        best = meta;
+        best_slot = slot;
+        best_sector = sector;
+        occupied_after_best_sector = occupied;
+        found = true;
+      }
     }
+    if (found && best_sector == sector) occupied_after_best_sector = occupied;
   }
 
   if (!found) {
     ESP_LOGI(TAG, "initializing empty flash history");
     flash.generation = 0;
+    flash.meta_sector = FLASH_PRIMARY_META_SECTOR;
     flash.next_meta_slot = 0;
-    esp_partition_erase_range(flash.partition, 0, FLASH_SECTOR_SIZE);
+    const esp_err_t erase_err = esp_partition_erase_range(flash.partition, 0, FLASH_SECTOR_SIZE);
+    if (erase_err != ESP_OK) {
+      ESP_LOGE(TAG, "initial metadata sector erase failed: %d", erase_err);
+      flash.ready = false;
+      return;
+    }
+    flash.metadata_dirty = true;
     write_meta();
     return;
   }
@@ -354,7 +468,9 @@ void init_flash() {
   flash.write_slot = best.flash_write_slot;
   flash.persisted = best.count;
   flash.generation = best.generation;
-  flash.next_meta_slot = best_slot + 1;
+  flash.meta_sector = best_sector;
+  flash.next_meta_slot = std::max<uint16_t>(best_slot + 1, occupied_after_best_sector);
+  flash.metadata_dirty = best.version == META_VERSION_V2;
 
   history.count = best.count;
   history.pending = 0;
@@ -365,6 +481,8 @@ void init_flash() {
   ESP_LOGI(TAG, "restored %u sample(s), interval=%u ms, flash_slot=%u",
            static_cast<unsigned>(history.count), static_cast<unsigned>(history.interval_ms),
            static_cast<unsigned>(flash.write_slot));
+  if (flash.metadata_dirty)
+    ESP_LOGI(TAG, "version-2 history metadata will migrate to redundant version 3 on next loop flush");
 }
 
 void commit_sample() {
@@ -392,6 +510,7 @@ void commit_sample() {
 }
 
 void sampling_tick() {
+  if (clearing.phase != ClearPhase::INACTIVE) return;
   const uint32_t now = now_ms();
   if (!history.clock_started) {
     if (sensirion_ble_sample().complete()) {
@@ -409,10 +528,14 @@ void sampling_tick() {
   if (history.pending > 0 &&
       static_cast<uint32_t>(now - flash.last_flush_ms) >= FLASH_FLUSH_MS)
     flush_flash();
+  else if (flash.metadata_dirty &&
+           static_cast<uint32_t>(now - flash.last_meta_attempt_ms) >= META_RETRY_MS)
+    flush_flash();
 }
 
 void start_download() {
-  if (gatt.download == nullptr)
+  if (gatt.download == nullptr || !gatt.connected || !gatt.download_notify_enabled ||
+      clearing.phase != ClearPhase::INACTIVE)
     return;
 
   uint16_t n = history.count;
@@ -433,7 +556,9 @@ void start_download() {
 }
 
 void download_tick() {
-  if (download.phase == DownloadPhase::INACTIVE || gatt.download == nullptr)
+  if (download.phase == DownloadPhase::INACTIVE || gatt.download == nullptr ||
+      !gatt.connected || !gatt.download_notify_enabled ||
+      clearing.phase != ClearPhase::INACTIVE)
     return;
 
   const uint32_t now = now_ms();
@@ -441,13 +566,14 @@ void download_tick() {
     return;
   download.last_packet_ms = now;
 
-  std::vector<uint8_t> packet(20, 0);
+  auto &packet = gatt.download->get_value();
+  if (packet.size() != 20) packet.resize(20);
+  std::fill(packet.begin(), packet.end(), 0);
   if (download.phase == DownloadPhase::HEADER) {
     put_u16_le(&packet[4], DOWNLOAD_TYPE);
     put_u32_le(&packet[6], history.interval_ms);
     put_u32_le(&packet[10], download.age_ms);
     put_u16_le(&packet[14], download.count);
-    gatt.download->set_value(std::move(packet));
     gatt.download->notify();
     download.sequence = 1;
     if (download.count == 0) {
@@ -461,10 +587,17 @@ void download_tick() {
 
   put_u16_le(&packet[0], download.sequence);
   for (uint8_t in_packet = 0; in_packet < 2 && download.sent < download.count; ++in_packet) {
-    const Sample sample = logical_sample(download.start_logical + download.sent++);
+    Sample sample{};
+    if (!logical_sample(download.start_logical + download.sent, sample)) {
+      ESP_LOGE(TAG, "history download aborted: sample %u could not be read",
+               static_cast<unsigned>(download.start_logical + download.sent));
+      download.phase = DownloadPhase::INACTIVE;
+      download.requested = 0;
+      return;
+    }
+    ++download.sent;
     memcpy(&packet[2 + in_packet * SAMPLE_SIZE], sample.data(), SAMPLE_SIZE);
   }
-  gatt.download->set_value(std::move(packet));
   gatt.download->notify();
   ++download.sequence;
 
@@ -535,8 +668,12 @@ void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
              static_cast<unsigned>(download.requested), static_cast<unsigned>(conn_id));
   });
   gatt.interval->on_write([](std::span<const uint8_t> x, uint16_t conn_id) {
-    if (x.size() < 4)
+    if (x.size() != 4) {
+      ESP_LOGW(TAG, "rejected history interval write with invalid length %u (conn=%u)",
+               static_cast<unsigned>(x.size()), static_cast<unsigned>(conn_id));
+      sync_gatt();
       return;
+    }
     const uint32_t ms = get_u32_le(x);
     ESP_LOGI(TAG, "8001 history interval WRITE = %u ms (conn=%u)",
              static_cast<unsigned>(ms), static_cast<unsigned>(conn_id));
@@ -567,7 +704,15 @@ bool sensirion_history_flush() {
 }
 
 void sensirion_history_loop() {
-  sampling_tick();
+  clear_tick();
+  if (clearing.phase == ClearPhase::INACTIVE) {
+    const uint32_t now = now_ms();
+    if (last_sampling_poll_ms == 0 ||
+        static_cast<uint32_t>(now - last_sampling_poll_ms) >= 100U) {
+      last_sampling_poll_ms = now;
+      sampling_tick();
+    }
+  }
   download_tick();
 }
 
@@ -579,7 +724,13 @@ void sensirion_history_gatts_event_handler(
     esp_gatts_cb_event_t event, esp_gatt_if_t, esp_ble_gatts_cb_param_t *param) {
   if (param == nullptr)
     return;
+  if (event == ESP_GATTS_CONNECT_EVT) {
+    gatt.connected = true;
+    return;
+  }
   if (event == ESP_GATTS_DISCONNECT_EVT) {
+    gatt.connected = false;
+    gatt.download_notify_enabled = false;
     download.phase = DownloadPhase::INACTIVE;
     download.requested = 0;
     return;
@@ -601,8 +752,10 @@ void sensirion_history_gatts_event_handler(
            static_cast<unsigned>(param->write.conn_id), static_cast<unsigned>(param->write.handle));
 
   if (lo == 0x01 && hi == 0x00) {
+    gatt.download_notify_enabled = true;
     start_download();
   } else if (lo == 0x00 && hi == 0x00) {
+    gatt.download_notify_enabled = false;
     download.phase = DownloadPhase::INACTIVE;
     ESP_LOGI(TAG, "history download unsubscribed");
   }

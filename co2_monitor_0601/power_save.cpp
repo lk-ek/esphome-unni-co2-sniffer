@@ -27,12 +27,85 @@ static esp_pm_lock_handle_t external_cpu_lock = nullptr;
 static esp_pm_lock_handle_t co2_active_lock = nullptr;
 static esp_pm_lock_handle_t co2_cpu_lock = nullptr;
 static volatile bool external_power = false;
-static bool external_locks_held = false;
-static bool co2_active_lock_held = false;
+struct PmLockPair {
+  esp_pm_lock_handle_t sleep{nullptr};
+  esp_pm_lock_handle_t cpu{nullptr};
+  bool sleep_held{false};
+  bool cpu_held{false};
+  uint32_t errors{0};
+
+  bool acquire(const char *name) {
+    bool acquired_sleep_now = false;
+    if (!sleep_held) {
+      const esp_err_t err = esp_pm_lock_acquire(sleep);
+      if (err != ESP_OK) {
+        ++errors;
+        ESP_LOGE(TAG, "%s NO_LIGHT_SLEEP acquire failed: %d (errors=%lu)", name, err,
+                 static_cast<unsigned long>(errors));
+        return false;
+      }
+      sleep_held = true;
+      acquired_sleep_now = true;
+    }
+    if (!cpu_held) {
+      const esp_err_t err = esp_pm_lock_acquire(cpu);
+      if (err != ESP_OK) {
+        ++errors;
+        ESP_LOGE(TAG, "%s CPU_FREQ_MAX acquire failed: %d (errors=%lu)", name, err,
+                 static_cast<unsigned long>(errors));
+        if (acquired_sleep_now) {
+          const esp_err_t rollback = esp_pm_lock_release(sleep);
+          if (rollback == ESP_OK) {
+            sleep_held = false;
+          } else {
+            ++errors;
+            ESP_LOGE(TAG, "%s NO_LIGHT_SLEEP acquire rollback failed: %d (errors=%lu)",
+                     name, rollback, static_cast<unsigned long>(errors));
+          }
+        }
+        return false;
+      }
+      cpu_held = true;
+    }
+    return sleep_held && cpu_held;
+  }
+
+  bool release(const char *name) {
+    if (cpu_held) {
+      const esp_err_t err = esp_pm_lock_release(cpu);
+      if (err == ESP_OK) {
+        cpu_held = false;
+      } else {
+        ++errors;
+        ESP_LOGE(TAG, "%s CPU_FREQ_MAX release failed: %d (errors=%lu)", name, err,
+                 static_cast<unsigned long>(errors));
+      }
+    }
+    if (sleep_held) {
+      const esp_err_t err = esp_pm_lock_release(sleep);
+      if (err == ESP_OK) {
+        sleep_held = false;
+      } else {
+        ++errors;
+        ESP_LOGE(TAG, "%s NO_LIGHT_SLEEP release failed: %d (errors=%lu)", name, err,
+                 static_cast<unsigned long>(errors));
+      }
+    }
+    return !sleep_held && !cpu_held;
+  }
+
+  bool held() const { return sleep_held || cpu_held; }
+  bool fully_held() const { return sleep_held && cpu_held; }
+};
+static PmLockPair external_locks;
+static PmLockPair co2_locks;
 static bool co2_state_initialized = false;
 static volatile bool co2_powered_down = false;
 static bool co2_scl_wakeup_armed = false;
 static volatile bool lock_held = false;
+static volatile bool awake_lock_held = false;
+static volatile bool cpu_lock_held = false;
+static uint32_t rtrh_lock_errors = 0;
 static volatile uint64_t wake_started_us = 0;
 static volatile bool rtrh_complete = false;
 static volatile bool co2_after_rtrh = false;
@@ -41,7 +114,26 @@ static volatile uint32_t wake_gen = 0;
 static uint32_t max_awake_ms = 10000;
 static uint32_t completed_cycles = 0;
 static uint32_t timeout_cycles = 0;
+static uint64_t last_pair_retry_us = 0;
 static constexpr uint32_t TRANSPORT_DRAIN_GRACE_MS = 1000;
+
+static void delete_lock(esp_pm_lock_handle_t &lock) {
+  if (lock != nullptr) {
+    esp_pm_lock_delete(lock);
+    lock = nullptr;
+  }
+}
+
+static void cleanup_locks() {
+  delete_lock(co2_cpu_lock);
+  delete_lock(co2_active_lock);
+  delete_lock(external_cpu_lock);
+  delete_lock(external_awake_lock);
+  delete_lock(cpu_lock);
+  delete_lock(awake_lock);
+  external_locks = {};
+  co2_locks = {};
+}
 
 static void configure_wakeup_pin(gpio_num_t pin) {
   // Wake on the opposite of the current idle level. RT/RH lines spend almost
@@ -87,34 +179,46 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_capture_cpu", &cpu_lock);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_create(CPU_FREQ_MAX) failed: %d", err);
+    cleanup_locks();
     return false;
   }
   err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_usb_awake", &external_awake_lock);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_create(USB NO_LIGHT_SLEEP) failed: %d", err);
+    cleanup_locks();
     return false;
   }
   err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_usb_cpu", &external_cpu_lock);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_create(USB CPU_FREQ_MAX) failed: %d", err);
+    cleanup_locks();
     return false;
   }
   err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_co2_window", &co2_active_lock);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_create(CO2 NO_LIGHT_SLEEP) failed: %d", err);
+    cleanup_locks();
     return false;
   }
   err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_co2_cpu", &co2_cpu_lock);
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_pm_lock_create(CO2 CPU_FREQ_MAX) failed: %d", err);
+    cleanup_locks();
     return false;
   }
+  external_locks.sleep = external_awake_lock;
+  external_locks.cpu = external_cpu_lock;
+  co2_locks.sleep = co2_active_lock;
+  co2_locks.cpu = co2_cpu_lock;
 
   configure_wakeup_pin(pin_rt);
   configure_wakeup_pin(pin_rh);
   err = esp_sleep_enable_gpio_wakeup();
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "esp_sleep_enable_gpio_wakeup failed: %d", err);
+    gpio_wakeup_disable(pin_rt);
+    gpio_wakeup_disable(pin_rh);
+    cleanup_locks();
     return false;
   }
 
@@ -141,31 +245,19 @@ void set_co2_bus_powered_down(bool powered_down) {
       gpio_wakeup_disable(pin_co2_scl);
       co2_scl_wakeup_armed = false;
     }
-    if (co2_active_lock_held) {
-      esp_pm_lock_release(co2_active_lock);
-      esp_pm_lock_release(co2_cpu_lock);
-      co2_active_lock_held = false;
-    }
+    co2_locks.release("CO2 window");
     co2_powered_down = false;
     co2_state_initialized = false;
     return;
   }
 
-  if (co2_state_initialized && powered_down == co2_powered_down) return;
+  const bool locks_settled = powered_down ? !co2_locks.held() : co2_locks.fully_held();
+  if (co2_state_initialized && powered_down == co2_powered_down && locks_settled) return;
   co2_state_initialized = true;
   co2_powered_down = powered_down;
 
   if (powered_down) {
-    if (co2_active_lock_held) {
-      const esp_err_t sleep_err = esp_pm_lock_release(co2_active_lock);
-      const esp_err_t cpu_err = esp_pm_lock_release(co2_cpu_lock);
-      if (sleep_err == ESP_OK && cpu_err == ESP_OK) {
-        co2_active_lock_held = false;
-      } else {
-        if (sleep_err != ESP_OK) ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP release failed: %d", sleep_err);
-        if (cpu_err != ESP_OK) ESP_LOGE(TAG, "CO2 window CPU_FREQ_MAX release failed: %d", cpu_err);
-      }
-    }
+    co2_locks.release("CO2 window");
 
     // The dead Unni bus sits LOW/LOW. Its next power-up raises SCL, so HIGH is
     // a stable level wake condition and gives us ample lead time before 21B1.
@@ -191,18 +283,7 @@ void set_co2_bus_powered_down(bool powered_down) {
       }
       co2_scl_wakeup_armed = false;
     }
-    if (!co2_active_lock_held) {
-      const esp_err_t sleep_err = esp_pm_lock_acquire(co2_active_lock);
-      const esp_err_t cpu_err = esp_pm_lock_acquire(co2_cpu_lock);
-      if (sleep_err == ESP_OK && cpu_err == ESP_OK) {
-        co2_active_lock_held = true;
-      } else {
-        if (sleep_err == ESP_OK) esp_pm_lock_release(co2_active_lock);
-        if (cpu_err == ESP_OK) esp_pm_lock_release(co2_cpu_lock);
-        if (sleep_err != ESP_OK) ESP_LOGE(TAG, "CO2 window NO_LIGHT_SLEEP acquire failed: %d", sleep_err);
-        if (cpu_err != ESP_OK) ESP_LOGE(TAG, "CO2 window CPU_FREQ_MAX acquire failed: %d", cpu_err);
-      }
-    }
+    co2_locks.acquire("CO2 window");
     ESP_LOGI(TAG, "CO2 subsystem active: SCL wake disarmed; keeping ESP awake at 80 MHz for native window");
   }
 }
@@ -217,11 +298,8 @@ void set_external_power(bool present) {
       gpio_wakeup_disable(pin_co2_scl);
       co2_scl_wakeup_armed = false;
     }
-    if (co2_active_lock_held && co2_active_lock != nullptr && co2_cpu_lock != nullptr) {
-      esp_pm_lock_release(co2_active_lock);
-      esp_pm_lock_release(co2_cpu_lock);
-      co2_active_lock_held = false;
-    }
+    if (co2_active_lock != nullptr && co2_cpu_lock != nullptr)
+      co2_locks.release("CO2 window");
     co2_powered_down = false;
     co2_state_initialized = false;
   }
@@ -242,31 +320,12 @@ void set_external_power(bool present) {
   }
 
   if (!configured || external_awake_lock == nullptr || external_cpu_lock == nullptr) return;
-  if (present == external_locks_held) return;
-
   if (present) {
-    const esp_err_t sleep_err = esp_pm_lock_acquire(external_awake_lock);
-    if (sleep_err != ESP_OK) {
-      ESP_LOGE(TAG, "USB NO_LIGHT_SLEEP lock acquire failed: %d", sleep_err);
-      return;
-    }
-    const esp_err_t cpu_err = esp_pm_lock_acquire(external_cpu_lock);
-    if (cpu_err != ESP_OK) {
-      esp_pm_lock_release(external_awake_lock);
-      ESP_LOGE(TAG, "USB CPU_FREQ_MAX lock acquire failed: %d", cpu_err);
-      return;
-    }
-    external_locks_held = true;
-    ESP_LOGI(TAG, "USB power mode: Light-sleep disabled, CPU locked at 80 MHz");
+    if (external_locks.acquire("USB"))
+      ESP_LOGI(TAG, "USB power mode: Light-sleep disabled, CPU locked at 80 MHz");
   } else {
-    const esp_err_t cpu_err = esp_pm_lock_release(external_cpu_lock);
-    const esp_err_t sleep_err = esp_pm_lock_release(external_awake_lock);
-    if (cpu_err != ESP_OK || sleep_err != ESP_OK) {
-      ESP_LOGE(TAG, "USB power lock release failed: CPU=%d sleep=%d", cpu_err, sleep_err);
-      return;
-    }
-    external_locks_held = false;
-    ESP_LOGI(TAG, "Battery mode: automatic Light-sleep restored");
+    if (external_locks.release("USB"))
+      ESP_LOGI(TAG, "Battery mode: automatic Light-sleep restored");
   }
 }
 
@@ -278,10 +337,22 @@ void IRAM_ATTR on_rtrh_edge_from_isr() {
   // the same lock handle are not thread-safe against concurrent calls. loop()
   // therefore masks both RT/RH GPIO interrupts while it releases these handles.
   if (esp_pm_lock_acquire(awake_lock) != ESP_OK) return;
+  awake_lock_held = true;
   if (esp_pm_lock_acquire(cpu_lock) != ESP_OK) {
-    esp_pm_lock_release(awake_lock);
+    if (esp_pm_lock_release(awake_lock) == ESP_OK) {
+      awake_lock_held = false;
+    } else {
+      // Preserve the partial ownership state so task context can retry the
+      // release. Pretending to be unlocked here would recursively acquire the
+      // same NO_LIGHT_SLEEP handle on the next edge.
+      lock_held = true;
+      wake_started_us = static_cast<uint64_t>(esp_timer_get_time());
+      rtrh_complete = true;
+      co2_after_rtrh = true;
+    }
     return;
   }
+  cpu_lock_held = true;
   lock_held = true;
   wake_started_us = static_cast<uint64_t>(esp_timer_get_time());
   rtrh_complete = false;
@@ -305,9 +376,39 @@ void on_valid_co2() {
 void set_transport_busy(bool busy) { transport_busy = busy; }
 
 void loop() {
-  if (!configured || !lock_held || awake_lock == nullptr || cpu_lock == nullptr) return;
+  if (!configured) return;
 
-  const uint64_t now_us = static_cast<uint64_t>(esp_timer_get_time());
+  // A policy transition may have observed a transient PM-lock error. Reconcile
+  // partial per-handle ownership at a bounded rate even when the orchestrator's
+  // high-level power state itself has not changed again.
+  const bool pair_retry_needed =
+      external_power ? (!external_locks.fully_held() || co2_locks.held())
+                     : (external_locks.held() ||
+                        (co2_state_initialized &&
+                         (co2_powered_down ? co2_locks.held() : !co2_locks.fully_held())));
+  uint64_t now_us = 0;
+  if (pair_retry_needed) now_us = static_cast<uint64_t>(esp_timer_get_time());
+  if (pair_retry_needed &&
+      (last_pair_retry_us == 0 || now_us - last_pair_retry_us >= 1000000ULL)) {
+    last_pair_retry_us = now_us;
+    if (external_power) {
+      if (!external_locks.fully_held()) external_locks.acquire("USB retry");
+      if (co2_locks.held()) co2_locks.release("CO2 window retry");
+    } else {
+      if (external_locks.held()) external_locks.release("USB retry");
+      if (co2_state_initialized) {
+        if (co2_powered_down) {
+          if (co2_locks.held()) co2_locks.release("CO2 window retry");
+        } else if (!co2_locks.fully_held()) {
+          co2_locks.acquire("CO2 window retry");
+        }
+      }
+    }
+  }
+
+  if (!lock_held || awake_lock == nullptr || cpu_lock == nullptr) return;
+
+  if (now_us == 0) now_us = static_cast<uint64_t>(esp_timer_get_time());
   const uint64_t elapsed_us = now_us - wake_started_us;
   const bool complete = rtrh_complete && co2_after_rtrh;
   const bool timeout = elapsed_us >= static_cast<uint64_t>(max_awake_ms) * 1000ULL;
@@ -328,21 +429,34 @@ void loop() {
   gpio_intr_disable(pin_rt);
   gpio_intr_disable(pin_rh);
 
-  const esp_err_t cpu_err = esp_pm_lock_release(cpu_lock);
-  const esp_err_t sleep_err = esp_pm_lock_release(awake_lock);
+  esp_err_t cpu_err = ESP_OK;
+  esp_err_t sleep_err = ESP_OK;
+  if (cpu_lock_held) {
+    cpu_err = esp_pm_lock_release(cpu_lock);
+    if (cpu_err == ESP_OK) cpu_lock_held = false;
+  }
+  if (awake_lock_held) {
+    sleep_err = esp_pm_lock_release(awake_lock);
+    if (sleep_err == ESP_OK) awake_lock_held = false;
+  }
 
   // Only expose an unlocked state after both handles have been released. The
   // previous ordering cleared lock_held first, allowing an ISR to re-acquire a
   // handle while loop() was concurrently releasing it.
-  lock_held = false;
-  rtrh_complete = false;
-  co2_after_rtrh = false;
+  if (!cpu_lock_held && !awake_lock_held) {
+    lock_held = false;
+    rtrh_complete = false;
+    co2_after_rtrh = false;
+  }
 
   gpio_intr_enable(pin_rt);
   gpio_intr_enable(pin_rh);
 
   if (cpu_err != ESP_OK || sleep_err != ESP_OK) {
-    ESP_LOGE(TAG, "esp_pm_lock_release failed: CPU=%d sleep=%d", cpu_err, sleep_err);
+    ++rtrh_lock_errors;
+    ESP_LOGE(TAG, "esp_pm_lock_release failed: CPU=%d sleep=%d (errors=%lu; retained CPU=%u sleep=%u)",
+             cpu_err, sleep_err, static_cast<unsigned long>(rtrh_lock_errors),
+             static_cast<unsigned>(cpu_lock_held), static_cast<unsigned>(awake_lock_held));
     return;
   }
 

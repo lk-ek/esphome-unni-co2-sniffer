@@ -79,6 +79,7 @@ co2_monitor_0601:
   # Expose the complete entity set, including RT-model, Unni-display,
   # protocol error, timing, quality and extrapolation diagnostics.
   debug_metrics: true
+  runtime_diagnostics: true
   i2c_capture_backend: rmt_scl
   # Active bus takeover was diagnostic-only; normal battery operation is fully passive.
   active_i2c_probe: false

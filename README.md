@@ -286,6 +286,9 @@ co2_monitor_0601:
   ble: true
   ble_live: true
   ble_history: true
+  # Keep legacy_fixed for existing bonds/caches. Use device_derived before
+  # commissioning multiple monitors that need unique BLE identities.
+  ble_identity_mode: legacy_fixed
   ble_advertising_interval: 2s
   ble_battery_advertising_interval: 3s
 
@@ -313,6 +316,8 @@ co2_monitor_0601:
 
   # Diagnostics
   debug_metrics: false
+  # Compiles main-loop stage timing and heap telemetry into the firmware.
+  runtime_diagnostics: false
   # Optional ESP32-C3/C6 hardware assist. "gpio" keeps the pure ISR backend;
   # "rmt_scl" records SCL in RMT hardware and uses it only to repair strictly
   # protocol-invalid GPIO captures.
@@ -328,6 +333,11 @@ co2_monitor_0601:
 The defaults match the tested XIAO ESP32-C3 installation.
 
 All configured GPIOs must be unique.
+
+`rtrh_enabled`, `rtrh_edge_capture`, and `rtrh_decode_only` are mutually
+exclusive capture modes. `rtrh_gpio_setup: true` is accepted only with one of
+those modes; invalid combinations fail during YAML validation rather than
+retrying GPIO setup at runtime.
 
 `battery_pin` must be an ESP32-C3 ADC1-capable GPIO.
 
@@ -480,6 +490,13 @@ co2_monitor_0601:
 
 `ble_device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option.
 
+`ble_identity_mode` defaults to `legacy_fixed`, preserving the address/device
+ID used by existing installations. `device_derived` instead derives a stable,
+locally administered Bluetooth address and Device ID from the ESP eFuse MAC so
+multiple monitors do not collide. Changing this option changes BLE identity and
+can invalidate existing bonds and MyAmbience caches; it is never migrated
+automatically.
+
 The GAP name used by the normal compatibility mode is:
 
 ```text
@@ -523,6 +540,14 @@ MyAmbience can download the history through the compatible GATT protocol.
 The history ring is persistent across normal reboots.
 
 The 4096-sample history is flash-backed. Only a small pending write ring is kept in RAM, so enabling MyAmbience history does not require a second 32 KiB in-memory copy of the persistent sample store.
+
+History metadata uses a redundant version-3 A/B journal in the first and last
+sectors of the 64 KiB partition; the 14 data sectors and sample wire layout are
+unchanged. Version-2 metadata is read in place and migrated on the next metadata
+flush. Failed metadata writes remain dirty and are retried. A client may select
+only intervals from 60 seconds through 24 hours. Changing the interval clears
+history incrementally from the main loop (at most one sector erase per loop),
+while sampling and download remain paused.
 
 ---
 

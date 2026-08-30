@@ -6,7 +6,9 @@
 // Copyright 2024 Sensirion AG. See THIRD_PARTY_NOTICES.md and LICENSES/.
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 
 namespace esphome {
@@ -21,16 +23,21 @@ struct SensirionSample {
   bool have_co2{false};
 
   bool complete() const {
-    return have_temperature && have_humidity && have_co2;
+    return have_temperature && have_humidity && have_co2 &&
+           std::isfinite(temperature_c) && std::isfinite(humidity_percent);
   }
 
   static uint16_t encode_temperature(float value) {
     // Sensirion UPT BLEProtocol::encodeTemperatureV1().
+    if (!std::isfinite(value)) return 0;
+    value = std::clamp(value, -45.0f, 130.0f);
     return static_cast<uint16_t>((((value + 45.0f) / 175.0f) * 65535.0f) + 0.5f);
   }
 
   static uint16_t encode_humidity(float value) {
     // Sensirion UPT BLEProtocol::encodeHumidityV1().
+    if (!std::isfinite(value)) return 0;
+    value = std::clamp(value, 0.0f, 100.0f);
     return static_cast<uint16_t>(((value / 100.0f) * 65535.0f) + 0.5f);
   }
 

@@ -15,6 +15,8 @@ setter surface as the ESP32 implementation. At startup it:
 - verifies a known-good EC05/500 ppm capture;
 - verifies rejection/accounting of a bad Sensirion CRC;
 - exercises the shared RT/RH calibration functions and range invariants;
+- verifies the Sensirion sample serializer against a golden byte sequence,
+  finite-value checks, and encoding clamps;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
 - prints `UNNI HOST SELF-TEST PASSED` on success (including an explicitly flushed
