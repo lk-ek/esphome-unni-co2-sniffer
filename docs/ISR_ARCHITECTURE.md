@@ -452,3 +452,17 @@ Light-sleep between RT/RH edges would add wake latency to ISR timestamps and
 could corrupt period measurements. The lock is released only from normal task
 context after RT/RH completion plus a subsequent valid CO2 frame, or the
 failsafe timeout.
+
+### Deferred edge diagnostics (2026-08-30)
+
+The GPIO ISR keeps only the exact ISR-entry counter. State/SCL/SDA transition
+counts are reconstructed from the captured edge stream in the main loop and the
+currently active buffer is included when the 5-second diagnostic is printed.
+This preserves the diagnostic semantics while removing three volatile
+read/modify/write operations from every captured edge.
+
+The ISR also checks the atomic GPIO snapshot against `last_value` before calling
+`esp_timer_get_time()`. Spurious/coalesced GPIO interrupts which no longer
+represent a new bus state therefore return without paying for a 64-bit timer
+read. Real edge timestamps remain on the same ESP Timer microsecond timebase;
+no CPU-cycle conversion or frequency/sleep assumption is introduced.

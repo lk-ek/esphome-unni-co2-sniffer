@@ -63,9 +63,12 @@ static volatile bool capture_overflow = false;
 // electrically quiet or misconfigured passive I2C tap. Counters are updated
 // only inside the GPIO ISR; reporting happens from the main loop.
 static volatile uint32_t diag_isr_calls = 0;
-static volatile uint32_t diag_state_changes = 0;
-static volatile uint32_t diag_scl_changes = 0;
-static volatile uint32_t diag_sda_changes = 0;
+// State/SCL/SDA counts are reconstructed in the main loop from the captured
+// edge stream. Keeping these out of the ISR removes three volatile read/modify/
+// write operations from every real bus edge without losing diagnostic data.
+static uint32_t diag_state_changes = 0;
+static uint32_t diag_scl_changes = 0;
+static uint32_t diag_sda_changes = 0;
 static volatile uint32_t diag_overflows = 0;
 static uint32_t diag_completed_captures = 0;
 static uint32_t diag_last_report_ms = 0;
@@ -97,6 +100,36 @@ static inline uint8_t IRAM_ATTR read_gpio_state() {
 static inline bool scl_level(uint8_t value) { return (value & 0x01) != 0; }
 static inline bool sda_level(uint8_t value) { return (value & 0x02) != 0; }
 
+struct EdgeDiagCounts {
+  uint32_t state{0};
+  uint32_t scl{0};
+  uint32_t sda{0};
+};
+
+static EdgeDiagCounts calculate_edge_diagnostics(const EdgeBuffer &data, uint16_t count,
+                                                  uint8_t initial_value) {
+  EdgeDiagCounts result;
+  uint8_t previous = initial_value;
+  for (uint16_t i = 0; i < count; ++i) {
+    const uint8_t current = data.value[i];
+    const uint8_t changed = static_cast<uint8_t>(current ^ previous);
+    if (changed == 0) continue;
+    result.state++;
+    if (changed & 0x01U) result.scl++;
+    if (changed & 0x02U) result.sda++;
+    previous = current;
+  }
+  return result;
+}
+
+static void account_edge_diagnostics(const EdgeBuffer &data, uint16_t count,
+                                     uint8_t initial_value) {
+  const EdgeDiagCounts delta = calculate_edge_diagnostics(data, count, initial_value);
+  diag_state_changes += delta.state;
+  diag_scl_changes += delta.scl;
+  diag_sda_changes += delta.sda;
+}
+
 static void IRAM_ATTR gpio_isr(void *) {
   if (!capturing) {
     diag_isr_calls++;
@@ -108,14 +141,15 @@ static void IRAM_ATTR gpio_isr(void *) {
   // possible reduces the window in which a second physical edge can collapse
   // into the same observed GPIO state.
   const uint8_t value = read_gpio_state();
-  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   diag_isr_calls++;
   const uint8_t previous_value = last_value;
+  // GPIO ANYEDGE can occasionally deliver an ISR after another edge has
+  // already returned the pins to the state we last stored. Do not pay for the
+  // 64-bit esp_timer read in that case; there is no sample to timestamp.
   if (value == previous_value) return;
-  diag_state_changes++;
-  if ((value ^ previous_value) & 0x01) diag_scl_changes++;
-  if ((value ^ previous_value) & 0x02) diag_sda_changes++;
-  if (sample_count == 0) capture_initial_value = last_value;
+
+  const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+  if (sample_count == 0) capture_initial_value = previous_value;
   last_value = value;
   last_edge = now;
 
@@ -1261,6 +1295,7 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   // succeeds do we re-arm GPIO capture.
   if (debug_udp::enabled() && udp_pending.active && capture_finished) {
     if (!udp_export_pending_step()) return false;
+    account_edge_diagnostics(samples, sample_count, capture_initial_value);
     sample_count = 0;
     capture_overflow = false;
     capture_finished = false;
@@ -1323,6 +1358,7 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   }
 #endif
 
+  account_edge_diagnostics(samples, sample_count, capture_initial_value);
   sample_count = 0;
   capture_overflow = false;
   capture_finished = false;
@@ -1427,9 +1463,16 @@ void log_edge_diagnostics(uint32_t now_ms) {
   if (static_cast<uint32_t>(now_ms - diag_last_report_ms) < 5000U) return;
 
   const uint32_t isr = diag_isr_calls;
-  const uint32_t changes = diag_state_changes;
-  const uint32_t scl = diag_scl_changes;
-  const uint32_t sda = diag_sda_changes;
+  // Completed captures are accumulated outside the ISR. Add the currently
+  // active/frozen buffer here so the 5-second diagnostic retains its original
+  // near-real-time semantics without paying three volatile increments per edge.
+  uint16_t pending_count = sample_count;
+  if (pending_count > MAX_SAMPLES) pending_count = MAX_SAMPLES;
+  const EdgeDiagCounts pending =
+      calculate_edge_diagnostics(samples, pending_count, capture_initial_value);
+  const uint32_t changes = diag_state_changes + pending.state;
+  const uint32_t scl = diag_scl_changes + pending.scl;
+  const uint32_t sda = diag_sda_changes + pending.sda;
   const uint32_t completed = diag_completed_captures;
   const uint32_t edge_age_us = static_cast<uint32_t>(
       static_cast<uint32_t>(esp_timer_get_time()) - last_edge);
