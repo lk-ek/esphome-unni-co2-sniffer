@@ -960,3 +960,7 @@ existing August 11 capture archives. These real measured timing points are used
 to regression-test normalization and all portable temperature/humidity
 calibration paths across a much wider range than the synthetic smoke fixture.
 See `tests/host/README.md` for scope and limitations.
+
+## Standalone Sensirion T/RH variant
+
+`mobilesensor-sensirion.yaml` exposes AHT21 temperature/humidity through the SHT43-compatible MyAmbience BLE/history path while keeping ENS160 eCO2, TVOC and AQI Home Assistant-only.

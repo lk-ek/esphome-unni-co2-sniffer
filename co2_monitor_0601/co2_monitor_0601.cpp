@@ -550,6 +550,25 @@ void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
 }
 #endif
 
+void CO2Monitor0601::publish_external_temperature_humidity(float temperature_c, float humidity_percent) {
+  if (!this->standalone_sensirion_mode_) {
+    ESP_LOGW(TAG, "Ignoring external T/RH sample because standalone_sensirion_mode is disabled");
+    return;
+  }
+  if (!std::isfinite(temperature_c) || !std::isfinite(humidity_percent) ||
+      humidity_percent < 0.0f || humidity_percent > 100.0f) {
+    ESP_LOGW(TAG, "Ignoring invalid external T/RH sample: %.2f C / %.1f %%",
+             temperature_c, humidity_percent);
+    return;
+  }
+#if UNNI_BLE_ENABLED
+  sensirion_ble_set_temperature_humidity(temperature_c, humidity_percent);
+#if UNNI_BLE_LIVE_ENABLED
+  sensirion_ble_commit_live_advertisement();
+#endif
+#endif
+}
+
 void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
 #if UNNI_BLE_ENABLED
   // Keep the MyAmbience 0x81FE control synchronized with the HA switch.
@@ -1024,15 +1043,18 @@ void CO2Monitor0601::setup() {
              static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)));
 #endif
     sensirion_settings_configure_gatt(this->gatt_server_, this->ble_device_name_);
-    // 0x81FE (shown by MyAmbience as IsLogEnabled) doubles as our HA/WiFi
-    // disable switch. This gives BLE a recovery/control path while WiFi is off.
-    this->wifi_ha_enabled_ = !sensirion_settings_ha_disabled();
-    if (this->wifi_ha_switch_ != nullptr)
-      this->wifi_ha_switch_->publish_state(this->wifi_ha_enabled_);
-    if (!this->wifi_ha_enabled_) {
-      this->wifi_disable_pending_ = true;
-      this->wifi_disable_requested_ms_ = millis();
-      ESP_LOGW(TAG, "MyAmbience HA/WiFi disable restored; WiFi will stop after startup grace");
+    if (!this->standalone_sensirion_mode_) {
+      // 0x81FE (shown by MyAmbience as IsLogEnabled) doubles as our HA/WiFi
+      // disable switch on the Unni bridge. A standalone SHT43-compatible node
+      // must not repurpose that SHT43 setting to control its Wi-Fi connection.
+      this->wifi_ha_enabled_ = !sensirion_settings_ha_disabled();
+      if (this->wifi_ha_switch_ != nullptr)
+        this->wifi_ha_switch_->publish_state(this->wifi_ha_enabled_);
+      if (!this->wifi_ha_enabled_) {
+        this->wifi_disable_pending_ = true;
+        this->wifi_disable_requested_ms_ = millis();
+        ESP_LOGW(TAG, "MyAmbience HA/WiFi disable restored; WiFi will stop after startup grace");
+      }
     }
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
@@ -1042,9 +1064,13 @@ void CO2Monitor0601::setup() {
   sensirion_history_setup(this->history_time_);
 #endif
 
-  this->setup_usb_power_();
-  this->setup_battery_adc_();
-  this->setup_battery_learning_();
+  if (!this->standalone_sensirion_mode_) {
+    this->setup_usb_power_();
+    this->setup_battery_adc_();
+    this->setup_battery_learning_();
+  } else {
+    ESP_LOGI(TAG, "Standalone Sensirion mode: Unni GPIO, USB-power and battery subsystems disabled");
+  }
 #if RTRH_DEBUG_CAPTURE
   if (!this->debug_udp_host_.empty() && this->debug_udp_port_ != 0) {
     if (!debug_udp::setup(this->debug_udp_host_.c_str(), this->debug_udp_port_))
@@ -1977,12 +2003,14 @@ void CO2Monitor0601::loop() {
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
 #endif
-  this->process_usb_power_();
-  this->process_energy_save_grace_();
+  if (!this->standalone_sensirion_mode_) {
+    this->process_usb_power_();
+    this->process_energy_save_grace_();
+  }
 #if UNNI_BLE_ENABLED
-  this->sync_wifi_ha_from_sensirion_settings_();
+  if (!this->standalone_sensirion_mode_) this->sync_wifi_ha_from_sensirion_settings_();
 #endif
-  this->process_wifi_ha_control_();
+  if (!this->standalone_sensirion_mode_) this->process_wifi_ha_control_();
 #if UNNI_BLE_ENABLED
   this->process_ble_pairing_window_();
 #endif
@@ -1999,7 +2027,7 @@ void CO2Monitor0601::loop() {
 
   stage_us = static_cast<uint64_t>(esp_timer_get_time());
 #endif
-  this->process_battery_();
+  if (!this->standalone_sensirion_mode_) this->process_battery_();
 #if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_battery_us,
                            static_cast<uint64_t>(esp_timer_get_time()) - stage_us);

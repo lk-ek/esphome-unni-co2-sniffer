@@ -156,6 +156,15 @@ uint32_t last_sampling_poll_ms = 0;
 uint16_t last_synced_downloadable_count = UINT16_MAX;
 time::RealTimeClock *wall_clock = nullptr;
 
+bool sample_complete_for_active_profile() {
+  const auto &sample = sensirion_ble_sample();
+#if UNNI_SHT43_IDENTITY_PROBE
+  return sample.temperature_humidity_complete();
+#else
+  return sample.complete();
+#endif
+}
+
 uint64_t now_us() {
   return static_cast<uint64_t>(esp_timer_get_time());
 }
@@ -572,7 +581,7 @@ void init_flash() {
 
 void commit_sample(bool new_run) {
   const auto &sample = sensirion_ble_sample();
-  if (!sample.complete())
+  if (!sample_complete_for_active_profile())
     return;
 
   // Never overwrite an unflushed sample. At unusually short history
@@ -625,16 +634,22 @@ void commit_sample(bool new_run) {
   history.latest_ms = sample_now_ms;
   sync_gatt();
 
+#if UNNI_SHT43_IDENTITY_PROBE
+  ESP_LOGI(TAG, "history sample %u/%u: %.2f C / %.1f %% (T/RH profile)",
+           static_cast<unsigned>(history.count), static_cast<unsigned>(HISTORY_CAPACITY),
+           sample.temperature_c, sample.humidity_percent);
+#else
   ESP_LOGI(TAG, "history sample %u/%u: %.2f C / %.1f %% / %u ppm",
            static_cast<unsigned>(history.count), static_cast<unsigned>(HISTORY_CAPACITY),
            sample.temperature_c, sample.humidity_percent, static_cast<unsigned>(sample.co2_ppm));
+#endif
 }
 
 void sampling_tick() {
   if (clearing.phase != ClearPhase::INACTIVE) return;
   const uint32_t now = now_ms();
   if (!history.clock_started) {
-    if (sensirion_ble_sample().complete()) {
+    if (sample_complete_for_active_profile()) {
       history.clock_started = true;
       history.last_sample_ms = now;
       commit_sample(history.force_new_run_on_next_sample || history.run_count == 0);

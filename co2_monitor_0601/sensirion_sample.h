@@ -22,9 +22,13 @@ struct SensirionSample {
   bool have_humidity{false};
   bool have_co2{false};
 
-  bool complete() const {
-    return have_temperature && have_humidity && have_co2 &&
+  bool temperature_humidity_complete() const {
+    return have_temperature && have_humidity &&
            std::isfinite(temperature_c) && std::isfinite(humidity_percent);
+  }
+
+  bool complete() const {
+    return temperature_humidity_complete() && have_co2;
   }
 
   static uint16_t encode_temperature(float value) {

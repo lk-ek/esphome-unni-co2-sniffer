@@ -1,0 +1,284 @@
+# SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Standalone mobile AHT21 + ENS160 sensor.
+# AHT21 temperature/humidity are also exposed as a Sensirion SHT43 DemoBoard-
+# compatible BLE device for MyAmbience, including persistent history.
+# ENS160 eCO2/TVOC/AQI remain Home Assistant-only; eCO2 is deliberately NOT
+# advertised as a real CO2 measurement.
+
+esphome:
+  name: mobilesensor
+  friendly_name: mobilesensor
+
+  on_boot:
+    - priority: -100
+      then:
+        # Stop ENS160 polling first.
+        - component.suspend: ens160_sensor
+
+        # Then put the ENS160 itself into deep sleep.
+        - lambda: |-
+            ESP_LOGI("ens160_control",
+                     "Boot: putting ENS160 into deep sleep...");
+
+            bool ok = id(ens160_raw).write_byte(0x10, 0x00);
+
+            ESP_LOGI("ens160_control",
+                     "write OPMODE=0x00: %s",
+                     ok ? "OK" : "FAILED");
+
+            delay(20);
+
+            if (auto mode = id(ens160_raw).read_byte(0x10)) {
+              ESP_LOGI("ens160_control",
+                       "Boot OPMODE readback: 0x%02X",
+                       *mode);
+            } else {
+              ESP_LOGE("ens160_control",
+                       "Boot OPMODE read failed");
+            }
+
+        # Don't leave stale air-quality values looking current in HA.
+        - lambda: |-
+            id(ens160_eco2).publish_state(NAN);
+            id(ens160_tvoc).publish_state(NAN);
+            id(ens160_aqi).publish_state(NAN);
+
+
+external_components:
+  - source:
+      type: local
+      path: .
+
+
+esp32:
+  board: wemos_d1_mini32
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+      sram1_as_iram: true
+
+
+logger:
+  level: DEBUG
+
+
+api:
+  encryption:
+    key: !secret mobilesensor_api
+
+
+ota:
+  - platform: esphome
+    password: !secret mobilesensor_ota
+    allow_partition_access: true
+    on_begin:
+      then:
+        - lambda: id(sensirion_bridge).prepare_for_ota();
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Mobilesensor Fallback Hotspot"
+    password: !secret mobilesensor_ap_password
+
+
+captive_portal:
+
+
+# Wall clock for sparse persistent Sensirion history anchors.
+time:
+  - platform: homeassistant
+    id: mobilesensor_wall_clock
+
+
+# Match the SHT43 DemoBoard security model used by MyAmbience.
+esp32_ble:
+  io_capability: display_yes_no
+  auth_req_mode: sc_mitm_bond
+  min_key_size: 10
+  max_key_size: 16
+
+
+# Reuse the project's Sensirion/MyAmbience implementation without enabling any
+# of the Unni-specific capture, GPIO, power-policy or battery subsystems.
+co2_monitor_0601:
+  id: sensirion_bridge
+  standalone_sensirion_mode: true
+  sht43_identity_probe: true
+  history_time_id: mobilesensor_wall_clock
+
+  ble: true
+  ble_live: true
+  ble_history: true
+  ble_advertising_interval: 2s
+  ble_battery_advertising_interval: 2s
+
+  home_assistant: true
+  sniffer_enabled: false
+  rtrh_enabled: false
+  rtrh_gpio_setup: false
+  rtrh_edge_capture: false
+  rtrh_decode_only: false
+  active_i2c_probe: false
+  light_sleep: false
+  debug_metrics: false
+  runtime_diagnostics: false
+
+
+i2c:
+  sda: GPIO23
+  scl: GPIO19
+  scan: true
+  frequency: 100kHz
+
+
+# Raw ENS160 access used only for changing OPMODE.
+i2c_device:
+  - id: ens160_raw
+    address: 0x53
+
+
+# Coalesce the AHT21's temperature and humidity callbacks. ESPHome publishes the
+# two values one after another; restarting this short script avoids briefly
+# advertising a new temperature together with the previous humidity sample.
+script:
+  - id: publish_sensirion_trh
+    mode: restart
+    then:
+      - delay: 100ms
+      - lambda: |-
+          if (!id(aht21_temp).has_state() || !id(aht21_humi).has_state()) {
+            return;
+          }
+          id(sensirion_bridge).publish_external_temperature_humidity(
+              id(aht21_temp).state,
+              id(aht21_humi).state);
+
+
+sensor:
+  ###############################
+  # AHT21 temperature / humidity
+  ###############################
+  - platform: aht10
+    id: aht21_sensor
+    address: 0x38
+
+    temperature:
+      name: "AHT21 Temperature"
+      id: aht21_temp
+      on_value:
+        then:
+          - script.execute: publish_sensirion_trh
+
+    humidity:
+      name: "AHT21 Humidity"
+      id: aht21_humi
+      on_value:
+        then:
+          - script.execute: publish_sensirion_trh
+
+    update_interval: 5s
+
+
+  ###############################
+  # ENS160 air quality
+  ###############################
+  - platform: ens160_i2c
+    id: ens160_sensor
+    address: 0x53
+
+    eco2:
+      name: "ENS160 eCO2"
+      id: ens160_eco2
+
+    tvoc:
+      name: "ENS160 Total Volatile Organic Compounds"
+      id: ens160_tvoc
+
+    aqi:
+      name: "ENS160 Air Quality Index"
+      id: ens160_aqi
+      entity_category: "diagnostic"
+      device_class: "aqi"
+      state_class: "measurement"
+
+    compensation:
+      temperature: aht21_temp
+      humidity: aht21_humi
+
+    update_interval: 5s
+
+
+switch:
+  - platform: template
+    name: "ENS160"
+    id: ens160_enabled
+    icon: mdi:molecule
+
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+    turn_on_action:
+      # Wake the physical ENS160 first.
+      - lambda: |-
+          ESP_LOGI("ens160_control",
+                   "Enabling ENS160 standard gas sensing...");
+
+          bool ok = id(ens160_raw).write_byte(0x10, 0x02);
+
+          ESP_LOGI("ens160_control",
+                   "write OPMODE=0x02: %s",
+                   ok ? "OK" : "FAILED");
+
+          delay(20);
+
+          if (auto mode = id(ens160_raw).read_byte(0x10)) {
+            ESP_LOGI("ens160_control",
+                     "OPMODE readback: 0x%02X",
+                     *mode);
+          } else {
+            ESP_LOGE("ens160_control",
+                     "OPMODE read failed");
+          }
+
+      # Resume ESPHome polling.
+      - component.resume: ens160_sensor
+
+
+    turn_off_action:
+      # First stop all automatic ENS160 accesses.
+      - component.suspend: ens160_sensor
+
+      # Then put the sensor into deep sleep.
+      - lambda: |-
+          ESP_LOGI("ens160_control",
+                   "Putting ENS160 into deep sleep...");
+
+          bool ok = id(ens160_raw).write_byte(0x10, 0x00);
+
+          ESP_LOGI("ens160_control",
+                   "write OPMODE=0x00: %s",
+                   ok ? "OK" : "FAILED");
+
+          delay(20);
+
+          if (auto mode = id(ens160_raw).read_byte(0x10)) {
+            ESP_LOGI("ens160_control",
+                     "OPMODE readback: 0x%02X",
+                     *mode);
+          } else {
+            ESP_LOGE("ens160_control",
+                     "OPMODE read failed");
+          }
+
+      # Clear the last measurements so HA doesn't display old values as current.
+      - lambda: |-
+          id(ens160_eco2).publish_state(NAN);
+          id(ens160_tvoc).publish_state(NAN);
+          id(ens160_aqi).publish_state(NAN);

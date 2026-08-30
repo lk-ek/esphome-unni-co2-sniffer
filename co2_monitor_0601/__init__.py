@@ -105,6 +105,7 @@ CONF_ENERGY_SAVE_MODE = "energy_save_mode"
 CONF_BLE_PAIRING_MODE = "ble_pairing_mode"
 CONF_BLE_PAIRING_WINDOW = "ble_pairing_window"
 CONF_SHT43_IDENTITY_PROBE = "sht43_identity_probe"
+CONF_STANDALONE_SENSIRION_MODE = "standalone_sensirion_mode"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_WIFI_HA_ENABLED = "wifi_ha_enabled"
@@ -351,11 +352,28 @@ def _validate_features(config):
     # when the key is omitted.
     config.setdefault(CONF_HOME_ASSISTANT, True)
 
-    pins = [config[CONF_RT_PIN], config[CONF_RH_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
-    if len(set(pins)) != len(pins):
-        raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
-    if config[CONF_BATTERY_PIN] not in range(0, 5):
-        raise cv.Invalid("battery_pin must be an ESP32-C3 ADC1 GPIO (0..4)")
+    standalone_sensirion = config.get(CONF_STANDALONE_SENSIRION_MODE, False)
+    if standalone_sensirion:
+        if config[CONF_SNIFFER_ENABLED] or config[CONF_RTRH_ENABLED] or config[CONF_RTRH_GPIO_SETUP] or config[CONF_RTRH_EDGE_CAPTURE] or config[CONF_RTRH_DECODE_ONLY]:
+            raise cv.Invalid(
+                "standalone_sensirion_mode requires all Unni sniffer/RT-RH capture options to be disabled"
+            )
+        # This mode is intended for an unrelated ESPHome sensor node. Do not
+        # create Unni-specific measurements, battery/power entities or policy
+        # switches; the top-level YAML owns its normal HA sensors. Pairing is
+        # intentionally retained when BLE is enabled.
+        for key in SENSOR_OUTPUTS:
+            config.pop(key, None)
+        for key in BINARY_OUTPUTS:
+            config.pop(key, None)
+        config.pop(CONF_ENERGY_SAVE_MODE, None)
+        config.pop(CONF_WIFI_HA_ENABLED, None)
+    else:
+        pins = [config[CONF_RT_PIN], config[CONF_RH_PIN], config[CONF_CO2_SDA_PIN], config[CONF_CO2_SCL_PIN], config[CONF_BATTERY_PIN], config[CONF_USB_POWER_PIN]]
+        if len(set(pins)) != len(pins):
+            raise cv.Invalid("RT/RH, CO2, battery and USB-power GPIOs must be unique")
+        if config[CONF_BATTERY_PIN] not in range(0, 5):
+            raise cv.Invalid("battery_pin must be an ESP32-C3 ADC1 GPIO (0..4)")
 
     if config[CONF_BLE_LIVE] and not config[CONF_BLE]:
         raise cv.Invalid("ble_live: true requires ble: true")
@@ -431,6 +449,7 @@ _SCHEMA = {
     cv.Optional(CONF_HA_PUBLISH_INTERVAL, default="60s"): _bounded_time(1000, 86400000),
     cv.Optional(CONF_HOME_ASSISTANT, default=True): cv.boolean,
     cv.Optional(CONF_SHT43_IDENTITY_PROBE, default=False): cv.boolean,
+    cv.Optional(CONF_STANDALONE_SENSIRION_MODE, default=False): cv.boolean,
     cv.Optional(CONF_SNIFFER_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_GPIO_SETUP, default=False): cv.boolean,
@@ -546,12 +565,15 @@ async def to_code(config):
     ble_enabled = config[CONF_BLE]
     home_assistant_enabled = config[CONF_HOME_ASSISTANT]
     sht43_identity_probe = config.get(CONF_SHT43_IDENTITY_PROBE, False)
+    standalone_sensirion = config.get(CONF_STANDALONE_SENSIRION_MODE, False)
 
     if not CORE.is_host:
-        # This component is timing-sensitive and validated at 80 MHz on ESP32-C3.
-        # Keep that platform detail out of user YAML.
-        add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
-        add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
+        # The Unni sniffer is timing-sensitive and validated at 80 MHz on ESP32-C3.
+        # A standalone Sensirion bridge may run on other ESP32 variants and must
+        # not inherit that hardware-specific CPU policy.
+        if not standalone_sensirion:
+            add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_80", True)
+            add_idf_sdkconfig_option("CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_160", False)
         # RT/RH and I2C GPIO ISRs call gpio_get_level(). Keep the GPIO control
         # functions in IRAM so an edge arriving while the flash cache is disabled
         # (for example during NVS/history writes) cannot trigger a cache panic.
@@ -560,12 +582,12 @@ async def to_code(config):
         if config[CONF_BLE_HISTORY]:
             add_partition("senshist", "data", "spiffs", 0x10000)
 
-        if config[CONF_LIGHT_SLEEP]:
+        if config[CONF_LIGHT_SLEEP] and not standalone_sensirion:
             add_idf_sdkconfig_option("CONFIG_PM_ENABLE", True)
             add_idf_sdkconfig_option("CONFIG_FREERTOS_USE_TICKLESS_IDLE", True)
             add_idf_sdkconfig_option("CONFIG_ESP_PHY_MAC_BB_PD", True)
 
-        if ble_enabled:
+        if ble_enabled and not standalone_sensirion:
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP", True)
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1", True)
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
@@ -598,6 +620,7 @@ async def to_code(config):
     cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
     cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
     cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
+    cg.add_define("UNNI_STANDALONE_SENSIRION_MODE", int(standalone_sensirion))
     cg.add_define("UNNI_RUNTIME_DIAGNOSTICS", int(config[CONF_RUNTIME_DIAGNOSTICS]))
     cg.add_define(
         "UNNI_BLE_DEVICE_DERIVED_IDENTITY",
@@ -632,6 +655,7 @@ async def to_code(config):
             cg.add(var.set_gatt_server(server))
 
     cg.add(var.set_ha_publish_interval(config[CONF_HA_PUBLISH_INTERVAL]))
+    cg.add(var.set_standalone_sensirion_mode(standalone_sensirion))
     cg.add(var.set_sniffer_enabled(config[CONF_SNIFFER_ENABLED]))
     cg.add(var.set_rtrh_enabled(config[CONF_RTRH_ENABLED]))
     cg.add(var.set_rtrh_gpio_setup(config[CONF_RTRH_GPIO_SETUP]))
@@ -658,7 +682,7 @@ async def to_code(config):
     cg.add(var.set_energy_save_mode_default(config[CONF_ENERGY_SAVE_MODE_DEFAULT]))
     cg.add(var.set_energy_save_grace(config[CONF_ENERGY_SAVE_GRACE]))
 
-    if home_assistant_enabled:
+    if home_assistant_enabled and not standalone_sensirion:
         energy_save = await switch.new_switch(config[CONF_ENERGY_SAVE_MODE])
         cg.add(energy_save.set_parent(var))
         cg.add(var.set_energy_save_mode_switch(energy_save))
@@ -674,6 +698,11 @@ async def to_code(config):
             cg.add(pairing.set_parent(var))
             cg.add(var.set_ble_pairing_mode_switch(pairing))
             cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
+    elif home_assistant_enabled and standalone_sensirion and ble_enabled and CONF_BLE_PAIRING_MODE in config:
+        pairing = await switch.new_switch(config[CONF_BLE_PAIRING_MODE])
+        cg.add(pairing.set_parent(var))
+        cg.add(var.set_ble_pairing_mode_switch(pairing))
+        cg.add(var.set_ble_pairing_window(config[CONF_BLE_PAIRING_WINDOW]))
 
     cg.add(var.set_thermal_transient_on_rate(config[CONF_THERMAL_TRANSIENT_ON_RATE]))
     cg.add(var.set_thermal_transient_off_rate(config[CONF_THERMAL_TRANSIENT_OFF_RATE]))

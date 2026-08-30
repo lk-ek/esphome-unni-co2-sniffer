@@ -51,6 +51,8 @@ class CO2Monitor0601 : public Component {
   void setup() override;
   void loop() override {}
   void prepare_for_ota() {}
+  void set_standalone_sensirion_mode(bool) {}
+  void publish_external_temperature_humidity(float, float) {}
 
   void set_ble_advertising_interval(uint32_t value) { this->ble_advertising_interval_ms_ = value; }
   void set_ble_battery_advertising_interval(uint32_t value) { this->ble_battery_advertising_interval_ms_ = value; }

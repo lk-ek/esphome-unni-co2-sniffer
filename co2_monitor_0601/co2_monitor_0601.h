@@ -65,6 +65,8 @@ class CO2Monitor0601 : public Component {
   void setup() override;
   void loop() override;
   void prepare_for_ota();
+  void set_standalone_sensirion_mode(bool value) { this->standalone_sensirion_mode_ = value; }
+  void publish_external_temperature_humidity(float temperature_c, float humidity_percent);
 
 #if UNNI_BLE_ENABLED
   void set_gatt_server(esp32_ble_server::BLEServer *server) { this->gatt_server_ = server; }
@@ -350,6 +352,7 @@ class CO2Monitor0601 : public Component {
 #endif
 
   time::RealTimeClock *history_time_{nullptr};
+  bool standalone_sensirion_mode_{false};
   bool sniffer_enabled_{true};
   bool i2c_rmt_scl_assist_{false};
   bool rtrh_enabled_{true};
