@@ -101,6 +101,10 @@ void shutdown();
 // disabling drops any partial frame collected so far.
 void set_capture_enabled(bool enabled);
 
+// Task-context snapshot used to keep self-generated BLE history traffic away
+// from a real edge capture. This is false while the enabled sniffer is idle.
+bool capture_in_progress();
+
 // Re-assert the passive GPIO input/interrupt configuration after automatic
 // Light-sleep wake. This never enables pulls and never drives SDA/SCL.
 void rearm_after_light_sleep();

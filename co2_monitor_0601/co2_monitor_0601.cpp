@@ -1704,6 +1704,12 @@ void CO2Monitor0601::process_co2_() {
 
   if (!result.have_co2) return;
 
+#if UNNI_BLE_HISTORY_ENABLED
+  // A protocol- and CRC-valid passive frame is the timing anchor for the
+  // cooperative history sender. Plausibility/confirmation remain independent.
+  sensirion_history_note_valid_co2_frame();
+#endif
+
   const uint16_t ppm = result.co2_ppm;
   static constexpr uint16_t CO2_MIN_PLAUSIBLE_PPM = 350;
   static constexpr uint16_t CO2_CONFIRM_MAX_DELTA_PPM = 150;
@@ -1950,7 +1956,7 @@ void CO2Monitor0601::loop() {
   sensirion_settings_loop();
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_loop();
+  sensirion_history_loop(this->io_initialized_ ? &i2c_sniffer::capture_in_progress : nullptr);
 #endif
 #if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_history_us,

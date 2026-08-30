@@ -549,6 +549,15 @@ only intervals from 60 seconds through 24 hours. Changing the interval clears
 history incrementally from the main loop (at most one sector erase per loop),
 while sampling and download remain paused.
 
+During a history download, packet production is cooperatively paused around
+the approximately six-second CO2 measurement rhythm. Valid frames continuously
+adapt the predicted period; sending stops 300 ms before the next prediction and
+for at least 150 ms afterwards. Any observed I2C edge capture blocks sending
+reactively, with a 750 ms failsafe, so a malformed/stuck capture cannot starve
+BLE forever. The connection, CCCD subscription, and sample cursor remain intact
+during ordinary pauses. A transfer is aborted without deleting history after
+120 seconds total or 15 seconds without queueing a notification.
+
 ---
 
 # Experimental secure MyAmbience settings

@@ -1621,6 +1621,10 @@ void set_capture_enabled(bool enabled) {
   }
 }
 
+bool capture_in_progress() {
+  return capture_enabled && (sample_count != 0 || capture_finished);
+}
+
 void rearm_after_light_sleep() {
   // Automatic Light-sleep should retain GPIO configuration, but the observed
   // battery-only failure mode leaves the passive tap reading both CO2 lines

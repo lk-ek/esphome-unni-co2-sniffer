@@ -149,6 +149,27 @@ BLE/GATT history traffic, where GPIO ISR latency can span a complete short SCL
 pulse. RMT records SCL durations in peripheral memory even while the CPU is busy;
 the callback only copies fixed-size symbol chunks into SRAM.
 
+## Cooperative BLE-history capture guard
+
+The history sender is the controllable source of that BLE load. It therefore
+stops queueing notifications from 300 ms before an adaptively predicted CO2
+frame until at least 150 ms after it. A protocol- and CRC-valid frame updates
+the period estimator; missed cycles are normalized to a multiple of the current
+roughly six-second estimate. Predictions expire after 30 seconds without a
+valid frame.
+
+Prediction is backed by a reactive task-context snapshot. The ISR still only
+records edges; `capture_in_progress()` reports whether the shared buffer has
+real samples or is frozen for decoding. History transmission pauses immediately
+when the loop observes that state, retains a 25 ms tail after normal completion,
+and ignores a continuously stuck state after 750 ms. RMT-SCL assist remains
+enabled and the sniffer ISR is never disabled by the history scheduler.
+
+Ordinary pauses preserve the BLE connection, CCCD subscription, packet sequence,
+and sample cursor. The total/no-progress watchdogs abort only transfer state and
+never erase history. ESPHome's `notify()` API has no delivery acknowledgement;
+for this watchdog, progress means a notification was handed to the BLE stack.
+
 ## Protocol-validated GPIO missing-clock recovery
 
 The GPIO path can miss an entire SCL pulse when ISR latency spans both edges.

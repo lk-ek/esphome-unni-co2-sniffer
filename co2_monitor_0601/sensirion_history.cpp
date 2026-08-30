@@ -11,6 +11,7 @@
 #include "sensirion_history.h"
 #include "sensirion_ble.h"
 #include "sensirion_history_format.h"
+#include "sensirion_history_guard.h"
 
 #include "esphome/components/esp32_ble_server/ble_2902.h"
 #include "esphome/components/esp32_ble_server/ble_characteristic.h"
@@ -130,6 +131,12 @@ struct DownloadState {
   uint16_t start_logical{0};
   uint32_t age_ms{0};
   uint32_t last_packet_ms{0};
+  uint32_t started_ms{0};
+  uint32_t last_progress_ms{0};
+  uint32_t guard_pause_started_ms{0};
+  uint32_t guard_paused_ms{0};
+  uint16_t guard_pauses{0};
+  bool guard_paused{false};
 };
 
 HistoryState history;
@@ -137,10 +144,15 @@ FlashState flash;
 GattState gatt;
 DownloadState download;
 ClearState clearing;
+sensirion_history_guard::Guard capture_guard;
 uint32_t last_sampling_poll_ms = 0;
 
+uint64_t now_us() {
+  return static_cast<uint64_t>(esp_timer_get_time());
+}
+
 uint32_t now_ms() {
-  return static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+  return static_cast<uint32_t>(now_us() / 1000ULL);
 }
 
 uint32_t get_u32_le(std::span<const uint8_t> x) {
@@ -549,22 +561,72 @@ void start_download() {
   download.age_ms = history.count ? now_ms() - history.latest_ms : 0;
   download.phase = DownloadPhase::HEADER;
   download.last_packet_ms = 0;
+  download.started_ms = now_ms();
+  download.last_progress_ms = download.started_ms;
 
   ESP_LOGI(TAG, "history download subscribed: requested=%u available=%u sending=%u age=%u ms",
            static_cast<unsigned>(download.requested), static_cast<unsigned>(history.count),
            static_cast<unsigned>(n), static_cast<unsigned>(download.age_ms));
 }
 
-void download_tick() {
+uint32_t current_guard_paused_ms(uint32_t now) {
+  return download.guard_paused
+             ? download.guard_paused_ms +
+                   static_cast<uint32_t>(now - download.guard_pause_started_ms)
+             : download.guard_paused_ms;
+}
+
+void abort_download(const char *reason, uint32_t now) {
+  ESP_LOGW(TAG,
+           "history download aborted after %u ms (%s); guard=%u pause(s)/%u ms; history and CCCD retained",
+           static_cast<unsigned>(now - download.started_ms), reason,
+           static_cast<unsigned>(download.guard_pauses),
+           static_cast<unsigned>(current_guard_paused_ms(now)));
+  download = {};
+}
+
+bool capture_guard_blocked(SensirionHistoryCaptureProbe capture_probe) {
+  const uint64_t current_us = now_us();
+  capture_guard.set_capture_active(capture_probe != nullptr && capture_probe(), current_us);
+  return capture_guard.blocked(current_us);
+}
+
+bool download_guard_blocked(SensirionHistoryCaptureProbe capture_probe, uint32_t now) {
+  if (capture_guard_blocked(capture_probe)) {
+    if (!download.guard_paused) {
+      download.guard_paused = true;
+      download.guard_pause_started_ms = now;
+      if (download.guard_pauses != UINT16_MAX) ++download.guard_pauses;
+    }
+    return true;
+  }
+  if (download.guard_paused) {
+    download.guard_paused_ms +=
+        static_cast<uint32_t>(now - download.guard_pause_started_ms);
+    download.guard_paused = false;
+  }
+  return false;
+}
+
+void download_tick(SensirionHistoryCaptureProbe capture_probe) {
   if (download.phase == DownloadPhase::INACTIVE || gatt.download == nullptr ||
       !gatt.connected || !gatt.download_notify_enabled ||
       clearing.phase != ClearPhase::INACTIVE)
     return;
 
   const uint32_t now = now_ms();
+  if (sensirion_history_guard::download_total_timeout(now, download.started_ms)) {
+    abort_download("120 s wall-clock timeout", now);
+    return;
+  }
+  if (sensirion_history_guard::download_no_progress_timeout(now, download.last_progress_ms)) {
+    abort_download("15 s without a queued notification", now);
+    return;
+  }
+  if (download_guard_blocked(capture_probe, now))
+    return;
   if (download.last_packet_ms != 0 && now - download.last_packet_ms < 4)
     return;
-  download.last_packet_ms = now;
 
   auto &packet = gatt.download->get_value();
   if (packet.size() != 20) packet.resize(20);
@@ -574,11 +636,16 @@ void download_tick() {
     put_u32_le(&packet[6], history.interval_ms);
     put_u32_le(&packet[10], download.age_ms);
     put_u16_le(&packet[14], download.count);
+    if (download_guard_blocked(capture_probe, now)) return;
+    download.last_packet_ms = now;
     gatt.download->notify();
+    download.last_progress_ms = now;
     download.sequence = 1;
     if (download.count == 0) {
-      download.phase = DownloadPhase::INACTIVE;
-      ESP_LOGI(TAG, "history download complete (0 samples)");
+      ESP_LOGI(TAG, "history download complete (0 samples; guard=%u pause(s)/%u ms)",
+               static_cast<unsigned>(download.guard_pauses),
+               static_cast<unsigned>(download.guard_paused_ms));
+      download = {};
     } else {
       download.phase = DownloadPhase::DATA;
     }
@@ -586,26 +653,32 @@ void download_tick() {
   }
 
   put_u16_le(&packet[0], download.sequence);
-  for (uint8_t in_packet = 0; in_packet < 2 && download.sent < download.count; ++in_packet) {
+  uint16_t next_sent = download.sent;
+  for (uint8_t in_packet = 0; in_packet < 2 && next_sent < download.count; ++in_packet) {
     Sample sample{};
-    if (!logical_sample(download.start_logical + download.sent, sample)) {
+    if (!logical_sample(download.start_logical + next_sent, sample)) {
       ESP_LOGE(TAG, "history download aborted: sample %u could not be read",
-               static_cast<unsigned>(download.start_logical + download.sent));
-      download.phase = DownloadPhase::INACTIVE;
-      download.requested = 0;
+               static_cast<unsigned>(download.start_logical + next_sent));
+      download = {};
       return;
     }
-    ++download.sent;
+    ++next_sent;
     memcpy(&packet[2 + in_packet * SAMPLE_SIZE], sample.data(), SAMPLE_SIZE);
   }
+  if (download_guard_blocked(capture_probe, now)) return;
+  download.last_packet_ms = now;
   gatt.download->notify();
+  download.sent = next_sent;
+  download.last_progress_ms = now;
   ++download.sequence;
 
   if (download.sent >= download.count) {
-    ESP_LOGI(TAG, "history download complete: %u sample(s), %u data packet(s)",
-             static_cast<unsigned>(download.count), static_cast<unsigned>(download.sequence - 1));
-    download.phase = DownloadPhase::INACTIVE;
-    download.requested = 0;
+    ESP_LOGI(TAG,
+             "history download complete: %u sample(s), %u data packet(s), guard=%u pause(s)/%u ms",
+             static_cast<unsigned>(download.count), static_cast<unsigned>(download.sequence - 1),
+             static_cast<unsigned>(download.guard_pauses),
+             static_cast<unsigned>(download.guard_paused_ms));
+    download = {};
   }
 }
 
@@ -666,6 +739,8 @@ void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
     download.requested = get_u32_le(x);
     ESP_LOGI(TAG, "8003 requested samples = %u (conn=%u)",
              static_cast<unsigned>(download.requested), static_cast<unsigned>(conn_id));
+    if (gatt.download_notify_enabled && download.phase == DownloadPhase::INACTIVE)
+      start_download();
   });
   gatt.interval->on_write([](std::span<const uint8_t> x, uint16_t conn_id) {
     if (x.size() != 4) {
@@ -703,7 +778,7 @@ bool sensirion_history_flush() {
   return flush_flash();
 }
 
-void sensirion_history_loop() {
+void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe) {
   clear_tick();
   if (clearing.phase == ClearPhase::INACTIVE) {
     const uint32_t now = now_ms();
@@ -713,7 +788,11 @@ void sensirion_history_loop() {
       sampling_tick();
     }
   }
-  download_tick();
+  download_tick(capture_probe);
+}
+
+void sensirion_history_note_valid_co2_frame() {
+  capture_guard.note_valid_frame(now_us());
 }
 
 void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server) {
@@ -731,8 +810,7 @@ void sensirion_history_gatts_event_handler(
   if (event == ESP_GATTS_DISCONNECT_EVT) {
     gatt.connected = false;
     gatt.download_notify_enabled = false;
-    download.phase = DownloadPhase::INACTIVE;
-    download.requested = 0;
+    download = {};
     return;
   }
   if (event != ESP_GATTS_WRITE_EVT || param->write.is_prep)
@@ -756,7 +834,7 @@ void sensirion_history_gatts_event_handler(
     start_download();
   } else if (lo == 0x00 && hi == 0x00) {
     gatt.download_notify_enabled = false;
-    download.phase = DownloadPhase::INACTIVE;
+    download = {};
     ESP_LOGI(TAG, "history download unsubscribed");
   }
 }

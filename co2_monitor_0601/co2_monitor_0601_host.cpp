@@ -6,6 +6,7 @@
 #include "co2_decoder.h"
 #include "sensirion_sample.h"
 #include "sensirion_history_format.h"
+#include "sensirion_history_guard.h"
 #include "esphome/core/log.h"
 
 #include <cerrno>
@@ -197,6 +198,63 @@ bool CO2Monitor0601::run_portable_self_test_() {
       !sensirion_history_format::generation_newer(0, UINT32_MAX) ||
       sensirion_history_format::generation_newer(UINT32_MAX, 0)) {
     ESP_LOGE(TAG, "portable self-test: history bounds/generation wrap failed");
+    return false;
+  }
+
+  sensirion_history_guard::Guard history_guard{};
+  constexpr uint64_t anchor_us = 1000000ULL;
+  history_guard.note_valid_frame(anchor_us);
+  if (history_guard.blocked(anchor_us + 5699999ULL) ||
+      !history_guard.blocked(anchor_us + 5700000ULL) ||
+      !history_guard.blocked(anchor_us + 6150000ULL) ||
+      history_guard.blocked(anchor_us + 6150001ULL) ||
+      history_guard.blocked(anchor_us + 31000000ULL)) {
+    ESP_LOGE(TAG, "portable self-test: predictive history guard boundaries failed");
+    return false;
+  }
+
+  history_guard.set_capture_active(true, anchor_us + 2000000ULL);
+  if (!history_guard.blocked(anchor_us + 2750000ULL) ||
+      history_guard.blocked(anchor_us + 2750001ULL)) {
+    ESP_LOGE(TAG, "portable self-test: reactive history guard timeout failed");
+    return false;
+  }
+  history_guard.set_capture_active(false, anchor_us + 2750001ULL);
+  if (history_guard.blocked(anchor_us + 2750002ULL)) {
+    ESP_LOGE(TAG, "portable self-test: timed-out capture incorrectly received a tail guard");
+    return false;
+  }
+
+  sensirion_history_guard::Guard tail_guard{};
+  tail_guard.set_capture_active(true, anchor_us);
+  tail_guard.set_capture_active(false, anchor_us + 10000ULL);
+  if (!tail_guard.blocked(anchor_us + 34999ULL) ||
+      tail_guard.blocked(anchor_us + 35000ULL)) {
+    ESP_LOGE(TAG, "portable self-test: reactive history tail guard failed");
+    return false;
+  }
+
+  sensirion_history_guard::Guard adaptive_guard{};
+  adaptive_guard.note_valid_frame(anchor_us);
+  adaptive_guard.note_valid_frame(anchor_us + 6400000ULL);
+  if (adaptive_guard.estimated_period_us != 6050000ULL) {
+    ESP_LOGE(TAG, "portable self-test: adaptive history period update failed");
+    return false;
+  }
+  adaptive_guard.note_valid_frame(anchor_us + 6400000ULL + 12100000ULL);
+  if (adaptive_guard.estimated_period_us != 6050000ULL) {
+    ESP_LOGE(TAG, "portable self-test: missed-frame period normalization failed");
+    return false;
+  }
+
+  constexpr uint32_t timeout_start = UINT32_MAX - 1000U;
+  if (!sensirion_history_guard::download_total_timeout(
+          timeout_start + sensirion_history_guard::DOWNLOAD_MAX_MS, timeout_start) ||
+      sensirion_history_guard::download_total_timeout(
+          timeout_start + sensirion_history_guard::DOWNLOAD_MAX_MS - 1U, timeout_start) ||
+      !sensirion_history_guard::download_no_progress_timeout(
+          timeout_start + sensirion_history_guard::DOWNLOAD_NO_PROGRESS_MS, timeout_start)) {
+    ESP_LOGE(TAG, "portable self-test: history download timeout/wrap handling failed");
     return false;
   }
 
