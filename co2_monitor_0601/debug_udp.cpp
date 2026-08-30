@@ -28,10 +28,12 @@ static constexpr uint32_t ENOMEM_RETRY_BACKOFF_MS = 50;
 static constexpr uint16_t ENOMEM_TRIP_THRESHOLD = 3;
 static constexpr uint32_t COLLECTOR_COOLDOWN_INITIAL_MS = 5000;
 static constexpr uint32_t COLLECTOR_COOLDOWN_MAX_MS = 60000;
+static constexpr uint32_t COLLECTOR_HEALTHY_RESET_MS = 60000;
 static uint32_t retry_not_before_ms = 0;
 static uint32_t suspended_until_ms = 0;
 static uint32_t collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
 static uint32_t enomem_count = 0;
+static uint32_t last_enomem_ms = 0;
 static uint16_t consecutive_enomem = 0;
 
 struct __attribute__((packed)) PacketHeader {
@@ -83,9 +85,11 @@ static bool suspension_active(uint32_t now_ms) {
   if (suspended_until_ms == 0) return false;
   if (static_cast<int32_t>(now_ms - suspended_until_ms) < 0) return true;
 
-  // The cooldown expired. Allow exactly the normal exporter traffic to probe
-  // the path again; a successful datagram fully closes the circuit breaker,
-  // while another short ENOMEM burst opens it with a longer cooldown.
+  // The cooldown expired. Allow normal exporter traffic to probe the path
+  // again. A few successful datagrams are not sufficient to declare the
+  // collector healthy: small I2C packets can succeed while a larger RT/RH
+  // burst still exhausts lwIP resources. A new ENOMEM burst therefore opens
+  // the breaker at the next (longer) cooldown level.
   suspended_until_ms = 0;
   consecutive_enomem = 0;
   retry_not_before_ms = 0;
@@ -187,6 +191,7 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
     const int send_errno = errno;
     if (send_errno == ENOMEM) {
       enomem_count++;
+      last_enomem_ms = now_ms;
       if (consecutive_enomem < UINT16_MAX) consecutive_enomem++;
       // A failed nonblocking send can itself mean lwIP had no pbuf/mailbox
       // resources available. Do not hammer sendto() again every component loop;
@@ -221,7 +226,22 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
   retry_not_before_ms = 0;
   consecutive_enomem = 0;
   suspended_until_ms = 0;
-  collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
+
+  // Do not reset the exponential cooldown just because one datagram made it
+  // through. With an unreachable/local collector, small packets may succeed
+  // between ARP/pbuf pressure bursts while a multi-packet RT/RH export still
+  // fails. Only a genuinely quiet period without ENOMEM closes the breaker
+  // history and returns the next trip to the 5 s base cooldown.
+  if (last_enomem_ms != 0 &&
+      static_cast<uint32_t>(now_ms - last_enomem_ms) >= COLLECTOR_HEALTHY_RESET_MS) {
+    if (collector_cooldown_ms != COLLECTOR_COOLDOWN_INITIAL_MS) {
+      ESP_LOGI(TAG, "UDP debug export healthy for %lu ms; resetting collector cooldown to %lu ms",
+               static_cast<unsigned long>(COLLECTOR_HEALTHY_RESET_MS),
+               static_cast<unsigned long>(COLLECTOR_COOLDOWN_INITIAL_MS));
+    }
+    collector_cooldown_ms = COLLECTOR_COOLDOWN_INITIAL_MS;
+    last_enomem_ms = 0;
+  }
   last_send_ms = now_ms;
   return true;
 }
