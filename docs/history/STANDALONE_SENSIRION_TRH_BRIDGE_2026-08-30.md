@@ -3,7 +3,9 @@
 `mobilesensor-sensirion.yaml` reuses the project's Sensirion/MyAmbience BLE and
 persistent-history implementation on an unrelated ESPHome sensor node. The
 source sensors are an AHT21 for temperature/humidity and an ENS160 for air
-quality.
+quality. Since the 2026-08-31 extraction, the shipped mobile YAML instantiates
+`sensirion_gadget_bridge` directly; the standalone mode described below remains
+only as the backward-compatible predecessor.
 
 `standalone_sensirion_mode` deliberately disables all Unni-specific GPIO
 capture, USB-power, battery ADC/learning and C3-only power-policy setup. External
@@ -29,11 +31,13 @@ humidity pair complete without requiring `have_co2`. The on-flash sample width
 and existing history wire/storage format remain unchanged; unused CO2 bytes stay
 zero. This avoids a flash-format migration while allowing T/RH-only sampling.
 
-The component itself registers AHT21 state callbacks. A restartable 100 ms
+The bridge component itself registers AHT21 state callbacks. A restartable 100 ms
 coalescer commits only the newest complete pair, preventing a transient mixed
 sample when ESPHome publishes temperature and humidity sequentially. The first
 pair immediately starts history; later entries follow the configured interval.
-The standalone history download bypasses the Unni capture guard.
+The standalone history download has no producer guard. The generic transport
+still owns its cursor, CCCD state and watchdogs; only an Unni composition
+injects the separate capture-aware guard adapter.
 
 The existing Unni-specific mapping of Sensirion setting `0x81FE` to Wi-Fi/HA
 disable is suppressed in standalone mode. The SHT43-compatible setting therefore

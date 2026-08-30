@@ -15,9 +15,10 @@ The current responsibility split is:
 - `i2c_sniffer.cpp/.h`: generic passive I²C edge capture and frame reconstruction
 - `co2_decoder.cpp/.h`: CO₂ command/response and CRC decoding over generic I²C frames
 - `rtrh_decoder.cpp/.h`: RT/RH capture, validation, quality, calibrated result
-- `sensirion_sample.h`: common BLE/history sample encoding
-- `sensirion_ble.cpp/.h`: live BLE and GAP/GATT connection handling
-- `sensirion_history.cpp/.h`: RAM/flash history and history download
+- `sensirion_gadget_bridge/`: reusable sample/coalescing, live BLE,
+  GAP/GATT/settings and flash-backed history component
+- `co2_monitor_0601/unni_history_transfer_guard.h`: Unni-only capture-aware
+  history scheduling adapter
 
 ## Removed stale configuration
 

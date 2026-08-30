@@ -16,7 +16,12 @@ The ESP32-C3 acts primarily as a **passive sniffer**:
 The tested monitor is sold as **CO2 Monitor Carbon Dioxide Detector 0601**, hence the ESPHome component name:
 
 ```yaml
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
+
 co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
   ble_device_name: "Unni CO2 Monitor"
 ```
 
@@ -183,7 +188,12 @@ api:
   encryption:
     key: !secret i2csniffer__encryption_key
 
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
+
 co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
 ```
 
 The repository contains complete example configurations, so in normal use it is easier to start with one of those rather than build the YAML from scratch.
@@ -482,16 +492,22 @@ Avoid running `ping`, `esphome logs`, an actively polling web UI or other unnece
 The normal firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format.
 For the temperature field it uses `Air Temperature` inside the externally validated air-temperature envelope, falling back to the diagnostic RT model only when that physical-air estimate is unavailable. BLE humidity remains the physical carrier-based `RH Humidity`; the Unni display-emulation values are never advertised as physical measurements.
 
-The name shown for the normal MyCO2 gadget can be configured in the component YAML:
+The reusable bridge is composed with the Unni orchestrator in the shipped BLE
+YAMLs. The name shown for the normal MyCO2 gadget is configured on that bridge:
 
 ```yaml
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
+  device_name: "Unni CO2 Monitor"
+
 co2_monitor_0601:
-  ble_device_name: "Unni CO2 Monitor"
+  sensirion_bridge_id: unni_sensirion_bridge
 ```
 
-`ble_device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option.
+`device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option. The old `ble_device_name` key remains on the Unni compatibility surface.
 
-`ble_identity_mode` defaults to `device_derived` and therefore needs no YAML
+Bridge `identity_mode` defaults to `device_derived` and therefore needs no YAML
 configuration. It derives a stable, locally administered Bluetooth address and
 Device ID from the ESP eFuse MAC so multiple monitors do not collide.
 `legacy_fixed` remains available only as an explicit compatibility override for
@@ -531,7 +547,7 @@ Advertising after GATT disconnects is reasserted deterministically so ESPHome's 
 With:
 
 ```yaml
-co2_monitor_0601:
+sensirion_gadget_bridge:
   ble_history: true
 ```
 
@@ -564,7 +580,7 @@ therefore receives only the newest continuous run (or the newest requested
 subset of that run). Older samples remain stored in the flash ring but are not
 misrepresented as contiguous data after a gap.
 
-During a history download, packet production is cooperatively paused around the
+On Unni, an injected producer guard cooperatively pauses history packet production around the
 approximately six-second CO2 and 30-second RT/RH rhythms. Completed measurements
 continuously adapt both predicted periods; sending stops 800 ms before either
 prediction and for at least 150 ms afterwards, allowing queued BLE work to drain.
@@ -579,6 +595,8 @@ with fewer than 130 SCL transitions or any frame error adds 250 ms, capped at
 500 ms extra. Every three consecutive clean captures remove 50 ms until the
 800 ms baseline is restored. RMT-SCL assist remains the permanent recovery
 layer for occasional missed GPIO edges both inside and outside history traffic.
+The mobile bridge supplies no Unni guard; its history transport still retains
+the generic connection/cursor behavior and the 120-second/15-second watchdogs.
 
 ---
 
@@ -857,6 +875,16 @@ co2_monitor_0601/
   calibration.h
       RT/RH calibration
 
+  unni_history_transfer_guard.h
+      Unni capture-aware history transfer guard adapter
+
+sensirion_gadget_bridge/
+  __init__.py
+      reusable ESPHome bridge schema and code generation
+
+  sensirion_gadget_bridge.cpp/.h
+      source binding and BLE/history lifecycle
+
   sensirion_bridge_core.cpp/.h
       shared profile-aware BLE/GATT/history sample and T/RH coalescer
 
@@ -973,23 +1001,26 @@ node. It exposes AHT21 temperature/humidity through the SHT43-compatible
 MyAmbience BLE and persistent-history path:
 
 ```yaml
-co2_monitor_0601:
-  standalone_sensirion_mode: true
-  sensirion_profile: sht43_trh
-  sensirion_temperature_id: aht21_temp
-  sensirion_humidity_id: aht21_humi
-  ble_advertising_interval: 2s
+sensirion_gadget_bridge:
+  id: sensirion_bridge
+  profile: sht43_trh
+  temperature_id: aht21_temp
+  humidity_id: aht21_humi
+  advertising_interval: 2s
 ```
 
 Both source IDs are required together. The component registers callbacks on
 the source sensors and coalesces their sequential updates for 100 ms, so BLE,
 SHT43 GATT and history consume one consistent, shared sample. The older
-`sht43_identity_probe: true` key remains a compatible alias for
-`sensirion_profile: sht43_trh`; contradictory settings are rejected.
+`sht43_identity_probe: true` remains a compatible alias for
+`profile: sht43_trh`; contradictory settings are rejected.
 
-Standalone mode does not initialize Unni GPIO capture, battery ADC/learning,
-VBUS policy or automatic Light Sleep, and it creates none of the related HA
-entities. Only the fixed mains-powered advertising interval is configured.
+The mobile YAML no longer instantiates the Unni component at all. Consequently
+it cannot initialize Unni GPIO capture, battery ADC/learning, VBUS policy or
+automatic Light Sleep, and it creates none of the related HA entities. Only the
+fixed mains-powered advertising interval is configured. The public C++
+delegation method remains available for compatibility, but the shipped YAMLs
+now compose the bridge explicitly.
 
 The `ENS160` HA switch restores `ALWAYS_OFF` after every boot. Turning it on
 wakes the sensor before resuming polling; turning it off suspends polling before

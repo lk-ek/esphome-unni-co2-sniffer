@@ -3,22 +3,24 @@
 #include "co2_monitor_0601.h"
 #include "debug_udp.h"
 
-#include "ble_options.h"
+#include "../sensirion_gadget_bridge/ble_options.h"
 #include "co2_decoder.h"
 #include "i2c_sniffer.h"
 #include "rtrh_decoder.h"
 #include "power_save.h"
-#include "sensirion_bridge_core.h"
+#include "../sensirion_gadget_bridge/sensirion_bridge_core.h"
+#include "../sensirion_gadget_bridge/sensirion_gadget_bridge.h"
+#include "unni_history_transfer_guard.h"
 
 #if UNNI_BLE_ENABLED
-#include "sensirion_ble.h"
-#include "sensirion_settings.h"
+#include "../sensirion_gadget_bridge/sensirion_ble.h"
+#include "../sensirion_gadget_bridge/sensirion_settings.h"
 #if UNNI_SHT43_IDENTITY_PROBE
-#include "sensirion_sht43_probe.h"
+#include "../sensirion_gadget_bridge/sensirion_sht43_probe.h"
 #endif
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-#include "sensirion_history.h"
+#include "../sensirion_gadget_bridge/sensirion_history.h"
 #endif
 
 #include "driver/gpio.h"
@@ -82,7 +84,10 @@ uint8_t sensor_capture_in_progress_() {
 #if UNNI_BLE_ENABLED
 void CO2Monitor0601::set_ble_advertising_interval(uint32_t interval_ms) {
   this->ble_usb_advertising_interval_ms_ = interval_ms;
-  sensirion_ble_set_advertising_interval(interval_ms);
+  if (this->sensirion_bridge_ != nullptr)
+    this->sensirion_bridge_->set_advertising_interval(interval_ms);
+  else
+    sensirion_ble_set_advertising_interval(interval_ms);
 }
 
 void CO2Monitor0601::gap_event_handler(esp_gap_ble_cb_event_t event,
@@ -224,6 +229,11 @@ void CO2Monitor0601::prepare_for_ota() {
 
   ESP_LOGI(TAG, "OTA starting: flushing persistent runtime state");
   this->save_battery_learning_(true, "OTA");
+
+  if (this->sensirion_bridge_ != nullptr) {
+    this->sensirion_bridge_->prepare_for_ota();
+    return;
+  }
 
 #if UNNI_BLE_HISTORY_ENABLED
   if (!sensirion_history_flush())
@@ -482,6 +492,12 @@ void CO2Monitor0601::begin_ble_security_(esp_bd_addr_t remote_bda) {
 }
 
 void CO2Monitor0601::set_ble_pairing_mode(bool enabled) {
+  if (this->sensirion_bridge_ != nullptr) {
+    this->sensirion_bridge_->set_pairing_mode(enabled);
+    this->ble_pairing_mode_ = enabled;
+    if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(enabled);
+    return;
+  }
   this->ble_pairing_mode_ = enabled;
   this->ble_pairing_started_ms_ = enabled ? millis() : 0;
   if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(enabled);
@@ -497,6 +513,14 @@ void CO2Monitor0601::set_ble_pairing_mode(bool enabled) {
 }
 
 void CO2Monitor0601::process_ble_pairing_window_() {
+  if (this->sensirion_bridge_ != nullptr) {
+    const bool enabled = this->sensirion_bridge_->pairing_mode();
+    if (enabled != this->ble_pairing_mode_) {
+      this->ble_pairing_mode_ = enabled;
+      if (this->ble_pairing_switch_ != nullptr) this->ble_pairing_switch_->publish_state(enabled);
+    }
+    return;
+  }
   if (!this->ble_pairing_mode_) return;
   if (static_cast<uint32_t>(millis() - this->ble_pairing_started_ms_) < this->ble_pairing_window_ms_) return;
   ESP_LOGW(TAG, "BLE Pairing Mode expired");
@@ -526,7 +550,9 @@ void CO2Monitor0601::open_wifi_recovery_window_(uint32_t now, const char *reason
 
 #if UNNI_BLE_ENABLED
 void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
-  const bool enabled = !sensirion_settings_ha_disabled();
+  const bool enabled = !(this->sensirion_bridge_ != nullptr
+                             ? this->sensirion_bridge_->settings_ha_disabled()
+                             : sensirion_settings_ha_disabled());
   if (enabled == this->wifi_ha_enabled_) return;
   ESP_LOGW(TAG, "MyAmbience 0x81FE changed: WiFi Home Assistant -> %s",
            enabled ? "ON" : "OFF");
@@ -552,6 +578,10 @@ void CO2Monitor0601::sync_wifi_ha_from_sensirion_settings_() {
 #endif
 
 void CO2Monitor0601::publish_external_temperature_humidity(float temperature_c, float humidity_percent) {
+  if (this->sensirion_bridge_ != nullptr) {
+    this->sensirion_bridge_->publish_external_temperature_humidity(temperature_c, humidity_percent);
+    return;
+  }
   if (!this->standalone_sensirion_mode_) {
     ESP_LOGW(TAG, "Ignoring external T/RH sample because standalone_sensirion_mode is disabled");
     return;
@@ -603,7 +633,10 @@ void CO2Monitor0601::set_wifi_ha_enabled(bool enabled) {
 #if UNNI_BLE_ENABLED
   // Keep the MyAmbience 0x81FE control synchronized with the HA switch.
   // 0x81FE uses the inverse sense: true means HA/WiFi disabled.
-  sensirion_settings_set_ha_disabled(!enabled);
+  if (this->sensirion_bridge_ != nullptr)
+    this->sensirion_bridge_->set_settings_ha_disabled(!enabled);
+  else
+    sensirion_settings_set_ha_disabled(!enabled);
 #endif
   this->wifi_ha_enabled_ = enabled;
   if (this->wifi_ha_switch_ != nullptr) this->wifi_ha_switch_->publish_state(enabled);
@@ -745,7 +778,10 @@ void CO2Monitor0601::apply_power_policy_(bool force) {
 #if UNNI_BLE_ENABLED
   const uint32_t adv_ms = external ? this->ble_usb_advertising_interval_ms_
                                    : this->ble_battery_advertising_interval_ms_;
-  sensirion_ble_set_advertising_interval(adv_ms);
+  if (this->sensirion_bridge_ != nullptr)
+    this->sensirion_bridge_->set_advertising_interval(adv_ms);
+  else
+    sensirion_ble_set_advertising_interval(adv_ms);
   ESP_LOGI(TAG, "BLE advertising interval: %lu ms (%s policy)",
            static_cast<unsigned long>(adv_ms), external ? "USB" : "battery");
 #endif
@@ -1002,10 +1038,17 @@ bool CO2Monitor0601::initialize_sniffer_io_() {
 }
 
 void CO2Monitor0601::setup() {
-  sensirion_bridge_core().set_profile(this->sensirion_sht43_profile_
-                                          ? SensirionProfile::SHT43_TRH
-                                          : SensirionProfile::TRH_CO2);
-  this->setup_sensirion_sources_();
+  if (this->sensirion_bridge_ != nullptr) {
+    this->history_transfer_guard_.set_capture_probe(&sensor_capture_in_progress_);
+    this->sensirion_bridge_->set_history_transfer_guard(&this->history_transfer_guard_);
+  } else {
+    sensirion_bridge_core().set_profile(this->sensirion_sht43_profile_
+                                            ? SensirionProfile::SHT43_TRH
+                                            : SensirionProfile::TRH_CO2);
+    if (!this->standalone_sensirion_mode_)
+      this->history_transfer_guard_.set_capture_probe(&sensor_capture_in_progress_);
+    this->setup_sensirion_sources_();
+  }
   ESP_LOGI(TAG, "ESPHome entities registered normally; API/Wi-Fi presence is controlled by YAML");
 #if defined(USE_SENSOR) && defined(USE_BINARY_SENSOR) && defined(USE_SWITCH)
   ESP_LOGI(TAG, "ESPHome entity registry: sensors=%u binary_sensors=%u switches=%u",
@@ -1050,7 +1093,8 @@ void CO2Monitor0601::setup() {
   }
 
 #if UNNI_BLE_ENABLED
-  sensirion_ble_setup();
+  if (this->sensirion_bridge_ == nullptr) {
+    sensirion_ble_setup();
 
   // GATT topology must be built at runtime, not from a codegen setter.
   // ESPHome creates the BLEServer object before all of its generated setup
@@ -1103,10 +1147,11 @@ void CO2Monitor0601::setup() {
   } else {
     ESP_LOGE(TAG, "BLE enabled but no GATT server instance is available");
   }
+  }
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_set_capture_guard_enabled(!this->standalone_sensirion_mode_);
-  sensirion_history_setup(this->history_time_);
+  if (this->sensirion_bridge_ == nullptr)
+    sensirion_history_setup(this->history_time_);
 #endif
 
   if (!this->standalone_sensirion_mode_) {
@@ -1275,7 +1320,8 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   if (!rtrh_decoder::poll(m)) return;
   power_save::on_rtrh_complete();
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_note_rtrh_cycle();
+  this->history_transfer_guard_.note_rtrh_cycle(
+      static_cast<uint64_t>(esp_timer_get_time()));
 #endif
 
   ESP_LOGI(TAG,
@@ -1484,8 +1530,13 @@ void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
     // falling back to the RT model rather than publishing NaN.
     const float sensirion_temperature_c =
         std::isfinite(m.air_temperature_c) ? m.air_temperature_c : m.temperature_c;
-    sensirion_ble_set_temperature_humidity(sensirion_temperature_c, m.humidity_percent);
-    this->sensirion_sample_updated_();
+    if (this->sensirion_bridge_ != nullptr)
+      this->sensirion_bridge_->publish_temperature_humidity(sensirion_temperature_c,
+                                                            m.humidity_percent);
+    else {
+      sensirion_ble_set_temperature_humidity(sensirion_temperature_c, m.humidity_percent);
+      this->sensirion_sample_updated_();
+    }
 #endif
 
     this->ha_.temperature = m.temperature_c;
@@ -1765,9 +1816,17 @@ void CO2Monitor0601::process_co2_() {
 #endif
 
 #if UNNI_BLE_HISTORY_ENABLED
-  if (result.have_co2 || result.frame_errors != 0)
-    sensirion_history_note_co2_capture(capture.raw_scl_edges,
-                                       result.frame_errors != 0);
+  if (result.have_co2 || result.frame_errors != 0) {
+    const uint64_t previous_guard_us = this->history_transfer_guard_.pre_guard_us();
+    if (this->history_transfer_guard_.note_co2_capture(capture.raw_scl_edges,
+                                                       result.frame_errors != 0)) {
+      ESP_LOGI(TAG, "history adaptive pre-guard %u -> %u ms after CO2 capture SCL=%u frame_error=%s",
+               static_cast<unsigned>(previous_guard_us / 1000U),
+               static_cast<unsigned>(this->history_transfer_guard_.pre_guard_us() / 1000U),
+               static_cast<unsigned>(capture.raw_scl_edges),
+               result.frame_errors != 0 ? "yes" : "no");
+    }
+  }
 #endif
 
   if (result.crc_errors) {
@@ -1789,7 +1848,8 @@ void CO2Monitor0601::process_co2_() {
 #if UNNI_BLE_HISTORY_ENABLED
   // A protocol- and CRC-valid passive frame is the timing anchor for the
   // cooperative history sender. Plausibility/confirmation remain independent.
-  sensirion_history_note_valid_co2_frame();
+  this->history_transfer_guard_.note_valid_co2_frame(
+      static_cast<uint64_t>(esp_timer_get_time()));
 #endif
 
   const uint16_t ppm = result.co2_ppm;
@@ -1842,8 +1902,12 @@ void CO2Monitor0601::process_co2_() {
 void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
   power_save::on_valid_co2();
 #if UNNI_BLE_ENABLED
-  sensirion_ble_set_co2(ppm);
-  this->sensirion_sample_updated_();
+  if (this->sensirion_bridge_ != nullptr)
+    this->sensirion_bridge_->publish_co2(ppm);
+  else {
+    sensirion_ble_set_co2(ppm);
+    this->sensirion_sample_updated_();
+  }
 #endif
 
   this->ha_.co2 = static_cast<float>(ppm);
@@ -2032,11 +2096,16 @@ void CO2Monitor0601::loop() {
   uint64_t stage_us = static_cast<uint64_t>(esp_timer_get_time());
 #endif
 #if UNNI_BLE_ENABLED
-  sensirion_ble_loop();
-  sensirion_settings_loop();
+  if (this->sensirion_bridge_ == nullptr) {
+    sensirion_ble_loop();
+    sensirion_settings_loop();
+  }
 #endif
 #if UNNI_BLE_HISTORY_ENABLED
-  sensirion_history_loop(this->io_initialized_ ? &sensor_capture_in_progress_ : nullptr);
+  if (this->sensirion_bridge_ == nullptr)
+    sensirion_history_loop(this->standalone_sensirion_mode_
+                               ? nullptr
+                               : &this->history_transfer_guard_);
 #endif
 #if UNNI_RUNTIME_DIAGNOSTICS
   runtime_diag_update_max_(this->runtime_diag_.max_history_us,
@@ -2116,7 +2185,8 @@ void CO2Monitor0601::loop() {
     if (rtrh_decoder::poll(discarded)) {
       power_save::on_rtrh_complete();
 #if UNNI_BLE_HISTORY_ENABLED
-      sensirion_history_note_rtrh_cycle();
+      this->history_transfer_guard_.note_rtrh_cycle(
+          static_cast<uint64_t>(esp_timer_get_time()));
 #endif
       ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
                static_cast<unsigned long>(discarded.sequence),

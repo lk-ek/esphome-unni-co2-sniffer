@@ -13,7 +13,7 @@ License: BSD-3-Clause. Copyright 2024 Sensirion AG. See [LICENSES/Sensirion-UPT-
 
 Relevant local code:
 
-- `co2_monitor_0601/sensirion_sample.h`: the temperature/humidity sample encoding formulas and `T_RH_CO2_ALT` byte layout are adapted from / compatible with Sensirion UPT Core's BLE protocol implementation.
+- `sensirion_gadget_bridge/sensirion_sample.h`: the temperature/humidity sample encoding formulas and `T_RH_CO2_ALT` byte layout are adapted from / compatible with Sensirion UPT Core's BLE protocol implementation.
 
 ## Sensirion Gadget BLE Arduino Library 1.5.0
 
@@ -23,8 +23,8 @@ License: BSD-3-Clause. Copyright (c) 2020, Sensirion AG. See [LICENSES/Sensirion
 
 Relevant local code:
 
-- `co2_monitor_0601/sensirion_ble.cpp`: Gadget/MyAmbience-compatible advertising layout and device-identity behavior are implemented with reference to the upstream Gadget BLE behavior.
-- `co2_monitor_0601/sensirion_history.cpp`: Gadget/MyAmbience-compatible GATT UUID topology and history-download wire format are implemented with reference to the upstream Gadget BLE implementation.
+- `sensirion_gadget_bridge/sensirion_ble.cpp`: Gadget/MyAmbience-compatible advertising layout and device-identity behavior are implemented with reference to the upstream Gadget BLE behavior.
+- `sensirion_gadget_bridge/sensirion_history.cpp`: Gadget/MyAmbience-compatible GATT UUID topology and history-download wire format are implemented with reference to the upstream Gadget BLE implementation.
 
 The local RAM/flash history ring, persistence/journaling, power policy, passive sensor decoders, ESPHome integration, and orchestration are project-specific implementations and are not claimed to originate from Sensirion Gadget BLE.
 
@@ -36,9 +36,9 @@ License: BSD-3-Clause. Copyright (c) 2023, Sensirion AG. See [LICENSES/Sensirion
 
 Relevant local code:
 
-- `co2_monitor_0601/sensirion_settings.cpp`: the Sensirion-compatible Device Settings service UUID topology, selected SHT43 DemoBoard settings, and authenticated/encrypted GATT security model are implemented with reference to the upstream SHT43 DemoBoard firmware.
-- `co2_monitor_0601/sensirion_sht43_probe.cpp`: the experimental SHT43 identity-probe GATT topology is implemented with reference to the upstream SHT43 DemoBoard firmware.
-- `co2_monitor_0601/sensirion_ble.cpp`: the experimental SHT43 identity/advertising mode and SHT43-compatible sample encoding are implemented with reference to the upstream SHT43 DemoBoard firmware.
+- `sensirion_gadget_bridge/sensirion_settings.cpp`: the Sensirion-compatible Device Settings service UUID topology, selected SHT43 DemoBoard settings, and authenticated/encrypted GATT security model are implemented with reference to the upstream SHT43 DemoBoard firmware.
+- `sensirion_gadget_bridge/sensirion_sht43_probe.cpp`: the experimental SHT43 identity-probe GATT topology is implemented with reference to the upstream SHT43 DemoBoard firmware.
+- `sensirion_gadget_bridge/sensirion_ble.cpp`: the experimental SHT43 identity/advertising mode and SHT43-compatible sample encoding are implemented with reference to the upstream SHT43 DemoBoard firmware.
 
 The local ESP-IDF/ESPHome implementation is project-specific. No STM32CubeWB source from the upstream SHT43 DemoBoard firmware is vendored or linked by this project.
 

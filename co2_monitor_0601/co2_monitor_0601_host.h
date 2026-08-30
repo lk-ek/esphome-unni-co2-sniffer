@@ -17,6 +17,7 @@ namespace time { class RealTimeClock; }
 namespace co2_monitor_0601 {
 
 class CO2Monitor0601;
+class SensirionGadgetBridge;
 
 class EnergySaveModeSwitch : public switch_::Switch {
  public:
@@ -51,6 +52,7 @@ class CO2Monitor0601 : public Component {
   void setup() override;
   void loop() override {}
   void prepare_for_ota() {}
+  void set_sensirion_bridge(SensirionGadgetBridge *) {}
   void set_standalone_sensirion_mode(bool) {}
   void set_sensirion_sht43_profile(bool value) { this->sensirion_sht43_profile_ = value; }
   void set_sensirion_temperature_source(sensor::Sensor *value) { this->sensirion_temperature_source_ = value; }

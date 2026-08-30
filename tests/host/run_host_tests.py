@@ -5,8 +5,8 @@
 
 The generated host YAML is derived mechanically from the real device YAML:
 ESP32/network/radio-only top-level blocks are removed, while the complete
-co2_monitor_0601 block is retained. This keeps the host matrix tied to the
-shipped configurations instead of maintaining five independent copies.
+component blocks are retained. This keeps the host matrix tied to the shipped
+configurations instead of maintaining independent copies.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parents[2]
 GENERATED_PREFIX = ".host-test-"
 PASS_MARKER = "UNNI HOST SELF-TEST PASSED"
 FAIL_MARKER = "UNNI HOST SELF-TEST FAILED"
+BRIDGE_PASS_MARKER = "SENSIRION BRIDGE HOST SELF-TEST PASSED"
+BRIDGE_FAIL_MARKER = "SENSIRION BRIDGE HOST SELF-TEST FAILED"
 
 VARIANTS = (
     "i2c-sniffer.yaml",
@@ -86,7 +88,7 @@ def _mobile_host_config(text: str) -> str:
     # The real mobile YAML's AHT21/ENS160, raw I2C control and boot automation
     # are hardware-only. Retain the exact bridge block while replacing those
     # sensors with portable templates carrying the same source/entity IDs.
-    bridge = _top_level_block(text, "co2_monitor_0601")
+    bridge = _top_level_block(text, "sensirion_gadget_bridge")
     ens160_templates = """
   - platform: template
     id: ens160_tvoc
@@ -115,11 +117,6 @@ sensor:
     id: aht21_humi
     name: AHT21 Humidity
 {ens160_templates}
-
-binary_sensor:
-  - platform: template
-    id: host_mobile_status
-    name: Host Mobile Status
 
 {bridge}"""
 
@@ -394,9 +391,6 @@ sensor:
   - platform: template
     id: source_humidity
     name: Source Humidity
-co2_monitor_0601:
-  ble: false
-  home_assistant: false
 {component}
 host:
   mac_address: "02:00:00:00:06:02"
@@ -405,26 +399,59 @@ host:
     cases = {
         "missing-source-pair": (
             "neg-missing-pair",
-            "sensirion_temperature_id and sensirion_humidity_id must be configured together",
-            """  standalone_sensirion_mode: true
-  sensirion_profile: sht43_trh
-  sensirion_temperature_id: source_temperature
-  sniffer_enabled: false
-  rtrh_enabled: false
+            "temperature_id and humidity_id must be configured together",
+            """sensirion_gadget_bridge:
+  ble: false
+  ble_live: false
+  ble_history: false
+  profile: sht43_trh
+  temperature_id: source_temperature
 """,
         ),
-        "sources-without-standalone": (
+        "legacy-sources-without-standalone": (
             "neg-source-mode",
             "Sensirion source IDs require standalone_sensirion_mode: true",
-            """  sensirion_temperature_id: source_temperature
+            """sensirion_gadget_bridge:
+  id: schema_bridge
+  ble: false
+  ble_live: false
+  ble_history: false
+co2_monitor_0601:
+  sensirion_bridge_id: schema_bridge
+  ble: false
+  home_assistant: false
+  sensirion_temperature_id: source_temperature
   sensirion_humidity_id: source_humidity
 """,
         ),
         "conflicting-profile-alias": (
             "neg-profile-alias",
-            "sht43_identity_probe: true conflicts with sensirion_profile: trh_co2",
-            """  sensirion_profile: trh_co2
+            "sht43_identity_probe: true conflicts with profile: trh_co2",
+            """sensirion_gadget_bridge:
+  ble: false
+  ble_live: false
+  ble_history: false
+  profile: trh_co2
   sht43_identity_probe: true
+""",
+        ),
+        "legacy-missing-source-pair": (
+            "neg-legacy-pair",
+            "sensirion_temperature_id and sensirion_humidity_id must be configured together",
+            """sensirion_gadget_bridge:
+  id: schema_bridge
+  ble: false
+  ble_live: false
+  ble_history: false
+co2_monitor_0601:
+  sensirion_bridge_id: schema_bridge
+  ble: false
+  home_assistant: false
+  standalone_sensirion_mode: true
+  sensirion_profile: sht43_trh
+  sensirion_temperature_id: source_temperature
+  sniffer_enabled: false
+  rtrh_enabled: false
 """,
         ),
     }
@@ -497,7 +524,7 @@ def _host_binary_path(variant: str) -> Path:
     return ROOT / ".esphome" / "build" / name / ".pioenvs" / name / "program"
 
 
-def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
+def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int, variant: str) -> bool:
     if not binary.is_file():
         print(f"Host binary not found after successful compile: {binary}", file=sys.stderr)
         return False
@@ -521,8 +548,10 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
     failed = False
     timed_out = False
     output = bytearray()
-    pass_marker = PASS_MARKER.encode()
-    fail_marker = FAIL_MARKER.encode()
+    mobile = variant.startswith("mobilesensor-sensirion")
+    expected_pass_marker = BRIDGE_PASS_MARKER if mobile else PASS_MARKER
+    pass_marker = expected_pass_marker.encode()
+    fail_markers = (FAIL_MARKER.encode(), BRIDGE_FAIL_MARKER.encode())
 
     try:
         assert proc.stdout is not None
@@ -540,7 +569,7 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
                     sys.stdout.buffer.write(chunk)
                     sys.stdout.buffer.flush()
                     output.extend(chunk)
-                    if fail_marker in output:
+                    if any(marker in output for marker in fail_markers):
                         failed = True
                         print("Host binary reported a self-test failure", file=sys.stderr)
                         break
@@ -561,7 +590,7 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
                         sys.stdout.buffer.write(chunk)
                         sys.stdout.buffer.flush()
                         output.extend(chunk)
-                    if fail_marker in output:
+                    if any(marker in output for marker in fail_markers):
                         failed = True
                     if pass_marker in output:
                         passed = True
@@ -581,7 +610,7 @@ def _run_host_binary(binary: Path, env: dict[str, str], timeout_s: int) -> bool:
                 proc.wait(timeout=2)
 
     if timed_out:
-        print(f"Host binary did not emit {PASS_MARKER!r} within {timeout_s}s", file=sys.stderr)
+        print(f"Host binary did not emit {expected_pass_marker!r} within {timeout_s}s", file=sys.stderr)
     return passed and not failed
 
 
@@ -591,7 +620,7 @@ def _run_smoke(esphome: str, config: Path, variant: str, env: dict[str, str], ti
     # ourselves so we control its lifetime and output capture.
     if _run_command([esphome, "compile", config.name], env) != 0:
         return False
-    return _run_host_binary(_host_binary_path(variant), env, timeout_s)
+    return _run_host_binary(_host_binary_path(variant), env, timeout_s, variant)
 
 
 def main() -> int:

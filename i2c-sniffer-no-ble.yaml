@@ -50,7 +50,15 @@ esp32:
     type: esp-idf
 # BLE deliberately omitted for timing A/B test.
 
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
+  ble: false
+  ble_live: false
+  ble_history: false
+
 co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
   id: unni_co2_monitor
   home_assistant: true
   # Force battery-style runtime policy while physically powered by USB.

@@ -104,32 +104,22 @@ esp32_ble:
   max_key_size: 16
 
 
-# Reuse the project's Sensirion/MyAmbience implementation without enabling any
-# of the Unni-specific capture, GPIO, power-policy or battery subsystems.
-co2_monitor_0601:
+# Standalone Sensirion/MyAmbience bridge. No Unni capture, GPIO, power-policy
+# or battery subsystem is instantiated on this permanently powered device.
+sensirion_gadget_bridge:
   id: sensirion_bridge
-  standalone_sensirion_mode: true
-  sensirion_profile: sht43_trh
+  profile: sht43_trh
   sht43_identity_probe: true
-  sensirion_temperature_id: aht21_temp
-  sensirion_humidity_id: aht21_humi
+  temperature_id: aht21_temp
+  humidity_id: aht21_humi
   history_time_id: mobilesensor_wall_clock
 
   ble: true
   ble_live: true
   ble_history: true
-  ble_advertising_interval: 2s
-
-  home_assistant: true
-  sniffer_enabled: false
-  rtrh_enabled: false
-  rtrh_gpio_setup: false
-  rtrh_edge_capture: false
-  rtrh_decode_only: false
-  active_i2c_probe: false
-  light_sleep: false
-  debug_metrics: false
-  runtime_diagnostics: false
+  advertising_interval: 2s
+  pairing_mode:
+    name: BLE Pairing Mode
 
 
 i2c:

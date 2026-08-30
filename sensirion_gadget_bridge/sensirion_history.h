@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include "ble_options.h"
+#include "history_transfer_guard.h"
 #if UNNI_BLE_HISTORY_ENABLED && !defined(USE_HOST)
 
 #include <cstdint>
@@ -12,16 +13,9 @@
 namespace esphome {
 namespace co2_monitor_0601 {
 
-// Bit 0: I2C capture, bit 1: RT/RH capture.
-using SensirionHistoryCaptureProbe = uint8_t (*)();
-
 void sensirion_history_setup(time::RealTimeClock *wall_clock);
-void sensirion_history_loop(SensirionHistoryCaptureProbe capture_probe);
+void sensirion_history_loop(HistoryTransferGuard *transfer_guard);
 void sensirion_history_on_sample_updated();
-void sensirion_history_set_capture_guard_enabled(bool enabled);
-void sensirion_history_note_valid_co2_frame();
-void sensirion_history_note_rtrh_cycle();
-void sensirion_history_note_co2_capture(uint16_t raw_scl_edges, bool frame_error);
 bool sensirion_history_flush();
 void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server);
 void sensirion_history_gatts_event_handler(esp_gatts_cb_event_t event,

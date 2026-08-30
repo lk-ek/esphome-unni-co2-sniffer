@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-// Compile-time feature switches for the Unni CO2 sniffer.
+// Compile-time feature switches retained under their established names for
+// wire/build compatibility with the Unni component.
 //
 // ESPHome's cg.add_define() writes these feature flags to
 // esphome/core/defines.h.  Include that file BEFORE applying standalone
@@ -34,6 +35,7 @@
 #else
 #define UNNI_BLE_HISTORY_ENABLED UNNI_BLE_ENABLED
 #endif
+#endif
 
 #ifndef UNNI_RUNTIME_DIAGNOSTICS
 #define UNNI_RUNTIME_DIAGNOSTICS 0
@@ -41,7 +43,6 @@
 
 #ifndef UNNI_BLE_DEVICE_DERIVED_IDENTITY
 #define UNNI_BLE_DEVICE_DERIVED_IDENTITY 1
-#endif
 #endif
 
 #if UNNI_BLE_LIVE_ENABLED && !UNNI_BLE_ENABLED

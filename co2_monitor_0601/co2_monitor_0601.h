@@ -6,7 +6,9 @@
 #include "co2_monitor_0601_host.h"
 #else
 
-#include "ble_options.h"
+#include "../sensirion_gadget_bridge/ble_options.h"
+#include "../sensirion_gadget_bridge/sensirion_gadget_bridge.h"
+#include "unni_history_transfer_guard.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
@@ -65,6 +67,7 @@ class CO2Monitor0601 : public Component {
   void setup() override;
   void loop() override;
   void prepare_for_ota();
+  void set_sensirion_bridge(SensirionGadgetBridge *value) { this->sensirion_bridge_ = value; }
   void set_standalone_sensirion_mode(bool value) { this->standalone_sensirion_mode_ = value; }
   void set_sensirion_sht43_profile(bool value) { this->sensirion_sht43_profile_ = value; }
   void set_sensirion_temperature_source(sensor::Sensor *value) { this->sensirion_temperature_source_ = value; }
@@ -78,7 +81,10 @@ class CO2Monitor0601 : public Component {
                            esp_ble_gatts_cb_param_t *param);
   void set_ble_advertising_interval(uint32_t interval_ms);
   void set_ble_battery_advertising_interval(uint32_t interval_ms) { this->ble_battery_advertising_interval_ms_ = interval_ms; }
-  void set_ble_device_name(const std::string &name) { this->ble_device_name_ = name; }
+  void set_ble_device_name(const std::string &name) {
+    this->ble_device_name_ = name;
+    if (this->sensirion_bridge_ != nullptr) this->sensirion_bridge_->set_ble_device_name(name);
+  }
 #endif
 
   void set_ha_publish_interval(uint32_t value) { this->ha_.interval_ms = value; }
@@ -116,7 +122,10 @@ class CO2Monitor0601 : public Component {
   void set_wifi_ha_enabled(bool enabled);
 #if UNNI_BLE_ENABLED
   void set_ble_pairing_mode_switch(BlePairingModeSwitch *s) { this->ble_pairing_switch_ = s; }
-  void set_ble_pairing_window(uint32_t value) { this->ble_pairing_window_ms_ = value; }
+  void set_ble_pairing_window(uint32_t value) {
+    this->ble_pairing_window_ms_ = value;
+    if (this->sensirion_bridge_ != nullptr) this->sensirion_bridge_->set_pairing_window(value);
+  }
   void set_ble_pairing_mode(bool enabled);
 #endif
   void set_energy_save_mode(bool enabled);
@@ -357,6 +366,8 @@ class CO2Monitor0601 : public Component {
 #endif
 
   time::RealTimeClock *history_time_{nullptr};
+  SensirionGadgetBridge *sensirion_bridge_{nullptr};
+  UnniHistoryTransferGuard history_transfer_guard_{};
   bool standalone_sensirion_mode_{false};
   bool sensirion_sht43_profile_{false};
   sensor::Sensor *sensirion_temperature_source_{nullptr};

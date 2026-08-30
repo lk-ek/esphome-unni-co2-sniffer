@@ -16,7 +16,8 @@ tested XIAO ESP32-C3 installation.
 
 Use current information in this order:
 
-1. The implementation under `co2_monitor_0601/` and the shipped YAML variants.
+1. The implementation under `co2_monitor_0601/`, `sensirion_gadget_bridge/`,
+   and the shipped YAML variants.
 2. `README.md` for the supported user-facing design and configuration.
 3. `docs/ISR_ARCHITECTURE.md` for ISR, concurrency, and decoder invariants.
 4. `tests/host/README.md` and the tests themselves for the native regression
@@ -59,12 +60,12 @@ Keep responsibilities separated:
 - `i2c_sniffer.cpp/.h`: generic passive I2C edge capture and frame assembly.
 - `co2_decoder.cpp/.h`: CO2 command/response and CRC decoding.
 - `rtrh_decoder.cpp/.h`: RT/RH capture, validation, quality, and calibration.
-- `sensirion_sample.h`: shared BLE/history sample representation.
-- `sensirion_bridge_core.cpp/.h`: portable profile-aware authoritative sample
-  state and external T/RH coalescing.
-- `sensirion_ble.cpp/.h`: advertising, GAP/GATT behavior, and live data.
-- `sensirion_history.cpp/.h`: persistent sample ring and history download.
-- `__init__.py`: ESPHome schema, validation, code generation, build flags,
+- `sensirion_gadget_bridge/`: reusable ESPHome component containing the shared
+  profile-aware sample, external T/RH coalescer, advertising, GAP/GATT,
+  settings, and persistent history.
+- `co2_monitor_0601/unni_history_transfer_guard.h`: Unni capture prediction and
+  activity adapter injected into the generic history transport.
+- Each component's `__init__.py`: its own schema, code generation, build flags,
   sdkconfig, and partition requirements.
 
 Preserve the Python-to-C++ setter surface unless a task deliberately changes

@@ -4,10 +4,11 @@
 
 #include "calibration.h"
 #include "co2_decoder.h"
-#include "sensirion_sample.h"
-#include "sensirion_bridge_core.h"
-#include "sensirion_history_format.h"
-#include "sensirion_history_guard.h"
+#include "../sensirion_gadget_bridge/sensirion_sample.h"
+#include "../sensirion_gadget_bridge/sensirion_bridge_core.h"
+#include "../sensirion_gadget_bridge/sensirion_history_format.h"
+#include "../sensirion_gadget_bridge/sensirion_history_guard.h"
+#include "unni_history_transfer_guard.h"
 #include "esphome/core/log.h"
 
 #include <cerrno>
@@ -270,7 +271,7 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
-  sensirion_history_guard::Guard history_guard{};
+  UnniHistoryTransferGuard history_guard{};
   constexpr uint64_t anchor_us = 1000000ULL;
   history_guard.note_co2_frame(anchor_us);
   if (history_guard.blocked(anchor_us + 5199999ULL) ||
@@ -294,7 +295,7 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
-  sensirion_history_guard::Guard tail_guard{};
+  UnniHistoryTransferGuard tail_guard{};
   tail_guard.set_capture_active(true, anchor_us);
   tail_guard.set_capture_active(false, anchor_us + 10000ULL);
   if (!tail_guard.blocked(anchor_us + 34999ULL) ||
@@ -303,7 +304,7 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
-  sensirion_history_guard::Guard overlap_guard{};
+  UnniHistoryTransferGuard overlap_guard{};
   overlap_guard.set_capture_mask(0x01U, anchor_us);
   overlap_guard.set_capture_mask(0x03U, anchor_us + 700000ULL);
   if (!overlap_guard.blocked(anchor_us + 1400000ULL) ||
@@ -312,7 +313,7 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
-  sensirion_history_guard::Guard quality_guard{};
+  UnniHistoryTransferGuard quality_guard{};
   quality_guard.note_capture_quality(true);
   if (quality_guard.pre_guard_us() != 1050000ULL) {
     ESP_LOGE(TAG, "portable self-test: damaged capture did not extend pre-guard");
@@ -330,21 +331,21 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
-  sensirion_history_guard::Guard adaptive_guard{};
+  UnniHistoryTransferGuard adaptive_guard{};
   adaptive_guard.note_co2_frame(anchor_us);
   adaptive_guard.note_co2_frame(anchor_us + 6400000ULL);
-  if (adaptive_guard.co2.estimated_period_us != 6050000ULL) {
+  if (adaptive_guard.co2_estimated_period_us() != 6050000ULL) {
     ESP_LOGE(TAG, "portable self-test: adaptive history period update failed");
     return false;
   }
   adaptive_guard.note_co2_frame(anchor_us + 6400000ULL + 12100000ULL);
-  if (adaptive_guard.co2.estimated_period_us != 6050000ULL) {
+  if (adaptive_guard.co2_estimated_period_us() != 6050000ULL) {
     ESP_LOGE(TAG, "portable self-test: missed-frame period normalization failed");
     return false;
   }
 
-  sensirion_history_guard::Guard rtrh_guard{};
-  rtrh_guard.note_rtrh_cycle(anchor_us + sensirion_history_guard::RTRH_COMPLETION_LAG_US);
+  UnniHistoryTransferGuard rtrh_guard{};
+  rtrh_guard.note_rtrh_cycle(anchor_us + UnniHistoryTransferGuard::rtrh_completion_lag_us());
   if (rtrh_guard.blocked(anchor_us + 29199999ULL) ||
       !rtrh_guard.blocked(anchor_us + 29200000ULL) ||
       !rtrh_guard.blocked(anchor_us + 30150000ULL) ||

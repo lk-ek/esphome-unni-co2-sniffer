@@ -3,7 +3,15 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import binary_sensor, esp32_ble, esp32_ble_server, sensor, switch, time as time_component
+from esphome.components import (
+    binary_sensor,
+    esp32_ble,
+    esp32_ble_server,
+    sensor,
+    sensirion_gadget_bridge,
+    switch,
+    time as time_component,
+)
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
@@ -14,7 +22,7 @@ from esphome.core import CORE, TimePeriod
 
 # BLE is deliberately NOT a hard dependency. A real `ble: false` build therefore
 # does not need esp32_ble / esp32_ble_server in the YAML at all.
-DEPENDENCIES = []
+DEPENDENCIES = ["sensirion_gadget_bridge"]
 
 
 def AUTO_LOAD(config):
@@ -36,10 +44,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
         "i2c_sniffer.cpp": {PlatformFramework.ESP32_IDF},
         "power_save.cpp": {PlatformFramework.ESP32_IDF},
         "rtrh_decoder.cpp": {PlatformFramework.ESP32_IDF},
-        "sensirion_ble.cpp": {PlatformFramework.ESP32_IDF},
-        "sensirion_history.cpp": {PlatformFramework.ESP32_IDF},
-        "sensirion_settings.cpp": {PlatformFramework.ESP32_IDF},
-        "sensirion_sht43_probe.cpp": {PlatformFramework.ESP32_IDF},
         "co2_monitor_0601_host.cpp": {PlatformFramework.HOST_NATIVE},
     }
 )
@@ -109,6 +113,7 @@ CONF_STANDALONE_SENSIRION_MODE = "standalone_sensirion_mode"
 CONF_SENSIRION_PROFILE = "sensirion_profile"
 CONF_SENSIRION_TEMPERATURE_ID = "sensirion_temperature_id"
 CONF_SENSIRION_HUMIDITY_ID = "sensirion_humidity_id"
+CONF_SENSIRION_BRIDGE_ID = "sensirion_bridge_id"
 CONF_ENERGY_SAVE_MODE_DEFAULT = "energy_save_mode_default"
 CONF_ENERGY_SAVE_GRACE = "energy_save_grace"
 CONF_WIFI_HA_ENABLED = "wifi_ha_enabled"
@@ -130,6 +135,7 @@ CONF_CALIBRATION_EXTRAPOLATION = "calibration_extrapolation"
 
 co2_monitor_0601_ns = cg.esphome_ns.namespace("co2_monitor_0601")
 CO2Monitor0601 = co2_monitor_0601_ns.class_("CO2Monitor0601", cg.Component)
+SensirionGadgetBridge = sensirion_gadget_bridge.SensirionGadgetBridge
 EnergySaveModeSwitch = co2_monitor_0601_ns.class_("EnergySaveModeSwitch", switch.Switch)
 BlePairingModeSwitch = co2_monitor_0601_ns.class_("BlePairingModeSwitch", switch.Switch)
 WifiHaSwitch = co2_monitor_0601_ns.class_("WifiHaSwitch", switch.Switch)
@@ -468,6 +474,7 @@ _SCHEMA = {
     cv.Optional(CONF_SENSIRION_PROFILE): cv.one_of("trh_co2", "sht43_trh", lower=True),
     cv.Optional(CONF_SENSIRION_TEMPERATURE_ID): cv.use_id(sensor.Sensor),
     cv.Optional(CONF_SENSIRION_HUMIDITY_ID): cv.use_id(sensor.Sensor),
+    cv.Required(CONF_SENSIRION_BRIDGE_ID): cv.use_id(SensirionGadgetBridge),
     cv.Optional(CONF_SNIFFER_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_ENABLED, default=True): cv.boolean,
     cv.Optional(CONF_RTRH_GPIO_SETUP, default=False): cv.boolean,
@@ -584,6 +591,10 @@ async def to_code(config):
     home_assistant_enabled = config[CONF_HOME_ASSISTANT]
     sht43_identity_probe = config[CONF_SENSIRION_PROFILE] == "sht43_trh"
     standalone_sensirion = config.get(CONF_STANDALONE_SENSIRION_MODE, False)
+    external_bridge = CONF_SENSIRION_BRIDGE_ID in config
+    if external_bridge:
+        bridge = await cg.get_variable(config[CONF_SENSIRION_BRIDGE_ID])
+        cg.add(var.set_sensirion_bridge(bridge))
 
     if not CORE.is_host:
         # The Unni sniffer is timing-sensitive and validated at 80 MHz on ESP32-C3.
@@ -597,7 +608,7 @@ async def to_code(config):
         # (for example during NVS/history writes) cannot trigger a cache panic.
         add_idf_sdkconfig_option("CONFIG_GPIO_CTRL_FUNC_IN_IRAM", True)
 
-        if config[CONF_BLE_HISTORY]:
+        if config[CONF_BLE_HISTORY] and not external_bridge:
             add_partition("senshist", "data", "spiffs", 0x10000)
 
         if config[CONF_LIGHT_SLEEP] and not standalone_sensirion:
@@ -605,7 +616,7 @@ async def to_code(config):
             add_idf_sdkconfig_option("CONFIG_FREERTOS_USE_TICKLESS_IDLE", True)
             add_idf_sdkconfig_option("CONFIG_ESP_PHY_MAC_BB_PD", True)
 
-        if ble_enabled and not standalone_sensirion:
+        if ble_enabled and not standalone_sensirion and not external_bridge:
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP", True)
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_MODEM_SLEEP_MODE_1", True)
             add_idf_sdkconfig_option("CONFIG_BT_CTRL_LPCLK_SEL_MAIN_XTAL", True)
@@ -634,16 +645,17 @@ async def to_code(config):
         cg.add_define("ESPHOME_ENTITY_SWITCH_COUNT", 0)
 
     cg.add_define("UNNI_HOME_ASSISTANT_ENABLED", int(home_assistant_enabled))
-    cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
-    cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
-    cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
-    cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
+    if not external_bridge:
+        cg.add_define("UNNI_BLE_ENABLED", int(ble_enabled))
+        cg.add_define("UNNI_BLE_LIVE_ENABLED", int(config[CONF_BLE_LIVE]))
+        cg.add_define("UNNI_BLE_HISTORY_ENABLED", int(config[CONF_BLE_HISTORY]))
+        cg.add_define("UNNI_SHT43_IDENTITY_PROBE", int(sht43_identity_probe))
+        cg.add_define(
+            "UNNI_BLE_DEVICE_DERIVED_IDENTITY",
+            int(config[CONF_BLE_IDENTITY_MODE] == "device_derived"),
+        )
     cg.add_define("UNNI_STANDALONE_SENSIRION_MODE", int(standalone_sensirion))
     cg.add_define("UNNI_RUNTIME_DIAGNOSTICS", int(config[CONF_RUNTIME_DIAGNOSTICS]))
-    cg.add_define(
-        "UNNI_BLE_DEVICE_DERIVED_IDENTITY",
-        int(config[CONF_BLE_IDENTITY_MODE] == "device_derived"),
-    )
     cg.add_define("RTRH_DEBUG_CAPTURE", int(config[CONF_DEBUG_CAPTURE]))
     if not CORE.is_host and config[CONF_I2C_CAPTURE_BACKEND] == "rmt_scl":
         # Keep the RMT RX driver/callback operational through cache-disabled
@@ -651,7 +663,7 @@ async def to_code(config):
         # fixed internal-SRAM storage.
         add_idf_sdkconfig_option("CONFIG_RMT_RX_ISR_CACHE_SAFE", True)
 
-    if CONF_HISTORY_TIME_ID in config and not CORE.is_host:
+    if CONF_HISTORY_TIME_ID in config and not CORE.is_host and not external_bridge:
         history_time = await cg.get_variable(config[CONF_HISTORY_TIME_ID])
         cg.add(var.set_history_time(history_time))
 
@@ -660,7 +672,7 @@ async def to_code(config):
         cg.add(var.set_ble_advertising_interval(config[CONF_BLE_ADVERTISING_INTERVAL]))
         cg.add(var.set_ble_battery_advertising_interval(config[CONF_BLE_BATTERY_ADVERTISING_INTERVAL]))
 
-        if not CORE.is_host:
+        if not CORE.is_host and not external_bridge:
             ble = await cg.get_variable(config[CONF_BLE_ID])
             # Set the Sensirion GAP/local name on ESPHome's BLE component itself.
             # This runs before component setup and prevents ESP32BLE from falling

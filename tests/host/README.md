@@ -6,16 +6,16 @@ external component. It uses ESPHome's official `host:` platform.
 `run_host_tests.py` derives a temporary native-host configuration from each of
 the seven shipped device YAML files. It removes only top-level blocks that are
 ESP32/network/radio specific (`esp32`, `esp32_ble`, `wifi`, `api`, `ota`, `captive_portal`, and
-`time`) and retains the real `co2_monitor_0601:` feature block.
+`time`) and retains the real component feature blocks.
 Therefore changes to a shipped variant automatically flow into its host test.
 For both mobile YAMLs, the hardware-only AHT21 and optional ENS160 entries are
-replaced by template sensors with the same IDs. A template status binary sensor
-also preserves ESPHome 2026.8's generated entity-count contract on host. Three
-negative configs verify paired source IDs, standalone-only source binding, and
-profile/alias conflict rejection.
+replaced by template sensors with the same IDs, while their real
+`sensirion_gadget_bridge:` block is retained. Negative configs verify the new
+bridge's paired source IDs and profile/alias conflict as well as the retained
+legacy standalone-schema constraints.
 
-The component's native host implementation keeps the same code-generation
-setter surface as the ESP32 implementation. At startup it:
+The native host implementations keep the same code-generation setter surfaces
+as their ESP32 implementations. At startup they:
 
 - verifies a known-good EC05/500 ppm capture;
 - verifies rejection/accounting of a bad Sensirion CRC;
@@ -30,8 +30,9 @@ setter surface as the ESP32 implementation. At startup it:
   download-guard boundaries;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
-- prints `UNNI HOST SELF-TEST PASSED` on success (including an explicitly flushed
-  native stderr marker for the runner) and marks the component failed otherwise.
+- prints `UNNI HOST SELF-TEST PASSED` for Unni variants or
+  `SENSIRION BRIDGE HOST SELF-TEST PASSED` for standalone mobile variants and
+  marks the corresponding component failed otherwise.
 
 It intentionally does **not** emulate GPIO edges, ISR timing, ADC, light sleep,
 ESP power-management locks, BLE radio/GATT behavior, Wi-Fi, or flash partition

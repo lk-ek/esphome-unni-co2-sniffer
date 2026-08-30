@@ -22,7 +22,17 @@ esp32:
   framework:
     type: esp-idf
 
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
+  ble: true
+  ble_live: true
+  ble_history: true
+  device_name: "Unni CO2 Monitor"
+  advertising_interval: 2s
+
 co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
   ble_device_name: "Unni CO2 Monitor"
   home_assistant: false
   ble: true
