@@ -835,12 +835,22 @@ bool CO2Monitor0601::setup_battery_adc_() {
     return false;
   }
 
+#if defined(CONFIG_IDF_TARGET_ESP32)
+  // The original ESP32 uses the line-fitting calibration scheme. Newer ESP32
+  // variants used by the Unni firmware (C3/C6) expose curve fitting instead.
+  adc_cali_line_fitting_config_t cali_cfg{};
+  cali_cfg.unit_id = this->battery_.unit;
+  cali_cfg.atten = ADC_ATTEN_DB_12;
+  cali_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
+  err = adc_cali_create_scheme_line_fitting(&cali_cfg, &this->battery_.cali_handle);
+#else
   adc_cali_curve_fitting_config_t cali_cfg{};
   cali_cfg.unit_id = this->battery_.unit;
   cali_cfg.chan = this->battery_.channel;
   cali_cfg.atten = ADC_ATTEN_DB_12;
   cali_cfg.bitwidth = ADC_BITWIDTH_DEFAULT;
   err = adc_cali_create_scheme_curve_fitting(&cali_cfg, &this->battery_.cali_handle);
+#endif
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "Battery ADC calibration unavailable (%d); battery entities disabled", err);
     return false;

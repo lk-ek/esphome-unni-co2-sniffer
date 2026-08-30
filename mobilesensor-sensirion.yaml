@@ -214,6 +214,10 @@ sensor:
 
     update_interval: 5s
 
+binary_sensor:
+  - platform: status
+    name: "Status"
+    id: mobilesensor_status
 
 switch:
   - platform: template
