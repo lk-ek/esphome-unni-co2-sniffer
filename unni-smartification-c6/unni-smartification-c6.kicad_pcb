@@ -21116,14 +21116,6 @@
 		(uuid "dfea1d23-d087-491c-a309-d3bef4bc651b")
 	)
 	(via
-		(at 147.2 135.53)
-		(size 0.6)
-		(drill 0.3)
-		(layers "F.Cu" "B.Cu")
-		(net "CONN_BTN")
-		(uuid "e4f5e02a-4a35-4d88-94e2-cf50b8a27205")
-	)
-	(via
 		(at 135.67 135.19)
 		(size 0.6)
 		(drill 0.3)
