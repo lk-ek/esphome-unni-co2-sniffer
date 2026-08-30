@@ -7,6 +7,8 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_rom_sys.h"
+#include "soc/gpio_reg.h"
+#include "soc/soc.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -31,6 +33,8 @@ namespace i2c_sniffer {
 static const char *TAG = "i2c_sniffer";
 static gpio_num_t pin_scl = GPIO_NUM_7;
 static gpio_num_t pin_sda = GPIO_NUM_6;
+static uint32_t pin_scl_mask = 1U << 7;
+static uint32_t pin_sda_mask = 1U << 6;
 static constexpr uint16_t MAX_SAMPLES = 4096;
 static constexpr uint32_t CAPTURE_TIMEOUT_US = 5000;
 
@@ -73,10 +77,22 @@ static uint32_t diag_prev_completed_captures = 0;
 
 
 static inline uint8_t IRAM_ATTR read_gpio_state() {
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  // Both Unni tap GPIOs live in the low 32-bit GPIO bank on C3/C6. Read that
+  // bank once so SDA/SCL are captured atomically and with substantially less
+  // ISR work than two gpio_get_level() calls. Besides reducing handler time,
+  // this avoids synthesizing an impossible mixed bus state if one line changes
+  // between two independent GPIO reads.
+  const uint32_t levels = REG_READ(GPIO_IN_REG);
+  return static_cast<uint8_t>(((levels & pin_scl_mask) ? 0x01U : 0U) |
+                              ((levels & pin_sda_mask) ? 0x02U : 0U));
+#else
+  // Portable fallback for other ESP32 families.
   uint8_t value = 0;
   if (gpio_get_level(pin_scl)) value |= 0x01;
   if (gpio_get_level(pin_sda)) value |= 0x02;
   return value;
+#endif
 }
 static inline bool scl_level(uint8_t value) { return (value & 0x01) != 0; }
 static inline bool sda_level(uint8_t value) { return (value & 0x02) != 0; }
@@ -1144,6 +1160,14 @@ static bool master_read_byte_(uint8_t &value, bool ack) {
 bool setup(uint8_t sda_pin, uint8_t scl_pin) {
   pin_sda = static_cast<gpio_num_t>(sda_pin);
   pin_scl = static_cast<gpio_num_t>(scl_pin);
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
+  // C3/C6 expose all GPIOs through the low 32-bit input register. Keep the
+  // optimized path explicit so other ESP32 families can still use pins >= 32
+  // through the gpio_get_level() fallback without an invalid 32-bit shift.
+  if (static_cast<uint32_t>(pin_scl) >= 32U || static_cast<uint32_t>(pin_sda) >= 32U) return false;
+  pin_scl_mask = 1U << static_cast<uint32_t>(pin_scl);
+  pin_sda_mask = 1U << static_cast<uint32_t>(pin_sda);
+#endif
   gpio_config_t io{};
   io.mode = GPIO_MODE_INPUT;
   io.pull_up_en = GPIO_PULLUP_DISABLE;

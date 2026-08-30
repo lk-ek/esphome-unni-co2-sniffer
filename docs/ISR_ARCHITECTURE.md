@@ -66,12 +66,21 @@ Both pins use `GPIO_INTR_ANYEDGE` and both call the same `gpio_isr()`.
 The passive I²C ISR does this:
 
 1. Return immediately if capture is paused.
-2. Read the current microsecond timestamp using `esp_timer_get_time()`.
-3. Read **both** bus pins and encode them into a two-bit state.
+2. Snapshot **both** bus pins as early as possible and encode them into a two-bit state.
+   On ESP32-C3/C6 this is one atomic read of `GPIO_IN_REG`; other ESP32 families
+   use the portable `gpio_get_level()` fallback.
+3. Read the current microsecond timestamp using `esp_timer_get_time()`.
 4. Ignore the interrupt if the combined state is unchanged.
 5. Remember the bus state that existed before the first captured transition.
 6. Store `{timestamp, combined_state}` in the fixed capture buffer.
 7. If the buffer is full, mark the capture as overflowed and finished.
+
+The single-register C3/C6 snapshot both shortens the hottest part of the ISR and
+prevents a transition between two separate SCL/SDA reads from creating a bus
+state that never physically existed. The timestamp deliberately remains based
+on `esp_timer_get_time()`: replacing it with the CPU cycle counter would make
+recovery thresholds and debug-export timing depend on CPU-frequency/light-sleep
+assumptions for relatively little guaranteed benefit.
 
 The buffer contains 4096 entries, stored as two aligned arrays:
 
