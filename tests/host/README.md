@@ -18,7 +18,8 @@ setter surface as the ESP32 implementation. At startup it:
 - verifies the Sensirion sample serializer against a golden byte sequence,
   finite-value checks, and encoding clamps;
 - verifies history interval/generation handling and the portable predictive,
-  reactive, stale-frame, and wrap-safe download-guard boundaries;
+  reactive, adaptive-quality, stale-frame, overlap, and wrap-safe
+  download-guard boundaries;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
 - prints `UNNI HOST SELF-TEST PASSED` on success (including an explicitly flushed

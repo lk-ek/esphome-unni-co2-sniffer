@@ -17,6 +17,10 @@ constexpr uint64_t RTRH_MAX_PERIOD_US = 40000000ULL;
 constexpr uint64_t RTRH_MAX_AGE_US = 90000000ULL;
 constexpr uint64_t RTRH_COMPLETION_LAG_US = 500000ULL;
 constexpr uint64_t PRE_GUARD_US = 800000ULL;
+constexpr uint64_t PRE_GUARD_DAMAGE_STEP_US = 250000ULL;
+constexpr uint64_t PRE_GUARD_MAX_EXTRA_US = 500000ULL;
+constexpr uint64_t PRE_GUARD_RECOVERY_STEP_US = 50000ULL;
+constexpr uint8_t CLEAN_CAPTURES_PER_RECOVERY = 3;
 constexpr uint64_t MIN_POST_GUARD_US = 150000ULL;
 constexpr uint64_t MAX_POST_GUARD_US = 500000ULL;
 constexpr uint64_t REACTIVE_MAX_US = 750000ULL;
@@ -53,7 +57,7 @@ struct Predictor {
     have_frame = true;
   }
 
-  bool blocked(uint64_t now_us) const {
+  bool blocked(uint64_t now_us, uint64_t pre_guard_us) const {
     if (!have_frame || now_us < last_frame_us) return false;
     const uint64_t since_frame = now_us - last_frame_us;
     if (since_frame > max_age_us) return false;
@@ -63,7 +67,7 @@ struct Predictor {
     if (now_us > expected_us + MAX_POST_GUARD_US)
       expected_us += estimated_period_us;
     if (now_us < expected_us)
-      return expected_us - now_us <= PRE_GUARD_US;
+      return expected_us - now_us <= pre_guard_us;
     return now_us - expected_us <= MIN_POST_GUARD_US;
   }
 };
@@ -75,7 +79,9 @@ struct Guard {
                  RTRH_MAX_AGE_US};
   uint64_t reactive_since_us[2]{};
   uint64_t reactive_tail_until_us{0};
+  uint64_t pre_guard_extra_us{0};
   uint8_t capture_mask{0};
+  uint8_t clean_capture_streak{0};
 
   void note_co2_frame(uint64_t now_us) { co2.note(now_us); }
   void note_rtrh_cycle(uint64_t now_us) {
@@ -101,13 +107,32 @@ struct Guard {
     set_capture_mask(active ? 0x01U : 0x00U, now_us);
   }
 
+  void note_capture_quality(bool damaged) {
+    if (damaged) {
+      pre_guard_extra_us = std::min<uint64_t>(
+          pre_guard_extra_us + PRE_GUARD_DAMAGE_STEP_US,
+          PRE_GUARD_MAX_EXTRA_US);
+      clean_capture_streak = 0;
+      return;
+    }
+    if (pre_guard_extra_us == 0) return;
+    if (++clean_capture_streak < CLEAN_CAPTURES_PER_RECOVERY) return;
+    clean_capture_streak = 0;
+    pre_guard_extra_us = pre_guard_extra_us > PRE_GUARD_RECOVERY_STEP_US
+                             ? pre_guard_extra_us - PRE_GUARD_RECOVERY_STEP_US
+                             : 0;
+  }
+
+  uint64_t pre_guard_us() const { return PRE_GUARD_US + pre_guard_extra_us; }
+
   bool blocked(uint64_t now_us) const {
     for (uint8_t i = 0; i < 2; ++i)
       if ((capture_mask & (1U << i)) &&
           now_us - reactive_since_us[i] <= REACTIVE_MAX_US)
         return true;
     if (now_us < reactive_tail_until_us) return true;
-    return co2.blocked(now_us) || rtrh.blocked(now_us);
+    return co2.blocked(now_us, pre_guard_us()) ||
+           rtrh.blocked(now_us, pre_guard_us());
   }
 };
 

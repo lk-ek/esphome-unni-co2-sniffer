@@ -243,6 +243,24 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
+  sensirion_history_guard::Guard quality_guard{};
+  quality_guard.note_capture_quality(true);
+  if (quality_guard.pre_guard_us() != 1050000ULL) {
+    ESP_LOGE(TAG, "portable self-test: damaged capture did not extend pre-guard");
+    return false;
+  }
+  quality_guard.note_capture_quality(false);
+  quality_guard.note_capture_quality(false);
+  if (quality_guard.pre_guard_us() != 1050000ULL) {
+    ESP_LOGE(TAG, "portable self-test: pre-guard recovered before clean streak");
+    return false;
+  }
+  quality_guard.note_capture_quality(false);
+  if (quality_guard.pre_guard_us() != 1000000ULL) {
+    ESP_LOGE(TAG, "portable self-test: pre-guard clean recovery step failed");
+    return false;
+  }
+
   sensirion_history_guard::Guard adaptive_guard{};
   adaptive_guard.note_co2_frame(anchor_us);
   adaptive_guard.note_co2_frame(anchor_us + 6400000ULL);

@@ -1695,6 +1695,12 @@ void CO2Monitor0601::process_co2_() {
     i2c_sniffer::freeze_last_capture(capture.debug_raw_sequence, freeze_reason);
 #endif
 
+#if UNNI_BLE_HISTORY_ENABLED
+  if (result.have_co2 || result.frame_errors != 0)
+    sensirion_history_note_co2_capture(capture.raw_scl_edges,
+                                       result.frame_errors != 0);
+#endif
+
   if (result.crc_errors) {
     this->co2_.crc_errors += result.crc_errors;
     publish(this->out_.crc_errors, static_cast<float>(this->co2_.crc_errors));

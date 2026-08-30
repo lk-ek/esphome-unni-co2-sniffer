@@ -164,6 +164,10 @@ edge capture, wake handling, decoder handoff, or ISR-shared state.
   normal guards, BLE drain lead time, bounded reactive failsafe, and the
   120-second/15-second transfer watchdogs. Do not move BLE work or guard
   bookkeeping into either ISR.
+- Adapt history drain time only from task-side raw capture results while a
+  download is active: SCL below 130 or a frame error adds 250 ms up to 500 ms;
+  three clean captures remove 50 ms toward the 800 ms baseline. Keep raw SCL
+  counting outside the ISR and retain RMT-SCL assist as an independent safety net.
 - Debug UDP capture may experience lwIP `ENOMEM`; bounded retry/drop behavior
   and the one-client native API limit in debug builds protect heap availability.
 

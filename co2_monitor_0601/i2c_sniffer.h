@@ -68,6 +68,9 @@ struct Capture {
   // diagnostics without the I2C layer knowing anything about the protocol.
   uint32_t frame_errors{0};
 
+  // Raw GPIO SCL transitions in this capture, before any RMT/software repair.
+  uint16_t raw_scl_edges{0};
+
   // Shared-GPIO ISR latency can collapse closely spaced SDA/SCL changes.
   // These diagnostics describe conservative decoder-side recovery only.
   uint16_t coalesced_edges_resolved{0};

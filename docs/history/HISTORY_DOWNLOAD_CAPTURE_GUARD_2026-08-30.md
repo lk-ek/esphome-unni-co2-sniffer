@@ -3,7 +3,7 @@
 
 # History download versus CO2 capture, 2026-08-30
 
-Status: second guard iteration implemented; repeat hardware validation pending.
+Status: adaptive third iteration implemented; repeat hardware validation pending.
 
 ## Failure
 
@@ -15,14 +15,14 @@ six-second CO2 measurements.
 
 ## Logical patch series
 
-### [PATCH 1/4] sniffer: expose activity without changing the ISR
+### [PATCH 1/5] sniffer: expose activity without changing the ISR
 
 `capture_in_progress()` is a task-context snapshot of non-empty/frozen edge
 state. It does not use the existing `capturing` flag, which is intentionally
 true while the armed sniffer is idle. No logging, BLE call, allocation, or new
 bookkeeping enters the ISR.
 
-### [PATCH 2/4] history: predict and guard measurement windows
+### [PATCH 2/5] history: predict and guard measurement windows
 
 A valid protocol/CRC result records `last_frame_us`. The period starts at 6 s
 and is updated by a 1/8 low-pass step. Elapsed time is divided by the nearest
@@ -46,20 +46,33 @@ shifted back 500 ms to approximate the next cycle start, preserving the full
 even when its derived measurement is rejected: occurrence timing and measurement
 validity are separate concerns.
 
-### [PATCH 3/4] history: add a reactive backstop
+### [PATCH 3/5] history: add a reactive backstop
 
 Any observed non-empty I2C capture or collecting RT/RH cycle blocks the next
 notification immediately. Normal completion adds a 25 ms tail. A continuously
 active/stuck capture stops blocking after 750 ms; prediction and the RMT-SCL
 protocol-validated recovery remain independent layers.
 
-### [PATCH 4/4] history: bound transfer lifetime
+### [PATCH 4/5] history: bound transfer lifetime
 
 Download state is reset after 120 s wall clock or 15 s without handing a
 notification to the BLE stack. History data and the peer-owned CCCD subscription
 are retained. ESPHome's `notify()` surface provides no delivery acknowledgement,
 so this is a queue-progress watchdog, not an RF/client-ack watchdog. One bounded
 completion/abort log reports guard count and cumulative paused milliseconds.
+
+### [PATCH 5/5] history: adapt drain lead from raw capture quality
+
+The 800 ms baseline is retained. During a running download, raw SCL below 130
+or any frame error adds 250 ms to subsequent predictive guards, capped at
+500 ms extra. Three consecutive clean captures remove 50 ms. The raw SCL count
+is derived from the frozen GPIO buffer in task context before repair; no counter
+or branch is added to the ISR.
+
+Occasional RMT repairs with no history transfer (observed missing-edge counts 2
+and 5) show that BLE history is not the only GPIO-latency source. RMT-SCL assist
+therefore remains permanently enabled as an independent safety net rather than
+being tied to adaptive guard state.
 
 ## Portable contract
 

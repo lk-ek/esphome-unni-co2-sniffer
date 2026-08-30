@@ -173,6 +173,14 @@ and sample cursor. The total/no-progress watchdogs abort only transfer state and
 never erase history. ESPHome's `notify()` API has no delivery acknowledgement;
 for this watchdog, progress means a notification was handed to the BLE stack.
 
+The decoded `Capture` also carries its raw pre-repair SCL-transition count,
+calculated in task context from the frozen edge buffer. During an active history
+download, fewer than 130 raw SCL transitions or a frame error raises the next
+predictive lead by 250 ms (maximum 500 ms extra). Three clean captures reduce
+the extra lead by 50 ms. This feedback adds no ISR work and does not replace the
+always-enabled RMT-SCL safety net; isolated RMT repairs also occur without a
+history download.
+
 ## Protocol-validated GPIO missing-clock recovery
 
 The GPIO path can miss an entire SCL pulse when ISR latency spans both edges.

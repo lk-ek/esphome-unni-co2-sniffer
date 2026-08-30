@@ -798,6 +798,21 @@ void sensirion_history_note_valid_co2_frame() {
 
 void sensirion_history_note_rtrh_cycle() { capture_guard.note_rtrh_cycle(now_us()); }
 
+void sensirion_history_note_co2_capture(uint16_t raw_scl_edges, bool frame_error) {
+  if (download.phase == DownloadPhase::INACTIVE) return;
+  const bool damaged = raw_scl_edges < 130U || frame_error;
+  const uint64_t previous_us = capture_guard.pre_guard_us();
+  capture_guard.note_capture_quality(damaged);
+  const uint64_t current_us = capture_guard.pre_guard_us();
+  if (current_us != previous_us) {
+    ESP_LOGI(TAG,
+             "history adaptive pre-guard %u -> %u ms after CO2 capture SCL=%u frame_error=%s",
+             static_cast<unsigned>(previous_us / 1000U),
+             static_cast<unsigned>(current_us / 1000U),
+             static_cast<unsigned>(raw_scl_edges), frame_error ? "yes" : "no");
+  }
+}
+
 void sensirion_history_configure_gatt(esp32_ble_server::BLEServer *server) {
   configure_gatt_impl(server);
 }

@@ -214,12 +214,15 @@ static EdgeDiagCounts calculate_edge_diagnostics(const EdgeBuffer &data, uint16_
   return result;
 }
 
-static void account_edge_diagnostics(const EdgeBuffer &data, uint16_t count,
-                                     uint8_t initial_value) {
-  const EdgeDiagCounts delta = calculate_edge_diagnostics(data, count, initial_value);
+static void account_edge_diagnostics(const EdgeDiagCounts &delta) {
   diag_state_changes += delta.state;
   diag_scl_changes += delta.scl;
   diag_sda_changes += delta.sda;
+}
+
+static void account_edge_diagnostics(const EdgeBuffer &data, uint16_t count,
+                                     uint8_t initial_value) {
+  account_edge_diagnostics(calculate_edge_diagnostics(data, count, initial_value));
 }
 
 
@@ -1705,6 +1708,8 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   if (count > MAX_SAMPLES) count = MAX_SAMPLES;
   const bool overflow = capture_overflow;
   const uint8_t initial_value = capture_initial_value;
+  const EdgeDiagCounts edge_diag =
+      calculate_edge_diagnostics(samples, count, initial_value);
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
   if (rmt_scl_assist_enabled && rmt_scl_done) diag_rmt_captures++;
 #endif
@@ -1752,6 +1757,8 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
       }
     }
   }
+  capture.raw_scl_edges = static_cast<uint16_t>(
+      std::min<uint32_t>(edge_diag.scl, UINT16_MAX));
 
 #if RTRH_DEBUG_CAPTURE
   if (debug_udp::enabled() && udp_pending.active) {
@@ -1761,7 +1768,7 @@ bool poll(Capture &capture, CaptureValidator recovery_validator) {
   }
 #endif
 
-  account_edge_diagnostics(samples, sample_count, capture_initial_value);
+  account_edge_diagnostics(edge_diag);
   sample_count = 0;
   capture_overflow = false;
   capture_finished = false;

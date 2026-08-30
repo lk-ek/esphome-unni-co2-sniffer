@@ -559,6 +559,12 @@ CCCD subscription, and sample cursor remain intact during ordinary pauses. A
 transfer is aborted without deleting history after 120 seconds total or 15
 seconds without queueing a notification.
 
+The 800 ms lead is adaptive only while a download is active. A raw CO2 capture
+with fewer than 130 SCL transitions or any frame error adds 250 ms, capped at
+500 ms extra. Every three consecutive clean captures remove 50 ms until the
+800 ms baseline is restored. RMT-SCL assist remains the permanent recovery
+layer for occasional missed GPIO edges both inside and outside history traffic.
+
 ---
 
 # Experimental secure MyAmbience settings
