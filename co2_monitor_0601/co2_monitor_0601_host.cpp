@@ -4,6 +4,7 @@
 
 #include "calibration.h"
 #include "co2_decoder.h"
+#include "rtrh_validation.h"
 #include "rtrh_wake_guard.h"
 #include "../sensirion_gadget_bridge/sensirion_sample.h"
 #include "../sensirion_gadget_bridge/sensirion_bridge_core.h"
@@ -129,6 +130,17 @@ bool CO2Monitor0601::run_portable_self_test_() {
           WakeCaptureState::UNSYNCHRONIZED ||
       rtrh_decoder::wake_state_after_complete_cycle() != WakeCaptureState::FRESH_CYCLE_ARMED) {
     ESP_LOGE(TAG, "portable self-test: RT/RH fresh cycle was not preserved across re-arm");
+    return false;
+  }
+
+  // The final two-wire/10 kohm installation produces complete RH bursts below
+  // the historical 127 ms envelope. Preserve the observed 115.8 ms case while
+  // retaining a lower guard against genuinely truncated RH tails.
+  if (!rtrh_decoder::rh_duration_is_plausible(115.806f) ||
+      rtrh_decoder::rh_duration_is_plausible(109.999f) ||
+      rtrh_decoder::rh_duration_is_plausible(134.001f) ||
+      rtrh_decoder::rh_duration_is_plausible(NAN)) {
+    ESP_LOGE(TAG, "portable self-test: RT/RH duration envelope failed");
     return false;
   }
 

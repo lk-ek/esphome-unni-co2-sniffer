@@ -468,6 +468,14 @@ context. It performs:
 `CO2Monitor0601` then adds the thermal-transient state and publishes the result to
 ESPHome/BLE.
 
+RH duration remains a capture-completeness guard, not a calibration observable.
+The final two-wire/10 kohm installation has produced complete, balanced native
+RH bursts from about 115.8 ms through 131.1 ms in battery operation. The current
+accepted envelope is therefore 110..134 ms: the lower margin retains those
+observed full bursts, while carrier count, carrier period, carrier/REF ratio and
+the other phase checks continue to reject incomplete or implausible captures.
+The production humidity value itself remains carrier-based.
+
 That boundary should remain intact:
 
 ```text

@@ -5,6 +5,7 @@
 
 #include "calibration.h"
 #include "power_save.h"
+#include "rtrh_validation.h"
 #include "rtrh_wake_guard.h"
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
@@ -91,8 +92,6 @@ static constexpr float RT_PERIOD_MAX_US = 220.0f;
 static constexpr float RT_DURATION_MIN_MS = 123.0f;
 static constexpr float RT_DURATION_MAX_MS = 130.0f;
 static constexpr uint16_t RT_COUNT_MIN = 600;
-static constexpr float RH_DURATION_MIN_MS = 127.0f;
-static constexpr float RH_DURATION_MAX_MS = 134.0f;
 // RH production validity is carrier-based. State recurrence remains only as a
 // diagnostic for comparison with older captures. The observed carrier spans
 // roughly 100..700 us over the current calibration data, so keep deliberately
@@ -790,8 +789,7 @@ static bool temperature_is_valid(const Measurement &m) {
 
 static bool humidity_is_valid(const Measurement &m) {
   if (!temperature_is_valid(m)) return false;
-  if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
-      m.rh_duration_ms > RH_DURATION_MAX_MS)
+  if (!rh_duration_is_plausible(m.rh_duration_ms))
     return false;
   if (m.rh_carrier_count < RH_CARRIER_COUNT_MIN) return false;
   if (!std::isfinite(m.rh_carrier_period_us) ||
@@ -817,8 +815,7 @@ static RejectReason reject_reason(const Measurement &m) {
       m.rt_duration_ms > RT_DURATION_MAX_MS)
     return RejectReason::RT_DURATION;
   if (m.rt_count < RT_COUNT_MIN) return RejectReason::RT_COUNT;
-  if (!std::isfinite(m.rh_duration_ms) || m.rh_duration_ms < RH_DURATION_MIN_MS ||
-      m.rh_duration_ms > RH_DURATION_MAX_MS)
+  if (!rh_duration_is_plausible(m.rh_duration_ms))
     return RejectReason::RH_DURATION;
   if (m.rh_carrier_count < RH_CARRIER_COUNT_MIN) return RejectReason::RH_CARRIER_COUNT;
   if (!std::isfinite(m.rh_carrier_period_us) ||

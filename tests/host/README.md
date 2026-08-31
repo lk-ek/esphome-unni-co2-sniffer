@@ -19,6 +19,8 @@ as their ESP32 implementations. At startup they:
 
 - verifies a known-good EC05/500 ppm capture;
 - verifies rejection/accounting of a bad Sensirion CRC;
+- verifies the current complete-RH-burst duration envelope and its lower/upper
+  rejection boundaries;
 - exercises the shared RT/RH calibration functions and range invariants;
 - verifies the Sensirion sample serializer against a golden byte sequence,
   finite-value checks, and encoding clamps;

@@ -15,6 +15,7 @@ from esphome.components import (
 from esphome.components.esp32 import (
     add_idf_sdkconfig_option,
     add_partition,
+    include_builtin_idf_component,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 from esphome.const import CONF_ID, ENTITY_CATEGORY_DIAGNOSTIC, PlatformFramework
@@ -597,6 +598,13 @@ async def to_code(config):
         cg.add(var.set_sensirion_bridge(bridge))
 
     if not CORE.is_host:
+        # ESPHome 2026.8.2 excludes unused built-in ESP-IDF components and
+        # requires external components to opt in to the drivers they include
+        # directly. The shared runtime always uses ADC oneshot/calibration;
+        # ESP32-C3/C6 builds also compile the optional RMT-SCL assist backend.
+        include_builtin_idf_component("esp_adc")
+        include_builtin_idf_component("esp_driver_rmt")
+
         # The Unni sniffer is timing-sensitive and validated at 80 MHz on ESP32-C3.
         # A standalone Sensirion bridge may run on other ESP32 variants and must
         # not inherit that hardware-specific CPU policy.
