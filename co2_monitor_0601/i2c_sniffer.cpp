@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "i2c_sniffer.h"
 #include "debug_udp.h"
+#include "power_save.h"
 
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
@@ -64,6 +65,7 @@ static volatile uint8_t last_value = 0xff;
 static volatile uint8_t capture_initial_value = 0xff;
 static volatile bool capturing = true;
 static bool capture_enabled = true;
+static volatile bool co2_warmup_activity_watch = false;
 static volatile bool capture_finished = false;
 static volatile bool capture_overflow = false;
 
@@ -448,6 +450,10 @@ static void IRAM_ATTR gpio_isr(void *) {
   // already returned the pins to the state we last stored. Do not pay for the
   // 64-bit esp_timer read in that case; there is no sample to timestamp.
   if (value == previous_value) return;
+
+  // The extra cross-component ISR call is armed only during the CO2 warm-up;
+  // normal high-rate I2C capture pays only this predictable branch.
+  if (co2_warmup_activity_watch) power_save::on_co2_edge_from_isr();
 
   const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   if (sample_count == 0) capture_initial_value = previous_value;
@@ -1639,6 +1645,8 @@ void set_capture_enabled(bool enabled) {
 #endif
   }
 }
+
+void set_co2_warmup_activity_watch(bool enabled) { co2_warmup_activity_watch = enabled; }
 
 bool capture_in_progress() {
   return capture_enabled && (sample_count != 0 || capture_finished);

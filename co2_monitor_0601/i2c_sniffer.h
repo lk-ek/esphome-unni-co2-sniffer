@@ -104,6 +104,12 @@ void shutdown();
 // disabling drops any partial frame collected so far.
 void set_capture_enabled(bool enabled);
 
+// Enable the one-shot CO2 warm-up activity handoff. While enabled, the first
+// real SDA/SCL transition asks the power-save layer to acquire its ISR-only
+// PM-lock pair. Disabled during normal capture so the hot ISR pays only one
+// predictable branch and no cross-component call.
+void set_co2_warmup_activity_watch(bool enabled);
+
 // Task-context snapshot used to keep self-generated BLE history traffic away
 // from a real edge capture. This is false while the enabled sniffer is idle.
 bool capture_in_progress();

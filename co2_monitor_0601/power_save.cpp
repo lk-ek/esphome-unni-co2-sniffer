@@ -26,6 +26,10 @@ static esp_pm_lock_handle_t external_awake_lock = nullptr;
 static esp_pm_lock_handle_t external_cpu_lock = nullptr;
 static esp_pm_lock_handle_t co2_active_lock = nullptr;
 static esp_pm_lock_handle_t co2_cpu_lock = nullptr;
+// Dedicated ISR-only handoff locks used during the low-power CO2 warm-up.
+// They are never acquired by task code, avoiding esp_pm_lock handle races.
+static esp_pm_lock_handle_t co2_edge_awake_lock = nullptr;
+static esp_pm_lock_handle_t co2_edge_cpu_lock = nullptr;
 static volatile bool external_power = false;
 struct PmLockPair {
   esp_pm_lock_handle_t sleep{nullptr};
@@ -102,6 +106,11 @@ static PmLockPair co2_locks;
 static bool co2_state_initialized = false;
 static volatile bool co2_powered_down = false;
 static bool co2_scl_wakeup_armed = false;
+static bool co2_warmup_wakeup_armed = false;
+static volatile bool co2_warmup = false;
+static volatile bool co2_edge_awake_held = false;
+static volatile bool co2_edge_cpu_held = false;
+static volatile uint32_t co2_activity_gen = 0;
 static volatile bool lock_held = false;
 static volatile bool awake_lock_held = false;
 static volatile bool cpu_lock_held = false;
@@ -125,6 +134,8 @@ static void delete_lock(esp_pm_lock_handle_t &lock) {
 }
 
 static void cleanup_locks() {
+  delete_lock(co2_edge_cpu_lock);
+  delete_lock(co2_edge_awake_lock);
   delete_lock(co2_cpu_lock);
   delete_lock(co2_active_lock);
   delete_lock(external_cpu_lock);
@@ -146,6 +157,34 @@ static void configure_wakeup_pin(gpio_num_t pin) {
   } else {
     ESP_LOGI(TAG, "GPIO%d Light-sleep wake on %s (idle=%d)", static_cast<int>(pin),
              idle ? "LOW" : "HIGH", idle);
+  }
+}
+
+static void disable_co2_warmup_wakeup_() {
+  if (!co2_warmup_wakeup_armed) return;
+  gpio_wakeup_disable(pin_co2_sda);
+  gpio_wakeup_disable(pin_co2_scl);
+  co2_warmup_wakeup_armed = false;
+}
+
+static void release_co2_edge_handoff_task_() {
+  // Call only after co2_warmup has been cleared and both I2C GPIO interrupts
+  // are masked, so the ISR cannot touch these dedicated handles concurrently.
+  if (co2_edge_cpu_held) {
+    const esp_err_t err = esp_pm_lock_release(co2_edge_cpu_lock);
+    if (err == ESP_OK) {
+      co2_edge_cpu_held = false;
+    } else {
+      ESP_LOGE(TAG, "CO2 edge CPU handoff release failed: %d", err);
+    }
+  }
+  if (co2_edge_awake_held) {
+    const esp_err_t err = esp_pm_lock_release(co2_edge_awake_lock);
+    if (err == ESP_OK) {
+      co2_edge_awake_held = false;
+    } else {
+      ESP_LOGE(TAG, "CO2 edge sleep handoff release failed: %d", err);
+    }
   }
 }
 
@@ -206,6 +245,18 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
     cleanup_locks();
     return false;
   }
+  err = esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "unni_co2_edge", &co2_edge_awake_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(CO2 edge NO_LIGHT_SLEEP) failed: %d", err);
+    cleanup_locks();
+    return false;
+  }
+  err = esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "unni_co2_edge_cpu", &co2_edge_cpu_lock);
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "esp_pm_lock_create(CO2 edge CPU_FREQ_MAX) failed: %d", err);
+    cleanup_locks();
+    return false;
+  }
   external_locks.sleep = external_awake_lock;
   external_locks.cpu = external_cpu_lock;
   co2_locks.sleep = co2_active_lock;
@@ -225,8 +276,8 @@ bool setup(bool enabled_value, uint32_t max_awake_value_ms, uint8_t rt_pin, uint
   configured = true;
   ESP_LOGI(TAG,
            "Auto Light-sleep enabled: CPU 40..80 MHz, forced 80 MHz while capturing; "
-           "wake GPIO%d/GPIO%d; CO2 SCL GPIO%d armed HIGH only during powered-down windows "
-           "(SDA GPIO%d remains passive); awake timeout %lu ms; "
+           "wake GPIO%d/GPIO%d; CO2 SCL GPIO%d HIGH wake while powered down, then "
+           "SDA GPIO%d/SCL LOW wake during low-power warm-up; awake timeout %lu ms; "
            "debug transport drain grace %lu ms",
            static_cast<int>(pin_rt), static_cast<int>(pin_rh),
            static_cast<int>(pin_co2_scl), static_cast<int>(pin_co2_sda),
@@ -239,12 +290,19 @@ void set_co2_bus_powered_down(bool powered_down) {
   if (!configured || co2_active_lock == nullptr || co2_cpu_lock == nullptr) return;
 
   // USB already holds the ESP awake continuously. Keep the CO2-specific wake
-  // source and lock out of the way until battery policy is active again.
+  // sources and locks out of the way until battery policy is active again.
   if (external_power) {
     if (co2_scl_wakeup_armed) {
       gpio_wakeup_disable(pin_co2_scl);
       co2_scl_wakeup_armed = false;
     }
+    gpio_intr_disable(pin_co2_scl);
+    gpio_intr_disable(pin_co2_sda);
+    co2_warmup = false;
+    disable_co2_warmup_wakeup_();
+    release_co2_edge_handoff_task_();
+    gpio_intr_enable(pin_co2_sda);
+    gpio_intr_enable(pin_co2_scl);
     co2_locks.release("CO2 window");
     co2_powered_down = false;
     co2_state_initialized = false;
@@ -252,9 +310,17 @@ void set_co2_bus_powered_down(bool powered_down) {
   }
 
   const bool locks_settled = powered_down ? !co2_locks.held() : co2_locks.fully_held();
-  if (co2_state_initialized && powered_down == co2_powered_down && locks_settled) return;
+  if (co2_state_initialized && powered_down == co2_powered_down && !co2_warmup && locks_settled) return;
   co2_state_initialized = true;
   co2_powered_down = powered_down;
+
+  gpio_intr_disable(pin_co2_scl);
+  gpio_intr_disable(pin_co2_sda);
+  co2_warmup = false;
+  disable_co2_warmup_wakeup_();
+  release_co2_edge_handoff_task_();
+  gpio_intr_enable(pin_co2_sda);
+  gpio_intr_enable(pin_co2_scl);
 
   if (powered_down) {
     co2_locks.release("CO2 window");
@@ -271,8 +337,6 @@ void set_co2_bus_powered_down(bool powered_down) {
                static_cast<int>(pin_co2_scl), wake_err);
     }
 
-    // If an RT/RH wake window is currently waiting for CO2, don't burn the
-    // full timeout: CO2 is known unavailable until SCL rises again.
     if (lock_held && rtrh_complete) co2_after_rtrh = true;
   } else {
     if (co2_scl_wakeup_armed) {
@@ -284,8 +348,91 @@ void set_co2_bus_powered_down(bool powered_down) {
       co2_scl_wakeup_armed = false;
     }
     co2_locks.acquire("CO2 window");
-    ESP_LOGI(TAG, "CO2 subsystem active: SCL wake disarmed; keeping ESP awake at 80 MHz for native window");
+    ESP_LOGI(TAG, "CO2 subsystem active: wake disarmed; keeping ESP awake at 80 MHz for native window");
   }
+}
+
+void begin_co2_warmup() {
+  if (!configured || external_power || co2_edge_awake_lock == nullptr || co2_edge_cpu_lock == nullptr) {
+    set_co2_bus_powered_down(false);
+    return;
+  }
+
+  if (co2_scl_wakeup_armed) {
+    const esp_err_t err = gpio_wakeup_disable(pin_co2_scl);
+    if (err != ESP_OK)
+      ESP_LOGW(TAG, "CO2 SCL power-up wake disable failed on GPIO%d: %d", static_cast<int>(pin_co2_scl), err);
+    co2_scl_wakeup_armed = false;
+  }
+
+  // The powered bus now idles HIGH/HIGH. Wake on the first falling edge of
+  // either line (START on SDA normally arrives before the first SCL LOW).
+  const esp_err_t sda_err = gpio_wakeup_enable(pin_co2_sda, GPIO_INTR_LOW_LEVEL);
+  const esp_err_t scl_err = gpio_wakeup_enable(pin_co2_scl, GPIO_INTR_LOW_LEVEL);
+  if (sda_err != ESP_OK || scl_err != ESP_OK) {
+    ESP_LOGW(TAG, "CO2 low-power warm-up wake arm failed: SDA=%d SCL=%d; falling back to full-power window",
+             sda_err, scl_err);
+    // One of the two arms may already have succeeded, so disable both
+    // explicitly rather than relying on the all-or-nothing bookkeeping flag.
+    gpio_wakeup_disable(pin_co2_sda);
+    gpio_wakeup_disable(pin_co2_scl);
+    co2_warmup_wakeup_armed = false;
+    set_co2_bus_powered_down(false);
+    return;
+  }
+  co2_warmup_wakeup_armed = true;
+  co2_powered_down = false;
+  co2_state_initialized = true;
+  co2_locks.release("CO2 warmup");
+  co2_warmup = true;
+  ESP_LOGI(TAG,
+           "CO2 subsystem warm-up: SDA/SCL LOW wake armed; automatic Light-sleep allowed at 40 MHz until first bus edge");
+}
+
+void IRAM_ATTR on_co2_edge_from_isr() {
+  if (!configured || external_power || !co2_warmup || co2_edge_awake_lock == nullptr || co2_edge_cpu_lock == nullptr)
+    return;
+  if (co2_edge_awake_held || co2_edge_cpu_held) return;
+
+  if (esp_pm_lock_acquire(co2_edge_awake_lock) != ESP_OK) return;
+  co2_edge_awake_held = true;
+  if (esp_pm_lock_acquire(co2_edge_cpu_lock) != ESP_OK) {
+    if (esp_pm_lock_release(co2_edge_awake_lock) == ESP_OK) {
+      co2_edge_awake_held = false;
+    } else {
+      // Preserve partial ownership and wake task context so it can complete
+      // the handoff/recovery instead of leaving warm-up stuck indefinitely.
+      co2_activity_gen++;
+    }
+    return;
+  }
+  co2_edge_cpu_held = true;
+  co2_activity_gen++;
+}
+
+uint32_t co2_activity_generation() { return co2_activity_gen; }
+bool co2_warmup_active() { return co2_warmup; }
+
+bool promote_co2_warmup() {
+  if (!configured || external_power || !co2_warmup) return false;
+
+  // Mask the same GPIO IRQs used by on_co2_edge_from_isr() while handing lock
+  // ownership from the ISR-only pair to the normal task-owned pair.
+  gpio_intr_disable(pin_co2_scl);
+  gpio_intr_disable(pin_co2_sda);
+  co2_warmup = false;
+  disable_co2_warmup_wakeup_();
+  const bool active_held = co2_locks.acquire("CO2 window after edge");
+  // Never drop the ISR handoff before the normal pair is fully held. On a
+  // transient acquire failure the loop retry path completes normal ownership
+  // first and only then releases these dedicated handles.
+  if (active_held) release_co2_edge_handoff_task_();
+  gpio_intr_enable(pin_co2_sda);
+  gpio_intr_enable(pin_co2_scl);
+
+  if (active_held)
+    ESP_LOGI(TAG, "CO2 bus activity promoted warm-up to full-power capture: Light-sleep blocked, CPU 80 MHz");
+  return active_held;
 }
 
 bool co2_bus_powered_down() { return co2_powered_down; }
@@ -298,6 +445,13 @@ void set_external_power(bool present) {
       gpio_wakeup_disable(pin_co2_scl);
       co2_scl_wakeup_armed = false;
     }
+    gpio_intr_disable(pin_co2_scl);
+    gpio_intr_disable(pin_co2_sda);
+    co2_warmup = false;
+    disable_co2_warmup_wakeup_();
+    release_co2_edge_handoff_task_();
+    gpio_intr_enable(pin_co2_sda);
+    gpio_intr_enable(pin_co2_scl);
     if (co2_active_lock != nullptr && co2_cpu_lock != nullptr)
       co2_locks.release("CO2 window");
     co2_powered_down = false;
@@ -371,7 +525,7 @@ void on_rtrh_complete() {
   // keeps Light Sleep disabled and the CPU at 80 MHz until the native CO2
   // window closes, so retaining the RT/RH lock here only creates a misleading
   // max-awake timeout and duplicate lock ownership.
-  if (co2_powered_down || co2_locks.fully_held()) co2_after_rtrh = true;
+  if (co2_powered_down || co2_warmup || co2_locks.fully_held()) co2_after_rtrh = true;
 }
 
 void on_valid_co2() {
@@ -391,7 +545,8 @@ void loop() {
       external_power ? (!external_locks.fully_held() || co2_locks.held())
                      : (external_locks.held() ||
                         (co2_state_initialized &&
-                         (co2_powered_down ? co2_locks.held() : !co2_locks.fully_held())));
+                         (co2_powered_down ? co2_locks.held()
+                                           : (co2_warmup ? co2_locks.held() : !co2_locks.fully_held()))));
   uint64_t now_us = 0;
   if (pair_retry_needed) now_us = static_cast<uint64_t>(esp_timer_get_time());
   if (pair_retry_needed &&
@@ -403,13 +558,19 @@ void loop() {
     } else {
       if (external_locks.held()) external_locks.release("USB retry");
       if (co2_state_initialized) {
-        if (co2_powered_down) {
+        if (co2_powered_down || co2_warmup) {
           if (co2_locks.held()) co2_locks.release("CO2 window retry");
         } else if (!co2_locks.fully_held()) {
           co2_locks.acquire("CO2 window retry");
         }
       }
     }
+  }
+
+  // A failed task-owned CO2 acquire may leave the ISR-only handoff pair held.
+  // Release it only once the normal pair has been reconciled successfully.
+  if (!co2_warmup && co2_locks.fully_held() && (co2_edge_awake_held || co2_edge_cpu_held)) {
+    release_co2_edge_handoff_task_();
   }
 
   if (!lock_held || awake_lock == nullptr || cpu_lock == nullptr) return;

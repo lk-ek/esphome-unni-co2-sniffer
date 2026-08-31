@@ -9,13 +9,19 @@ namespace co2_monitor_0601 {
 namespace power_save {
 
 // Configure ESP-IDF automatic Light-sleep. RT/RH remain wake sources.
-// The CO2 SCL wake source is armed dynamically only while the Unni CO2 bus is
-// electrically powered down (quiet LOW/LOW).
+// CO2 wake sources are armed dynamically: SCL HIGH while the Unni bus is
+// powered down (quiet LOW/LOW), then SDA/SCL LOW during the powered high/high
+// warm-up so the first native bus activity can promote capture to full power.
 bool setup(bool enabled, uint32_t max_awake_ms, uint8_t rt_pin, uint8_t rh_pin,
            uint8_t co2_sda_pin, uint8_t co2_scl_pin);
 
 // Called from the RT/RH GPIO ISR. esp_pm_lock_acquire() is explicitly ISR-safe.
 void on_rtrh_edge_from_isr();
+
+// Called from the passive I2C GPIO ISR. During the low-power CO2 warm-up this
+// acquires a dedicated ISR-only PM-lock pair on the first real bus transition.
+// Task context later hands ownership over to the normal CO2 lock pair.
+void on_co2_edge_from_isr();
 
 // Monotonic generation incremented when an RT/RH edge opens a new battery
 // awake window after automatic Light-sleep. Task code can use this to restore
@@ -28,12 +34,16 @@ uint32_t wake_generation();
 void on_rtrh_complete();
 void on_valid_co2();
 
-// Track the Unni CO2 power window. In battery mode, a quiet LOW/LOW bus arms
-// GPIO-high wake on SCL and permits sleep after RT/RH completes. When the bus
-// comes back, SCL wake is disabled and NO_LIGHT_SLEEP + CPU_FREQ_MAX locks keep
-// the ESP awake at 80 MHz until the CO2 window closes again. This minimizes
-// ISR latency while passively capturing the relatively fast native I2C bus.
+// Track the Unni CO2 power window. A quiet LOW/LOW bus arms GPIO-high wake on
+// SCL. After power-up, begin_co2_warmup() permits automatic Light Sleep and
+// 40 MHz operation while SDA/SCL idle HIGH. The first observed bus transition
+// acquires ISR-only handoff locks; promote_co2_warmup() transfers that hold to
+// the normal task-owned CO2 locks for the active native capture window.
 void set_co2_bus_powered_down(bool powered_down);
+void begin_co2_warmup();
+bool promote_co2_warmup();
+uint32_t co2_activity_generation();
+bool co2_warmup_active();
 bool co2_bus_powered_down();
 
 // Keep automatic Light-sleep inhibited until queued debug-network traffic has

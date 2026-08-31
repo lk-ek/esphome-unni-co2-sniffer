@@ -395,12 +395,13 @@ class CO2Monitor0601 : public Component {
   // window, passive I2C edge capture is disabled before the sensor rail
   // collapses. GPIO7 wake is armed only after LOW/LOW has remained stable and
   // an additional guard interval has elapsed.
-  enum class Co2CaptureGatePhase : uint8_t { Active, WaitIdleStable, Guard, WakeArmed };
+  enum class Co2CaptureGatePhase : uint8_t { Active, WaitIdleStable, Guard, WakeArmed, Warmup };
   Co2CaptureGatePhase co2_capture_gate_phase_{Co2CaptureGatePhase::Active};
   uint8_t co2_window_observations_{0};
   bool co2_gate_requested_{false};
   uint32_t co2_idle_since_ms_{0};
   uint32_t co2_guard_since_ms_{0};
+  uint32_t co2_activity_generation_{0};
   uint32_t co2_wake_idle_stable_ms_{500};
   uint32_t co2_wake_guard_time_ms_{500};
   struct Co2WakeTrace {
@@ -408,6 +409,7 @@ class CO2Monitor0601 : public Component {
     uint32_t power_down_ms{0};
     uint32_t wake_observed_ms{0};
     uint32_t capture_rearmed_ms{0};
+    uint32_t bus_activity_ms{0};
     uint32_t first_capture_ms{0};
     uint32_t first_plausible_ms{0};
     bool awaiting_first_capture{false};

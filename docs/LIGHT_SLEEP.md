@@ -127,3 +127,23 @@ uses that electrical state as an additional power-saving signal:
 This does not predict the native measurement interval and does not actively
 drive the Unni I2C bus. It follows the hardware state instead, so a changed
 Unni schedule is detected by the SCL wake transition rather than by a timer.
+
+## CO2 two-stage power-up warm-up
+
+Battery-mode CO2 power-up uses two power states. The powered-down LOW/LOW bus
+still wakes the ESP when SCL rises HIGH. After that wake the passive sniffer is
+re-armed, but the firmware does not keep the normal CO2 `NO_LIGHT_SLEEP` and
+`CPU_FREQ_MAX` pair held during the sensor's observed ~16 s HIGH/HIGH warm-up.
+Instead, SDA and SCL are configured as LOW-level Light-sleep wake sources.
+
+The first real SDA/SCL transition calls an ISR-safe handoff path. That path uses
+a dedicated PM-lock pair which is never manipulated by task code. The next main
+loop iteration acquires the normal task-owned CO2 locks, releases the ISR-only
+handoff locks, restores the passive ANYEDGE capture baseline, and continues the
+native capture window at 80 MHz with Light Sleep blocked. This keeps the PM-lock
+ownership rule intact while avoiding a long full-power wait before bus traffic.
+
+The first transaction after warm-up is deliberately allowed to be discarded:
+the observed Unni sequence begins with setup/control traffic and the first
+plausible CO2 measurement follows several seconds later. Strict protocol/CRC
+validation and the two-reading recovery confirmation remain unchanged.

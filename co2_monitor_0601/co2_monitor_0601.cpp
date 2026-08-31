@@ -1629,9 +1629,11 @@ void CO2Monitor0601::reset_co2_capture_gate_() {
   this->co2_guard_since_ms_ = 0;
   this->co2_wake_trace_.wake_observed_ms = 0;
   this->co2_wake_trace_.capture_rearmed_ms = 0;
+  this->co2_wake_trace_.bus_activity_ms = 0;
   this->co2_wake_trace_.first_capture_ms = 0;
   this->co2_wake_trace_.first_plausible_ms = 0;
   this->co2_wake_trace_.awaiting_first_capture = false;
+  i2c_sniffer::set_co2_warmup_activity_watch(false);
   i2c_sniffer::set_capture_enabled(true);
 }
 
@@ -1641,6 +1643,7 @@ void CO2Monitor0601::begin_co2_wake_trace_(const char *reason) {
   trace.power_down_ms = millis();
   trace.wake_observed_ms = 0;
   trace.capture_rearmed_ms = 0;
+  trace.bus_activity_ms = 0;
   trace.first_capture_ms = 0;
   trace.first_plausible_ms = 0;
   trace.awaiting_first_capture = false;
@@ -1667,6 +1670,7 @@ void CO2Monitor0601::gate_co2_capture_after_window_() {
   // window. Stop edge capture before the sensor rail collapses; the slow GPIO
   // decay otherwise creates tens of thousands of meaningless ISR entries and
   // very large debug captures.
+  i2c_sniffer::set_co2_warmup_activity_watch(false);
   i2c_sniffer::set_capture_enabled(false);
   this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WaitIdleStable;
   this->co2_idle_since_ms_ = 0;
@@ -1709,6 +1713,7 @@ void CO2Monitor0601::process_co2_capture_gate_() {
       // the shutdown storm is over and it is safe to use the legacy wake arm.
       const bool quiet_power_down = low_low && i2c_sniffer::last_edge_age_us() >= 1000000U;
       if (quiet_power_down) {
+        i2c_sniffer::set_co2_warmup_activity_watch(false);
         i2c_sniffer::set_capture_enabled(false);
         power_save::set_co2_bus_powered_down(true);
         this->co2_capture_gate_phase_ = Co2CaptureGatePhase::WakeArmed;
@@ -1771,7 +1776,6 @@ void CO2Monitor0601::process_co2_capture_gate_() {
                  static_cast<unsigned long>(now - trace.power_down_ms), static_cast<int>(wake_cause),
                  static_cast<unsigned long>(gpio_wakeup_status & 0xFFFFFFFFULL),
                  static_cast<unsigned>(this->co2_scl_pin_), scl_gpio_asserted ? "yes" : "no");
-        power_save::set_co2_bus_powered_down(false);
         i2c_sniffer::set_capture_enabled(true);
         i2c_sniffer::rearm_after_light_sleep();
         trace.capture_rearmed_ms = millis();
@@ -1781,14 +1785,59 @@ void CO2Monitor0601::process_co2_capture_gate_() {
                  static_cast<unsigned long>(trace.sequence),
                  static_cast<unsigned long>(trace.capture_rearmed_ms),
                  static_cast<unsigned long>(trace.capture_rearmed_ms - trace.wake_observed_ms));
-        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
+        // Snapshot before arming warm-up so an immediate first edge cannot be
+        // lost between begin_co2_warmup() and the next loop iteration.
+        this->co2_activity_generation_ = power_save::co2_activity_generation();
+        i2c_sniffer::set_co2_warmup_activity_watch(true);
+        power_save::begin_co2_warmup();
+        if (!power_save::co2_warmup_active()) {
+          // Warm-up wake arming failed and power_save fell back to the normal
+          // full-power CO2 window. Keep the hot ISR free of the warm-up hook.
+          i2c_sniffer::set_co2_warmup_activity_watch(false);
+          this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
+          ESP_LOGW(TAG, "CO2 low-power warm-up unavailable; continuing with full-power native capture");
+          break;
+        }
+        this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Warmup;
         this->co2_window_observations_ = 0;
         this->co2_gate_requested_ = false;
         this->co2_idle_since_ms_ = 0;
         this->co2_guard_since_ms_ = 0;
-        ESP_LOGI(TAG, "CO2 bus power-up detected: GPIO7 wake disarmed and passive sniffer re-enabled");
+        ESP_LOGI(TAG,
+                 "CO2 bus power-up detected: passive sniffer re-enabled in low-power warm-up until first bus edge");
       }
       break;
+
+    case Co2CaptureGatePhase::Warmup: {
+      const uint32_t activity_generation = power_save::co2_activity_generation();
+      if (activity_generation == this->co2_activity_generation_) break;
+      this->co2_activity_generation_ = activity_generation;
+
+      auto &trace = this->co2_wake_trace_;
+      trace.bus_activity_ms = now;
+      ESP_LOGI(TAG,
+               "CO2 wake trace: seq=%lu event=first_bus_activity t=%lu ms since_wake=%lu ms since_rearm=%lu ms",
+               static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(trace.bus_activity_ms),
+               static_cast<unsigned long>(trace.bus_activity_ms - trace.wake_observed_ms),
+               static_cast<unsigned long>(trace.bus_activity_ms - trace.capture_rearmed_ms));
+
+      i2c_sniffer::set_co2_warmup_activity_watch(false);
+      if (!power_save::promote_co2_warmup()) {
+        ESP_LOGW(TAG, "CO2 warm-up promotion did not acquire the full active lock pair; retry reconciliation remains enabled");
+      }
+      // The wake/ISR can land part-way through the first setup transaction.
+      // Drop that fragment and establish a clean HIGH/HIGH/edge baseline for
+      // subsequent native traffic; measurement frames arrive seconds later.
+      i2c_sniffer::rearm_after_light_sleep();
+      trace.capture_rearmed_ms = millis();
+      trace.awaiting_first_capture = true;
+      this->co2_capture_gate_phase_ = Co2CaptureGatePhase::Active;
+      ESP_LOGI(TAG,
+               "CO2 wake trace: seq=%lu event=active_capture_rearm t=%lu ms since_bus_activity=%lu ms",
+               static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(trace.capture_rearmed_ms),
+               static_cast<unsigned long>(trace.capture_rearmed_ms - trace.bus_activity_ms));
+      break;
+    }
   }
 }
 
@@ -1959,11 +2008,12 @@ void CO2Monitor0601::process_co2_() {
         trace.first_plausible_ms = millis();
         ESP_LOGW(TAG,
                  "CO2 wake trace: seq=%lu event=first_plausible_co2 t=%lu ms since_wake=%lu ms "
-                 "since_rearm=%lu ms ppm=%u",
+                 "since_rearm=%lu ms since_bus_activity=%lu ms ppm=%u",
                  static_cast<unsigned long>(trace.sequence),
                  static_cast<unsigned long>(trace.first_plausible_ms),
                  static_cast<unsigned long>(trace.first_plausible_ms - trace.wake_observed_ms),
                  static_cast<unsigned long>(trace.first_plausible_ms - trace.capture_rearmed_ms),
+                 static_cast<unsigned long>(trace.bus_activity_ms != 0 ? trace.first_plausible_ms - trace.bus_activity_ms : 0),
                  static_cast<unsigned>(ppm));
       }
       ESP_LOGW(TAG,
@@ -2001,10 +2051,12 @@ void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
     const uint32_t accepted_ms = millis();
     ESP_LOGI(TAG,
              "CO2 wake trace: seq=%lu event=accepted_co2 t=%lu ms since_wake=%lu ms "
-             "since_rearm=%lu ms since_first_capture=%lu ms since_first_plausible=%lu ms ppm=%u",
+             "since_rearm=%lu ms since_bus_activity=%lu ms since_first_capture=%lu ms "
+             "since_first_plausible=%lu ms ppm=%u",
              static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(accepted_ms),
              static_cast<unsigned long>(accepted_ms - trace.wake_observed_ms),
              static_cast<unsigned long>(accepted_ms - trace.capture_rearmed_ms),
+             static_cast<unsigned long>(trace.bus_activity_ms != 0 ? accepted_ms - trace.bus_activity_ms : 0),
              static_cast<unsigned long>(trace.first_capture_ms != 0 ? accepted_ms - trace.first_capture_ms : 0),
              static_cast<unsigned long>(trace.first_plausible_ms != 0 ? accepted_ms - trace.first_plausible_ms : 0),
              static_cast<unsigned>(ppm));
