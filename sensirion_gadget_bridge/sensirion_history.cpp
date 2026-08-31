@@ -18,6 +18,7 @@
 #include "esphome/components/esp32_ble_server/ble_server.h"
 #include "esphome/components/esp32_ble_server/ble_service.h"
 #include "esphome/core/log.h"
+#include "esphome/core/preferences.h"
 #include "esphome/components/time/real_time_clock.h"
 
 #include "esp_partition.h"
@@ -56,6 +57,11 @@ constexpr uint16_t META_VERSION_V2 = 2;
 constexpr uint16_t META_VERSION_V3 = 3;
 constexpr uint16_t META_VERSION = 4;
 constexpr uint16_t DOWNLOAD_TYPE = 7;
+constexpr uint32_t DOWNLOAD_SESSION_TIMEOUT_MS = 5U * 60U * 1000U;
+constexpr uint32_t RUN_INDEX_PREF_KEY = 0x53474852U;  // "SGHR"
+constexpr uint32_t RUN_INDEX_MAGIC = 0x53475249U;     // "SGRI"
+constexpr uint16_t RUN_INDEX_VERSION = 1;
+constexpr uint16_t RUN_INDEX_CAPACITY = 128;
 
 using Sample = std::array<uint8_t, SAMPLE_SIZE>;
 
@@ -136,6 +142,7 @@ struct DownloadState {
   uint16_t sent{0};
   uint16_t sequence{0};
   uint16_t start_logical{0};
+  uint16_t run_ordinal{0};
   uint32_t age_ms{0};
   uint32_t last_packet_ms{0};
   uint32_t started_ms{0};
@@ -146,10 +153,52 @@ struct DownloadState {
   bool guard_paused{false};
 };
 
+struct __attribute__((packed)) RunDescriptor {
+  uint32_t anchor_epoch_s{0};
+  uint16_t start_slot{0};
+  uint16_t count{0};
+};
+static_assert(sizeof(RunDescriptor) == 8);
+
+struct __attribute__((packed)) PersistedRunIndex {
+  uint32_t magic{RUN_INDEX_MAGIC};
+  uint16_t version{RUN_INDEX_VERSION};
+  uint16_t count{0};
+  uint16_t head{0};
+  uint16_t reserved{0};
+  uint32_t interval_ms{DEFAULT_INTERVAL_MS};
+  std::array<RunDescriptor, RUN_INDEX_CAPACITY> runs{};
+};
+
+struct RunIndexState {
+  std::array<RunDescriptor, RUN_INDEX_CAPACITY> runs{};
+  uint16_t count{0};
+  uint16_t head{0};
+  ESPPreferenceObject preference{};
+  bool preference_ready{false};
+};
+
+struct DownloadSessionState {
+  bool active{false};
+  uint16_t next_ordinal{0};
+  uint32_t last_complete_ms{0};
+};
+
+struct DownloadSelection {
+  bool available{false};
+  bool newest{false};
+  uint16_t ordinal{0};
+  uint16_t start_logical{0};
+  uint16_t count{0};
+  uint32_t age_ms{0};
+};
+
 HistoryState history;
 FlashState flash;
 GattState gatt;
 DownloadState download;
+RunIndexState run_index;
+DownloadSessionState download_session;
 ClearState clearing;
 uint32_t last_sampling_poll_ms = 0;
 uint16_t last_synced_downloadable_count = UINT16_MAX;
@@ -171,6 +220,87 @@ uint64_t now_us() {
 
 uint32_t now_ms() {
   return static_cast<uint32_t>(now_us() / 1000ULL);
+}
+
+void reset_download_session() {
+  download_session = {};
+}
+
+bool download_session_active(uint32_t now) {
+  if (!download_session.active) return false;
+  if (sensirion_history_format::within_elapsed_window(
+          now, download_session.last_complete_ms, DOWNLOAD_SESSION_TIMEOUT_MS))
+    return true;
+  ESP_LOGI(TAG, "history multi-run download session expired after 5 minutes; restarting at newest run");
+  reset_download_session();
+  return false;
+}
+
+void setup_run_index_preference() {
+  if (global_preferences == nullptr) return;
+  run_index.preference = global_preferences->make_preference<PersistedRunIndex>(RUN_INDEX_PREF_KEY, true);
+  run_index.preference_ready = true;
+
+  PersistedRunIndex saved{};
+  if (!run_index.preference.load(&saved) || saved.magic != RUN_INDEX_MAGIC ||
+      saved.version != RUN_INDEX_VERSION || saved.count > RUN_INDEX_CAPACITY ||
+      saved.head >= RUN_INDEX_CAPACITY || saved.interval_ms != history.interval_ms)
+    return;
+  run_index.runs = saved.runs;
+  run_index.count = saved.count;
+  run_index.head = saved.head;
+  ESP_LOGI(TAG, "restored %u sparse history run descriptor(s)",
+           static_cast<unsigned>(run_index.count));
+}
+
+bool persist_run_index() {
+  if (!run_index.preference_ready) return true;
+  PersistedRunIndex saved{};
+  saved.magic = RUN_INDEX_MAGIC;
+  saved.version = RUN_INDEX_VERSION;
+  saved.count = run_index.count;
+  saved.head = run_index.head;
+  saved.interval_ms = history.interval_ms;
+  saved.runs = run_index.runs;
+  if (!run_index.preference.save(&saved)) {
+    ESP_LOGW(TAG, "failed to save sparse history run index");
+    return false;
+  }
+  if (!global_preferences->sync()) {
+    ESP_LOGW(TAG, "failed to sync sparse history run index");
+    return false;
+  }
+  return true;
+}
+
+void clear_run_index(bool persist) {
+  run_index.runs = {};
+  run_index.count = 0;
+  run_index.head = 0;
+  reset_download_session();
+  if (persist) persist_run_index();
+}
+
+void append_run_descriptor(const RunDescriptor &descriptor) {
+  if (!sensirion_history_format::wall_clock_valid(descriptor.anchor_epoch_s) ||
+      descriptor.count == 0 || descriptor.count > HISTORY_CAPACITY ||
+      descriptor.start_slot >= FLASH_CAPACITY)
+    return;
+  if (run_index.count != 0) {
+    const uint16_t latest_index = static_cast<uint16_t>(
+        (run_index.head + RUN_INDEX_CAPACITY - 1U) % RUN_INDEX_CAPACITY);
+    const RunDescriptor &latest = run_index.runs[latest_index];
+    if (latest.anchor_epoch_s == descriptor.anchor_epoch_s &&
+        latest.start_slot == descriptor.start_slot && latest.count == descriptor.count)
+      return;
+  }
+  if (run_index.count == RUN_INDEX_CAPACITY)
+    ESP_LOGW(TAG, "sparse history run index full; evicting oldest completed-run descriptor");
+  run_index.runs[run_index.head] = descriptor;
+  run_index.head = static_cast<uint16_t>((run_index.head + 1U) % RUN_INDEX_CAPACITY);
+  if (run_index.count < RUN_INDEX_CAPACITY) ++run_index.count;
+  if (!persist_run_index())
+    ESP_LOGW(TAG, "sparse history run descriptor remains RAM-only until the next gap");
 }
 
 uint32_t get_u32_le(std::span<const uint8_t> x) {
@@ -286,10 +416,98 @@ bool restored_run_age_available() {
   return latest_epoch_s != 0 && now_epoch_s >= latest_epoch_s;
 }
 
+bool descriptor_logical_window(const RunDescriptor &descriptor, uint16_t &start_logical) {
+  if (!flash.ready || descriptor.count == 0 || descriptor.count > HISTORY_CAPACITY ||
+      descriptor.start_slot >= FLASH_CAPACITY || flash.persisted == 0 ||
+      history.pending > history.count || flash.persisted < history.count - history.pending)
+    return false;
+
+  const uint16_t visible_persisted = static_cast<uint16_t>(history.count - history.pending);
+  if (descriptor.count > visible_persisted) return false;
+  const uint16_t oldest_flash = static_cast<uint16_t>(
+      (flash.write_slot + FLASH_CAPACITY - flash.persisted) % FLASH_CAPACITY);
+  const uint16_t persisted_skip = static_cast<uint16_t>(flash.persisted - visible_persisted);
+  const uint16_t oldest_visible = static_cast<uint16_t>(
+      (oldest_flash + persisted_skip) % FLASH_CAPACITY);
+  const uint16_t distance = static_cast<uint16_t>(
+      (descriptor.start_slot + FLASH_CAPACITY - oldest_visible) % FLASH_CAPACITY);
+  if (distance >= visible_persisted ||
+      static_cast<uint32_t>(distance) + descriptor.count > visible_persisted)
+    return false;
+  start_logical = distance;
+  return true;
+}
+
+bool age_ms_from_epoch(uint32_t now_epoch_s, uint32_t latest_epoch_s, uint32_t &age_ms) {
+  if (latest_epoch_s == 0 || now_epoch_s < latest_epoch_s) return false;
+  const uint32_t delta_s = now_epoch_s - latest_epoch_s;
+  if (delta_s > UINT32_MAX / 1000U) return false;
+  age_ms = delta_s * 1000U;
+  return true;
+}
+
+bool select_download_run(uint16_t ordinal, DownloadSelection &selection) {
+  selection = {};
+  selection.ordinal = ordinal;
+
+  if (ordinal == 0) {
+    if (history.run_count == 0 ||
+        (!history.run_relative_age_valid && !restored_run_age_available()))
+      return false;
+    selection.available = true;
+    selection.newest = true;
+    selection.count = history.run_count;
+    selection.start_logical = static_cast<uint16_t>(history.count - history.run_count);
+    if (history.run_relative_age_valid) {
+      selection.age_ms = now_ms() - history.latest_ms;
+    } else {
+      const uint32_t now_epoch_s = wall_clock_epoch_s();
+      const uint32_t latest_epoch_s = sensirion_history_format::run_latest_epoch_s(
+          history.run_anchor_epoch_s, history.run_count, history.interval_ms);
+      if (!age_ms_from_epoch(now_epoch_s, latest_epoch_s, selection.age_ms))
+        return false;
+    }
+    return true;
+  }
+
+  const uint32_t now_epoch_s = wall_clock_epoch_s();
+  if (now_epoch_s == 0 || run_index.count == 0) return false;
+  uint16_t valid_ordinal = 0;
+  for (uint16_t offset = 0; offset < run_index.count; ++offset) {
+    const uint16_t index = static_cast<uint16_t>(
+        (run_index.head + RUN_INDEX_CAPACITY - 1U - offset) % RUN_INDEX_CAPACITY);
+    const RunDescriptor &descriptor = run_index.runs[index];
+    // A power loss immediately after indexing a completed run but before the
+    // first sample of the new run is flushed can leave that descriptor equal
+    // to the restored current run. Never offer the same run twice.
+    if (descriptor.anchor_epoch_s == history.run_anchor_epoch_s &&
+        descriptor.count == history.run_count)
+      continue;
+    uint16_t start_logical = 0;
+    if (!descriptor_logical_window(descriptor, start_logical)) continue;
+    const uint32_t latest_epoch_s = sensirion_history_format::run_latest_epoch_s(
+        descriptor.anchor_epoch_s, descriptor.count, history.interval_ms);
+    uint32_t age_ms = 0;
+    if (!age_ms_from_epoch(now_epoch_s, latest_epoch_s, age_ms)) continue;
+    ++valid_ordinal;
+    if (valid_ordinal != ordinal) continue;
+    selection.available = true;
+    selection.start_logical = start_logical;
+    selection.count = descriptor.count;
+    selection.age_ms = age_ms;
+    return true;
+  }
+  return false;
+}
+
+uint16_t next_download_ordinal() {
+  const uint32_t now = now_ms();
+  return download_session_active(now) ? download_session.next_ordinal : 0U;
+}
+
 uint16_t downloadable_count() {
-  if (history.run_count == 0) return 0;
-  if (history.run_relative_age_valid || restored_run_age_available()) return history.run_count;
-  return 0;
+  DownloadSelection selection{};
+  return select_download_run(next_download_ordinal(), selection) ? selection.count : 0U;
 }
 
 void sync_gatt() {
@@ -360,10 +578,12 @@ void reset_history_in_memory() {
   history.force_new_run_on_next_sample = false;
   flash.write_slot = flash.persisted = 0;
   reset_download();
+  reset_download_session();
 }
 
 void request_clear() {
   reset_history_in_memory();
+  clear_run_index(true);
   if (!flash.ready) {
     clearing = {};
     sync_gatt();
@@ -562,6 +782,8 @@ void init_flash() {
   if (best.version == META_VERSION) {
     history.run_anchor_epoch_s = best.reserved0;
     history.run_count = static_cast<uint16_t>(std::min<uint32_t>(best.reserved1, best.count));
+    history.last_sample_epoch_s = sensirion_history_format::run_latest_epoch_s(
+        history.run_anchor_epoch_s, history.run_count, history.interval_ms);
   } else {
     // V2/V3 did not persist gap/run timing. Keep the samples, but do not expose
     // them as a falsely continuous MyAmbience run after migration.
@@ -577,6 +799,27 @@ void init_flash() {
   if (flash.metadata_dirty)
     ESP_LOGI(TAG, "legacy history metadata v%u will migrate to sparse-time version 4 on next loop flush",
              static_cast<unsigned>(best.version));
+}
+
+void finalize_current_run_for_index() {
+  if (history.run_count == 0 ||
+      !sensirion_history_format::wall_clock_valid(history.run_anchor_epoch_s))
+    return;
+  if (!flush_flash()) {
+    ESP_LOGW(TAG, "could not flush completed history run; older-run download index not updated");
+    return;
+  }
+  if (flash.persisted < history.run_count) return;
+  RunDescriptor descriptor{};
+  descriptor.anchor_epoch_s = history.run_anchor_epoch_s;
+  descriptor.count = history.run_count;
+  descriptor.start_slot = static_cast<uint16_t>(
+      (flash.write_slot + FLASH_CAPACITY - descriptor.count) % FLASH_CAPACITY);
+  append_run_descriptor(descriptor);
+  ESP_LOGI(TAG, "indexed completed history run: %u sample(s), anchor=%u, flash_start=%u",
+           static_cast<unsigned>(descriptor.count),
+           static_cast<unsigned>(descriptor.anchor_epoch_s),
+           static_cast<unsigned>(descriptor.start_slot));
 }
 
 void commit_sample(bool new_run) {
@@ -599,6 +842,14 @@ void commit_sample(bool new_run) {
                                  ? sample_epoch_s - expected_epoch_s
                                  : expected_epoch_s - sample_epoch_s;
     if (delta_s > 2U) new_run = true;
+  }
+
+  if (new_run && history.run_count > 0) {
+    finalize_current_run_for_index();
+    // The topology changed while a client may have been walking older runs.
+    // Restart the five-minute chain at the new newest run rather than mixing
+    // two snapshots of the history ring.
+    reset_download_session();
   }
 
   history.pending_samples[history.pending_head] = sample.encoded();
@@ -698,27 +949,25 @@ void start_download() {
       clearing.phase != ClearPhase::INACTIVE)
     return;
 
-  const uint16_t available = downloadable_count();
+  const uint32_t requested = download.requested;
+  reset_download();
+  download.requested = requested;
+  DownloadSelection selection{};
+  const uint16_t ordinal = next_download_ordinal();
+  const bool have_selection = select_download_run(ordinal, selection);
+  const uint16_t available = have_selection ? selection.count : 0U;
   uint16_t n = available;
-  if (download.requested > 0 && download.requested < n)
+  if (download.requested != 0 && download.requested < n)
     n = static_cast<uint16_t>(download.requested);
 
   download.count = n;
   download.sent = 0;
   download.sequence = 0;
-  download.start_logical = static_cast<uint16_t>(history.count - n);
-  if (n == 0) {
-    download.age_ms = 0;
-  } else if (history.run_relative_age_valid) {
-    download.age_ms = now_ms() - history.latest_ms;
-  } else {
-    const uint32_t now_epoch_s = wall_clock_epoch_s();
-    const uint32_t latest_epoch_s = sensirion_history_format::run_latest_epoch_s(
-        history.run_anchor_epoch_s, history.run_count, history.interval_ms);
-    download.age_ms = (now_epoch_s >= latest_epoch_s)
-                          ? (now_epoch_s - latest_epoch_s) * 1000U
-                          : 0U;
-  }
+  download.run_ordinal = ordinal;
+  download.start_logical = have_selection
+                               ? static_cast<uint16_t>(selection.start_logical + available - n)
+                               : 0U;
+  download.age_ms = have_selection ? selection.age_ms : 0U;
   download.phase = DownloadPhase::HEADER;
   download.last_packet_ms = 0;
   download.started_ms = now_ms();
@@ -726,10 +975,23 @@ void start_download() {
   if (active_transfer_guard != nullptr) active_transfer_guard->set_download_active(true);
 
   ESP_LOGI(TAG,
-           "history download subscribed: requested=%u stored=%u latest_run=%u sending=%u age=%u ms",
+           "history download subscribed: requested=%u stored=%u run=%u available=%u sending=%u age=%u ms session=%s",
            static_cast<unsigned>(download.requested), static_cast<unsigned>(history.count),
-           static_cast<unsigned>(available), static_cast<unsigned>(n),
-           static_cast<unsigned>(download.age_ms));
+           static_cast<unsigned>(ordinal), static_cast<unsigned>(available),
+           static_cast<unsigned>(n), static_cast<unsigned>(download.age_ms),
+           ordinal == 0 ? "newest" : (have_selection ? "older" : "exhausted"));
+}
+
+void complete_download_session(uint32_t now) {
+  const uint16_t completed_ordinal = download.run_ordinal;
+  download_session.active = true;
+  download_session.next_ordinal = completed_ordinal == UINT16_MAX
+                                      ? UINT16_MAX
+                                      : static_cast<uint16_t>(completed_ordinal + 1U);
+  download_session.last_complete_ms = now;
+  ESP_LOGI(TAG, "history multi-run session: completed run %u; next run=%u; expiry reset to 5 min",
+           static_cast<unsigned>(completed_ordinal),
+           static_cast<unsigned>(download_session.next_ordinal));
 }
 
 uint32_t current_guard_paused_ms(uint32_t now) {
@@ -813,7 +1075,9 @@ void download_tick(HistoryTransferGuard *transfer_guard) {
                static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_damaged_capture_count() : 0U),
                static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_min_raw_edges() : 0U),
                static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_pre_guard_ms() : 0U));
+      complete_download_session(now);
       reset_download();
+      sync_gatt();
     } else {
       download.phase = DownloadPhase::DATA;
     }
@@ -851,7 +1115,9 @@ void download_tick(HistoryTransferGuard *transfer_guard) {
              static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_damaged_capture_count() : 0U),
              static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_min_raw_edges() : 0U),
              static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_pre_guard_ms() : 0U));
+    complete_download_session(now);
     reset_download();
+    sync_gatt();
   }
 }
 
@@ -941,12 +1207,15 @@ void configure_gatt_impl(esp32_ble_server::BLEServer *server) {
 void sensirion_history_setup(time::RealTimeClock *clock) {
   wall_clock = clock;
   init_flash();
+  setup_run_index_preference();
+  if (history.count == 0 && run_index.count != 0) clear_run_index(true);
   sync_gatt();
   flash.last_flush_ms = now_ms();
   ESP_LOGI(TAG,
-           "history storage: flash-backed %u samples, RAM pending ring %u samples (%u bytes), sparse-time metadata v4",
+           "history storage: flash-backed %u samples, RAM pending ring %u samples (%u bytes), sparse-time metadata v4 + %u-run sparse index",
            static_cast<unsigned>(HISTORY_CAPACITY), static_cast<unsigned>(PENDING_CAPACITY),
-           static_cast<unsigned>(PENDING_CAPACITY * SAMPLE_SIZE));
+           static_cast<unsigned>(PENDING_CAPACITY * SAMPLE_SIZE),
+           static_cast<unsigned>(RUN_INDEX_CAPACITY));
 }
 
 bool sensirion_history_flush() {

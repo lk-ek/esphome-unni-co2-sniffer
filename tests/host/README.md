@@ -28,7 +28,8 @@ as their ESP32 implementations. At startup they:
   coalescing, newest-pair selection, zeroed SHT43 history CO2 bytes, and a
   golden SHT43 type-0x06 manufacturer payload;
 - verifies history interval/generation handling, sparse-time anchor rebasing
-  after a full 4096-sample ring starts evicting old samples, and the portable
+  after a full 4096-sample ring starts evicting old samples, the wrap-safe
+  five-minute multi-download session window, and the portable
   predictive, reactive, adaptive-quality, stale-frame, overlap, and wrap-safe
   download-guard boundaries;
 - simulates a full 4096-sample MyAmbience schedule (2049 notifications) at the

@@ -3,7 +3,7 @@
 
 # Sparse history time anchors, 2026-08-30
 
-Status: implemented; all five host variants compile/self-test on ESPHome 2026.7.4; ESP32/MyAmbience hardware validation pending.
+Status: implemented and extended on 2026-08-31 with a sparse completed-run index and rolling multi-download session; ESP32/MyAmbience multi-run hardware validation pending.
 
 ## Why
 
@@ -45,10 +45,26 @@ for restored samples until an absolute clock is available.
 ## MyAmbience compatibility
 
 The GATT UUIDs, type-7 header, 20-byte notifications, sample bytes, and packet
-sequence remain unchanged. The history-count characteristic and download cursor
-refer to only the newest continuous run. If the client requests fewer samples,
-the newest requested subset of that same run is sent. Older runs remain in flash
-but are not concatenated across gaps.
+sequence remain unchanged. Runs are never concatenated across a gap inside one
+Sensirion transfer.
+
+The bridge now treats consecutive downloads as a rolling five-minute session.
+The first completed transfer sends the newest continuous run. Each later
+completed transfer within five minutes sends the next older retained run and
+resets the timeout. Disconnects preserve this cursor; aborted transfers do not
+advance it. After five minutes without a completed transfer, the next request
+starts at the newest run again. The count characteristic tracks the run selected
+by this cursor.
+
+To make older runs reconstructable without per-sample timestamps, each run is
+finalized only when a gap starts the next run. At that point one 8-byte sparse
+record is persisted in ESPHome NVS containing the completed run's UTC anchor,
+physical flash start slot, and sample count. Up to 128 completed runs are kept.
+Entries are used only while their complete sample range is still inside the
+4096-sample flash window and their age is representable by the Sensirion header.
+Runs without a trustworthy wall-clock anchor are skipped rather than assigned a
+false age. Existing V4 samples are unchanged and remain readable; older gaps
+that occurred before this run index existed cannot be inferred retroactively.
 
 This deliberately favors correct timestamps over pretending that separated runs
 were sampled continuously.

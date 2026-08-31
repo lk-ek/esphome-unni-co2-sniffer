@@ -303,6 +303,9 @@ bool CO2Monitor0601::run_portable_self_test_() {
       sensirion_history_format::generation_newer(UINT32_MAX, 0) ||
       !sensirion_history_format::cadence_gap(120000, 60000) ||
       sensirion_history_format::cadence_gap(119999, 60000) ||
+      !sensirion_history_format::within_elapsed_window(299999, 0, 300000) ||
+      sensirion_history_format::within_elapsed_window(300000, 0, 300000) ||
+      !sensirion_history_format::within_elapsed_window(0x00000020U, 0xFFFFFFF0U, 64U) ||
       !sensirion_history_format::wall_clock_valid(1577836800UL) ||
       sensirion_history_format::wall_clock_valid(1577836799UL) ||
       sensirion_history_format::run_latest_epoch_s(1700000000UL, 3, 60000) != 1700000120UL) {

@@ -731,10 +731,26 @@ main loop (at most one sector erase per loop), while sampling and download
 remain paused.
 
 The official Sensirion download format has one header with one interval and one
-`age-of-latest-sample`, so it cannot describe gaps inside a transfer. MyAmbience
-therefore receives only the newest continuous run (or the newest requested
-subset of that run). Older samples remain stored in the flash ring but are not
-misrepresented as contiguous data after a gap.
+`age-of-latest-sample`, so it cannot describe gaps inside a single transfer.
+The bridge therefore keeps runs separate on the wire. The first download sends
+the newest continuous run (or its newest requested subset). Each subsequently
+completed download within a rolling five-minute session sends the next older
+continuous run; completion resets the five-minute timer. Disconnecting does not
+reset the cursor, while an aborted transfer does not advance it. Once the timer
+expires, the next download starts again at the newest run. The history-count
+characteristic follows the same cursor so MyAmbience sees the size of the run it
+will receive next.
+
+Completed-run boundaries are persisted sparsely in ESPHome NVS: one 8-byte
+record per gap containing the run's UTC anchor, sample count and physical flash
+start slot. No timestamp is added to ordinary samples and the Sensirion sample
+or download wire formats are unchanged. Up to 128 completed-run descriptors are
+retained; descriptors whose samples have already fallen out of the 4096-sample
+flash window are ignored. Runs without a trustworthy wall-clock anchor are not
+presented as older timestamped history. Existing V4 history remains readable,
+but runs that predate this sparse run index cannot be reconstructed
+retroactively; they become chainable only after a future gap finalizes a
+properly anchored run.
 
 On Unni, an injected producer guard cooperatively pauses history packet production around the
 approximately six-second CO2 and 30-second RT/RH rhythms. Completed measurements

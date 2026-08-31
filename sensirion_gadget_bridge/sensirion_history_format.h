@@ -58,4 +58,8 @@ inline bool generation_newer(uint32_t candidate, uint32_t reference) {
   return static_cast<int32_t>(candidate - reference) > 0;
 }
 
+inline bool within_elapsed_window(uint32_t now, uint32_t anchor, uint32_t window_ms) {
+  return static_cast<uint32_t>(now - anchor) < window_ms;
+}
+
 }  // namespace esphome::co2_monitor_0601::sensirion_history_format
