@@ -1629,6 +1629,8 @@ void CO2Monitor0601::reset_co2_capture_gate_() {
   this->co2_guard_since_ms_ = 0;
   this->co2_wake_trace_.wake_observed_ms = 0;
   this->co2_wake_trace_.capture_rearmed_ms = 0;
+  this->co2_wake_trace_.first_capture_ms = 0;
+  this->co2_wake_trace_.first_plausible_ms = 0;
   this->co2_wake_trace_.awaiting_first_capture = false;
   i2c_sniffer::set_capture_enabled(true);
 }
@@ -1639,6 +1641,8 @@ void CO2Monitor0601::begin_co2_wake_trace_(const char *reason) {
   trace.power_down_ms = millis();
   trace.wake_observed_ms = 0;
   trace.capture_rearmed_ms = 0;
+  trace.first_capture_ms = 0;
+  trace.first_plausible_ms = 0;
   trace.awaiting_first_capture = false;
   ESP_LOGI(TAG, "CO2 wake trace: seq=%lu event=power_down t=%lu ms reason=%s",
            static_cast<unsigned long>(trace.sequence),
@@ -1865,6 +1869,7 @@ void CO2Monitor0601::process_co2_() {
     auto &trace = this->co2_wake_trace_;
     trace.awaiting_first_capture = false;
     const uint32_t outcome_ms = millis();
+    trace.first_capture_ms = outcome_ms;
     if (result.have_co2) {
       const char *outcome = (result.crc_errors != 0 || result.frame_errors != 0) ? "valid_with_errors" : "valid";
       ESP_LOGI(TAG,
@@ -1949,6 +1954,18 @@ void CO2Monitor0601::process_co2_() {
     if (!this->co2_.have_confirmation_candidate) {
       this->co2_.confirmation_candidate_ppm = ppm;
       this->co2_.have_confirmation_candidate = true;
+      if (this->co2_wake_trace_.wake_observed_ms != 0) {
+        auto &trace = this->co2_wake_trace_;
+        trace.first_plausible_ms = millis();
+        ESP_LOGW(TAG,
+                 "CO2 wake trace: seq=%lu event=first_plausible_co2 t=%lu ms since_wake=%lu ms "
+                 "since_rearm=%lu ms ppm=%u",
+                 static_cast<unsigned long>(trace.sequence),
+                 static_cast<unsigned long>(trace.first_plausible_ms),
+                 static_cast<unsigned long>(trace.first_plausible_ms - trace.wake_observed_ms),
+                 static_cast<unsigned long>(trace.first_plausible_ms - trace.capture_rearmed_ms),
+                 static_cast<unsigned>(ppm));
+      }
       ESP_LOGW(TAG,
                "CO2 bus recovery candidate: %u ppm; waiting for a second reading within +/- %u ppm",
                ppm, CO2_CONFIRM_MAX_DELTA_PPM);
@@ -1977,6 +1994,21 @@ void CO2Monitor0601::process_co2_() {
 
 void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
   power_save::on_valid_co2();
+
+  const bool passive_sniffer = source && std::strcmp(source, "passive sniffer") == 0;
+  if (passive_sniffer && this->co2_wake_trace_.wake_observed_ms != 0) {
+    const auto &trace = this->co2_wake_trace_;
+    const uint32_t accepted_ms = millis();
+    ESP_LOGI(TAG,
+             "CO2 wake trace: seq=%lu event=accepted_co2 t=%lu ms since_wake=%lu ms "
+             "since_rearm=%lu ms since_first_capture=%lu ms since_first_plausible=%lu ms ppm=%u",
+             static_cast<unsigned long>(trace.sequence), static_cast<unsigned long>(accepted_ms),
+             static_cast<unsigned long>(accepted_ms - trace.wake_observed_ms),
+             static_cast<unsigned long>(accepted_ms - trace.capture_rearmed_ms),
+             static_cast<unsigned long>(trace.first_capture_ms != 0 ? accepted_ms - trace.first_capture_ms : 0),
+             static_cast<unsigned long>(trace.first_plausible_ms != 0 ? accepted_ms - trace.first_plausible_ms : 0),
+             static_cast<unsigned>(ppm));
+  }
 #if UNNI_BLE_ENABLED
   if (this->sensirion_bridge_ != nullptr)
     this->sensirion_bridge_->publish_co2(ppm);
@@ -1991,7 +2023,6 @@ void CO2Monitor0601::accept_co2_ppm_(uint16_t ppm, const char *source) {
 
   // Two plausible passive observations are enough to identify the end of the
   // useful native CO2 window. Gate before the subsequent rail-collapse storm.
-  const bool passive_sniffer = source && std::strcmp(source, "passive sniffer") == 0;
   if (passive_sniffer && !this->external_powered_() && this->co2_window_observations_ >= 2)
     this->gate_co2_capture_after_window_();
 

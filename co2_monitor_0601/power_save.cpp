@@ -365,7 +365,13 @@ uint32_t wake_generation() { return wake_gen; }
 void on_rtrh_complete() {
   if (!configured || !lock_held) return;
   rtrh_complete = true;
-  if (co2_powered_down) co2_after_rtrh = true;
+
+  // The short RT/RH wake window does not need to wait for a CO2 result once
+  // the independent CO2 window owns both of its PM locks. The CO2 lock pair
+  // keeps Light Sleep disabled and the CPU at 80 MHz until the native CO2
+  // window closes, so retaining the RT/RH lock here only creates a misleading
+  // max-awake timeout and duplicate lock ownership.
+  if (co2_powered_down || co2_locks.fully_held()) co2_after_rtrh = true;
 }
 
 void on_valid_co2() {

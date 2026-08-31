@@ -613,3 +613,9 @@ The normal Home Assistant entity defaults were shortened from `Air Temperature` 
 - Log every successful battery-learning preference checkpoint after the synchronous flash commit.
 - Include the checkpoint reason (`periodic`, `OTA`, or `session-end`), current persisted SOC, accumulated session runtime, learning progress, learned full-runtime value and completed learning-cycle count.
 - Log the checkpoint reason on save failures as well, so OTA and periodic persistence failures are distinguishable in field logs.
+
+### 2026-08-31: CO2 wake ownership and debug-transport hardening
+
+- RT/RH wake locks now end as soon as RT/RH capture is complete when the independent CO2 PM-lock pair already owns the active native CO2 window. This avoids misleading 10-second RT/RH awake-window timeouts while preserving the CO2 window's NO_LIGHT_SLEEP + 80 MHz guarantee.
+- CO2 wake tracing now records first capture, first plausible CO2, and accepted CO2 latencies relative to wake/re-arm, making the long native power-up interval directly measurable.
+- UDP raw-debug export treats the first lwIP `ENOMEM` as a circuit-breaker event and drops the pending capture instead of retrying packet fragments under network-buffer pressure. Measurement/capture paths remain independent.

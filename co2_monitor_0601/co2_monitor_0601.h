@@ -408,6 +408,8 @@ class CO2Monitor0601 : public Component {
     uint32_t power_down_ms{0};
     uint32_t wake_observed_ms{0};
     uint32_t capture_rearmed_ms{0};
+    uint32_t first_capture_ms{0};
+    uint32_t first_plausible_ms{0};
     bool awaiting_first_capture{false};
   } co2_wake_trace_;
   std::string debug_udp_host_;

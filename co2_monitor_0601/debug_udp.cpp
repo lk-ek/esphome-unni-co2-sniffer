@@ -24,8 +24,11 @@ static sockaddr_in destination{};
 static bool configured = false;
 static uint32_t last_send_ms = 0;
 static constexpr uint32_t MIN_SEND_GAP_MS = 5;
-static constexpr uint32_t ENOMEM_RETRY_BACKOFF_MS = 50;
-static constexpr uint16_t ENOMEM_TRIP_THRESHOLD = 3;
+// Raw debug transport is strictly best-effort. One lwIP ENOMEM is enough to
+// abandon the current capture and open the circuit breaker; retrying packet
+// fragments under pbuf/mailbox pressure only adds Wi-Fi/CPU load to the
+// timing-sensitive capture path.
+static constexpr uint16_t ENOMEM_TRIP_THRESHOLD = 1;
 static constexpr uint32_t COLLECTOR_COOLDOWN_INITIAL_MS = 5000;
 static constexpr uint32_t COLLECTOR_COOLDOWN_MAX_MS = 60000;
 static constexpr uint32_t COLLECTOR_HEALTHY_RESET_MS = 60000;
@@ -198,11 +201,10 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
       enomem_count++;
       last_enomem_ms = now_ms;
       if (consecutive_enomem < UINT16_MAX) consecutive_enomem++;
-      // A failed nonblocking send can itself mean lwIP had no pbuf/mailbox
-      // resources available. Do not hammer sendto() again every component loop;
-      // leave the exporter pending and let the network stack recover first.
-      retry_not_before_ms = now_ms + ENOMEM_RETRY_BACKOFF_MS;
-      if (consecutive_enomem >= ENOMEM_TRIP_THRESHOLD) suspend_export(now_ms);
+      // Do not retry fragments from this capture. The exporter observes the
+      // active breaker, drops its pending capture immediately, and leaves lwIP
+      // alone until the cooldown expires.
+      suspend_export(now_ms);
     }
 
     static uint32_t last_error_log_ms = 0;
@@ -216,15 +218,14 @@ bool send_packet(PacketType type, uint32_t capture_id, uint16_t packet_index,
       const size_t largest_internal =
           heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
       ESP_LOGW(TAG,
-               "UDP send deferred type=%u capture=%lu packet=%u/%u: sent=%d errno=%d "
-               "heap8=%u/%u min=%u internal=%u/%u enomem=%lu backoff=%u ms",
+               "UDP send dropped type=%u capture=%lu packet=%u/%u: sent=%d errno=%d "
+               "heap8=%u/%u min=%u internal=%u/%u enomem=%lu",
                static_cast<unsigned>(type), static_cast<unsigned long>(capture_id),
                static_cast<unsigned>(packet_index + 1), static_cast<unsigned>(packet_count),
                sent, send_errno, static_cast<unsigned>(free_8),
                static_cast<unsigned>(largest_8), static_cast<unsigned>(min_8),
                static_cast<unsigned>(free_internal), static_cast<unsigned>(largest_internal),
-               static_cast<unsigned long>(enomem_count),
-               send_errno == ENOMEM ? static_cast<unsigned>(ENOMEM_RETRY_BACKOFF_MS) : 0U);
+               static_cast<unsigned long>(enomem_count));
     }
     return false;
   }
