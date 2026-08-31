@@ -1,11 +1,14 @@
 <!-- SPDX-FileCopyrightText: 2026 The esphome-unni-co2-sniffer contributors -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
-# Unni CO₂ Sensor Smartification
+# Unni CO₂ Smartification and Sensirion Gadget Bridge
 
-ESPHome firmware for adding a Seeed Studio XIAO ESP32-C3 to an Unni CO₂ monitor without taking control away from the original electronics.
+ESPHome components and example firmware for two related sensor integrations:
 
-The ESP32-C3 acts primarily as a **passive sniffer**:
+- a Seeed Studio XIAO ESP32-C3 added to an Unni CO₂ monitor without taking control away from the original electronics; and
+- a permanently powered AHT21 room sensor, optionally combined with an ENS160, which reuses the same Sensirion/MyAmbience BLE and persistent-history implementation.
+
+In the Unni build, the XIAO ESP32-C3 acts primarily as a **passive sniffer**:
 
 - CO₂ is decoded from the existing I²C traffic between the Unni controller and the CO₂ module.
 - Temperature and relative humidity are reconstructed from the existing RT/RH timing signals.
@@ -13,19 +16,19 @@ The ESP32-C3 acts primarily as a **passive sniffer**:
 - The same measurements can be advertised over BLE in a Sensirion MyAmbience-compatible format.
 - Optional persistent BLE history allows historical samples to be downloaded with MyAmbience.
 
-The tested monitor is sold as **CO2 Monitor Carbon Dioxide Detector 0601**, hence the ESPHome component name:
+The tested Unni monitor is sold as **CO2 Monitor Carbon Dioxide Detector 0601**, hence the orchestrator component name. BLE and history are provided by the separate reusable bridge:
 
 ```yaml
 sensirion_gadget_bridge:
   id: unni_sensirion_bridge
   profile: trh_co2
+  device_name: "Unni CO2 Monitor"
 
 co2_monitor_0601:
   sensirion_bridge_id: unni_sensirion_bridge
-  ble_device_name: "Unni CO2 Monitor"
 ```
 
-This project was developed against one specific hardware revision. Other revisions should be verified before connecting the ESP.
+The Unni integration was developed against one specific hardware revision. Other revisions should be verified before connecting the ESP.
 
 ---
 
@@ -33,12 +36,19 @@ This project was developed against one specific hardware revision. Other revisio
 
 ### Measurements
 
-- CO₂ concentration
-- temperature
-- relative humidity
-- battery voltage
-- estimated battery state of charge
-- USB/VBUS presence
+The Unni integration provides:
+
+- passively decoded CO₂ concentration;
+- reconstructed temperature and relative humidity;
+- battery voltage and estimated battery state of charge; and
+- USB/VBUS presence.
+
+The mobile integration provides:
+
+- AHT21 temperature and relative humidity; and
+- optional ENS160 TVOC and AQI as Home Assistant-only air-quality measurements.
+
+ENS160 eCO₂ is deliberately not published. It is an algorithmic estimate, not the direct CO₂ measurement required by the `trh_co2` profile.
 
 ### Integrations
 
@@ -48,6 +58,8 @@ This project was developed against one specific hardware revision. Other revisio
 
 ### Power management
 
+The following features belong to the Unni/XIAO integration:
+
 - automatic distinction between USB and battery operation
 - ESP32-C3 dynamic frequency scaling
 - automatic Light Sleep in battery mode
@@ -55,6 +67,8 @@ This project was developed against one specific hardware revision. Other revisio
 - reduced Home Assistant publication rate on battery
 - optional `Energy Save Mode` for measuring battery-style firmware behavior while physically powered through USB
 - dedicated BLE-only measurement build without Wi-Fi or Home Assistant
+
+The mobile variants are permanently powered and instantiate none of the Unni battery, VBUS, energy-save or automatic Light-Sleep subsystems.
 
 ### Diagnostics
 
@@ -69,6 +83,30 @@ Optional debug builds provide:
 ---
 
 # Hardware
+
+## ESP32-C6 Rev A PCB — work in progress
+
+The [`unni-smartification-c6/`](unni-smartification-c6/) subtree contains a
+dedicated four-layer ESP32-C6 hardware design with a replacement USB/power board
+and a separate ESP/battery board. It keeps the original Unni connections as
+T-taps and adds autonomous charging, USB/battery source isolation, native USB
+and a hardware-inhibited forced-awake 5 V path.
+
+> [!WARNING]
+> This PCB is a **work in progress**. Placement and routing are not final, and
+> the design has not replaced the currently tested XIAO ESP32-C3 installation.
+> Reproducible schematic, connectivity, mechanical and system-level SPICE checks
+> reduce design risk but do not constitute assembled-hardware validation.
+
+The prototype PCBs for this project are kindly sponsored by
+[PCBWay](https://www.pcbway.com/). Thank you to PCBWay for supporting the
+project and helping turn the design into physical prototypes.
+
+<a href="https://www.pcbway.com/"><img src="unni-smartification-c6/docs/images/pcbway-logo.png" alt="PCBWay" width="320"></a>
+
+See the [ESP32-C6 Rev A project README](unni-smartification-c6/README.md) for
+the power architecture, mechanics, current routing/fabrication status and
+validation commands.
 
 ## XIAO ESP32-C3 wiring
 
@@ -96,6 +134,21 @@ Unni signal ---- 10 kΩ ---- XIAO GPIO
 The resistors belong only in the ESP branches; do not insert them into the original Unni signal path. The RT/RH calibration is hardware-dependent, so calibration data collected with earlier direct or three/four-wire tap arrangements must not be mixed with the current two-wire/10 kΩ setup.
 
 The RT/RH decoder now keeps separate temperature views: a diagnostic RT-model temperature, a dedicated Unni LCD-emulation curve, and a provisional external-reference Air Temperature curve. RH uses the RH-phase carrier period normalized by REF with temperature compensation. Air Temperature is the canonical temperature exported through Sensirion BLE/history when it is inside its validated envelope; the RT model is retained as a fallback outside that envelope. See `co2_monitor_0601/calibration.h` and the dated calibration notes under `docs/history/` for the coefficients and fit provenance.
+
+---
+
+## Mobile sensor hardware
+
+The shipped mobile configurations target `wemos_d1_mini32` and use one 100 kHz
+I²C bus:
+
+| GPIO | Device | Address | Purpose |
+|---:|---|---:|---|
+| GPIO23 | AHT21 and optional ENS160 | `0x38` / `0x53` | SDA |
+| GPIO19 | AHT21 and optional ENS160 | `0x38` / `0x53` | SCL |
+
+The device is permanently externally powered. No battery divider, VBUS input or
+Unni signal tap is part of this configuration.
 
 ---
 
@@ -136,6 +189,11 @@ Battery runtime also has a persistent self-learning layer. During battery operat
 
 With `debug_metrics: true`, `Battery Learned Full Runtime`, `Battery Learning Progress`, and `Battery Learning Cycles` expose the learning state. `Battery Learning Progress` reaches 100% when the current session has both at least 2 hours of data and at least 8 percentage points of SOC drop. The model intentionally learns effective runtime rather than claiming to measure true battery capacity in mAh; without a coulomb counter the voltage/SOC curve cannot provide that measurement reliably.
 
+Battery-learning flash writes are logged after a successful synchronous commit.
+Periodic checkpoints are labeled `periodic`, OTA-triggered force-saves are
+labeled `OTA`, and end-of-session commits are labeled `session-end`, together
+with the persisted SOC/session runtime/progress and learned-runtime state.
+
 On battery, the estimator uses the normal voltage-derived SOC curve. With USB present, `Battery Level` stays unavailable and the charge estimator uses the charger-influenced battery-node voltage only as a charge-progress proxy. The charge ETA is therefore inherently less accurate, especially in the constant-voltage/taper region near full charge.
 
 ---
@@ -163,6 +221,8 @@ The reported value always reflects actual VBUS presence, even when the firmware 
 ---
 
 # Installation
+
+## Unni monitor
 
 A minimal normal configuration is:
 
@@ -205,6 +265,28 @@ esphome compile i2c-sniffer.yaml
 esphome run i2c-sniffer.yaml
 ```
 
+## Permanently powered mobile sensor
+
+The mobile sensor uses the bridge directly; it does not instantiate
+`co2_monitor_0601`:
+
+```yaml
+sensirion_gadget_bridge:
+  id: sensirion_bridge
+  profile: sht43_trh
+  temperature_id: aht21_temp
+  humidity_id: aht21_humi
+  history_time_id: mobilesensor_wall_clock
+  ble: true
+  ble_live: true
+  ble_history: true
+  advertising_interval: 2s
+```
+
+Start with `mobilesensor-sensirion.yaml` when an ENS160 is fitted, or
+`mobilesensor-sensirion-no-ens160.yaml` for AHT21-only hardware. Both variants
+use the same AHT21 BLE live-data and history path.
+
 ---
 
 # Build variants
@@ -215,11 +297,11 @@ The repository contains several configurations for different purposes.
 |---|---|---|---|---|
 | `i2c-sniffer.yaml` | yes | yes | no | normal operation |
 | `i2c-sniffer-debug.yaml` | yes | yes | yes | protocol/debugging work |
-| `i2c-sniffer-no-ble.yaml` | yes | no | optional | BLE power comparison |
+| `i2c-sniffer-no-ble.yaml` | yes | no | no | BLE power comparison |
 | `i2c-sniffer-ble-only.yaml` | no | yes | no | BLE-only power measurement |
-| `i2c-sniffer-sht43-probe.yaml` | yes | experimental | yes | MyAmbience reverse engineering |
-| `mobilesensor-sensirion.yaml` | yes | SHT43-compatible | no | mains-powered AHT21/ENS160 room sensor |
-| `mobilesensor-sensirion-no-ens160.yaml` | yes | SHT43-compatible | no | mains-powered AHT21-only room sensor |
+| `i2c-sniffer-sht43-probe.yaml` | yes | experimental | no | MyAmbience reverse engineering |
+| `mobilesensor-sensirion.yaml` | yes | SHT43-compatible | no | permanently powered AHT21/ENS160 room sensor |
+| `mobilesensor-sensirion-no-ens160.yaml` | yes | SHT43-compatible | no | permanently powered AHT21-only room sensor |
 
 The SHT43 probe is diagnostic firmware and should not be used as the normal device identity.
 
@@ -282,9 +364,40 @@ emulation entities, protocol error counters, raw timing/ratio metrics, battery
 charge/discharge rates, quality and calibration/extrapolation flags. These are
 not instantiated by the normal build.
 
+The mobile variants expose the AHT21 temperature and humidity entities. The
+ENS160 variant additionally exposes TVOC, AQI and an `ENS160` control switch.
+That switch is always off after boot. Turning it off suspends polling, puts the
+sensor into Deep Sleep and makes TVOC/AQI unavailable; AHT21 BLE and history
+continue independently. No mobile variant creates battery, VBUS, Energy Save
+Mode or ENS160-eCO₂ entities.
+
 ---
 
 # Component configuration
+
+## Sensirion bridge
+
+BLE identity, live advertisements and persistent history belong to the bridge:
+
+```yaml
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2       # or sht43_trh
+  ble: true
+  ble_live: true
+  ble_history: true
+  device_name: "Unni CO2 Monitor"
+  identity_mode: device_derived
+  advertising_interval: 2s
+  history_time_id: unni_wall_clock
+```
+
+For `sht43_trh`, `temperature_id` and `humidity_id` may bind the bridge directly
+to ESPHome sensors. They must be configured together.
+`sht43_identity_probe: true` remains a compatibility alias for this profile;
+contradictory profile and alias settings are rejected.
+
+## Unni orchestrator
 
 Useful options include:
 
@@ -294,13 +407,8 @@ co2_monitor_0601:
   home_assistant: true
   ha_publish_interval: 60s
 
-  # BLE
-  ble: true
-  ble_live: true
-  ble_history: true
-  # BLE identity defaults to device_derived; no identity option is required.
-  # Use legacy_fixed only to retain an older fixed identity/bond cache.
-  ble_advertising_interval: 2s
+  # Bridge composition and battery-specific BLE interval
+  sensirion_bridge_id: unni_sensirion_bridge
   ble_battery_advertising_interval: 3s
 
   # Power management
@@ -352,7 +460,8 @@ retrying GPIO setup at runtime.
 
 `battery_pin` must be an ESP32-C3 ADC1-capable GPIO.
 
-The component configures the ESP-IDF power-management requirements, BLE server and persistent history partition automatically.
+The Unni orchestrator configures its ESP-IDF power-management requirements;
+the bridge configures the BLE server and persistent-history partition.
 
 `active_i2c_probe` is intentionally disabled by default. It is a hardware diagnostic, not normal passive-sniffer operation. The probe runs only on battery policy after the CO2 bus has remained LOW/LOW and edge-free for at least one second. It first tries `0xEC05`; if no slave ACKs, it tries the observed `0x21B1` start command. Every attempt restores SDA/SCL to input-only/no-pull mode immediately afterwards. Do not enable it without series resistance on both CO2 tap lines.
 
@@ -395,13 +504,17 @@ Battery operation prioritizes low average power:
 The corresponding options are:
 
 ```yaml
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  advertising_interval: 2s
+
 co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
   light_sleep: true
   light_sleep_max_awake: 10s
   co2_wake_idle_stable: 500ms
   co2_wake_guard_time: 500ms
   ha_publish_interval: 60s
-  ble_advertising_interval: 2s
   ble_battery_advertising_interval: 3s
 ```
 
@@ -460,13 +573,16 @@ It keeps:
 The relevant configuration is:
 
 ```yaml
-co2_monitor_0601:
-  home_assistant: false
-
+sensirion_gadget_bridge:
+  id: unni_sensirion_bridge
+  profile: trh_co2
   ble: true
   ble_live: true
   ble_history: true
 
+co2_monitor_0601:
+  sensirion_bridge_id: unni_sensirion_bridge
+  home_assistant: false
   energy_save_mode_default: true
   energy_save_grace: 0s
 ```
@@ -487,9 +603,51 @@ Avoid running `ping`, `esphome logs`, an actively polling web UI or other unnece
 
 ---
 
+# Shared Sensirion bridge architecture
+
+BLE and history consume one authoritative, profile-aware sample owned by
+`sensirion_gadget_bridge`:
+
+| Concern | Unni monitor | Mobile sensor |
+|---|---|---|
+| Measurement producer | passive CO₂ and RT/RH decoders | AHT21 state callbacks |
+| Bridge profile | `trh_co2` | `sht43_trh` |
+| Complete sample | finite T/RH plus valid CO₂ | finite T/RH; CO₂ remains unset |
+| History guard | Unni capture-aware guard | generic transfer watchdogs only |
+| Optional air quality | none | ENS160 TVOC/AQI in HA only |
+| Power policy | USB/battery orchestration | permanently powered; no Unni policy |
+
+Invalid or out-of-range input does not replace the last valid sample. BLE live
+data, SHT43 GATT temperature/humidity and history all read the same accepted
+sample, preventing different paths from applying different completeness rules.
+The first complete sample is immediately eligible for history; subsequent
+samples follow the configured history interval. Existing flash layout and GATT
+history wire format are shared by both producers.
+
+## Standalone AHT21 and optional ENS160
+
+The bridge coalesces sequential AHT21 temperature and humidity callbacks for
+100 ms. A restarted coalescing window ensures that a burst publishes exactly
+the newest complete pair rather than two partially updated samples.
+
+`mobilesensor-sensirion.yaml` includes an ENS160 controlled by the Home
+Assistant `ENS160` switch. It starts off after every boot. Enabling the switch
+wakes the sensor before polling resumes; disabling it suspends polling before
+Deep Sleep and publishes TVOC/AQI as unavailable. AHT21 compensation remains
+enabled for ENS160 operation. Heating from an active ENS160 may influence the
+nearby AHT21; no unvalidated correction curve is applied.
+
+ENS160 TVOC and AQI never participate in BLE sample completeness, GATT or
+history. ENS160 eCO₂ is exposed nowhere. Switching the ENS160 on or off therefore
+cannot pause, clear or reset AHT21 history. The AHT21-only variant provides the
+same BLE identity, history, OTA flush and MyAmbience behavior without creating
+the ENS160 driver, raw I²C control, switch or air-quality entities.
+
+---
+
 # Sensirion / MyAmbience compatibility
 
-The normal firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format.
+The normal Unni firmware advertises temperature, humidity and CO₂ in a Sensirion Gadget/MyAmbience-compatible format. The mobile profile advertises SHT43-style temperature and humidity only.
 For the temperature field it uses `Air Temperature` inside the externally validated air-temperature envelope, falling back to the diagnostic RT model only when that physical-air estimate is unavailable. BLE humidity remains the physical carrier-based `RH Humidity`; the Unni display-emulation values are never advertised as physical measurements.
 
 The reusable bridge is composed with the Unni orchestrator in the shipped BLE
@@ -900,6 +1058,10 @@ sensirion_gadget_bridge/
   sensirion_sht43_probe.cpp/.h
       experimental SHT43 identity probe
 
+unni-smartification-c6/
+  ESP32-C6 Rev A PCB work in progress
+  KiCad sources, validation, mechanics and fabrication tooling
+
 docs/
   DEVELOPMENT_HISTORY.md
       development process and design rationale
@@ -937,6 +1099,11 @@ decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
 ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
 out of scope and still require hardware testing. See `tests/host/README.md`.
 
+The suite also runs the Sensirion bridge portable tests and both mobile YAML
+variants. Its RT/RH regression corpus contains 135 timing records extracted
+from the August 11 capture archives, covering normalization and portable
+temperature/humidity calibration paths beyond the synthetic smoke fixture.
+
 On macOS the runner also handles native C++20 standard-library selection. If
 the active Apple libc++ lacks ESPHome's required concepts support and Homebrew
 LLVM is installed, the generated host builds are automatically pointed at the
@@ -950,7 +1117,24 @@ Historical documents may describe earlier pin assignments, names or implementati
 
 `WiFi Home Assistant` can intentionally disable the ESPHome Wi-Fi interface. Because Home Assistant cannot reach the device while Wi-Fi is off, connecting USB opens a temporary recovery window in which the switch can be turned back on. The example Wi-Fi/API configurations use `reboot_timeout: 0s` so intentional offline operation is not treated as a fault.
 
-The passive CO₂ sniffer remains armed independently of the RT/RH Light-Sleep awake window. GPIO6/GPIO7 do not wake the ESP from Light Sleep, but CO₂ transactions can still be captured whenever the MCU is already awake. Debug builds periodically emit `I2C edge diag` messages to distinguish missing electrical activity from framing/decoder failures.
+During a powered CO₂ window, the passive sniffer remains active independently
+of the RT/RH awake window and its PM lock keeps capture available. After the
+CO₂ bus has shut down and passed the LOW/LOW blanking guards, capture is disabled
+and GPIO7/SCL HIGH is explicitly armed as a Light-Sleep wake source for the next
+power-up. GPIO6/SDA is never used as a wake source.
+
+The CO₂ wake trace correlates each battery-policy cycle with one sequence
+number. It logs monotonic timestamps for `power_down`, the task-side
+`gpio7_wake_observed`, `capture_rearm` and the first completed capture. The wake
+entry also records the ESP-IDF wake cause, GPIO wake mask and configured SCL
+pin. The first capture is classified as `valid`, `valid_with_errors`,
+`crc_error`, `frame_error`, `protocol_no_measurement` or `unhandled_capture`,
+with frame, raw-SCL and decoder counters. Absence of a later event therefore
+distinguishes a missing native power-up, an unobserved wake, a failed rearm and
+a captured-but-rejected transaction without adding recovery behavior.
+
+Debug builds periodically emit `I2C edge diag` messages as an additional way to
+distinguish missing electrical activity from framing or decoder failures.
 
 Because an intermittent passive tap can produce malformed I²C captures, decoded CO₂ values below 350 ppm are rejected. After a CRC/framing error, publication resumes only after two plausible consecutive readings agree within 150 ppm.
 
@@ -982,58 +1166,3 @@ See:
 
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - `LICENSES/`
-
-
-Battery-learning flash writes are logged after a successful synchronous commit. Periodic checkpoints are labeled `periodic`, OTA-triggered force-saves are labeled `OTA`, and end-of-session commits are labeled `session-end`, together with the persisted SOC/session runtime/progress and learned-runtime state.
-
-### Host regression corpus
-
-The native host suite includes 135 RT/RH timing records extracted from the
-existing August 11 capture archives. These real measured timing points are used
-to regression-test normalization and all portable temperature/humidity
-calibration paths across a much wider range than the synthetic smoke fixture.
-See `tests/host/README.md` for scope and limitations.
-
-## Standalone Sensirion T/RH variant
-
-`mobilesensor-sensirion.yaml` is a permanently powered, batteryless AHT21/ENS160
-node. It exposes AHT21 temperature/humidity through the SHT43-compatible
-MyAmbience BLE and persistent-history path:
-
-```yaml
-sensirion_gadget_bridge:
-  id: sensirion_bridge
-  profile: sht43_trh
-  temperature_id: aht21_temp
-  humidity_id: aht21_humi
-  advertising_interval: 2s
-```
-
-Both source IDs are required together. The component registers callbacks on
-the source sensors and coalesces their sequential updates for 100 ms, so BLE,
-SHT43 GATT and history consume one consistent, shared sample. The older
-`sht43_identity_probe: true` remains a compatible alias for
-`profile: sht43_trh`; contradictory settings are rejected.
-
-The mobile YAML no longer instantiates the Unni component at all. Consequently
-it cannot initialize Unni GPIO capture, battery ADC/learning, VBUS policy or
-automatic Light Sleep, and it creates none of the related HA entities. Only the
-fixed mains-powered advertising interval is configured. The public C++
-delegation method remains available for compatibility, but the shipped YAMLs
-now compose the bridge explicitly.
-
-The `ENS160` HA switch restores `ALWAYS_OFF` after every boot. Turning it on
-wakes the sensor before resuming polling; turning it off suspends polling before
-Deep Sleep and publishes TVOC/AQI as unavailable. ENS160 eCO₂ is intentionally
-not exposed to HA and is never fed to BLE, GATT or history because it is an
-estimate rather than a direct CO₂ measurement. AHT21 compensation remains
-enabled for the ENS160. Its self-heating may influence the nearby AHT21 while
-active; no unvalidated correction curve is applied.
-
-For hardware without an ENS160, use
-`mobilesensor-sensirion-no-ens160.yaml`. It contains the same AHT21 source IDs,
-BLE profile, flash-backed history, OTA flush and MyAmbience GATT behavior, but
-does not instantiate the ENS160 driver, raw I²C device, control switch, or
-TVOC/AQI entities. In the ENS160 build, switching the gas sensor on or off does
-not reset, pause, or otherwise participate in Sensirion history; history always
-continues from AHT21 T/RH.
