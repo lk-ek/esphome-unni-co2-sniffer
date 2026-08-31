@@ -4,6 +4,7 @@
 
 #include "calibration.h"
 #include "co2_decoder.h"
+#include "rtrh_wake_guard.h"
 #include "../sensirion_gadget_bridge/sensirion_sample.h"
 #include "../sensirion_gadget_bridge/sensirion_bridge_core.h"
 #include "../sensirion_gadget_bridge/sensirion_history_format.h"
@@ -104,6 +105,32 @@ void WifiHaSwitch::write_state(bool state) {
 
 bool CO2Monitor0601::run_portable_self_test_() {
   using namespace i2c_sniffer;
+
+  using rtrh_decoder::WakeCaptureState;
+  using rtrh_decoder::WakeRearmAction;
+  WakeCaptureState wake_state = WakeCaptureState::UNSYNCHRONIZED;
+  wake_state = rtrh_decoder::wake_state_after_edge(wake_state);
+  if (rtrh_decoder::wake_rearm_action(wake_state, true) != WakeRearmAction::DISCARD_PARTIAL ||
+      rtrh_decoder::wake_state_after_rearm(wake_state, true) !=
+          WakeCaptureState::DISCARD_UNTIL_IDLE ||
+      !rtrh_decoder::wake_edge_is_discarded(WakeCaptureState::DISCARD_UNTIL_IDLE)) {
+    ESP_LOGE(TAG, "portable self-test: RT/RH partial wake cycle was not discarded");
+    return false;
+  }
+  wake_state = rtrh_decoder::wake_state_after_idle(WakeCaptureState::DISCARD_UNTIL_IDLE);
+  if (wake_state != WakeCaptureState::FRESH_CYCLE_ARMED) {
+    ESP_LOGE(TAG, "portable self-test: RT/RH idle did not arm a fresh cycle");
+    return false;
+  }
+  wake_state = rtrh_decoder::wake_state_after_edge(wake_state);
+  if (wake_state != WakeCaptureState::FRESH_CYCLE_ACTIVE ||
+      rtrh_decoder::wake_rearm_action(wake_state, true) != WakeRearmAction::KEEP_FRESH_CYCLE ||
+      rtrh_decoder::wake_state_after_rearm(wake_state, true) !=
+          WakeCaptureState::UNSYNCHRONIZED ||
+      rtrh_decoder::wake_state_after_complete_cycle() != WakeCaptureState::FRESH_CYCLE_ARMED) {
+    ESP_LOGE(TAG, "portable self-test: RT/RH fresh cycle was not preserved across re-arm");
+    return false;
+  }
 
   // Known-good EC05 command + 500 ppm response. CRC(0x01, 0xF4) = 0x33.
   Capture capture{};

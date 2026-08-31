@@ -108,6 +108,10 @@ void loop();
 bool poll(Measurement &measurement);
 void update_latest(const Measurement &measurement);
 
+// Reports completion of an in-flight cycle discarded after a Light-sleep
+// wake. This closes the PM wake window without exposing a partial measurement.
+bool consume_partial_after_wake();
+
 // Task-context snapshot for cooperative BLE-history scheduling.
 bool capture_in_progress();
 

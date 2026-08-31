@@ -82,6 +82,7 @@ static constexpr uint8_t RMT_MAX_REPAIR_EDGES = 16U;
 
 static bool rmt_scl_assist_enabled = false;
 static rmt_channel_handle_t rmt_scl_channel = nullptr;
+static bool rmt_scl_channel_enabled = false;
 static rmt_symbol_word_t rmt_scl_user_buffer[RMT_RX_USER_SYMBOLS];
 static rmt_symbol_word_t rmt_scl_accum[RMT_SCL_ACCUM_SYMBOLS];
 static volatile size_t rmt_scl_accum_count = 0;
@@ -134,7 +135,14 @@ static bool rmt_scl_arm_() {
 
 static void rmt_scl_suspend_() {
   if (!rmt_scl_assist_enabled || !rmt_scl_channel) return;
-  rmt_disable(rmt_scl_channel);
+  if (rmt_scl_channel_enabled) {
+    const esp_err_t err = rmt_disable(rmt_scl_channel);
+    if (err == ESP_OK || err == ESP_ERR_INVALID_STATE) {
+      rmt_scl_channel_enabled = false;
+    } else {
+      ESP_LOGW(TAG, "RMT SCL disable failed: %s", esp_err_to_name(err));
+    }
+  }
   rmt_scl_done = false;
   rmt_scl_accum_count = 0;
   rmt_scl_overflow = false;
@@ -142,10 +150,13 @@ static void rmt_scl_suspend_() {
 
 static bool rmt_scl_resume_() {
   if (!rmt_scl_assist_enabled || !rmt_scl_channel) return true;
-  const esp_err_t err = rmt_enable(rmt_scl_channel);
-  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-    ESP_LOGW(TAG, "RMT SCL enable failed: %s", esp_err_to_name(err));
-    return false;
+  if (!rmt_scl_channel_enabled) {
+    const esp_err_t err = rmt_enable(rmt_scl_channel);
+    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
+      ESP_LOGW(TAG, "RMT SCL enable failed: %s", esp_err_to_name(err));
+      return false;
+    }
+    rmt_scl_channel_enabled = true;
   }
   return rmt_scl_arm_();
 }
@@ -1542,13 +1553,17 @@ bool setup(uint8_t sda_pin, uint8_t scl_pin, bool use_rmt_scl_assist) {
       cbs.on_recv_done = rmt_scl_done_callback;
       err = rmt_rx_register_event_callbacks(rmt_scl_channel, &cbs, nullptr);
     }
-    if (err == ESP_OK) err = rmt_enable(rmt_scl_channel);
+    if (err == ESP_OK) {
+      err = rmt_enable(rmt_scl_channel);
+      if (err == ESP_OK) rmt_scl_channel_enabled = true;
+    }
     if (err == ESP_OK && !rmt_scl_arm_()) err = ESP_FAIL;
     if (err != ESP_OK) {
       ESP_LOGW(TAG, "RMT SCL assist unavailable (%s); continuing with GPIO backend",
                esp_err_to_name(err));
       if (rmt_scl_channel) {
-        rmt_disable(rmt_scl_channel);
+        if (rmt_scl_channel_enabled) rmt_disable(rmt_scl_channel);
+        rmt_scl_channel_enabled = false;
         rmt_del_channel(rmt_scl_channel);
         rmt_scl_channel = nullptr;
       }
@@ -1579,7 +1594,8 @@ void shutdown() {
   gpio_isr_handler_remove(pin_sda);
 #if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
   if (rmt_scl_channel != nullptr) {
-    rmt_disable(rmt_scl_channel);
+    if (rmt_scl_channel_enabled) rmt_disable(rmt_scl_channel);
+    rmt_scl_channel_enabled = false;
     rmt_del_channel(rmt_scl_channel);
     rmt_scl_channel = nullptr;
   }

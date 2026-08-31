@@ -1317,6 +1317,12 @@ float CO2Monitor0601::update_thermal_transient_(float temperature_c) {
 void CO2Monitor0601::process_rtrh_(bool publish_outputs) {
   rtrh_decoder::loop();
 
+  if (rtrh_decoder::consume_partial_after_wake()) {
+    power_save::on_rtrh_complete();
+    ESP_LOGI(TAG, "RT/RH partial_after_wake cycle discarded; awaiting next full cycle");
+    return;
+  }
+
   rtrh_decoder::Measurement m;
   if (!rtrh_decoder::poll(m)) return;
   power_save::on_rtrh_complete();
@@ -2251,16 +2257,21 @@ void CO2Monitor0601::loop() {
     // do not publish or feed measurements into HA/BLE. Poll only to release
     // completed snapshots and keep the capture path representative.
     rtrh_decoder::loop();
-    rtrh_decoder::Measurement discarded;
-    if (rtrh_decoder::poll(discarded)) {
+    if (rtrh_decoder::consume_partial_after_wake()) {
       power_save::on_rtrh_complete();
+      ESP_LOGI(TAG, "RT/RH ISR-only partial_after_wake cycle discarded; awaiting next full cycle");
+    } else {
+      rtrh_decoder::Measurement discarded;
+      if (rtrh_decoder::poll(discarded)) {
+        power_save::on_rtrh_complete();
 #if UNNI_BLE_HISTORY_ENABLED
-      this->history_transfer_guard_.note_rtrh_cycle(
-          static_cast<uint64_t>(esp_timer_get_time()));
+        this->history_transfer_guard_.note_rtrh_cycle(
+            static_cast<uint64_t>(esp_timer_get_time()));
 #endif
-      ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
-               static_cast<unsigned long>(discarded.sequence),
-               discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);
+        ESP_LOGI(TAG, "RT/RH ISR-only capture %lu complete: %s, quality %.0f%%",
+                 static_cast<unsigned long>(discarded.sequence),
+                 discarded.valid ? "VALID" : "REJECT", discarded.quality_percent);
+      }
     }
   }
 #if UNNI_RUNTIME_DIAGNOSTICS

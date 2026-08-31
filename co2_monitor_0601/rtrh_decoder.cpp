@@ -5,6 +5,7 @@
 
 #include "calibration.h"
 #include "power_save.h"
+#include "rtrh_wake_guard.h"
 #include "esphome/core/log.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
@@ -149,6 +150,8 @@ struct DecoderState {
   Snapshot snapshot;
   volatile bool snapshot_ready{false};
   volatile uint8_t pin_level[2]{0, 0};
+  volatile WakeCaptureState wake_capture_state{WakeCaptureState::UNSYNCHRONIZED};
+  volatile bool partial_after_wake_complete{false};
   uint32_t last_polled_sequence{0};
   Measurement latest_measurement;
 };
@@ -369,6 +372,7 @@ static void finalize_measurement() {
   if (!decoder.collecting) return;
   if (!decoder.ref.count || !decoder.rt.count || !decoder.rh.count) {
     decoder.collecting = false;
+    decoder.wake_capture_state = wake_state_after_complete_cycle();
     return;
   }
   Snapshot next{};
@@ -388,6 +392,7 @@ static void finalize_measurement() {
   decoder.snapshot = next;
   decoder.snapshot_ready = true;
   decoder.collecting = false;
+  decoder.wake_capture_state = wake_state_after_complete_cycle();
 }
 
 #if RTRH_DEBUG_CAPTURE
@@ -507,51 +512,63 @@ static void IRAM_ATTR gpio_isr(void *arg) {
 
   const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
   const uint8_t state = read_state();
-  if (!decoder.collecting) reset_measurement(now, state);
-  else decoder.last_edge_us = now;
-  update_phase(now);
+  const WakeCaptureState wake_state = decoder.wake_capture_state;
+  const bool discard_edge = wake_edge_is_discarded(wake_state);
+  decoder.wake_capture_state = wake_state_after_edge(wake_state);
 
-  // Count physical edges during the RH phase independently of the combined
-  // GPIO state. This remains useful when RT and RH switch almost in phase and
-  // the historical RT=0/RH=1 state becomes too short to observe reliably.
-  if (decoder.phase == Phase::RH) {
-    volatile uint16_t *counter = nullptr;
-    if (pin_index == 0)
-      counter = level ? &decoder.rh_rt_rise_edges : &decoder.rh_rt_fall_edges;
-    else
-      counter = level ? &decoder.rh_rh_rise_edges : &decoder.rh_rh_fall_edges;
-    if (*counter != 0xFFFF) (*counter)++;
-    observe_rh_phase_edge(now, pin_index, level);
-  }
+  if (discard_edge) {
+    // Keep only the silence timestamp and pin baseline. The current native
+    // waveform began before task context could re-arm the GPIOs, so none of
+    // its timing may seed a decoded measurement.
+    decoder.last_edge_us = now;
+    decoder.gpio_state = state;
+  } else {
+    if (!decoder.collecting) reset_measurement(now, state);
+    else decoder.last_edge_us = now;
+    update_phase(now);
 
-  // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
-  // errors when several sensor lines change almost simultaneously.
-  const bool is_rt_irq = pin_index == 0;
-  if (is_rt_irq && previous == 0 && level != 0) decoder.have_rt_rise = true;
-  if (is_rt_irq && previous != 0 && level == 0) {
-    const uint32_t previous_fall = decoder.last_rt_fall_us;
-    decoder.last_rt_fall_us = now;
-    if (previous_fall && decoder.have_rt_rise) {
-      const uint32_t period = static_cast<uint32_t>(now - previous_fall);
-      if (period <= CYCLE_MAX_US) {
-        if (decoder.phase == Phase::REF) add_period(decoder.ref, period);
-        else if (decoder.phase == Phase::RT) {
-          add_period(decoder.rt, period);
-          if (decoder.rt_temperature_count < RT_TEMP_CYCLES) {
-            decoder.rt_temperature_period_sum += period;
-            decoder.rt_temperature_count++;
+    // Count physical edges during the RH phase independently of the combined
+    // GPIO state. This remains useful when RT and RH switch almost in phase and
+    // the historical RT=0/RH=1 state becomes too short to observe reliably.
+    if (decoder.phase == Phase::RH) {
+      volatile uint16_t *counter = nullptr;
+      if (pin_index == 0)
+        counter = level ? &decoder.rh_rt_rise_edges : &decoder.rh_rt_fall_edges;
+      else
+        counter = level ? &decoder.rh_rh_rise_edges : &decoder.rh_rh_fall_edges;
+      if (*counter != 0xFFFF) (*counter)++;
+      observe_rh_phase_edge(now, pin_index, level);
+    }
+
+    // REF/RT timing comes only from the physical RT IRQ. This avoids ordering
+    // errors when several sensor lines change almost simultaneously.
+    const bool is_rt_irq = pin_index == 0;
+    if (is_rt_irq && previous == 0 && level != 0) decoder.have_rt_rise = true;
+    if (is_rt_irq && previous != 0 && level == 0) {
+      const uint32_t previous_fall = decoder.last_rt_fall_us;
+      decoder.last_rt_fall_us = now;
+      if (previous_fall && decoder.have_rt_rise) {
+        const uint32_t period = static_cast<uint32_t>(now - previous_fall);
+        if (period <= CYCLE_MAX_US) {
+          if (decoder.phase == Phase::REF) add_period(decoder.ref, period);
+          else if (decoder.phase == Phase::RT) {
+            add_period(decoder.rt, period);
+            if (decoder.rt_temperature_count < RT_TEMP_CYCLES) {
+              decoder.rt_temperature_period_sum += period;
+              decoder.rt_temperature_count++;
+            }
+          } else if (decoder.phase == Phase::RH) {
+            add_period(decoder.rh, period);
           }
-        } else if (decoder.phase == Phase::RH) {
-          add_period(decoder.rh, period);
         }
       }
+      decoder.have_rt_rise = false;
     }
-    decoder.have_rt_rise = false;
-  }
 
-  if (state != decoder.gpio_state) {
-    observe_rh_state(now, state);
-    decoder.gpio_state = state;
+    if (state != decoder.gpio_state) {
+      observe_rh_state(now, state);
+      decoder.gpio_state = state;
+    }
   }
 
 
@@ -605,6 +622,8 @@ bool setup(uint8_t rt_pin, uint8_t rh_pin) {
   if (err != ESP_OK) return false;
 
   for (gpio_num_t pin : pins) gpio_set_intr_type(pin, GPIO_INTR_ANYEDGE);
+  decoder.wake_capture_state = WakeCaptureState::UNSYNCHRONIZED;
+  decoder.partial_after_wake_complete = false;
   decoder.gpio_state = read_state();
   for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
 #if RTRH_DEBUG_CAPTURE
@@ -633,6 +652,8 @@ void shutdown() {
   }
   decoder.collecting = false;
   decoder.snapshot_ready = false;
+  decoder.wake_capture_state = WakeCaptureState::UNSYNCHRONIZED;
+  decoder.partial_after_wake_complete = false;
 #if RTRH_DEBUG_CAPTURE
   debug.capturing = false;
 #endif
@@ -640,10 +661,14 @@ void shutdown() {
 
 void rearm_after_light_sleep() {
   // Re-assert the passive tap configuration after automatic Light-sleep.
-  // Do not restart an in-flight measurement: the first RT/RH edge is itself
-  // what woke the CPU, so resetting phase timing here would shift REF/RT/RH
-  // boundaries by task-loop latency.
+  // Preserve only a cycle whose first edge was already armed at a known idle
+  // boundary. An unsynchronized in-flight cycle is discarded until silence;
+  // treating its wake edge as REF would shift the phase origin arbitrarily.
   for (gpio_num_t pin : pins) gpio_intr_disable(pin);
+
+  const bool was_collecting = decoder.collecting;
+  const WakeCaptureState prior_wake_state = decoder.wake_capture_state;
+  const WakeRearmAction wake_action = wake_rearm_action(prior_wake_state, was_collecting);
 
   gpio_set_direction(pin_rt, GPIO_MODE_INPUT);
   gpio_set_direction(pin_rh, GPIO_MODE_INPUT);
@@ -659,16 +684,55 @@ void rearm_after_light_sleep() {
   decoder.gpio_state = state;
   decoder.pin_level[0] = gpio_get_level(pin_rt);
   decoder.pin_level[1] = gpio_get_level(pin_rh);
+  decoder.wake_capture_state = wake_state_after_rearm(prior_wake_state, was_collecting);
+  if (wake_action == WakeRearmAction::DISCARD_PARTIAL) {
+    decoder.collecting = false;
+    decoder.phase = Phase::WAIT_REF;
+    decoder.last_rt_fall_us = 0;
+    decoder.have_rt_rise = false;
+  }
 #if RTRH_DEBUG_CAPTURE
   debug.last_value = state;
 #endif
 
   for (gpio_num_t pin : pins) gpio_intr_enable(pin);
-  ESP_LOGI(TAG, "RT/RH GPIOs re-armed after Light-sleep wake: RT=%d RH=%d",
-           gpio_get_level(pin_rt), gpio_get_level(pin_rh));
+  if (wake_action == WakeRearmAction::DISCARD_PARTIAL) {
+    ESP_LOGI(TAG,
+             "RT/RH GPIOs re-armed after Light-sleep wake: RT=%d RH=%d; "
+             "partial_after_wake=yes, discarding until idle",
+             gpio_get_level(pin_rt), gpio_get_level(pin_rh));
+  } else {
+    ESP_LOGI(TAG,
+             "RT/RH GPIOs re-armed after Light-sleep wake: RT=%d RH=%d; "
+             "fresh_cycle=%s",
+             gpio_get_level(pin_rt), gpio_get_level(pin_rh),
+             wake_action == WakeRearmAction::KEEP_FRESH_CYCLE ? "preserved" : "not-active");
+  }
 }
 
 void loop() {
+  bool partial_reached_idle = false;
+  if (decoder.wake_capture_state == WakeCaptureState::DISCARD_UNTIL_IDLE) {
+    const uint32_t now = static_cast<uint32_t>(esp_timer_get_time());
+    const uint32_t last = decoder.last_edge_us;
+    if (last && static_cast<uint32_t>(now - last) > MEASUREMENT_QUIET_US) {
+      for (gpio_num_t pin : pins) gpio_intr_disable(pin);
+      const uint32_t now2 = static_cast<uint32_t>(esp_timer_get_time());
+      const uint32_t last2 = decoder.last_edge_us;
+      if (decoder.wake_capture_state == WakeCaptureState::DISCARD_UNTIL_IDLE && last2 &&
+          static_cast<uint32_t>(now2 - last2) > MEASUREMENT_QUIET_US) {
+        decoder.wake_capture_state = wake_state_after_idle(decoder.wake_capture_state);
+        decoder.partial_after_wake_complete = true;
+        decoder.gpio_state = read_state();
+        for (uint8_t i = 0; i < 2; i++) decoder.pin_level[i] = gpio_get_level(pins[i]);
+        partial_reached_idle = true;
+      }
+      for (gpio_num_t pin : pins) gpio_intr_enable(pin);
+    }
+  }
+  if (partial_reached_idle)
+    ESP_LOGI(TAG, "RT/RH partial_after_wake cycle reached idle; next full cycle armed");
+
   // RH can legitimately contain periods up to 60 ms. 100 ms of silence therefore
   // terminates the ~383 ms RT/RH transaction safely without the former 15 s delay.
   if (decoder.collecting) {
@@ -703,7 +767,10 @@ void loop() {
 #endif
 }
 
-bool capture_in_progress() { return decoder.collecting; }
+bool capture_in_progress() {
+  return decoder.collecting ||
+         decoder.wake_capture_state == WakeCaptureState::DISCARD_UNTIL_IDLE;
+}
 
 static bool temperature_is_valid(const Measurement &m) {
   if (!std::isfinite(m.ref_period_us) || m.ref_period_us < REF_PERIOD_MIN_US ||
@@ -1000,6 +1067,12 @@ bool poll(Measurement &measurement) {
 }
 
 void update_latest(const Measurement &measurement) { decoder.latest_measurement = measurement; }
+
+bool consume_partial_after_wake() {
+  if (!decoder.partial_after_wake_complete) return false;
+  decoder.partial_after_wake_complete = false;
+  return true;
+}
 
 #if RTRH_DEBUG_CAPTURE
 #if defined(USE_WEB_SERVER_BASE)

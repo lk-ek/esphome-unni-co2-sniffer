@@ -438,6 +438,19 @@ between ISR-owned live state and task-owned snapshot processing.
 Do not perform logging, calibration, BLE work, HA publishing, HTTP work, or any
 other slow operation while those GPIO interrupts are disabled.
 
+After a Light-sleep wake, task context cannot assume that the wake edge was the
+beginning of REF: ISR acquisition may have occurred after the native waveform
+was already active. Such an in-flight cycle is marked `partial_after_wake` and
+its decoder accumulators are discarded. The ISR then tracks edges only far
+enough to establish 100 ms of idle silence. That idle boundary arms the next
+first edge as a fresh cycle; its time origin is preserved when task context
+re-asserts the passive GPIO configuration. A completed full cycle leaves the
+next cycle armed, so synchronization does not require discarding every wake.
+
+The partial-cycle completion is reported separately to the power manager. It
+closes the bounded awake window without publishing a rejected measurement or
+changing any decoder acceptance threshold.
+
 ## Snapshot -> derived measurement
 
 After finalization, `poll()` operates on the completed snapshot in normal task
