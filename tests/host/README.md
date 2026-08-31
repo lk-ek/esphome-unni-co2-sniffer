@@ -27,9 +27,12 @@ as their ESP32 implementations. At startup they:
 - verifies profile completeness, invalid-sample retention, 100 ms T/RH
   coalescing, newest-pair selection, zeroed SHT43 history CO2 bytes, and a
   golden SHT43 type-0x06 manufacturer payload;
-- verifies history interval/generation handling and the portable predictive,
-  reactive, adaptive-quality, stale-frame, overlap, and wrap-safe
+- verifies history interval/generation handling, sparse-time anchor rebasing
+  after a full 4096-sample ring starts evicting old samples, and the portable
+  predictive, reactive, adaptive-quality, stale-frame, overlap, and wrap-safe
   download-guard boundaries;
+- simulates a full 4096-sample MyAmbience schedule (2049 notifications) at the
+  production 4 ms pacing while crossing normal six-second CO2 guard windows;
 - publishes deterministic fixture values to any entities enabled by that YAML
   variant;
 - prints `UNNI HOST SELF-TEST PASSED` for Unni variants or
@@ -42,11 +45,23 @@ semantics. Those remain hardware-in-the-loop concerns.
 
 ## Run
 
-With ESPHome 2026.7.4 (or a newer compatible release) installed:
+With the current tested ESPHome release installed (`requirements-test.txt` pins 2026.8.2):
 
 ```sh
 python3 tests/host/run_host_tests.py
 ```
+
+
+To exercise the complete supported-version matrix in isolated virtual environments:
+
+```sh
+python3 tests/host/run_version_matrix.py
+```
+
+The matrix currently covers ESPHome 2026.8.1 (minimum supported) and 2026.8.2
+(current project pin). `--mode config` and `--mode compile` are forwarded to the
+normal runner. `--find-links /path/to/wheelhouse` enables a fully offline run
+when matching wheels for both versions are available.
 
 The runner first looks for an `esphome` console script next to the Python
 interpreter executing the test harness (for example `/opt/esphome/bin/esphome`

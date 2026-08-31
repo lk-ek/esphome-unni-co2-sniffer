@@ -70,6 +70,8 @@ def _validate(config):
     config[CONF_PROFILE] = explicit_profile or (
         "sht43_trh" if config.get(CONF_SHT43_IDENTITY_PROBE, False) else "trh_co2"
     )
+    if CONF_DEVICE_NAME not in config:
+        config[CONF_DEVICE_NAME] = "SHT43 DB" if config[CONF_PROFILE] == "sht43_trh" else "Unni CO2 Monitor"
     if config[CONF_BLE_LIVE] and not config[CONF_BLE]:
         raise cv.Invalid("ble_live: true requires ble: true")
     if config[CONF_BLE_HISTORY] and not config[CONF_BLE]:
@@ -89,7 +91,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_BLE, default=True): cv.boolean,
             cv.Optional(CONF_BLE_LIVE, default=True): cv.boolean,
             cv.Optional(CONF_BLE_HISTORY, default=True): cv.boolean,
-            cv.Optional(CONF_DEVICE_NAME, default="Unni CO2 Monitor"): _device_name,
+            cv.Optional(CONF_DEVICE_NAME): _device_name,
             cv.Optional(CONF_IDENTITY_MODE, default="device_derived"): cv.one_of(
                 "legacy_fixed", "device_derived", lower=True
             ),

@@ -614,21 +614,41 @@ void commit_sample(bool new_run) {
              static_cast<unsigned>(history.count),
              sample_epoch_s != 0 ? " with wall-clock anchor" : " without wall-clock anchor");
   } else {
-    if (history.run_count < HISTORY_CAPACITY) ++history.run_count;
-    if (history.run_anchor_epoch_s == 0 && sample_epoch_s != 0) {
+    const bool run_window_full = history.run_count >= HISTORY_CAPACITY;
+    if (!run_window_full) ++history.run_count;
+
+    if (run_window_full && history.run_anchor_epoch_s != 0) {
+      // The oldest sample in the visible 4096-sample run was just evicted.
+      // Move the sparse anchor with the ring. Prefer the current wall clock so
+      // fractional-millisecond intervals cannot accumulate rounding drift.
+      const uint32_t rebased = sample_epoch_s != 0
+                                   ? sensirion_history_format::run_anchor_for_latest_epoch_s(
+                                         sample_epoch_s, history.run_count, history.interval_ms)
+                                   : sensirion_history_format::advance_run_anchor_epoch_s(
+                                         history.run_anchor_epoch_s, history.interval_ms);
+      if (rebased != 0 && rebased != history.run_anchor_epoch_s) {
+        history.run_anchor_epoch_s = rebased;
+        flash.metadata_dirty = true;
+      }
+    } else if (history.run_anchor_epoch_s == 0 && sample_epoch_s != 0) {
       // Time became valid after the run started. Cadence is still known from
-      // uptime, so reconstruct the run's first-sample anchor once.
-      const uint64_t prior_ms = static_cast<uint64_t>(history.run_count - 1U) * history.interval_ms;
-      const uint32_t prior_s = static_cast<uint32_t>(prior_ms / 1000ULL);
-      if (sample_epoch_s >= prior_s) {
-        history.run_anchor_epoch_s = sample_epoch_s - prior_s;
+      // uptime, so reconstruct the run's first retained-sample anchor once.
+      const uint32_t reconstructed = sensirion_history_format::run_anchor_for_latest_epoch_s(
+          sample_epoch_s, history.run_count, history.interval_ms);
+      if (reconstructed != 0) {
+        history.run_anchor_epoch_s = reconstructed;
         flash.metadata_dirty = true;
         ESP_LOGI(TAG, "history wall-clock acquired; anchored current %u-sample run",
                  static_cast<unsigned>(history.run_count));
       }
     }
   }
-  history.last_sample_epoch_s = sample_epoch_s;
+  if (sample_epoch_s != 0)
+    history.last_sample_epoch_s = sample_epoch_s;
+  else if (!new_run && history.last_sample_epoch_s != 0)
+    history.last_sample_epoch_s += history.interval_ms / 1000U;
+  else
+    history.last_sample_epoch_s = 0;
   history.force_new_run_on_next_sample = false;
   history.run_relative_age_valid = true;
   history.latest_ms = sample_now_ms;
@@ -721,10 +741,15 @@ uint32_t current_guard_paused_ms(uint32_t now) {
 
 void abort_download(const char *reason, uint32_t now) {
   ESP_LOGW(TAG,
-           "history download aborted after %u ms (%s); guard=%u pause(s)/%u ms; history and CCCD retained",
+           "history download aborted after %u ms (%s); guard=%u pause(s)/%u ms; "
+           "capture=%u damaged=%u min_edges=%u pre_guard=%u ms; history and CCCD retained",
            static_cast<unsigned>(now - download.started_ms), reason,
            static_cast<unsigned>(download.guard_pauses),
-           static_cast<unsigned>(current_guard_paused_ms(now)));
+           static_cast<unsigned>(current_guard_paused_ms(now)),
+           static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_capture_count() : 0U),
+           static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_damaged_capture_count() : 0U),
+           static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_min_raw_edges() : 0U),
+           static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_pre_guard_ms() : 0U));
   reset_download();
 }
 
@@ -762,7 +787,7 @@ void download_tick(HistoryTransferGuard *transfer_guard) {
   }
   if (download_guard_blocked(transfer_guard, now))
     return;
-  if (download.last_packet_ms != 0 && now - download.last_packet_ms < 4)
+  if (download.last_packet_ms != 0 && now - download.last_packet_ms < sensirion_history_guard::DOWNLOAD_PACKET_INTERVAL_MS)
     return;
 
   auto &packet = gatt.download->get_value();
@@ -779,9 +804,15 @@ void download_tick(HistoryTransferGuard *transfer_guard) {
     download.last_progress_ms = now;
     download.sequence = 1;
     if (download.count == 0) {
-      ESP_LOGI(TAG, "history download complete (0 samples; guard=%u pause(s)/%u ms)",
+      ESP_LOGI(TAG,
+               "history download complete (0 samples; guard=%u pause(s)/%u ms; "
+               "capture=%u damaged=%u min_edges=%u pre_guard=%u ms)",
                static_cast<unsigned>(download.guard_pauses),
-               static_cast<unsigned>(download.guard_paused_ms));
+               static_cast<unsigned>(download.guard_paused_ms),
+               static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_capture_count() : 0U),
+               static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_damaged_capture_count() : 0U),
+               static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_min_raw_edges() : 0U),
+               static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_pre_guard_ms() : 0U));
       reset_download();
     } else {
       download.phase = DownloadPhase::DATA;
@@ -811,10 +842,15 @@ void download_tick(HistoryTransferGuard *transfer_guard) {
 
   if (download.sent >= download.count) {
     ESP_LOGI(TAG,
-             "history download complete: %u sample(s), %u data packet(s), guard=%u pause(s)/%u ms",
+             "history download complete: %u sample(s), %u data packet(s), guard=%u pause(s)/%u ms; "
+             "capture=%u damaged=%u min_edges=%u pre_guard=%u ms",
              static_cast<unsigned>(download.count), static_cast<unsigned>(download.sequence - 1),
              static_cast<unsigned>(download.guard_pauses),
-             static_cast<unsigned>(download.guard_paused_ms));
+             static_cast<unsigned>(download.guard_paused_ms),
+             static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_capture_count() : 0U),
+             static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_damaged_capture_count() : 0U),
+             static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_min_raw_edges() : 0U),
+             static_cast<unsigned>(active_transfer_guard != nullptr ? active_transfer_guard->diagnostic_pre_guard_ms() : 0U));
     reset_download();
   }
 }

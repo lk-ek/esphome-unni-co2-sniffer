@@ -310,6 +310,28 @@ bool CO2Monitor0601::run_portable_self_test_() {
     return false;
   }
 
+  // A continuous run may outlive the 4096-sample ring. The sparse wall-clock
+  // anchor must then move with every eviction so a reboot cannot make the
+  // retained window appear progressively older.
+  constexpr uint16_t history_capacity = 4096U;
+  constexpr uint32_t history_interval_ms = 60000U;
+  uint32_t newest_epoch_s = 1700000000UL +
+      static_cast<uint32_t>(history_capacity - 1U) * (history_interval_ms / 1000U);
+  uint32_t full_run_anchor_s = sensirion_history_format::run_anchor_for_latest_epoch_s(
+      newest_epoch_s, history_capacity, history_interval_ms);
+  for (uint16_t overwrite = 0; overwrite < 100U; ++overwrite) {
+    newest_epoch_s += history_interval_ms / 1000U;
+    full_run_anchor_s = sensirion_history_format::run_anchor_for_latest_epoch_s(
+        newest_epoch_s, history_capacity, history_interval_ms);
+  }
+  if (sensirion_history_format::run_latest_epoch_s(
+          full_run_anchor_s, history_capacity, history_interval_ms) != newest_epoch_s ||
+      sensirion_history_format::advance_run_anchor_epoch_s(1700000000UL, 60000U) !=
+          1700000060UL) {
+    ESP_LOGE(TAG, "portable self-test: full history ring sparse-time anchor drifted after eviction");
+    return false;
+  }
+
   UnniHistoryTransferGuard history_guard{};
   constexpr uint64_t anchor_us = 1000000ULL;
   history_guard.note_co2_frame(anchor_us);
@@ -393,6 +415,65 @@ bool CO2Monitor0601::run_portable_self_test_() {
     ESP_LOGE(TAG, "portable self-test: RT/RH history guard boundaries failed");
     return false;
   }
+
+  // Stress the portable scheduler with a full MyAmbience-sized history. A
+  // 4096-sample transfer is one header plus 2048 two-sample notifications.
+  // Simulate 1 ms loop ticks and a normal 6 s CO2 cadence; the transfer must
+  // retain progress across the predictive guard and remain far inside both
+  // watchdog limits. This does not emulate BLE radio/flash latency.
+  if (sensirion_history_guard::download_data_packet_count(history_capacity) != 2048U ||
+      sensirion_history_guard::download_notification_count(history_capacity) != 2049U) {
+    ESP_LOGE(TAG, "portable self-test: 4096-sample history packet count failed");
+    return false;
+  }
+  UnniHistoryTransferGuard full_download_guard{};
+  full_download_guard.set_download_active(true);
+  constexpr uint64_t stress_anchor_us = 1000000ULL;
+  full_download_guard.note_co2_frame(stress_anchor_us);
+  uint32_t notifications = 0;
+  uint32_t last_notification_ms = 0;
+  uint32_t max_no_progress_ms = 0;
+  uint32_t blocked_ms = 0;
+  uint64_t next_co2_us = stress_anchor_us + 6000000ULL;
+  const uint32_t target_notifications =
+      sensirion_history_guard::download_notification_count(history_capacity);
+  uint32_t elapsed_ms = 0;
+  for (; elapsed_ms < sensirion_history_guard::DOWNLOAD_MAX_MS &&
+         notifications < target_notifications; ++elapsed_ms) {
+    const uint64_t now_us = stress_anchor_us + 100000ULL +
+                            static_cast<uint64_t>(elapsed_ms) * 1000ULL;
+    if (now_us >= next_co2_us) {
+      full_download_guard.note_co2_frame(next_co2_us);
+      next_co2_us += 6000000ULL;
+    }
+    if (full_download_guard.blocked(now_us)) {
+      ++blocked_ms;
+      continue;
+    }
+    const uint32_t since_progress = elapsed_ms - last_notification_ms;
+    if (since_progress > max_no_progress_ms) max_no_progress_ms = since_progress;
+    if (notifications == 0 ||
+        since_progress >= sensirion_history_guard::DOWNLOAD_PACKET_INTERVAL_MS) {
+      ++notifications;
+      last_notification_ms = elapsed_ms;
+    }
+  }
+  full_download_guard.set_download_active(false);
+  if (notifications != target_notifications || blocked_ms == 0 ||
+      elapsed_ms >= sensirion_history_guard::DOWNLOAD_MAX_MS ||
+      max_no_progress_ms >= sensirion_history_guard::DOWNLOAD_NO_PROGRESS_MS) {
+    ESP_LOGE(TAG,
+             "portable self-test: 4096-sample guarded download stress failed "
+             "(notifications=%u blocked=%u ms elapsed=%u ms max_stall=%u ms)",
+             static_cast<unsigned>(notifications), static_cast<unsigned>(blocked_ms),
+             static_cast<unsigned>(elapsed_ms), static_cast<unsigned>(max_no_progress_ms));
+    return false;
+  }
+  ESP_LOGI(TAG,
+           "portable self-test: 4096-sample guarded download: %u notifications, "
+           "%u ms blocked, %u ms simulated total, %u ms max stall",
+           static_cast<unsigned>(notifications), static_cast<unsigned>(blocked_ms),
+           static_cast<unsigned>(elapsed_ms), static_cast<unsigned>(max_no_progress_ms));
 
   constexpr uint32_t timeout_start = UINT32_MAX - 1000U;
   if (!sensirion_history_guard::download_total_timeout(

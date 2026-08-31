@@ -14,6 +14,13 @@ class HistoryTransferGuard {
   virtual ~HistoryTransferGuard() = default;
   virtual bool blocked(uint64_t now_us) = 0;
   virtual void set_download_active(bool active) { (void) active; }
+
+  // Optional producer diagnostics included in transfer-completion logs. They
+  // deliberately do not affect the generic scheduler or wire protocol.
+  virtual uint32_t diagnostic_capture_count() const { return 0; }
+  virtual uint32_t diagnostic_damaged_capture_count() const { return 0; }
+  virtual uint16_t diagnostic_min_raw_edges() const { return 0; }
+  virtual uint32_t diagnostic_pre_guard_ms() const { return 0; }
 };
 
 }  // namespace esphome::co2_monitor_0601

@@ -21,8 +21,13 @@ class UnniHistoryTransferGuard : public HistoryTransferGuard {
   }
   bool note_co2_capture(uint16_t raw_scl_edges, bool frame_error) {
     if (!this->download_active_) return false;
+    const bool damaged = raw_scl_edges < 130U || frame_error;
+    ++this->download_capture_count_;
+    if (damaged) ++this->download_damaged_capture_count_;
+    if (this->download_capture_count_ == 1U || raw_scl_edges < this->download_min_raw_edges_)
+      this->download_min_raw_edges_ = raw_scl_edges;
     const uint64_t previous = this->pre_guard_us();
-    this->note_capture_quality_(raw_scl_edges < 130U || frame_error);
+    this->note_capture_quality_(damaged);
     return previous != this->pre_guard_us();
   }
   void set_capture_mask(uint8_t mask, uint64_t now_us) { this->set_capture_mask_(mask, now_us); }
@@ -52,8 +57,22 @@ class UnniHistoryTransferGuard : public HistoryTransferGuard {
   }
 
   void set_download_active(bool active) override {
+    if (active && !this->download_active_) {
+      this->download_capture_count_ = 0;
+      this->download_damaged_capture_count_ = 0;
+      this->download_min_raw_edges_ = 0;
+    }
     this->download_active_ = active;
     if (!active) this->clean_capture_streak_ = 0;
+  }
+
+  uint32_t diagnostic_capture_count() const override { return this->download_capture_count_; }
+  uint32_t diagnostic_damaged_capture_count() const override {
+    return this->download_damaged_capture_count_;
+  }
+  uint16_t diagnostic_min_raw_edges() const override { return this->download_min_raw_edges_; }
+  uint32_t diagnostic_pre_guard_ms() const override {
+    return static_cast<uint32_t>(this->pre_guard_us() / 1000ULL);
   }
 
  protected:
@@ -150,6 +169,9 @@ class UnniHistoryTransferGuard : public HistoryTransferGuard {
   uint8_t capture_mask_{0};
   uint8_t clean_capture_streak_{0};
   bool download_active_{false};
+  uint32_t download_capture_count_{0};
+  uint32_t download_damaged_capture_count_{0};
+  uint16_t download_min_raw_edges_{0};
 };
 
 }  // namespace esphome::co2_monitor_0601

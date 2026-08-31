@@ -661,7 +661,7 @@ co2_monitor_0601:
   sensirion_bridge_id: unni_sensirion_bridge
 ```
 
-`device_name` defaults to `Unni CO2 Monitor` and is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option. The old `ble_device_name` key remains on the Unni compatibility surface.
+`device_name` defaults to `Unni CO2 Monitor` for the `trh_co2` profile and to `SHT43 DB` for the `sht43_trh` profile. It is limited to 31 bytes to match the Sensirion `AlternativeDeviceName` characteristic. It sets the normal Device Information model name and the default `AlternativeDeviceName`. A name explicitly changed through the Device Settings service remains persistent. The compatibility-sensitive GAP/local identity remains `S` and is intentionally not changed by this option. The old `ble_device_name` key remains on the Unni compatibility surface.
 
 Bridge `identity_mode` defaults to `device_derived` and therefore needs no YAML
 configuration. It derives a stable, locally administered Bluetooth address and
@@ -713,7 +713,7 @@ MyAmbience can download the history through the compatible GATT protocol.
 
 The history ring is persistent across normal reboots.
 
-The 4096-sample history is flash-backed. Only a small pending write ring is kept in RAM, so enabling MyAmbience history does not require a second 32 KiB in-memory copy of the persistent sample store.
+The 4096-sample history is flash-backed. Only a small pending write ring is kept in RAM, so enabling MyAmbience history does not require a second 32 KiB in-memory copy of the persistent sample store. When a continuous run exceeds 4096 samples, the sparse time anchor advances with each ring eviction; restored history therefore still timestamps the retained 4096-sample window rather than the already-overwritten beginning of the run.
 
 History metadata uses a redundant version-4 A/B journal in the first and last
 sectors of the 64 KiB partition; the 14 data sectors and 8-byte sample wire
@@ -749,7 +749,11 @@ seconds without queueing a notification.
 The 800 ms lead is adaptive only while a download is active. A raw CO2 capture
 with fewer than 130 SCL transitions or any frame error adds 250 ms, capped at
 500 ms extra. Every three consecutive clean captures remove 50 ms until the
-800 ms baseline is restored. RMT-SCL assist remains the permanent recovery
+800 ms baseline is restored. Completion and abort logs include guard pause count/time,
+CO2 captures observed during the transfer, damaged-capture count, minimum raw
+edge count, and the final adaptive pre-guard. This makes a real 4096-sample
+MyAmbience field download directly auditable without enabling high-rate debug
+transport. RMT-SCL assist remains the permanent recovery
 layer for occasional missed GPIO edges both inside and outside history traffic.
 The standalone room-sensor bridge supplies no Unni guard; its history transport still retains
 the generic connection/cursor behavior and the 120-second/15-second watchdogs.
@@ -1126,10 +1130,17 @@ binary directly, and waits for the portable component self-test to pass:
 ```sh
 python3 -m pip install -r requirements-test.txt
 python3 tests/host/run_host_tests.py
+
+# Full supported ESPHome matrix (currently 2026.8.1 and 2026.8.2):
+python3 tests/host/run_version_matrix.py
 ```
 
 The host shim exercises the real component schema/code-generation surface, CO₂
-decoder/CRC logic, calibration functions and entity wiring. ESP32-specific GPIO,
+decoder/CRC logic, calibration functions and entity wiring. It also stress-tests
+a complete 4096-sample history schedule (2049 notifications: one header plus
+2048 two-sample data packets) across the predictive Unni capture guard and
+verifies sparse-anchor rebasing after the history ring begins overwriting old
+samples. ESP32-specific GPIO,
 ISR timing, ADC, Light-Sleep/PM, BLE radio/GATT and flash behavior are explicitly
 out of scope and still require hardware testing. See `tests/host/README.md`.
 
