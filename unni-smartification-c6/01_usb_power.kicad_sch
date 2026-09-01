@@ -1894,7 +1894,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Regulator_Switching:TPS613221ADBZ"
+		(symbol "Regulator_Switching:TPS613222ADBV"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -1911,7 +1911,7 @@
 					(justify left)
 				)
 			)
-			(property "Value" "TPS613221ADBZ"
+			(property "Value" "TPS613222ADBV"
 				(at 2.54 6.35 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -1921,7 +1921,7 @@
 					)
 				)
 			)
-			(property "Footprint" "Package_TO_SOT_SMD:SOT-23"
+			(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
 				(at 0 -20.32 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -1943,7 +1943,7 @@
 					)
 				)
 			)
-			(property "Description" "1.2A Step-Up Converter, 3.3V Output Voltage, 0.9-5.5V Input Voltage, SOT-23"
+			(property "Description" "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23-5"
 				(at 0 0 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -1976,7 +1976,7 @@
 					)
 				)
 			)
-			(symbol "TPS613221ADBZ_0_1"
+			(symbol "TPS613222ADBV_0_1"
 				(rectangle
 					(start -7.62 5.08)
 					(end 7.62 -5.08)
@@ -1989,25 +1989,7 @@
 					)
 				)
 			)
-			(symbol "TPS613221ADBZ_1_1"
-				(pin power_out line
-					(at 10.16 2.54 180)
-					(length 2.54)
-					(name "VOUT"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
+			(symbol "TPS613222ADBV_1_1"
 				(pin power_in line
 					(at -10.16 2.54 0)
 					(length 2.54)
@@ -2018,7 +2000,7 @@
 							)
 						)
 					)
-					(number "2"
+					(number "1"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2036,7 +2018,63 @@
 							)
 						)
 					)
+					(number "2"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin no_connect line
+					(at -7.62 -2.54 0)
+					(length 2.54)
+					(hide yes)
+					(name "NC"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
 					(number "3"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin power_out line
+					(at 10.16 2.54 180)
+					(length 2.54)
+					(name "VOUT"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "4"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin no_connect line
+					(at 7.62 -2.54 180)
+					(length 2.54)
+					(hide yes)
+					(name "NC"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "5"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -5650,7 +5688,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Regulator_Switching:TPS613221ADBZ")
+		(lib_id "Regulator_Switching:TPS613222ADBV")
 		(at 133.35 176.53 0)
 		(unit 1)
 		(body_style 1)
@@ -5671,46 +5709,46 @@
 				)
 			)
 		)
-		(property "Value" "TPS613222A"
+		(property "Value" "TPS613222ADBV"
 			(at 133.35 168.91 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 			)
 		)
-		(property "Footprint" "Package_TO_SOT_SMD:SOT-23_Handsoldering"
+		(property "Footprint" "Package_TO_SOT_SMD:SOT-23-5"
+			(at 133.35 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" "http://www.ti.com/lit/ds/symlink/tps61322.pdf"
+			(at 133.35 180.34 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "1.8A Step-Up Converter, 5V Output Voltage, 0.9-5.5V Input Voltage, SOT-23-5"
 			(at 133.35 176.53 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps61322.pdf"
-			(at 133.35 176.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 133.35 176.53 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1 1)
+					(size 1.27 1.27)
 				)
 			)
 		)
@@ -5799,6 +5837,12 @@
 		)
 		(pin "3"
 			(uuid "9a426988-1a13-4b9c-bc00-a8602d242015")
+		)
+		(pin "4"
+			(uuid "a16facd2-c515-4585-9253-dd53e7a3b5be")
+		)
+		(pin "5"
+			(uuid "a089f2d1-c7f6-494c-8a0a-b2bd2afd2268")
 		)
 		(instances
 			(project "unni-smartification-c6"
@@ -9104,6 +9148,28 @@
 			)
 		)
 	)
+	(group "5V Boost TPS613222ADBZ"
+		(uuid "7a10a620-9f61-44f1-b32c-2b571210db2c")
+		(lib_id "Library:5V Boost TPS613222ADBZ")
+		(members "01083c63-ba25-48c9-b27b-caf93458f60c" "04c9d2d5-f6e0-457d-b9be-a52cb7061d7d"
+			"05126eed-77df-4554-a978-4ec69a96e79b" "0e50fb23-d8f3-4991-8067-e55211285e55"
+			"115efad9-6298-44f2-aa10-6d75fd4ff61f" "12413106-fa23-44df-8048-e91d618386cb"
+			"1493afe2-607a-4734-8e31-3f808e15ecf6" "14947983-38b7-453a-a70c-76cd76293bed"
+			"2782b409-f722-493f-817d-d19e4de81822" "2ac8d321-7c89-41e5-a576-3bbb20dec863"
+			"38b2c436-f720-4723-b82a-04b91d6fe175" "4fb8006e-102e-4671-9c77-b450670fc563"
+			"504901ea-5195-4545-97d2-df4407ae09a3" "51d7401e-9223-40c8-8cac-4c48839b2e79"
+			"538b046a-09b1-4f31-9f83-7d2ff4ecef04" "5e0443d0-ea60-416a-b7e0-c40577ad85ac"
+			"5e519403-d5e2-442b-a7b7-6a2702a99b26" "8811a838-4a51-4921-b7fe-d5a8c1f248f1"
+			"8d363c4f-8d48-4a7d-bf1a-5390f2e986e8" "9364f048-a019-4715-9b4e-02b856920780"
+			"9cb2dc49-ee52-4b21-9f79-3fa642389efb" "aa3a111e-7031-4fe6-a139-95f801208e81"
+			"ac46210f-2e14-4170-8925-16b7b04e7bc6" "acc4ef8e-a949-4554-bb17-fa6a2d11e6d1"
+			"acf80f90-2a82-40e3-bf4d-2e13f0e6eb89" "b6431ef4-80eb-46aa-8cc8-419584bbc460"
+			"c329f727-e446-486f-90e4-c2f2e63b8b46" "c47244fc-cc71-41bf-8938-1b75fb7e414f"
+			"ce398a50-4c81-4c08-8619-b4b77ecd2f8c" "d2b9675a-f727-45bc-aefc-fee8eb43deff"
+			"e72f689f-73b0-4a0c-a0bc-7f7d403a89ad" "f2a256d2-afe4-4e30-ada0-56618362332c"
+			"fbdb7a1d-dd4e-46cf-8e39-5485571848cb"
+		)
+	)
 	(group "USB-PD-5V-ESD"
 		(uuid "a5091146-98ec-482c-8991-4bc60f843d4d")
 		(lib_id "Library:USB-PD-5V-ESD")
@@ -9140,23 +9206,6 @@
 	(group "5V Boost TPS613222ADBZ"
 		(uuid "c44b4233-c108-4744-be82-25c11153165b")
 		(lib_id "Library:5V Boost TPS613222ADBZ")
-		(members "01083c63-ba25-48c9-b27b-caf93458f60c" "04c9d2d5-f6e0-457d-b9be-a52cb7061d7d"
-			"05126eed-77df-4554-a978-4ec69a96e79b" "0e50fb23-d8f3-4991-8067-e55211285e55"
-			"115efad9-6298-44f2-aa10-6d75fd4ff61f" "12413106-fa23-44df-8048-e91d618386cb"
-			"1493afe2-607a-4734-8e31-3f808e15ecf6" "14947983-38b7-453a-a70c-76cd76293bed"
-			"2782b409-f722-493f-817d-d19e4de81822" "2ac8d321-7c89-41e5-a576-3bbb20dec863"
-			"38b2c436-f720-4723-b82a-04b91d6fe175" "4fb8006e-102e-4671-9c77-b450670fc563"
-			"504901ea-5195-4545-97d2-df4407ae09a3" "51d7401e-9223-40c8-8cac-4c48839b2e79"
-			"538b046a-09b1-4f31-9f83-7d2ff4ecef04" "5e0443d0-ea60-416a-b7e0-c40577ad85ac"
-			"5e519403-d5e2-442b-a7b7-6a2702a99b26" "8811a838-4a51-4921-b7fe-d5a8c1f248f1"
-			"8d363c4f-8d48-4a7d-bf1a-5390f2e986e8" "9364f048-a019-4715-9b4e-02b856920780"
-			"9cb2dc49-ee52-4b21-9f79-3fa642389efb" "aa3a111e-7031-4fe6-a139-95f801208e81"
-			"ac46210f-2e14-4170-8925-16b7b04e7bc6" "acc4ef8e-a949-4554-bb17-fa6a2d11e6d1"
-			"acf80f90-2a82-40e3-bf4d-2e13f0e6eb89" "b6431ef4-80eb-46aa-8cc8-419584bbc460"
-			"c329f727-e446-486f-90e4-c2f2e63b8b46" "c47244fc-cc71-41bf-8938-1b75fb7e414f"
-			"ce398a50-4c81-4c08-8619-b4b77ecd2f8c" "d2b9675a-f727-45bc-aefc-fee8eb43deff"
-			"e72f689f-73b0-4a0c-a0bc-7f7d403a89ad" "f2a256d2-afe4-4e30-ada0-56618362332c"
-			"fbdb7a1d-dd4e-46cf-8e39-5485571848cb"
-		)
+		(members "7a10a620-9f61-44f1-b32c-2b571210db2c")
 	)
 )
